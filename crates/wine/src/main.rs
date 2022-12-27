@@ -53,6 +53,12 @@ impl Rgb {
             b: grey,
         }
     }
+
+    pub fn mul(&mut self, by: u8) {
+        self.r *= (by / 255);
+        self.g *= (by / 255);
+        self.b *= (by / 255);
+    }
 }
 
 impl From<Rgb> for u32 {
@@ -125,81 +131,18 @@ fn main() {
     fonts.insert(recursive);
     fonts.insert(fira);
 
-    let context = Context::new(fonts);
+    let mut context = Context::new(fonts);
 
-    struct FontStuff {
-        shape_context: ShapeContext,
-        scale_context: ScaleContext,
-    }
+    const SIZE: f32 = 120.;
 
-    impl FontStuff {
-        fn do_stuff(
-            &mut self,
-            font: FontRef,
-            size: f32,
-            str: &str,
-            mono: f32,
-            wght: f32,
-            slnt: f32,
-            casl: f32,
-            crsv: bool,
-        ) -> Vec<(Glyph, Image)> {
-            let mut shaper = self
-                .shape_context
-                .builder(font)
-                .size(size)
-                .features([("dlig", 1), ("calt", 1)])
-                .variations([
-                    ("MONO", mono),
-                    ("wght", wght),
-                    ("slnt", slnt),
-                    ("CASL", casl),
-                    ("CRSV", if crsv { 1. } else { 0. }),
-                ])
-                .build();
-            let mut scaler = self
-                .scale_context
-                .builder(font)
-                .hint(false)
-                .size(size)
-                .variations([
-                    ("MONO", mono),
-                    ("wght", wght),
-                    ("slnt", slnt),
-                    ("CASL", casl),
-                    ("CRSV", if crsv { 1. } else { 0. }),
-                ])
-                .build();
-            let render = Render::new(&[
-                Source::ColorOutline(0),
-                Source::ColorBitmap(StrikeWith::BestFit),
-                Source::Outline,
-                Source::Bitmap(StrikeWith::BestFit),
-            ]);
-
-            dbg!(scaler.has_bitmaps());
-            dbg!(scaler.has_outlines());
-            dbg!(scaler.has_color_bitmaps());
-            dbg!(scaler.has_color_outlines());
-
-            shaper.add_str(str);
-
-            let mut scaleds: Vec<(Glyph, Image)> = vec![];
-
-            shaper.shape_with(|cluster| {
-                for glyph in cluster.glyphs {
-                    scaleds.push((*glyph, render.render(&mut scaler, glyph.id).unwrap()));
-                }
-            });
-
-            scaleds
-        }
-    }
-
-    let mut font_stuff = FontStuff {
-        shape_context: ShapeContext::new(),
-        scale_context: ScaleContext::new(),
-    };
+    // let str = include_str!("./main.rs");
+    // let lines = str.lines().skip(10).take(20);
+    let line = Line::from_iter(
+        &mut context,
+        [(Rgb::RED, "Hello -"), (Rgb::GREEN, ">, world ->")],
+        fira_key,
+        SIZE,
+    );
 
     let now = Instant::now();
     event_loop.run(move |event, _, control_flow| {
@@ -207,9 +150,12 @@ fn main() {
 
         match event {
             Event::RedrawRequested(window_id) if window_id == graphics_context.window().id() => {
-                if now.elapsed() < Duration::from_secs(1) {
+                if now.elapsed() < Duration::from_millis(500) {
                     return;
                 }
+
+                const X: usize = 100;
+                const Y: usize = 100;
 
                 let size = graphics_context.window().inner_size();
                 let (width, height) = (size.width as usize, size.height as usize);
@@ -218,62 +164,44 @@ fn main() {
 
                 let color = |grey| u32::from(Rgb::grey(grey));
 
-                const X: usize = 100;
-                const Y: usize = 100;
+                let render = Render::new(&[
+                    Source::ColorOutline(0),
+                    Source::ColorBitmap(StrikeWith::BestFit),
+                    Source::Outline,
+                    Source::Bitmap(StrikeWith::BestFit),
+                ]);
 
-                let mono = (now.elapsed().as_millis() % 1_000) as f32 / 1_000.;
-                let mono = 1.;
-                let weight = (now.elapsed().as_millis() % 1_000) as f32;
-                // let weight = 300.;
-                let slant = ((now.elapsed().as_millis() % 1_000) as f32 / 1_000.) * 15. - 15.;
-                // let slant = 0.;
-                let casual = (now.elapsed().as_millis() % 1_000) as f32 / 1_000.;
-                // let casual = 0.;
-                let cursive = (now.elapsed().as_millis() % 1_000) > 500;
-                // let cursive = false;
+                let mut scale_context = ScaleContext::default();
+                let mut scaler = scale_context
+                    .builder(context.fonts().get(fira_key).unwrap())
+                    .size(SIZE)
+                    .build();
 
-                let d = format!(
-                    "-> mono: {mono}, slant: {:02}, weight: {weight:04}, casual: {casual:05}, cursive: {cursive}",
-                    (-slant as isize) as usize,
-                );
+                let scaleds = line
+                    .glyphs()
+                    .iter()
+                    .map(|glyph| (glyph, render.render(&mut scaler, glyph.id).unwrap()));
 
-                let str = include_str!("./main.rs");
-                let lines = d.lines().chain(str.lines().skip(10).take(20));
-                // let lines = "🦀".lines();
+                let mut advance = 0;
+                for (glyph, image) in scaleds {
+                    let gw = image.placement.width as usize;
+                    let gh = image.placement.height as usize;
+                    let gt = image.placement.top as isize;
+                    let gl = image.placement.left as isize;
 
-                for (line_offset, str) in lines.enumerate() {
-                    let line = Line::from_iter(&mut self, context, iter, size);
+                    for y in 0..gh {
+                        for x in 0..gw {
+                            let mut color = glyph.color;
+                            color.mul(image.data[y * gw + x]);
 
-                    // let line_offset = line_offset * (60. * 1.5) as usize;
-                    // let scaleds = font_stuff.do_stuff(
-                    //     font.as_ref(),
-                    //     60.,
-                    //     &str,
-                    //     mono,
-                    //     weight,
-                    //     slant,
-                    //     casual,
-                    //     cursive,
-                    // );
+                            *buffer.get_mut(
+                                ((X + advance + x) as isize + gl) as usize,
+                                ((Y + y) as isize - gt) as usize,
+                            ) = color.into();
+                        }
+                    }
 
-                    // let mut advance = 0;
-                    // for (glyph, image) in &scaleds {
-                    //     let gw = image.placement.width as usize;
-                    //     let gh = image.placement.height as usize;
-                    //     let gt = image.placement.top as isize;
-                    //     let gl = image.placement.left as isize;
-
-                    //     for y in 0..gh {
-                    //         for x in 0..gw {
-                    //             *buffer.get_mut(
-                    //                 ((X + advance + x) as isize + gl) as usize,
-                    //                 ((Y + line_offset + y) as isize - gt) as usize,
-                    //             ) = color(image.data[y * gw + x]);
-                    //         }
-                    //     }
-
-                    //     advance += glyph.advance as usize;
-                    // }
+                    advance += glyph.advance as usize;
                 }
 
                 buffer.render(&mut graphics_context);

@@ -74,6 +74,10 @@ impl Context {
             scale: default(),
         }
     }
+
+    pub fn fonts(&self) -> &Fonts {
+        &self.fonts
+    }
 }
 
 pub struct Glyph {
@@ -86,16 +90,14 @@ pub struct Glyph {
 
 pub struct Line {
     glyphs: Vec<Glyph>,
+    key: CacheKey,
+    size: f32,
 }
 
 impl Line {
-    pub fn new() -> Self {
-        Self { glyphs: default() }
-    }
-
-    pub fn from_iter<'a, I>(&mut self, context: &mut Context, iter: I, size: f32)
+    pub fn from_iter<'a, I>(context: &mut Context, iter: I, key: CacheKey, size: f32) -> Self
     where
-        I: IntoIterator<Item = (CacheKey, Rgb, &'a str)>,
+        I: IntoIterator<Item = (Rgb, &'a str)>,
     {
         const SCRIPT: Script = Script::Latin;
         const FEATURES: [(&str, u16); 2] = [("dlig", 1), ("calt", 1)];
@@ -154,13 +156,14 @@ impl Line {
             });
         }
 
+        let font = context.fonts.get(key).expect("Font not found");
+        let emoji = context.fonts.emoji();
+
+        let mut glyphs = vec![];
         let mut offset = 0;
         let mut cluster = CharCluster::default();
 
-        for (key, color, str) in iter {
-            let font = context.fonts.get(key).expect("Font not found");
-            let emoji = context.fonts.emoji();
-
+        for (color, str) in iter {
             let mut font_or_emoji = FontOrEmoji::Font;
             let mut shaper = build!(context, font, size);
             let mut parser = Parser::new(SCRIPT, str.char_indices().map(token(offset)));
@@ -170,12 +173,12 @@ impl Line {
                     (FontOrEmoji::Font, FontOrEmoji::Font) => shaper,
                     (FontOrEmoji::Emoji, FontOrEmoji::Emoji) => shaper,
                     (FontOrEmoji::Font, FontOrEmoji::Emoji) => {
-                        flush(&mut self.glyphs, shaper, key, color);
+                        flush(&mut glyphs, shaper, key, color);
                         font_or_emoji = FontOrEmoji::Font;
                         build!(context, font, size)
                     }
                     (FontOrEmoji::Emoji, FontOrEmoji::Font) => {
-                        flush(&mut self.glyphs, shaper, key, color);
+                        flush(&mut glyphs, shaper, key, color);
                         font_or_emoji = FontOrEmoji::Emoji;
                         build!(context, emoji, size)
                     }
@@ -187,8 +190,14 @@ impl Line {
                 offset += range.end - range.start;
             }
 
-            flush(&mut self.glyphs, shaper, key, color);
+            flush(&mut glyphs, shaper, key, color);
         }
+
+        Self { glyphs, key, size }
+    }
+
+    pub fn glyphs(&self) -> &[Glyph] {
+        &self.glyphs
     }
 }
 
