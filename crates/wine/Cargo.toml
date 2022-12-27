@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+utils = { path = "../utils" }
 grappe = { path = "../grappe" }
 
 softbuffer = "0.1.1"

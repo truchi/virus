@@ -16,18 +16,16 @@ use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Fullscreen, Window, WindowBuilder};
 
+// const RECURSIVE: &str =
+//     "/home/romain/.local/share/fonts/Recursive/Recursive_Desktop/Recursive_VF_1.084.ttf";
 const RECURSIVE: &str =
-    "/home/romain/.local/share/fonts/Recursive/Recursive_Desktop/Recursive_VF_1.084.ttf";
+    "/home/romain/.local/share/fonts/Recursive/Recursive_Code/RecMonoDuotone/RecMonoDuotone-Regular-1.084.ttf";
 const FIRA: &str =
     "/home/romain/.local/share/fonts/FiraCodeNerdFont/Fira Code Regular Nerd Font Complete Mono.ttf";
 const EMOJI: &str = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf";
 const FONT: &str = RECURSIVE;
 
-fn default<T: Default>() -> T {
-    T::default()
-}
-
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct Rgb {
     r: u8,
     g: u8,
@@ -133,16 +131,22 @@ fn main() {
 
     let mut context = Context::new(fonts);
 
-    const SIZE: f32 = 120.;
+    const SIZE: FontSize = 20;
 
-    // let str = include_str!("./main.rs");
-    // let lines = str.lines().skip(10).take(20);
-    let line = Line::from_iter(
-        &mut context,
-        [(Rgb::RED, "Hello -"), (Rgb::GREEN, ">, world ->")],
-        fira_key,
-        SIZE,
-    );
+    let lines = include_str!("./main.rs")
+        .lines()
+        .skip(20)
+        .take(10)
+        .enumerate()
+        .map(|(i, line)| {
+            Line::from_iter(
+                &mut context,
+                [(if i % 2 == 0 { Rgb::RED } else { Rgb::GREEN }, line)],
+                recursive_key,
+                SIZE,
+            )
+        })
+        .collect::<Vec<_>>();
 
     let now = Instant::now();
     event_loop.run(move |event, _, control_flow| {
@@ -159,49 +163,36 @@ fn main() {
 
                 let size = graphics_context.window().inner_size();
                 let (width, height) = (size.width as usize, size.height as usize);
-
                 buffer.resize(width, height, Rgb::default());
 
-                let color = |grey| u32::from(Rgb::grey(grey));
+                for (i, line) in lines.iter().enumerate() {
+                    let mut advance = 0;
+                    let mut descent = i * (SIZE as f32 * 1.5) as usize;
 
-                let render = Render::new(&[
-                    Source::ColorOutline(0),
-                    Source::ColorBitmap(StrikeWith::BestFit),
-                    Source::Outline,
-                    Source::Bitmap(StrikeWith::BestFit),
-                ]);
+                    context.scale(&line, |glyph, image| {
+                        if let Some(image) = image {
+                            let gw = image.placement.width as usize;
+                            let gh = image.placement.height as usize;
+                            let gt = image.placement.top as isize;
+                            let gl = image.placement.left as isize;
 
-                let mut scale_context = ScaleContext::default();
-                let mut scaler = scale_context
-                    .builder(context.fonts().get(fira_key).unwrap())
-                    .size(SIZE)
-                    .build();
+                            for y in 0..gh {
+                                for x in 0..gw {
+                                    let mut color = glyph.color;
+                                    color.mul(image.data[y * gw + x]);
 
-                let scaleds = line
-                    .glyphs()
-                    .iter()
-                    .map(|glyph| (glyph, render.render(&mut scaler, glyph.id).unwrap()));
-
-                let mut advance = 0;
-                for (glyph, image) in scaleds {
-                    let gw = image.placement.width as usize;
-                    let gh = image.placement.height as usize;
-                    let gt = image.placement.top as isize;
-                    let gl = image.placement.left as isize;
-
-                    for y in 0..gh {
-                        for x in 0..gw {
-                            let mut color = glyph.color;
-                            color.mul(image.data[y * gw + x]);
-
-                            *buffer.get_mut(
-                                ((X + advance + x) as isize + gl) as usize,
-                                ((Y + y) as isize - gt) as usize,
-                            ) = color.into();
+                                    *buffer.get_mut(
+                                        ((X + advance + x) as isize + gl) as usize,
+                                        ((Y + descent + y) as isize - gt) as usize,
+                                    ) = color.into();
+                                }
+                            }
                         }
-                    }
 
-                    advance += glyph.advance as usize;
+                        advance += glyph.advance as usize;
+
+                        true
+                    });
                 }
 
                 buffer.render(&mut graphics_context);

@@ -1,8 +1,7 @@
+use crate::{Buffer, Rgb};
 use std::{collections::HashMap, path::Path};
-
-use crate::{default, Rgb};
 use swash::{
-    scale::ScaleContext,
+    scale::{image::Image, Render, ScaleContext, Scaler, Source, StrikeWith},
     shape::{ShapeContext, Shaper},
     text::{
         cluster::{CharCluster, Parser, SourceRange, Status, Token},
@@ -10,6 +9,9 @@ use swash::{
     },
     CacheKey, FontRef, GlyphId,
 };
+use utils::lru::Lru;
+
+pub type FontSize = u8;
 
 pub struct Fonts {
     fonts: HashMap<CacheKey, Font>,
@@ -19,7 +21,7 @@ pub struct Fonts {
 impl Fonts {
     pub fn new(emoji: Font) -> Self {
         Self {
-            fonts: default(),
+            fonts: Default::default(),
             emoji,
         }
     }
@@ -28,8 +30,12 @@ impl Fonts {
         self.fonts.insert(font.key, font);
     }
 
-    pub fn get(&self, key: CacheKey) -> Option<FontRef> {
-        Some(self.fonts.get(&key)?.as_ref())
+    pub fn get(&self, key: CacheKey) -> Option<&Font> {
+        self.fonts.get(&key)
+    }
+
+    pub fn get_mut(&mut self, key: CacheKey) -> Option<&mut Font> {
+        self.fonts.get_mut(&key)
     }
 
     pub fn emoji(&self) -> FontRef {
@@ -62,6 +68,7 @@ impl Font {
 
 pub struct Context {
     fonts: Fonts,
+    cache: Lru<(CacheKey, GlyphId, FontSize), Option<Image>>,
     shape: ShapeContext,
     scale: ScaleContext,
 }
@@ -70,16 +77,52 @@ impl Context {
     pub fn new(fonts: Fonts) -> Self {
         Self {
             fonts,
-            shape: default(),
-            scale: default(),
+            cache: Lru::new(1_024),
+            shape: Default::default(),
+            scale: Default::default(),
         }
     }
 
     pub fn fonts(&self) -> &Fonts {
         &self.fonts
     }
+
+    pub fn scale<'a, F>(&'a mut self, line: &'a Line, mut f: F)
+    where
+        F: FnMut(Glyph, Option<&Image>) -> bool,
+    {
+        const HINT: bool = false;
+        const SOURCES: &[Source] = &[
+            Source::ColorOutline(0),
+            Source::ColorBitmap(StrikeWith::BestFit),
+            Source::Outline,
+            Source::Bitmap(StrikeWith::BestFit),
+        ];
+
+        let key = line.key;
+        let size = line.size;
+        let font = self.fonts.get(key).expect("font");
+        let render = Render::new(SOURCES);
+        let scaler = &mut self
+            .scale
+            .builder(font.as_ref())
+            .size(size as f32)
+            .hint(HINT)
+            .build();
+
+        for glyph in line.glyphs() {
+            let image = self.cache.get_or_set((font.key, glyph.id, size), || {
+                render.render(scaler, glyph.id)
+            });
+
+            if !f(*glyph, image.as_ref()) {
+                return;
+            }
+        }
+    }
 }
 
+#[derive(Copy, Clone, Debug)]
 pub struct Glyph {
     pub id: GlyphId,
     pub advance: f32,
@@ -91,11 +134,11 @@ pub struct Glyph {
 pub struct Line {
     glyphs: Vec<Glyph>,
     key: CacheKey,
-    size: f32,
+    size: FontSize,
 }
 
 impl Line {
-    pub fn from_iter<'a, I>(context: &mut Context, iter: I, key: CacheKey, size: f32) -> Self
+    pub fn from_iter<'a, I>(context: &mut Context, iter: I, key: CacheKey, size: FontSize) -> Self
     where
         I: IntoIterator<Item = (Rgb, &'a str)>,
     {
@@ -124,7 +167,7 @@ impl Line {
                     .shape
                     .builder($font)
                     .script(SCRIPT)
-                    .size($size)
+                    .size($size as f32)
                     .features(FEATURES)
                     .build()
             };
@@ -156,7 +199,7 @@ impl Line {
             });
         }
 
-        let font = context.fonts.get(key).expect("Font not found");
+        let font = context.fonts.get(key).expect("Font not found").as_ref();
         let emoji = context.fonts.emoji();
 
         let mut glyphs = vec![];
@@ -200,84 +243,3 @@ impl Line {
         &self.glyphs
     }
 }
-
-// pub struct LineBuilder<'a> {
-//     context: &'a mut Context,
-//     shaper: Shaper<'a>,
-//     cluster: CharCluster,
-//     offset: u32,
-//     line: Line,
-// }
-
-// impl<'a> LineBuilder<'a> {
-//     pub fn push(&mut self, font_key: FontKey, color: Rgb, str: &str) {
-//         let font = self.context.fonts.get(font_key).expect("Font not found");
-//         let emoji = self.context.fonts.emoji();
-
-//         let mut parser = Parser::new(
-//             Context::SCRIPT,
-//             str.char_indices().map(|(i, ch)| Token {
-//                 ch,
-//                 offset: self.offset + i as u32,
-//                 len: ch.len_utf8() as u8,
-//                 info: ch.into(),
-//                 data: 0,
-//             }),
-//         );
-
-//         let select = |cluster: &mut CharCluster| match cluster.map(|ch| font.charmap().map(ch)) {
-//             Status::Discard => FontOrEmoji::Emoji,
-//             Status::Complete => FontOrEmoji::Font,
-//             Status::Keep => match cluster.map(|ch| emoji.charmap().map(ch)) {
-//                 Status::Discard => FontOrEmoji::Font,
-//                 Status::Complete => FontOrEmoji::Emoji,
-//                 Status::Keep => FontOrEmoji::Emoji,
-//             },
-//         };
-
-//         #[derive(Copy, Clone)]
-//         enum FontOrEmoji {
-//             Font,
-//             Emoji,
-//         }
-
-//         let mut offset = 0;
-//         let mut font_or_emoji = FontOrEmoji::Font;
-//         let mut shaper = self
-//             .context
-//             .shape
-//             .builder(font)
-//             .script(Context::SCRIPT)
-//             .build();
-
-//         while parser.next(&mut self.cluster) {
-//             shaper = match (select(&mut self.cluster), font_or_emoji) {
-//                 (FontOrEmoji::Font, FontOrEmoji::Font) => shaper,
-//                 (FontOrEmoji::Emoji, FontOrEmoji::Emoji) => shaper,
-//                 (FontOrEmoji::Font, FontOrEmoji::Emoji) => {
-//                     font_or_emoji = FontOrEmoji::Font;
-//                     self.context
-//                         .shape
-//                         .builder(font)
-//                         .script(Context::SCRIPT)
-//                         .build()
-//                 }
-//                 (FontOrEmoji::Emoji, FontOrEmoji::Font) => {
-//                     font_or_emoji = FontOrEmoji::Emoji;
-//                     self.context
-//                         .shape
-//                         .builder(emoji)
-//                         .script(Context::SCRIPT)
-//                         .build()
-//                 }
-//             };
-
-//             shaper.add_cluster(&self.cluster);
-
-//             let range = self.cluster.range();
-//             offset += range.end - range.start;
-//         }
-
-//         self.offset += offset;
-//     }
-// }
