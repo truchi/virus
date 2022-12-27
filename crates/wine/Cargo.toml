@@ -1,0 +1,11 @@
+[package]
+name = "wine"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+grappe = { path = "../grappe" }
+
+softbuffer = "0.1.1"
+winit = "0.27.5"
+swash = "0.1.6"
