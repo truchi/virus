@@ -93,19 +93,17 @@ fn main() {
 
     let mut context = Context::new(fonts);
 
-    const SIZE: FontSize = 120;
+    const SIZE: FontSize = 60;
 
     let file = include_str!("./main.rs");
     // let file = "./main.rs";
     let lines = file
         .lines()
-        .skip(0)
-        .take(37)
         .enumerate()
         .map(|(i, line)| {
             Line::from_iter(
                 &mut context,
-                [(if i % 2 == 0 { Rgb::RED } else { Rgb::RED }, line)],
+                [(if i % 2 == 0 { Rgb::RED } else { Rgb::GREEN }, line)],
                 // recursive_key,
                 fira_key,
                 SIZE,
@@ -118,25 +116,8 @@ fn main() {
     let mut fps = Vec::with_capacity(100);
     let mut fpsi = 0;
 
-    let image = Image {
-        source: Source::Outline,
-        content: Content::Mask,
-        placement: Placement {
-            left: 0,
-            top: 0,
-            width: 100,
-            height: 100,
-        },
-        data: {
-            let mut data = Vec::with_capacity(100 * 100);
-            for i in 0..(100 * 100) {
-                data.push((i % u8::MAX as usize) as u8);
-            }
-            data
-        },
-    };
+    let mut dy = 0;
 
-    let mut done = false;
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
 
@@ -146,12 +127,7 @@ fn main() {
                     return;
                 }
 
-                if done {
-                    return;
-                }
-
-                const X: usize = 100;
-                const Y: usize = 100;
+                let line_height = SIZE as f32 * 1.5;
 
                 if fps.len() == 100 {
                     let sum: f32 = fps.iter().sum();
@@ -167,15 +143,17 @@ fn main() {
                 let (width, height) = (size.width as usize, size.height as usize);
                 buffer.resize(width, height, Rgb::default());
 
+                dy += 10;
+                dy = dy % 10_000;
                 for (i, line) in lines.iter().enumerate() {
                     let mut advance = 0;
-                    let mut descent = i * (SIZE as f32 * 1.5) as usize;
+                    let mut descent = (i + 1) * (line_height) as usize;
 
                     context.scale(&line, |glyph, image| {
                         if let Some(image) = image {
                             buffer.draw_image_mask(
-                                (X + advance) as _,
-                                (Y + descent) as _,
+                                (advance) as _,
+                                (descent as i32 - dy as i32) as _,
                                 image,
                                 glyph.color,
                             );
@@ -187,11 +165,7 @@ fn main() {
                     });
                 }
 
-                // buffer.draw_image_mask(0, 0, &image, Rgb::GREEN);
-                buffer.draw_rect(0, 0, X as _, Y as _, Rgb::RED);
                 buffer.render(&mut graphics_context);
-
-                done = true;
             }
             Event::MainEventsCleared => {
                 graphics_context.window().request_redraw();
