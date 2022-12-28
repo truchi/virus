@@ -143,9 +143,9 @@ impl Line {
         I: IntoIterator<Item = (Rgb, &'a str)>,
     {
         const SCRIPT: Script = Script::Latin;
-        const FEATURES: [(&str, u16); 2] = [("dlig", 1), ("calt", 1)];
+        const FEATURES: &[(&str, u16)] = &[("dlig", 1), ("calt", 1)];
 
-        #[derive(Copy, Clone)]
+        #[derive(Copy, Clone, Debug)]
         enum FontOrEmoji {
             Font,
             Emoji,

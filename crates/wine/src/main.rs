@@ -1,16 +1,18 @@
 #![allow(unused)]
 
+mod buffer;
 mod line;
 
+use buffer::*;
 use line::*;
 
 use softbuffer::GraphicsContext;
 use std::time::{Duration, Instant};
-use swash::scale::image::Image;
+use swash::scale::image::{Content, Image};
 use swash::scale::{Render, ScaleContext, Source, StrikeWith};
 use swash::shape::cluster::Glyph;
 use swash::shape::ShapeContext;
-use swash::zeno::Format;
+use swash::zeno::{Format, Placement};
 use swash::{CacheKey, FontRef, GlyphId, Weight};
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -53,55 +55,15 @@ impl Rgb {
     }
 
     pub fn mul(&mut self, by: u8) {
-        self.r *= (by / 255);
-        self.g *= (by / 255);
-        self.b *= (by / 255);
+        self.r = (self.r as f32 * (by as f32 / 255.)) as u8;
+        self.g = (self.g as f32 * (by as f32 / 255.)) as u8;
+        self.b = (self.b as f32 * (by as f32 / 255.)) as u8;
     }
 }
 
 impl From<Rgb> for u32 {
     fn from(Rgb { r, g, b }: Rgb) -> Self {
         b as u32 | ((g as u32) << 8) | ((r as u32) << 16)
-    }
-}
-
-pub struct Buffer {
-    pixels: Vec<u32>,
-    width: usize,
-    height: usize,
-}
-
-impl Buffer {
-    pub fn new(width: usize, height: usize, color: Rgb) -> Self {
-        let mut pixels = Vec::with_capacity(width * height);
-        pixels.resize(width * height, color.into());
-
-        Self {
-            pixels,
-            width,
-            height,
-        }
-    }
-
-    pub fn resize(&mut self, width: usize, height: usize, color: Rgb) {
-        self.width = width;
-        self.height = height;
-        self.pixels.fill(color.into());
-        self.pixels.resize(width * height, color.into());
-    }
-
-    pub fn get_mut(&mut self, x: usize, y: usize) -> &mut u32 {
-        &mut self.pixels[y * self.width + x]
-    }
-
-    pub fn render(&self, context: &mut GraphicsContext<Window>) {
-        context.set_buffer(&self.pixels, self.width as u16, self.height as u16);
-    }
-}
-
-impl AsRef<[u32]> for Buffer {
-    fn as_ref(&self) -> &[u32] {
-        &self.pixels
     }
 }
 
@@ -131,24 +93,50 @@ fn main() {
 
     let mut context = Context::new(fonts);
 
-    const SIZE: FontSize = 20;
+    const SIZE: FontSize = 120;
 
-    let lines = include_str!("./main.rs")
+    let file = include_str!("./main.rs");
+    // let file = "./main.rs";
+    let lines = file
         .lines()
-        .skip(20)
-        .take(10)
+        .skip(0)
+        .take(37)
         .enumerate()
         .map(|(i, line)| {
             Line::from_iter(
                 &mut context,
-                [(if i % 2 == 0 { Rgb::RED } else { Rgb::GREEN }, line)],
-                recursive_key,
+                [(if i % 2 == 0 { Rgb::RED } else { Rgb::RED }, line)],
+                // recursive_key,
+                fira_key,
                 SIZE,
             )
         })
         .collect::<Vec<_>>();
 
     let now = Instant::now();
+    let mut last = now;
+    let mut fps = Vec::with_capacity(100);
+    let mut fpsi = 0;
+
+    let image = Image {
+        source: Source::Outline,
+        content: Content::Mask,
+        placement: Placement {
+            left: 0,
+            top: 0,
+            width: 100,
+            height: 100,
+        },
+        data: {
+            let mut data = Vec::with_capacity(100 * 100);
+            for i in 0..(100 * 100) {
+                data.push((i % u8::MAX as usize) as u8);
+            }
+            data
+        },
+    };
+
+    let mut done = false;
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
 
@@ -158,8 +146,22 @@ fn main() {
                     return;
                 }
 
+                if done {
+                    return;
+                }
+
                 const X: usize = 100;
                 const Y: usize = 100;
+
+                if fps.len() == 100 {
+                    let sum: f32 = fps.iter().sum();
+                    fps.clear();
+                    println!("{}", sum / 100.);
+                }
+
+                let dur = Instant::now() - last;
+                fps.push(1000. / dur.as_millis() as f32);
+                last = Instant::now();
 
                 let size = graphics_context.window().inner_size();
                 let (width, height) = (size.width as usize, size.height as usize);
@@ -171,22 +173,12 @@ fn main() {
 
                     context.scale(&line, |glyph, image| {
                         if let Some(image) = image {
-                            let gw = image.placement.width as usize;
-                            let gh = image.placement.height as usize;
-                            let gt = image.placement.top as isize;
-                            let gl = image.placement.left as isize;
-
-                            for y in 0..gh {
-                                for x in 0..gw {
-                                    let mut color = glyph.color;
-                                    color.mul(image.data[y * gw + x]);
-
-                                    *buffer.get_mut(
-                                        ((X + advance + x) as isize + gl) as usize,
-                                        ((Y + descent + y) as isize - gt) as usize,
-                                    ) = color.into();
-                                }
-                            }
+                            buffer.draw_image_mask(
+                                (X + advance) as _,
+                                (Y + descent) as _,
+                                image,
+                                glyph.color,
+                            );
                         }
 
                         advance += glyph.advance as usize;
@@ -195,7 +187,11 @@ fn main() {
                     });
                 }
 
+                // buffer.draw_image_mask(0, 0, &image, Rgb::GREEN);
+                buffer.draw_rect(0, 0, X as _, Y as _, Rgb::RED);
                 buffer.render(&mut graphics_context);
+
+                done = true;
             }
             Event::MainEventsCleared => {
                 graphics_context.window().request_redraw();
