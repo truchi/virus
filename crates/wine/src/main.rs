@@ -28,14 +28,14 @@ const FIRA: &str =
 const EMOJI: &str = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf";
 const FONT: &str = RECURSIVE;
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
 pub struct Rgb {
     r: u8,
     g: u8,
     b: u8,
 }
 
-// 🔥 🦀
+// 🔥 🦀 😍
 impl Rgb {
     pub const RED: Self = Self::new(255, 0, 0);
     pub const GREEN: Self = Self::new(0, 255, 0);
@@ -77,8 +77,7 @@ fn main() {
 
     let mut graphics_context = unsafe { GraphicsContext::new(window) }.unwrap();
     let size = graphics_context.window().inner_size();
-    let (width, height) = (size.width as usize, size.height as usize);
-    let mut buffer = Buffer::new(width, height, Rgb::default());
+    let mut buffer = Buffer::new(size.width as usize, size.height as usize, Rgb::default());
 
     let recursive = Font::from_file(RECURSIVE).unwrap();
     let fira = Font::from_file(FIRA).unwrap();
@@ -101,7 +100,7 @@ fn main() {
     const SIZE: FontSize = 60;
 
     let file = include_str!("./main.rs");
-    let file = "!!🔥 🦀?\n12345678";
+    // let file = "!!🔥 🦀😍?\n1234567890123";
     let lines = file
         .lines()
         .enumerate()
@@ -151,11 +150,10 @@ fn main() {
                 last = Instant::now();
 
                 let size = graphics_context.window().inner_size();
-                let (width, height) = (size.width as usize, size.height as usize);
-                buffer.resize(width, height, Rgb::default());
+                buffer.reset(size.width as usize, size.height as usize, Rgb::default());
 
-                // dy += 10;
-                // dy = dy % 10_000;
+                dy += 10;
+                dy = dy % 10_000;
                 for (i, line) in lines.iter().enumerate() {
                     let mut advance = 0;
                     let mut descent = (i + 1) * (line_height) as usize;
@@ -188,7 +186,7 @@ fn main() {
 
                 buffer.render(&mut graphics_context);
 
-                done = true;
+                // done = true;
             }
             Event::MainEventsCleared => {
                 graphics_context.window().request_redraw();

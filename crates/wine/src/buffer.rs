@@ -21,11 +21,26 @@ impl Buffer {
         }
     }
 
+    pub fn clear(&mut self, color: Rgb) {
+        self.pixels.fill(color.into());
+    }
+
     pub fn resize(&mut self, width: usize, height: usize, color: Rgb) {
         self.width = width;
         self.height = height;
-        self.pixels.fill(color.into());
         self.pixels.resize(width * height, color.into());
+    }
+
+    pub fn reset(&mut self, width: usize, height: usize, color: Rgb) {
+        if self.width * self.height < width * height {
+            // Going bigger, clear first
+            self.clear(color);
+            self.resize(width, height, color);
+        } else {
+            // Going smaller, clear last
+            self.resize(width, height, color);
+            self.clear(color);
+        }
     }
 
     pub fn get_mut(&mut self, x: usize, y: usize) -> &mut u32 {
@@ -41,8 +56,6 @@ impl Buffer {
         let y1 = self.clamp_y(y) as usize;
         let x2 = self.clamp_x(x + w as i32) as usize;
         let y2 = self.clamp_y(y + h as i32) as usize;
-        // let x2 = (x + w as i32).min(self.width as i32) as usize;
-        // let y2 = (y + h as i32).min(self.height as i32) as usize;
 
         for y in y1..y2 {
             self.pixels
@@ -124,6 +137,10 @@ impl Buffer {
                     g: *image_pixel.next().unwrap(),
                     b: *image_pixel.next().unwrap(),
                 };
+
+                if color == Rgb::BLACK {
+                    continue;
+                }
 
                 *buffer_pixel = color.into();
             }
