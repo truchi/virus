@@ -12,6 +12,7 @@ use swash::scale::image::{Content, Image};
 use swash::scale::{Render, ScaleContext, Source, StrikeWith};
 use swash::shape::cluster::Glyph;
 use swash::shape::ShapeContext;
+use swash::text::Script;
 use swash::zeno::{Format, Placement};
 use swash::{CacheKey, FontRef, GlyphId, Weight};
 use winit::event::{Event, WindowEvent};
@@ -87,6 +88,10 @@ fn main() {
     let fira_key = fira.key;
     let emoji_key = emoji.key;
 
+    dbg!(recursive_key);
+    dbg!(fira_key);
+    dbg!(emoji_key);
+
     let mut fonts = Fonts::new(emoji);
     fonts.insert(recursive);
     fonts.insert(fira);
@@ -96,7 +101,7 @@ fn main() {
     const SIZE: FontSize = 60;
 
     let file = include_str!("./main.rs");
-    // let file = "./main.rs";
+    let file = "🔥 🦀";
     let lines = file
         .lines()
         .enumerate()
@@ -105,7 +110,8 @@ fn main() {
                 &mut context,
                 [(if i % 2 == 0 { Rgb::RED } else { Rgb::GREEN }, line)],
                 // recursive_key,
-                fira_key,
+                // fira_key,
+                emoji_key,
                 SIZE,
             )
         })
@@ -118,12 +124,17 @@ fn main() {
 
     let mut dy = 0;
 
+    let mut done = false;
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
 
         match event {
             Event::RedrawRequested(window_id) if window_id == graphics_context.window().id() => {
                 if now.elapsed() < Duration::from_millis(500) {
+                    return;
+                }
+
+                if done {
                     return;
                 }
 
@@ -143,20 +154,32 @@ fn main() {
                 let (width, height) = (size.width as usize, size.height as usize);
                 buffer.resize(width, height, Rgb::default());
 
-                dy += 10;
-                dy = dy % 10_000;
+                // dy += 10;
+                // dy = dy % 10_000;
                 for (i, line) in lines.iter().enumerate() {
                     let mut advance = 0;
                     let mut descent = (i + 1) * (line_height) as usize;
 
                     context.scale(&line, |glyph, image| {
                         if let Some(image) = image {
-                            buffer.draw_image_mask(
-                                (advance) as _,
-                                (descent as i32 - dy as i32) as _,
-                                image,
-                                glyph.color,
-                            );
+                            dbg!(image.content);
+
+                            match image.content {
+                                Content::Mask => buffer.draw_image_mask(
+                                    (advance) as _,
+                                    (descent as i32 - dy as i32) as _,
+                                    image,
+                                    glyph.color,
+                                ),
+                                Content::SubpixelMask => todo!(),
+                                Content::Color => buffer.draw_image_color(
+                                    (advance) as _,
+                                    (descent as i32 - dy as i32) as _,
+                                    image,
+                                ),
+                            }
+                        } else {
+                            dbg!("NONE");
                         }
 
                         advance += glyph.advance as usize;
@@ -166,6 +189,8 @@ fn main() {
                 }
 
                 buffer.render(&mut graphics_context);
+
+                done = true;
             }
             Event::MainEventsCleared => {
                 graphics_context.window().request_redraw();

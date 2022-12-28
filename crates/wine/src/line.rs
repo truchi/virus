@@ -31,7 +31,11 @@ impl Fonts {
     }
 
     pub fn get(&self, key: CacheKey) -> Option<&Font> {
-        self.fonts.get(&key)
+        if key == self.emoji.key {
+            Some(&self.emoji)
+        } else {
+            self.fonts.get(&key)
+        }
     }
 
     pub fn get_mut(&mut self, key: CacheKey) -> Option<&mut Font> {
@@ -99,19 +103,24 @@ impl Context {
             Source::Bitmap(StrikeWith::BestFit),
         ];
 
-        let key = line.key;
-        let size = line.size;
-        let font = self.fonts.get(key).expect("font");
         let render = Render::new(SOURCES);
-        let scaler = &mut self
-            .scale
-            .builder(font.as_ref())
-            .size(size as f32)
-            .hint(HINT)
-            .build();
+
+        dbg!(line
+            .glyphs()
+            .iter()
+            .map(|glyph| (glyph.key.value(), glyph.id))
+            .collect::<Vec<_>>());
 
         for glyph in line.glyphs() {
-            let image = self.cache.get_or_set((font.key, glyph.id, size), || {
+            let font = self.fonts.get(glyph.key).expect("font");
+            let scaler = &mut self
+                .scale
+                .builder(font.as_ref())
+                .size(line.size as f32)
+                .hint(HINT)
+                .build();
+
+            let image = self.cache.get_or_set((glyph.key, glyph.id, line.size), || {
                 render.render(scaler, glyph.id)
             });
 
@@ -133,7 +142,6 @@ pub struct Glyph {
 
 pub struct Line {
     glyphs: Vec<Glyph>,
-    key: CacheKey,
     size: FontSize,
 }
 
@@ -142,7 +150,7 @@ impl Line {
     where
         I: IntoIterator<Item = (Rgb, &'a str)>,
     {
-        const SCRIPT: Script = Script::Latin;
+        const SCRIPT: Script = Script::Unknown;
         const FEATURES: &[(&str, u16)] = &[("dlig", 1), ("calt", 1)];
 
         #[derive(Copy, Clone, Debug)]
@@ -186,7 +194,9 @@ impl Line {
         }
 
         fn flush(glyphs: &mut Vec<Glyph>, shaper: Shaper, key: CacheKey, color: Rgb) {
+            dbg!(("FLUSH", key));
             shaper.shape_with(|cluster| {
+                dbg!(("SHAPE WITH", cluster.glyphs.len()));
                 for glyph in cluster.glyphs {
                     glyphs.push(Glyph {
                         id: glyph.id,
@@ -201,27 +211,34 @@ impl Line {
 
         let font = context.fonts.get(key).expect("Font not found").as_ref();
         let emoji = context.fonts.emoji();
+        let font_key = font.key;
+        let emoji_key = emoji.key;
 
         let mut glyphs = vec![];
         let mut offset = 0;
         let mut cluster = CharCluster::default();
 
         for (color, str) in iter {
+            let mut key = font_key;
             let mut font_or_emoji = FontOrEmoji::Font;
             let mut shaper = build!(context, font, size);
             let mut parser = Parser::new(SCRIPT, str.char_indices().map(token(offset)));
 
             while parser.next(&mut cluster) {
-                shaper = match (select(font, emoji, &mut cluster), font_or_emoji) {
+                let selected = select(font, emoji, &mut cluster);
+                dbg!((selected, font_or_emoji));
+                shaper = match (selected, font_or_emoji) {
                     (FontOrEmoji::Font, FontOrEmoji::Font) => shaper,
                     (FontOrEmoji::Emoji, FontOrEmoji::Emoji) => shaper,
                     (FontOrEmoji::Font, FontOrEmoji::Emoji) => {
                         flush(&mut glyphs, shaper, key, color);
+                        key = font_key;
                         font_or_emoji = FontOrEmoji::Font;
                         build!(context, font, size)
                     }
                     (FontOrEmoji::Emoji, FontOrEmoji::Font) => {
                         flush(&mut glyphs, shaper, key, color);
+                        key = emoji_key;
                         font_or_emoji = FontOrEmoji::Emoji;
                         build!(context, emoji, size)
                     }
@@ -236,7 +253,7 @@ impl Line {
             flush(&mut glyphs, shaper, key, color);
         }
 
-        Self { glyphs, key, size }
+        Self { glyphs, size }
     }
 
     pub fn glyphs(&self) -> &[Glyph] {

@@ -67,12 +67,8 @@ impl Buffer {
         let width = image.placement.width as i32;
         let height = image.placement.height as i32;
 
-        // self.draw_rect(x, y, width as _, height as _, Rgb::GREEN);
-
         let x = x + left;
         let y = y - top;
-
-        // self.draw_rect(x, y, width as _, height as _, Rgb::BLUE);
 
         let x1 = self.clamp_x(x);
         let y1 = self.clamp_y(y);
@@ -105,8 +101,41 @@ impl Buffer {
         }
     }
 
-    fn draw_image_color(&mut self, x: i32, y: i32, image: Image) {
+    pub fn draw_image_color(&mut self, x: i32, y: i32, image: &Image) {
         debug_assert!(image.content == Content::Color);
+        let top = image.placement.top;
+        let left = image.placement.left;
+        let width = image.placement.width as i32;
+        let height = image.placement.height as i32;
+
+        let x = x + left;
+        let y = y - top;
+
+        let x1 = self.clamp_x(x);
+        let y1 = self.clamp_y(y);
+        let x2 = self.clamp_x(x + width);
+        let y2 = self.clamp_y(y + height);
+
+        for j in y1..y2 {
+            for i in x1..x2 {
+                let buffer_pixel = self
+                    .pixels
+                    .get_mut(i as usize + j as usize * self.width)
+                    .unwrap();
+
+                let i = i - x;
+                let j = j - y;
+                let index = i as usize + j as usize * width as usize;
+                let mut image_pixel = image.data.get(index * 4..(index + 1) * 4).unwrap().iter();
+                let color = Rgb {
+                    r: *image_pixel.next().unwrap(),
+                    g: *image_pixel.next().unwrap(),
+                    b: *image_pixel.next().unwrap(),
+                };
+
+                *buffer_pixel = color.into();
+            }
+        }
     }
 
     fn clamp_x(&self, x: i32) -> i32 {
