@@ -52,14 +52,6 @@ impl Buffer {
         }
     }
 
-    // pub fn draw_image(&mut self, x: i32, y: i32, image: Image) {
-    //     match image.content {
-    //         Content::SubpixelMask => unreachable!(),
-    //         Content::Mask => self.draw_image_mask(x, y, image),
-    //         Content::Color => self.draw_image_color(x, y, image),
-    //     }
-    // }
-
     pub fn draw_image_mask(&mut self, x: i32, y: i32, image: &Image, color: Rgb) {
         debug_assert!(image.content == Content::Mask);
         let top = image.placement.top;

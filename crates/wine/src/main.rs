@@ -101,7 +101,7 @@ fn main() {
     const SIZE: FontSize = 60;
 
     let file = include_str!("./main.rs");
-    let file = "🔥 🦀";
+    let file = "!!🔥 🦀?\n12345678";
     let lines = file
         .lines()
         .enumerate()
@@ -110,8 +110,8 @@ fn main() {
                 &mut context,
                 [(if i % 2 == 0 { Rgb::RED } else { Rgb::GREEN }, line)],
                 // recursive_key,
-                // fira_key,
-                emoji_key,
+                fira_key,
+                // emoji_key,
                 SIZE,
             )
         })
@@ -162,8 +162,6 @@ fn main() {
 
                     context.scale(&line, |glyph, image| {
                         if let Some(image) = image {
-                            dbg!(image.content);
-
                             match image.content {
                                 Content::Mask => buffer.draw_image_mask(
                                     (advance) as _,

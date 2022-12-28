@@ -95,7 +95,7 @@ impl Context {
     where
         F: FnMut(Glyph, Option<&Image>) -> bool,
     {
-        const HINT: bool = false;
+        const HINT: bool = true;
         const SOURCES: &[Source] = &[
             Source::ColorOutline(0),
             Source::ColorBitmap(StrikeWith::BestFit),
@@ -104,12 +104,6 @@ impl Context {
         ];
 
         let render = Render::new(SOURCES);
-
-        dbg!(line
-            .glyphs()
-            .iter()
-            .map(|glyph| (glyph.key.value(), glyph.id))
-            .collect::<Vec<_>>());
 
         for glyph in line.glyphs() {
             let font = self.fonts.get(glyph.key).expect("font");
@@ -183,10 +177,18 @@ impl Line {
 
         fn select(font: FontRef, emoji: FontRef, cluster: &mut CharCluster) -> FontOrEmoji {
             match cluster.map(|ch| font.charmap().map(ch)) {
-                Status::Discard => FontOrEmoji::Emoji,
+                Status::Discard => {
+                    // Making sure to map cluster with correct font
+                    cluster.map(|ch| emoji.charmap().map(ch));
+                    FontOrEmoji::Emoji
+                }
                 Status::Complete => FontOrEmoji::Font,
                 Status::Keep => match cluster.map(|ch| emoji.charmap().map(ch)) {
-                    Status::Discard => FontOrEmoji::Font,
+                    Status::Discard => {
+                        // Making sure to map cluster with correct font
+                        cluster.map(|ch| font.charmap().map(ch));
+                        FontOrEmoji::Font
+                    }
                     Status::Complete => FontOrEmoji::Emoji,
                     Status::Keep => FontOrEmoji::Emoji,
                 },
@@ -194,9 +196,7 @@ impl Line {
         }
 
         fn flush(glyphs: &mut Vec<Glyph>, shaper: Shaper, key: CacheKey, color: Rgb) {
-            dbg!(("FLUSH", key));
             shaper.shape_with(|cluster| {
-                dbg!(("SHAPE WITH", cluster.glyphs.len()));
                 for glyph in cluster.glyphs {
                     glyphs.push(Glyph {
                         id: glyph.id,
@@ -225,9 +225,7 @@ impl Line {
             let mut parser = Parser::new(SCRIPT, str.char_indices().map(token(offset)));
 
             while parser.next(&mut cluster) {
-                let selected = select(font, emoji, &mut cluster);
-                dbg!((selected, font_or_emoji));
-                shaper = match (selected, font_or_emoji) {
+                shaper = match (select(font, emoji, &mut cluster), font_or_emoji) {
                     (FontOrEmoji::Font, FontOrEmoji::Font) => shaper,
                     (FontOrEmoji::Emoji, FontOrEmoji::Emoji) => shaper,
                     (FontOrEmoji::Font, FontOrEmoji::Emoji) => {
