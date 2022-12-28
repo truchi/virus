@@ -29,11 +29,7 @@ const EMOJI: &str = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf";
 const FONT: &str = RECURSIVE;
 
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
-pub struct Rgb {
-    r: u8,
-    g: u8,
-    b: u8,
-}
+pub struct Rgb(u32); // 0RGB
 
 // 🔥 🦀 😍
 impl Rgb {
@@ -44,27 +40,34 @@ impl Rgb {
     pub const WHITE: Self = Self::new(255, 255, 255);
 
     pub const fn new(r: u8, g: u8, b: u8) -> Self {
-        Self { r, g, b }
+        Self(u32::from_be_bytes([0, r, g, b]))
     }
 
     pub const fn grey(grey: u8) -> Self {
-        Self {
-            r: grey,
-            g: grey,
-            b: grey,
-        }
+        Self::new(grey, grey, grey)
     }
 
     pub fn mul(&mut self, by: u8) {
-        self.r = (self.r as f32 * (by as f32 / 255.)) as u8;
-        self.g = (self.g as f32 * (by as f32 / 255.)) as u8;
-        self.b = (self.b as f32 * (by as f32 / 255.)) as u8;
+        let (r, g, b) = <(u8, u8, u8)>::from(*self);
+        *self = Self::new(
+            (r as f32 * (by as f32 / 255.)) as u8,
+            (g as f32 * (by as f32 / 255.)) as u8,
+            (b as f32 * (by as f32 / 255.)) as u8,
+        );
     }
 }
 
 impl From<Rgb> for u32 {
-    fn from(Rgb { r, g, b }: Rgb) -> Self {
-        b as u32 | ((g as u32) << 8) | ((r as u32) << 16)
+    fn from(Rgb(u32): Rgb) -> Self {
+        u32
+    }
+}
+
+impl From<Rgb> for (u8, u8, u8) {
+    fn from(Rgb(u32): Rgb) -> Self {
+        let [_, r, g, b] = u32::to_be_bytes(u32);
+
+        (r, g, b)
     }
 }
 

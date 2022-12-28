@@ -132,11 +132,11 @@ impl Buffer {
                 let j = j - y;
                 let index = i as usize + j as usize * width as usize;
                 let mut image_pixel = image.data.get(index * 4..(index + 1) * 4).unwrap().iter();
-                let color = Rgb {
-                    r: *image_pixel.next().unwrap(),
-                    g: *image_pixel.next().unwrap(),
-                    b: *image_pixel.next().unwrap(),
-                };
+                let color = Rgb::new(
+                    *image_pixel.next().unwrap(),
+                    *image_pixel.next().unwrap(),
+                    *image_pixel.next().unwrap(),
+                );
 
                 if color == Rgb::BLACK {
                     continue;
