@@ -1,0 +1,8 @@
+[package]
+name = "vigne"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tree-sitter = "0.20"
+tree-sitter-rust = "0.20"
