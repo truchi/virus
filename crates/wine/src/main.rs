@@ -1,10 +1,20 @@
 #![allow(unused)]
 
 mod buffer;
+mod context;
+mod font;
+mod fonts;
+mod glyph;
 mod line;
+mod text;
 
 use buffer::*;
+use context::*;
+use font::*;
+use fonts::*;
+use glyph::*;
 use line::*;
+use text::*;
 
 use softbuffer::GraphicsContext;
 use std::time::{Duration, Instant};
@@ -27,6 +37,8 @@ const FIRA: &str =
     "/home/romain/.local/share/fonts/FiraCodeNerdFont/Fira Code Regular Nerd Font Complete Mono.ttf";
 const EMOJI: &str = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf";
 const FONT: &str = RECURSIVE;
+
+pub type FontSize = u8;
 
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
 pub struct Rgb(u32); // 0RGB

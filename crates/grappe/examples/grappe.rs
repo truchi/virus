@@ -1,4 +1,4 @@
-use grappe::{Line, Text};
+use grappe::{line::Line, text::Text};
 use std::sync::Arc;
 
 fn main() {
