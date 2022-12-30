@@ -1,10 +1,10 @@
-use std::{fmt::Write, sync::Arc};
+use std::{fmt::Write, iter::FusedIterator, sync::Arc};
 
-// ============================================================================================== //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                               Line                                             //
-// ============================================================================================== //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// A line in a [`Text`].
+/// A line in a [`Text`](crate::text::Text).
 ///
 /// A thread-safe reference-counted `String` of line content (***without newlines***)
 /// with a virtual final `\n`.
@@ -12,7 +12,7 @@ use std::{fmt::Write, sync::Arc};
 /// ***Do not insert newlines!***
 #[derive(Clone, Eq, PartialEq, Default, Debug)]
 pub struct Line {
-    pub string: Arc<String>,
+    string: Arc<String>,
 }
 
 impl Line {
@@ -31,9 +31,16 @@ impl Line {
         self.string.len() + /* newline */ 1
     }
 
-    /// Returns `false`.
+    /// Returns wheter this [`Line`] is empty, i.e. `false`.
     pub fn is_empty(&self) -> bool {
         false
+    }
+
+    /// Returns the `String` of this [`Line`].
+    ///
+    /// ***Does not include the final newline!***
+    pub fn string(&self) -> &Arc<String> {
+        &self.string
     }
 
     /// Gets the strong count to the [`string`](Self::string).
@@ -77,3 +84,370 @@ impl std::fmt::Display for Line {
         f.write_char('\n')
     }
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                            LineCursor                                          //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+/// A cursor in a [`Line`].
+#[derive(Copy, Clone, Debug)]
+pub struct LineCursor<'a> {
+    string: &'a str,
+    index: usize,
+}
+
+impl<'a> LineCursor<'a> {
+    /// Creates a new [`LineCursor`] at the start of `line`.
+    ///
+    /// ```
+    /// # use grappe::line::{Line, LineCursor};
+    /// let line = Line::from("😍🦀");
+    ///
+    /// let cursor = LineCursor::from_start(&line);
+    /// assert!(cursor.index() == 0);
+    /// ```
+    pub fn from_start(line: &'a Line) -> Self {
+        Self {
+            string: &line.string,
+            index: 0,
+        }
+    }
+
+    /// Creates a new [`LineCursor`] at the end of `line`.
+    ///
+    /// ```
+    /// # use grappe::line::{Line, LineCursor};
+    /// let line = Line::from("😍🦀");
+    ///
+    /// let cursor = LineCursor::from_end(&line);
+    /// assert!(cursor.index() == 9);
+    /// ```
+    pub fn from_end(line: &'a Line) -> Self {
+        Self {
+            string: &line.string,
+            index: line.len(),
+        }
+    }
+
+    /// Returns the length of the [`Line`].
+    ///
+    /// ```
+    /// # use grappe::line::{Line, LineCursor};
+    /// let line = Line::from("😍🦀");
+    ///
+    /// let cursor = LineCursor::from_start(&line);
+    /// assert!(cursor.len() == 9);
+    /// ```
+    pub fn len(&self) -> usize {
+        self.string.len() + /* newline */ 1
+    }
+
+    /// Returns the current index of this [`LineCursor`].
+    ///
+    /// ```
+    /// # use grappe::line::{Line, LineCursor};
+    /// let line = Line::from("😍🦀");
+    ///
+    /// let cursor = LineCursor::from_start(&line);
+    /// assert!(cursor.index() == 0);
+    ///
+    /// let cursor = LineCursor::from_end(&line);
+    /// assert!(cursor.index() == 9);
+    /// ```
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    /// Returns a fused double-ended iterator over the previous chars in the line.
+    ///
+    /// ```
+    /// # use grappe::line::{Line, LineCursor};
+    /// let line = Line::from("😍🦀");
+    /// let cursor = LineCursor::from_end(&line);
+    /// let map = |o: Option<(LineCursor, char)>| o.map(|(cursor, char)| (cursor.index(), char));
+    ///
+    /// let mut prev_chars = cursor.prev_chars();
+    /// assert!((prev_chars.front(), prev_chars.back()) == (9, 0));
+    ///
+    /// assert!(map(prev_chars.next()) == Some((8, '\n')));
+    /// assert!((prev_chars.front(), prev_chars.back()) == (8, 0));
+    ///
+    /// assert!(map(prev_chars.next_back()) == Some((0, '😍')));
+    /// assert!((prev_chars.front(), prev_chars.back()) == (8, 4));
+    ///
+    /// assert!(map(prev_chars.next()) == Some((4, '🦀')));
+    /// assert!((prev_chars.front(), prev_chars.back()) == (4, 4));
+    ///
+    /// assert!(map(prev_chars.next_back()) == None);
+    /// assert!(map(prev_chars.next()) == None);
+    /// ```
+    pub fn prev_chars(&self) -> LinePrevChars {
+        LinePrevChars::new(*self)
+    }
+
+    /// Returns a fused double-ended iterator over the next chars in the line.
+    ///
+    /// ```
+    /// # use grappe::line::{Line, LineCursor};
+    /// let line = Line::from("😍🦀");
+    /// let cursor = LineCursor::from_start(&line);
+    /// let map = |o: Option<(LineCursor, char)>| o.map(|(cursor, char)| (cursor.index(), char));
+    ///
+    /// let mut next_chars = cursor.next_chars();
+    /// assert!((next_chars.front(), next_chars.back()) == (0, 9));
+    ///
+    /// assert!(map(next_chars.next()) == Some((0, '😍')));
+    /// assert!((next_chars.front(), next_chars.back()) == (4, 9));
+    ///
+    /// assert!(map(next_chars.next_back()) == Some((8, '\n')));
+    /// assert!((next_chars.front(), next_chars.back()) == (4, 8));
+    ///
+    /// assert!(map(next_chars.next()) == Some((4, '🦀')));
+    /// assert!((next_chars.front(), next_chars.back()) == (8, 8));
+    ///
+    /// assert!(map(next_chars.next_back()) == None);
+    /// assert!(map(next_chars.next()) == None);
+    /// ```
+    pub fn next_chars(&self) -> LineNextChars {
+        LineNextChars::new(*self)
+    }
+
+    /// Goes to the previous char in the line and returns it,
+    /// or `None` if already at the first char.
+    ///
+    /// ```
+    /// # use grappe::line::{Line, LineCursor};
+    /// let line = Line::from("😍🦀");
+    ///
+    /// let mut cursor = LineCursor::from_end(&line);
+    /// assert!(cursor.index() == 9);
+    ///
+    /// assert!(cursor.prev_char() == Some('\n'));
+    /// assert!(cursor.index() == 8);
+    ///
+    /// assert!(cursor.prev_char() == Some('🦀'));
+    /// assert!(cursor.index() == 4);
+    ///
+    /// assert!(cursor.prev_char() == Some('😍'));
+    /// assert!(cursor.index() == 0);
+    ///
+    /// assert!(cursor.prev_char() == None);
+    /// assert!(cursor.index() == 0);
+    /// ```
+    pub fn prev_char(&mut self) -> Option<char> {
+        let mut prev_chars = self.prev_chars();
+        let (_, char) = prev_chars.next()?;
+        self.index = prev_chars.front;
+        Some(char)
+    }
+
+    /// Goes to the next char in the line and returns it,
+    /// or `None` if already at the last char.
+    ///
+    /// ```
+    /// # use grappe::line::{Line, LineCursor};
+    /// let line = Line::from("😍🦀");
+    ///
+    /// let mut cursor = LineCursor::from_start(&line);
+    /// assert!(cursor.index() == 0);
+    ///
+    /// assert!(cursor.next_char() == Some('😍'));
+    /// assert!(cursor.index() == 4);
+    ///
+    /// assert!(cursor.next_char() == Some('🦀'));
+    /// assert!(cursor.index() == 8);
+    ///
+    /// assert!(cursor.next_char() == Some('\n'));
+    /// assert!(cursor.index() == 9);
+    ///
+    /// assert!(cursor.next_char() == None);
+    /// assert!(cursor.index() == 9);
+    /// ```
+    pub fn next_char(&mut self) -> Option<char> {
+        let mut next_chars = self.next_chars();
+        let (_, char) = next_chars.next()?;
+        self.index = next_chars.front;
+        Some(char)
+    }
+
+    /// Goes to the start of the line.
+    ///
+    /// ```
+    /// # use grappe::line::{Line, LineCursor};
+    /// let line = Line::from("😍🦀");
+    ///
+    /// let mut cursor = LineCursor::from_end(&line);
+    /// assert!(cursor.index() == 9);
+    ///
+    /// cursor.start();
+    /// assert!(cursor.index() == 0);
+    /// ```
+    pub fn start(&mut self) {
+        self.index = 0;
+    }
+
+    /// Goes to the end of the line.
+    ///
+    /// ```
+    /// # use grappe::line::{Line, LineCursor};
+    /// let line = Line::from("😍🦀");
+    ///
+    /// let mut cursor = LineCursor::from_start(&line);
+    /// assert!(cursor.index() == 0);
+    ///
+    /// cursor.end();
+    /// assert!(cursor.index() == 9);
+    /// ```
+    pub fn end(&mut self) {
+        self.index = self.len();
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                           LinePrevChars                                        //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+/// A fused double-ended iterator over the previous chars of a [`LineCursor`].
+///
+/// See [`LineCursor::prev_chars()`].
+pub struct LinePrevChars<'a> {
+    string: &'a str,
+    front: usize,
+    back: usize,
+    chars: std::iter::Rev<std::iter::Chain<std::str::Chars<'a>, std::option::IntoIter<char>>>,
+}
+
+impl<'a> LinePrevChars<'a> {
+    /// Returns a new [`LinePrevChars`] from `cursor`.
+    pub fn new(cursor: LineCursor<'a>) -> Self {
+        let string = cursor.string;
+
+        Self {
+            string,
+            front: cursor.index,
+            back: 0,
+            chars: if let Some(string) = string.get(..cursor.index) {
+                string.chars().chain(None)
+            } else {
+                string.chars().chain(Some('\n'))
+            }
+            .rev(),
+        }
+    }
+
+    /// The front index of the iterator.
+    pub fn front(&self) -> usize {
+        self.front
+    }
+
+    /// The back index of the iterator.
+    pub fn back(&self) -> usize {
+        self.back
+    }
+}
+
+impl<'a> Iterator for LinePrevChars<'a> {
+    type Item = (LineCursor<'a>, char);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let char = self.chars.next()?;
+        self.front -= char.len_utf8();
+
+        let cursor = LineCursor {
+            string: self.string,
+            index: self.front,
+        };
+
+        Some((cursor, char))
+    }
+}
+
+impl<'a> DoubleEndedIterator for LinePrevChars<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let cursor = LineCursor {
+            string: self.string,
+            index: self.back,
+        };
+
+        let char = self.chars.next_back()?;
+        self.back += char.len_utf8();
+
+        Some((cursor, char))
+    }
+}
+
+impl<'a> FusedIterator for LinePrevChars<'a> {}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                           LineNextChars                                        //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+/// A fused double-ended iterator over the next chars of a [`LineCursor`].
+///
+/// See [`LineCursor::next_chars()`].
+pub struct LineNextChars<'a> {
+    string: &'a str,
+    front: usize,
+    back: usize,
+    chars: std::iter::Chain<std::str::Chars<'a>, std::option::IntoIter<char>>,
+}
+
+impl<'a> LineNextChars<'a> {
+    /// Returns a new [`LineNextChars`] from `¢ursor`.
+    pub fn new(cursor: LineCursor<'a>) -> Self {
+        let string = cursor.string;
+
+        Self {
+            string,
+            front: cursor.index,
+            back: cursor.len(),
+            chars: if let Some(string) = string.get(cursor.index..) {
+                string.chars().chain(Some('\n'))
+            } else {
+                "".chars().chain(None)
+            },
+        }
+    }
+
+    /// The front index of the iterator.
+    pub fn front(&self) -> usize {
+        self.front
+    }
+
+    /// The back index of the iterator.
+    pub fn back(&self) -> usize {
+        self.back
+    }
+}
+
+impl<'a> Iterator for LineNextChars<'a> {
+    type Item = (LineCursor<'a>, char);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let cursor = LineCursor {
+            string: self.string,
+            index: self.front,
+        };
+
+        let char = self.chars.next()?;
+        self.front += char.len_utf8();
+
+        Some((cursor, char))
+    }
+}
+
+impl<'a> DoubleEndedIterator for LineNextChars<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let char = self.chars.next_back()?;
+        self.back -= char.len_utf8();
+
+        let cursor = LineCursor {
+            string: self.string,
+            index: self.back,
+        };
+
+        Some((cursor, char))
+    }
+}
+
+impl<'a> FusedIterator for LineNextChars<'a> {}
