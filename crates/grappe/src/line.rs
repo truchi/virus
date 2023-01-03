@@ -4,7 +4,7 @@ use std::{fmt::Write, iter::FusedIterator, sync::Arc};
 //                                               Line                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// A line in a [`Text`](crate::text::Text).
+/// An immutable, thread-safe line in a [`Text`](crate::text::Text).
 ///
 /// A thread-safe reference-counted `String` of line content (***without newlines***)
 /// with a virtual final `\n`.
@@ -92,8 +92,8 @@ impl std::fmt::Display for Line {
 /// A cursor in a [`Line`].
 #[derive(Copy, Clone, Debug)]
 pub struct LineCursor<'a> {
-    string: &'a str,
-    index: usize,
+    pub(crate) string: &'a str,
+    pub(crate) offset: usize,
 }
 
 impl<'a> LineCursor<'a> {
@@ -104,12 +104,12 @@ impl<'a> LineCursor<'a> {
     /// let line = Line::from("😍🦀");
     ///
     /// let cursor = LineCursor::from_start(&line);
-    /// assert!(cursor.index() == 0);
+    /// assert!(cursor.offset() == 0);
     /// ```
     pub fn from_start(line: &'a Line) -> Self {
         Self {
             string: &line.string,
-            index: 0,
+            offset: 0,
         }
     }
 
@@ -120,12 +120,12 @@ impl<'a> LineCursor<'a> {
     /// let line = Line::from("😍🦀");
     ///
     /// let cursor = LineCursor::from_end(&line);
-    /// assert!(cursor.index() == 9);
+    /// assert!(cursor.offset() == 9);
     /// ```
     pub fn from_end(line: &'a Line) -> Self {
         Self {
             string: &line.string,
-            index: line.len(),
+            offset: line.len(),
         }
     }
 
@@ -149,13 +149,13 @@ impl<'a> LineCursor<'a> {
     /// let line = Line::from("😍🦀");
     ///
     /// let cursor = LineCursor::from_start(&line);
-    /// assert!(cursor.index() == 0);
+    /// assert!(cursor.offset() == 0);
     ///
     /// let cursor = LineCursor::from_end(&line);
-    /// assert!(cursor.index() == 9);
+    /// assert!(cursor.offset() == 9);
     /// ```
-    pub fn index(&self) -> usize {
-        self.index
+    pub fn offset(&self) -> usize {
+        self.offset
     }
 
     /// Returns a fused double-ended iterator over the previous chars in the line.
@@ -164,7 +164,7 @@ impl<'a> LineCursor<'a> {
     /// # use grappe::line::{Line, LineCursor};
     /// let line = Line::from("😍🦀");
     /// let cursor = LineCursor::from_end(&line);
-    /// let map = |o: Option<(LineCursor, char)>| o.map(|(cursor, char)| (cursor.index(), char));
+    /// let map = |o: Option<(LineCursor, char)>| o.map(|(cursor, char)| (cursor.offset(), char));
     ///
     /// let mut prev_chars = cursor.prev_chars();
     /// assert!((prev_chars.front(), prev_chars.back()) == (9, 0));
@@ -181,7 +181,7 @@ impl<'a> LineCursor<'a> {
     /// assert!(map(prev_chars.next_back()) == None);
     /// assert!(map(prev_chars.next()) == None);
     /// ```
-    pub fn prev_chars(&self) -> LinePrevChars {
+    pub fn prev_chars(&self) -> LinePrevChars<'a> {
         LinePrevChars::new(*self)
     }
 
@@ -191,7 +191,7 @@ impl<'a> LineCursor<'a> {
     /// # use grappe::line::{Line, LineCursor};
     /// let line = Line::from("😍🦀");
     /// let cursor = LineCursor::from_start(&line);
-    /// let map = |o: Option<(LineCursor, char)>| o.map(|(cursor, char)| (cursor.index(), char));
+    /// let map = |o: Option<(LineCursor, char)>| o.map(|(cursor, char)| (cursor.offset(), char));
     ///
     /// let mut next_chars = cursor.next_chars();
     /// assert!((next_chars.front(), next_chars.back()) == (0, 9));
@@ -208,7 +208,7 @@ impl<'a> LineCursor<'a> {
     /// assert!(map(next_chars.next_back()) == None);
     /// assert!(map(next_chars.next()) == None);
     /// ```
-    pub fn next_chars(&self) -> LineNextChars {
+    pub fn next_chars(&self) -> LineNextChars<'a> {
         LineNextChars::new(*self)
     }
 
@@ -220,24 +220,24 @@ impl<'a> LineCursor<'a> {
     /// let line = Line::from("😍🦀");
     ///
     /// let mut cursor = LineCursor::from_end(&line);
-    /// assert!(cursor.index() == 9);
+    /// assert!(cursor.offset() == 9);
     ///
     /// assert!(cursor.prev_char() == Some('\n'));
-    /// assert!(cursor.index() == 8);
+    /// assert!(cursor.offset() == 8);
     ///
     /// assert!(cursor.prev_char() == Some('🦀'));
-    /// assert!(cursor.index() == 4);
+    /// assert!(cursor.offset() == 4);
     ///
     /// assert!(cursor.prev_char() == Some('😍'));
-    /// assert!(cursor.index() == 0);
+    /// assert!(cursor.offset() == 0);
     ///
     /// assert!(cursor.prev_char() == None);
-    /// assert!(cursor.index() == 0);
+    /// assert!(cursor.offset() == 0);
     /// ```
     pub fn prev_char(&mut self) -> Option<char> {
         let mut prev_chars = self.prev_chars();
         let (_, char) = prev_chars.next()?;
-        self.index = prev_chars.front;
+        self.offset = prev_chars.front;
         Some(char)
     }
 
@@ -249,24 +249,24 @@ impl<'a> LineCursor<'a> {
     /// let line = Line::from("😍🦀");
     ///
     /// let mut cursor = LineCursor::from_start(&line);
-    /// assert!(cursor.index() == 0);
+    /// assert!(cursor.offset() == 0);
     ///
     /// assert!(cursor.next_char() == Some('😍'));
-    /// assert!(cursor.index() == 4);
+    /// assert!(cursor.offset() == 4);
     ///
     /// assert!(cursor.next_char() == Some('🦀'));
-    /// assert!(cursor.index() == 8);
+    /// assert!(cursor.offset() == 8);
     ///
     /// assert!(cursor.next_char() == Some('\n'));
-    /// assert!(cursor.index() == 9);
+    /// assert!(cursor.offset() == 9);
     ///
     /// assert!(cursor.next_char() == None);
-    /// assert!(cursor.index() == 9);
+    /// assert!(cursor.offset() == 9);
     /// ```
     pub fn next_char(&mut self) -> Option<char> {
         let mut next_chars = self.next_chars();
         let (_, char) = next_chars.next()?;
-        self.index = next_chars.front;
+        self.offset = next_chars.front;
         Some(char)
     }
 
@@ -277,13 +277,13 @@ impl<'a> LineCursor<'a> {
     /// let line = Line::from("😍🦀");
     ///
     /// let mut cursor = LineCursor::from_end(&line);
-    /// assert!(cursor.index() == 9);
+    /// assert!(cursor.offset() == 9);
     ///
     /// cursor.start();
-    /// assert!(cursor.index() == 0);
+    /// assert!(cursor.offset() == 0);
     /// ```
     pub fn start(&mut self) {
-        self.index = 0;
+        self.offset = 0;
     }
 
     /// Goes to the end of the line.
@@ -293,13 +293,13 @@ impl<'a> LineCursor<'a> {
     /// let line = Line::from("😍🦀");
     ///
     /// let mut cursor = LineCursor::from_start(&line);
-    /// assert!(cursor.index() == 0);
+    /// assert!(cursor.offset() == 0);
     ///
     /// cursor.end();
-    /// assert!(cursor.index() == 9);
+    /// assert!(cursor.offset() == 9);
     /// ```
     pub fn end(&mut self) {
-        self.index = self.len();
+        self.offset = self.len();
     }
 }
 
@@ -324,9 +324,9 @@ impl<'a> LinePrevChars<'a> {
 
         Self {
             string,
-            front: cursor.index,
+            front: cursor.offset,
             back: 0,
-            chars: if let Some(string) = string.get(..cursor.index) {
+            chars: if let Some(string) = string.get(..cursor.offset) {
                 string.chars().chain(None)
             } else {
                 string.chars().chain(Some('\n'))
@@ -355,7 +355,7 @@ impl<'a> Iterator for LinePrevChars<'a> {
 
         let cursor = LineCursor {
             string: self.string,
-            index: self.front,
+            offset: self.front,
         };
 
         Some((cursor, char))
@@ -366,7 +366,7 @@ impl<'a> DoubleEndedIterator for LinePrevChars<'a> {
     fn next_back(&mut self) -> Option<Self::Item> {
         let cursor = LineCursor {
             string: self.string,
-            index: self.back,
+            offset: self.back,
         };
 
         let char = self.chars.next_back()?;
@@ -386,7 +386,7 @@ impl<'a> FusedIterator for LinePrevChars<'a> {}
 ///
 /// See [`LineCursor::next_chars()`].
 pub struct LineNextChars<'a> {
-    string: &'a str,
+    pub(crate) string: &'a str,
     front: usize,
     back: usize,
     chars: std::iter::Chain<std::str::Chars<'a>, std::option::IntoIter<char>>,
@@ -399,9 +399,9 @@ impl<'a> LineNextChars<'a> {
 
         Self {
             string,
-            front: cursor.index,
+            front: cursor.offset,
             back: cursor.len(),
-            chars: if let Some(string) = string.get(cursor.index..) {
+            chars: if let Some(string) = string.get(cursor.offset..) {
                 string.chars().chain(Some('\n'))
             } else {
                 "".chars().chain(None)
@@ -426,7 +426,7 @@ impl<'a> Iterator for LineNextChars<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let cursor = LineCursor {
             string: self.string,
-            index: self.front,
+            offset: self.front,
         };
 
         let char = self.chars.next()?;
@@ -443,7 +443,7 @@ impl<'a> DoubleEndedIterator for LineNextChars<'a> {
 
         let cursor = LineCursor {
             string: self.string,
-            index: self.back,
+            offset: self.back,
         };
 
         Some((cursor, char))
