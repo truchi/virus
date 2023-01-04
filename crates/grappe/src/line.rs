@@ -92,11 +92,24 @@ impl std::fmt::Display for Line {
 /// A cursor in a [`Line`].
 #[derive(Copy, Clone, Debug)]
 pub struct LineCursor<'a> {
-    pub(crate) string: &'a str,
-    pub(crate) offset: usize,
+    string: &'a str,
+    offset: usize,
 }
 
 impl<'a> LineCursor<'a> {
+    pub fn new(string: &'a str, offset: usize) -> Option<Self> {
+        if offset == string.len() + /* newline */ 1 || string.is_char_boundary(offset) {
+            Some(Self { string, offset })
+        } else {
+            None
+        }
+    }
+
+    pub fn new_unchecked(string: &'a str, offset: usize) -> Self {
+        debug_assert!(Self::new(string, offset).is_some());
+        Self { string, offset }
+    }
+
     /// Creates a new [`LineCursor`] at the start of `line`.
     ///
     /// ```
@@ -129,6 +142,13 @@ impl<'a> LineCursor<'a> {
         }
     }
 
+    pub fn from_empty() -> Self {
+        Self {
+            string: "",
+            offset: 0,
+        }
+    }
+
     /// Returns the length of the [`Line`].
     ///
     /// ```
@@ -156,6 +176,14 @@ impl<'a> LineCursor<'a> {
     /// ```
     pub fn offset(&self) -> usize {
         self.offset
+    }
+
+    pub fn is_start(&self) -> bool {
+        self.offset == 0
+    }
+
+    pub fn is_end(&self) -> bool {
+        self.offset == self.len()
     }
 
     /// Returns a fused double-ended iterator over the previous chars in the line.
@@ -310,8 +338,9 @@ impl<'a> LineCursor<'a> {
 /// A fused double-ended iterator over the previous chars of a [`LineCursor`].
 ///
 /// See [`LineCursor::prev_chars()`].
+#[derive(Clone, Debug)]
 pub struct LinePrevChars<'a> {
-    string: &'a str,
+    pub(crate) string: &'a str,
     front: usize,
     back: usize,
     chars: std::iter::Rev<std::iter::Chain<std::str::Chars<'a>, std::option::IntoIter<char>>>,
@@ -385,6 +414,7 @@ impl<'a> FusedIterator for LinePrevChars<'a> {}
 /// A fused double-ended iterator over the next chars of a [`LineCursor`].
 ///
 /// See [`LineCursor::next_chars()`].
+#[derive(Clone, Debug)]
 pub struct LineNextChars<'a> {
     pub(crate) string: &'a str,
     front: usize,
