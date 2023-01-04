@@ -1,10 +1,14 @@
+mod builder;
 mod cursor;
 mod next_chars;
 mod prev_chars;
+mod selection;
 
+pub use builder::*;
 pub use cursor::*;
 pub use next_chars::*;
 pub use prev_chars::*;
+pub use selection::*;
 
 use crate::line::Line;
 use std::sync::Arc;

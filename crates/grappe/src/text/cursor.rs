@@ -8,11 +8,11 @@ use crate::{line::Line, Index};
 /// A cursor in a [`Text`].
 #[derive(Copy, Clone, Debug)]
 pub struct TextCursor<'a> {
-    pub(super) lines: &'a [Line],
-    pub(super) offset: usize,
-    pub(super) row: usize,
-    pub(super) column: usize,
-    pub(super) len: usize,
+    pub(crate) lines: &'a [Line],
+    pub(crate) offset: usize,
+    pub(crate) row: usize,
+    pub(crate) column: usize,
+    pub(crate) len: usize,
 }
 
 impl<'a> TextCursor<'a> {
