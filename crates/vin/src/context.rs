@@ -1,13 +1,15 @@
+use crate::{fonts::Fonts, glyph::Glyph, line::Line, FontSize};
+use lru::LruCache;
+use std::num::NonZeroUsize;
 use swash::{
     scale::{image::Image, Render, ScaleContext, Source, StrikeWith},
     shape::ShapeContext,
     CacheKey, GlyphId,
 };
-use utils::lru::Lru;
 
-use crate::{fonts::Fonts, glyph::Glyph, line::Line, FontSize};
+const GLYPH_CACHE_CAPACITY: usize = 1_024;
 
-pub type GlyphCache = Lru<(CacheKey, GlyphId, FontSize), Option<Image>>;
+pub type GlyphCache = LruCache<(CacheKey, GlyphId, FontSize), Option<Image>>;
 
 pub struct Context {
     pub fonts: Fonts,
@@ -20,7 +22,7 @@ impl Context {
     pub fn new(fonts: Fonts) -> Self {
         Self {
             fonts,
-            cache: Lru::new(1_024),
+            cache: GlyphCache::new(NonZeroUsize::new(GLYPH_CACHE_CAPACITY).unwrap()),
             shape: Default::default(),
             scale: Default::default(),
         }
@@ -51,7 +53,7 @@ impl Context {
 
             let image = self
                 .cache
-                .get_or_set((glyph.key, glyph.id, line.size()), || {
+                .get_or_insert((glyph.key, glyph.id, line.size()), || {
                     render.render(scaler, glyph.id)
                 });
 

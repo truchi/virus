@@ -9,7 +9,6 @@ use swash::{
     },
     CacheKey, FontRef, GlyphId,
 };
-use utils::lru::Lru;
 
 #[derive(Clone, Debug)]
 pub struct Line {
