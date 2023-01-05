@@ -385,13 +385,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "grappe"
-version = "0.1.0"
-dependencies = [
- "unicode-segmentation",
-]
-
-[[package]]
 name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1030,12 +1023,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "84a22b9f218b40614adcb3f4ff08b703773ad44fa9423e4e0d346d5db86e4ebc"
 
 [[package]]
-name = "unicode-segmentation"
-version = "1.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fdbf052a0783de01e944a6ce7a8cb939e295b1e7be835a1112c3b9a7f047a5a"
-
-[[package]]
 name = "utils"
 version = "0.1.0"
 
@@ -1063,7 +1050,6 @@ dependencies = [
 name = "vin"
 version = "0.1.0"
 dependencies = [
- "grappe",
  "softbuffer",
  "swash",
  "utils",
