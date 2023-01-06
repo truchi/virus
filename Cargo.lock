@@ -806,6 +806,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ropey"
+version = "1.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4f832915525613e83f275694cb8c184f5df13ca26a9ef0ea6ce736921964c8e"
+dependencies = [
+ "smallvec",
+ "str_indices",
+]
+
+[[package]]
 name = "safe_arch"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -929,6 +939,12 @@ dependencies = [
  "winapi",
  "x11-dl",
 ]
+
+[[package]]
+name = "str_indices"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f026164926842ec52deb1938fae44f83dfdb82d0a5b0270c5bd5935ab74d6dd"
 
 [[package]]
 name = "strsim"
@@ -1067,6 +1083,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 name = "vigne"
 version = "0.1.0"
 dependencies = [
+ "ropey",
  "tree-sitter",
  "tree-sitter-rust",
 ]
