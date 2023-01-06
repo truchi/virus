@@ -1,6 +1,7 @@
 pub mod eol;
-pub mod meta;
 pub mod page;
+pub mod segment;
+pub mod text;
 
 // meta:
 // - leading spaces: 6b 0..64
@@ -33,4 +34,17 @@ fn split(str: &str, mut at: usize) -> (&str, &str) {
 
         str.split_at(at)
     }
+}
+
+#[derive(Copy, Clone, Default, Debug)]
+pub struct Offset {
+    bytes: usize,
+    lines: usize,
+}
+
+#[derive(Copy, Clone, Default, Debug)]
+pub struct Index {
+    byte: usize,
+    line: usize,
+    column: usize,
 }
