@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 pub mod eol;
 pub mod page;
 pub mod segment;
@@ -47,4 +49,9 @@ pub struct Index {
     byte: usize,
     line: usize,
     column: usize,
+}
+
+pub enum State<T, U> {
+    Incomplete(T),
+    Complete(U),
 }

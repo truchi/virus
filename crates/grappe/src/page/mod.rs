@@ -1,6 +1,8 @@
 pub mod builder;
 pub mod meta;
 
+use crate::Offset;
+
 use self::meta::PageMeta;
 use std::{
     mem::size_of,
@@ -13,8 +15,13 @@ use std::{
 
 #[derive(Clone, Debug)]
 pub struct Page {
-    bytes: Arc<[u8; Self::BYTES]>,
-    meta: PageMeta,
+    data: Arc<[u8; Self::BYTES]>,
+    len: u16,
+    sol: u16,
+    bytes: u16,
+    lines: u16,
+    offset_bytes: usize,
+    offset_lines: usize,
 }
 
 impl Page {
@@ -25,8 +32,11 @@ impl Page {
 //                                             PageRef                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct PageRef<'a> {
-    bytes: &'a [u8],
-    meta: PageMeta,
+    data: &'a [u8],
+    bytes: u16,
+    lines: u16,
+    offset_bytes: usize,
+    offset_lines: usize,
 }

@@ -7,45 +7,33 @@ use crate::eol::Eol;
 const SPACES: &str = "                                                               ";
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                               Page                                             //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-pub struct Segment<T> {
-    buffer: T,
-    meta: SegmentMeta,
-}
-
-impl<T> Segment<T> {
-    pub fn new(buffer: T, meta: SegmentMeta) -> Self {
-        Self { buffer, meta }
-    }
-
-    pub fn meta(&self) -> SegmentMeta {
-        self.meta
-    }
-
-    pub fn len(&self) -> usize {
-        self.meta.len()
-    }
-
-    pub fn spaces(&self) -> &'static str {
-        self.meta.spaces()
-    }
-
-    pub fn eol(&self) -> &'static str {
-        self.meta.eol()
-    }
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            SegmentRef                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-pub type SegmentRef<'a> = Segment<&'a str>;
+#[derive(Copy, Clone, Debug)]
+pub struct SegmentRef<'a> {
+    str: &'a str,
+    spaces: u8,
+    eol: Option<Eol>,
+}
 
 impl<'a> SegmentRef<'a> {
+    pub fn len(&self) -> usize {
+        self.spaces as usize
+            + self.str.len()
+            + self.eol.map(|eol| eol.as_str().len()).unwrap_or_default()
+    }
+
+    pub fn spaces(&self) -> &'static str {
+        &SPACES[..self.spaces as usize]
+    }
+
     pub fn str(&self) -> &'a str {
-        self.buffer
+        self.str
+    }
+
+    pub fn eol(&self) -> &'static str {
+        self.eol.map(|eol| eol.as_str()).unwrap_or_default()
     }
 }
 
@@ -53,17 +41,28 @@ impl<'a> SegmentRef<'a> {
 //                                            SegmentMut                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-pub type SegmentMut<'a> = Segment<&'a mut [u8]>;
+pub struct SegmentBuilderMut<'a> {
+    data: &'a mut [u8],
+    meta: SegmentMeta,
+}
 
-impl<'a> SegmentMut<'a> {
-    pub fn new_unchecked(buffer: &'a mut [u8], meta: SegmentMeta) -> Self {
-        debug_assert!(buffer.len() >= SegmentMeta::SIZE);
-
-        Self { buffer, meta }
+impl<'a> SegmentBuilderMut<'a> {
+    pub fn new(data: &'a mut [u8], meta: SegmentMeta) -> Option<Self> {
+        if data.len() >= SegmentMeta::SIZE {
+            Some(Self { data, meta })
+        } else {
+            None
+        }
     }
 
-    pub fn size(&self) -> usize {
-        SegmentMeta::SIZE + self.meta.len as usize
+    pub fn new_unchecked(data: &'a mut [u8], meta: SegmentMeta) -> Self {
+        debug_assert!(data.len() >= SegmentMeta::SIZE);
+
+        Self { data, meta }
+    }
+
+    pub fn meta(&self) -> SegmentMeta {
+        self.meta
     }
 
     pub fn push_str<'str>(&mut self, mut str: &'str str) -> &'str str {
@@ -94,13 +93,13 @@ impl<'a> SegmentMut<'a> {
     }
 
     pub fn write(&mut self) {
-        self.meta.encode(self.buffer);
+        self.meta.encode(self.data);
     }
 }
 
-impl<'a> SegmentMut<'a> {
+impl<'a> SegmentBuilderMut<'a> {
     fn available(&self) -> usize {
-        (self.buffer.len() - SegmentMeta::SIZE - self.meta.len as usize)
+        (self.data.len() - SegmentMeta::SIZE - self.meta.len as usize)
             .min(SegmentMeta::MAX_LEN as usize)
     }
 
@@ -129,10 +128,10 @@ impl<'a> SegmentMut<'a> {
 
         debug_assert!(!str.contains('\r'));
         debug_assert!(!str.contains('\n'));
-        debug_assert!(end + SegmentMeta::SUFFIX_SIZE <= self.buffer.len());
+        debug_assert!(end + SegmentMeta::SUFFIX_SIZE <= self.data.len());
         debug_assert!(self.meta.len as usize + str.len() <= SegmentMeta::MAX_LEN as usize);
 
-        self.buffer[start..end].copy_from_slice(str.as_bytes());
+        self.data[start..end].copy_from_slice(str.as_bytes());
         self.meta.len += str.len() as u8;
     }
 }
@@ -152,8 +151,8 @@ mod tests {
 
     #[test]
     fn segment_mut() {
-        let mut buffer = [0; 1_000];
-        let mut segment_mut = SegmentMut::new(&mut buffer, Default::default());
+        let mut data = [0; 1_000];
+        let mut segment_mut = SegmentBuilderMut::new(&mut data, Default::default()).unwrap();
 
         assert!(segment_mut.push_str("   ").is_empty());
         assert!(segment_mut.meta.spaces == 3);
@@ -177,7 +176,7 @@ mod tests {
 
         use std::str::from_utf8;
         assert!(
-            from_utf8(&buffer[SegmentMeta::PREFIX_SIZE..SegmentMeta::PREFIX_SIZE + 9])
+            from_utf8(&data[SegmentMeta::PREFIX_SIZE..SegmentMeta::PREFIX_SIZE + 9])
                 == Ok("abc   def")
         );
     }

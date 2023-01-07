@@ -15,6 +15,11 @@ impl SegmentMeta {
     pub const SUFFIX_SIZE: usize = 1; // 1 byte
     pub const SIZE: usize = Self::PREFIX_SIZE + Self::SUFFIX_SIZE; // 3 bytes
 
+    /// Returns the physical size of the segment.
+    pub fn size(&self) -> usize {
+        SegmentMeta::SIZE + self.len as usize
+    }
+
     pub fn len(&self) -> usize {
         self.spaces as usize
             + self.len as usize
