@@ -3,7 +3,7 @@ use crate::segment::{meta::SegmentMeta, SegmentBuilderMut};
 
 #[derive(Debug)]
 pub struct PageBuilder {
-    data: [u8; Page::BYTES],
+    data: [u8; Page::LEN],
     offset: usize,
     meta: SegmentMeta,
     bytes: usize,

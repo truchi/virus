@@ -5,6 +5,8 @@ pub mod page;
 pub mod segment;
 pub mod text;
 
+pub mod builder;
+
 // meta:
 // - leading spaces: 6b 0..64
 // - byte length   : 8b 0..255

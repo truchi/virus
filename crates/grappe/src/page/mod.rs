@@ -15,17 +15,17 @@ use std::{
 
 #[derive(Clone, Debug)]
 pub struct Page {
-    data: Arc<[u8; Self::BYTES]>,
-    len: u16,
-    sol: u16,
-    bytes: u16,
-    lines: u16,
-    offset_bytes: usize,
-    offset_lines: usize,
+    pub(crate) data: Arc<[u8; Self::LEN]>,
+    pub(crate) len: u16,
+    pub(crate) sol: u16,
+    pub(crate) bytes: u16,
+    pub(crate) lines: u16,
+    pub(crate) offset_bytes: usize,
+    pub(crate) offset_lines: usize,
 }
 
 impl Page {
-    pub const BYTES: usize = 1_024 - 2 * size_of::<AtomicUsize>();
+    pub const LEN: usize = 1_024 - 2 * size_of::<AtomicUsize>();
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //

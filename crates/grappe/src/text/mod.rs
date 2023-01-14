@@ -9,9 +9,9 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub struct Text {
-    pages: Arc<Vec<Page>>,
-    bytes: usize,
-    lines: usize,
+    pub(crate) pages: Arc<Vec<Page>>,
+    pub(crate) bytes: usize,
+    pub(crate) lines: usize,
 }
 
 #[derive(Copy, Clone, Debug)]
