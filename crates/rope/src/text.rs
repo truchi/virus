@@ -8,6 +8,7 @@ use std::{
 //                                               Text                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+/// Thread-safe, structurally shared ***Text***.
 #[derive(Clone, Default, Debug)]
 pub struct Text {
     pages: Arc<Vec<Page>>,
@@ -16,6 +17,7 @@ pub struct Text {
 }
 
 impl Text {
+    /// Creates a new empty [`Text`].
     pub fn new() -> Self {
         Self {
             pages: Default::default(),
@@ -24,6 +26,7 @@ impl Text {
         }
     }
 
+    /// Returns a [`TextRef`] of `self`.
     pub fn as_ref(&self) -> TextRef {
         TextRef {
             pages: &self.pages,
@@ -32,34 +35,42 @@ impl Text {
         }
     }
 
+    /// Returns `true` if `self` has a length of zero bytes.
     pub fn is_empty(&self) -> bool {
         self.as_ref().is_empty()
     }
 
+    /// Returns the byte length of this [`Text`].
     pub fn len(&self) -> usize {
         self.as_ref().len()
     }
 
+    /// Returns the count of `\n` in this [`Text`].
     pub fn lines(&self) -> usize {
         self.as_ref().lines()
     }
 
+    /// Returns a [`Cursor`] at the start of this [`Text`].
     pub fn start(&self) -> Cursor {
         self.as_ref().start()
     }
 
+    /// Returns a [`Cursor`] at the end of this [`Text`].
     pub fn end(&self) -> Cursor {
         self.as_ref().end()
     }
 
+    /// Returns a [`Cursor`] at `index`.
     pub fn cursor<I: CursorIndex>(&self, index: I) -> Cursor {
         self.as_ref().cursor(index)
     }
 
+    /// Returns a [`Selection`] at `range`.
     pub fn selection<R: SelectionRange>(&self, range: R) -> Selection {
         self.as_ref().selection(range)
     }
 
+    /// Returns an iterator over the [`Chunk`](crate::Chunk)s of this [`Text`].
     pub fn chunks(&self) -> Chunks {
         self.as_ref().chunks()
     }
@@ -69,6 +80,7 @@ impl Text {
 //                                             TextRef                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+/// A reference to a [`Text`].
 #[derive(Copy, Clone, Debug)]
 pub struct TextRef<'text> {
     pages: &'text [Page],
@@ -77,34 +89,42 @@ pub struct TextRef<'text> {
 }
 
 impl<'text> TextRef<'text> {
+    /// Returns `true` if `self` has a length of zero bytes.
     pub fn is_empty(&self) -> bool {
         self.bytes == 0
     }
 
+    /// Returns the byte length of this [`Text`].
     pub fn len(&self) -> usize {
         self.bytes
     }
 
+    /// Returns the count of `\n` in this [`Text`].
     pub fn lines(&self) -> usize {
         self.lines
     }
 
+    /// Returns a [`Cursor`] at the start of this [`Text`].
     pub fn start(&self) -> Cursor<'text> {
         todo!()
     }
 
+    /// Returns a [`Cursor`] at the end of this [`Text`].
     pub fn end(&self) -> Cursor<'text> {
         todo!()
     }
 
+    /// Returns a [`Cursor`] at `index`.
     pub fn cursor<I: CursorIndex>(&self, index: I) -> Cursor<'text> {
         index.cursor_from_text(*self)
     }
 
+    /// Returns a [`Selection`] at `range`.
     pub fn selection<R: SelectionRange>(&self, range: R) -> Selection<'text> {
         range.selection(*self)
     }
 
+    /// Returns an iterator over the [`Chunk`](crate::Chunk)s of this [`Text`].
     pub fn chunks(&self) -> Chunks<'text> {
         self.selection(..).chunks()
     }
@@ -114,8 +134,12 @@ impl<'text> TextRef<'text> {
 //                                           CursorIndex                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+/// Cursoring operations.
 pub trait CursorIndex {
+    /// Returns a [`Cursor`] at this index from a [`TextRef`].
     fn cursor_from_text(self, text: TextRef) -> Cursor;
+
+    /// Returns a [`Cursor`] at this index from another [`Cursor`].
     fn cursor_from_cursor(self, cursor: Cursor) -> Cursor;
 }
 
@@ -143,7 +167,9 @@ impl CursorIndex for (usize, usize) {
 //                                          SelectionRange                                        //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+/// Selecting operations.
 pub trait SelectionRange {
+    /// Returns a [`Selection`] at this range from a [`TextRef`].
     fn selection(self, text: TextRef) -> Selection;
 }
 

@@ -19,6 +19,7 @@ pub use text::TextRef;
 //                                             Index                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+/// An index in a [`Text`].
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Index {
     pub byte: usize,
@@ -30,6 +31,7 @@ pub struct Index {
 //                                             Chunk                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+/// A chunk of a [`Text`].
 #[derive(Copy, Clone, Debug)]
 pub struct Chunk<'text> {
     pub str: &'text str,
