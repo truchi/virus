@@ -52,11 +52,11 @@ impl Text {
         self.as_ref().end()
     }
 
-    pub fn cursor<I: CursorIndex>(&self, index: I) -> Option<Cursor> {
+    pub fn cursor<I: CursorIndex>(&self, index: I) -> Cursor {
         self.as_ref().cursor(index)
     }
 
-    pub fn selection<R: SelectionRange>(&self, range: R) -> Option<Selection> {
+    pub fn selection<R: SelectionRange>(&self, range: R) -> Selection {
         self.as_ref().selection(range)
     }
 }
@@ -93,11 +93,11 @@ impl<'text> TextRef<'text> {
         todo!()
     }
 
-    pub fn cursor<I: CursorIndex>(&self, index: I) -> Option<Cursor<'text>> {
+    pub fn cursor<I: CursorIndex>(&self, index: I) -> Cursor<'text> {
         index.cursor_from_text(*self)
     }
 
-    pub fn selection<R: SelectionRange>(&self, range: R) -> Option<Selection<'text>> {
+    pub fn selection<R: SelectionRange>(&self, range: R) -> Selection<'text> {
         range.selection(*self)
     }
 }
@@ -107,26 +107,26 @@ impl<'text> TextRef<'text> {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub trait CursorIndex {
-    fn cursor_from_text(self, text: TextRef) -> Option<Cursor>;
-    fn cursor_from_cursor(self, cursor: Cursor) -> Option<Cursor>;
+    fn cursor_from_text(self, text: TextRef) -> Cursor;
+    fn cursor_from_cursor(self, cursor: Cursor) -> Cursor;
 }
 
 impl CursorIndex for Byte {
-    fn cursor_from_text(self, text: TextRef) -> Option<Cursor> {
+    fn cursor_from_text(self, text: TextRef) -> Cursor {
         todo!()
     }
 
-    fn cursor_from_cursor(self, cursor: Cursor) -> Option<Cursor> {
+    fn cursor_from_cursor(self, cursor: Cursor) -> Cursor {
         todo!()
     }
 }
 
 impl CursorIndex for LineColumn {
-    fn cursor_from_text(self, text: TextRef) -> Option<Cursor> {
+    fn cursor_from_text(self, text: TextRef) -> Cursor {
         todo!()
     }
 
-    fn cursor_from_cursor(self, cursor: Cursor) -> Option<Cursor> {
+    fn cursor_from_cursor(self, cursor: Cursor) -> Cursor {
         todo!()
     }
 }
@@ -136,29 +136,29 @@ impl CursorIndex for LineColumn {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub trait SelectionRange {
-    fn selection(self, text: TextRef) -> Option<Selection>;
+    fn selection(self, text: TextRef) -> Selection;
 }
 
 impl<T: CursorIndex> SelectionRange for T {
-    fn selection(self, text: TextRef) -> Option<Selection> {
+    fn selection(self, text: TextRef) -> Selection {
         todo!()
     }
 }
 
 impl<S: CursorIndex, E: CursorIndex> SelectionRange for (Bound<S>, Bound<E>) {
-    fn selection(self, text: TextRef) -> Option<Selection> {
+    fn selection(self, text: TextRef) -> Selection {
         todo!()
     }
 }
 
 impl<T: CursorIndex> SelectionRange for Range<T> {
-    fn selection(self, text: TextRef) -> Option<Selection> {
+    fn selection(self, text: TextRef) -> Selection {
         todo!()
     }
 }
 
 impl SelectionRange for RangeFull {
-    fn selection(self, text: TextRef) -> Option<Selection> {
+    fn selection(self, text: TextRef) -> Selection {
         todo!()
     }
 }

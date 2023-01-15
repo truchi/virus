@@ -9,9 +9,7 @@ mod utils;
 
 pub use cursor::Cursor;
 pub use selection::Chunks;
-pub use selection::EndMut;
 pub use selection::Selection;
-pub use selection::StartMut;
 pub use text::CursorIndex;
 pub use text::SelectionRange;
 pub use text::Text;

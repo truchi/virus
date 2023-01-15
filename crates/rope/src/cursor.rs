@@ -15,22 +15,13 @@ pub struct Cursor<'text> {
 impl<'text> Cursor<'text> {
     pub fn selection(&self) -> Selection<'text> {
         Selection {
-            text_ref: self.text_ref,
-            start_page_ref: self.page_ref,
-            start_page: self.page,
-            start_index: self.index,
-            end_page_ref: self.page_ref,
-            end_page: self.page,
-            end_index: self.index,
+            start: *self,
+            end: *self,
         }
     }
 
     pub fn index(&self) -> Index {
         self.index
-    }
-
-    pub fn is_char_boundary(&self) -> bool {
-        true
     }
 
     pub fn is_grapheme_boundary(&self) -> bool {
@@ -49,91 +40,91 @@ impl<'text> Cursor<'text> {
         todo!()
     }
 
-    pub fn to<I: CursorIndex>(&self, index: I) -> Option<Cursor<'text>> {
+    pub fn to<I: CursorIndex>(&self, index: I) -> Cursor<'text> {
         index.cursor_from_cursor(*self)
     }
 
-    pub fn to_line(&self, line: usize) -> Option<Cursor<'text>> {
+    pub fn to_line(&self, line: usize) -> Cursor<'text> {
         self.to((line, 0))
     }
 
-    pub fn to_column(&self, column: usize) -> Option<Cursor<'text>> {
+    pub fn to_column(&self, column: usize) -> Cursor<'text> {
         self.to((self.index.line, column))
     }
 
-    pub fn to_prev_char_boundary(&self) -> Option<Cursor<'text>> {
+    pub fn to_prev_char(&self) -> Cursor<'text> {
         todo!()
     }
 
-    pub fn to_next_char_boundary(&self) -> Option<Cursor<'text>> {
+    pub fn to_next_char(&self) -> Cursor<'text> {
         todo!()
     }
 
-    pub fn to_prev_grapheme_boundary(&self) -> Option<Cursor<'text>> {
+    pub fn to_prev_grapheme(&self) -> Cursor<'text> {
         todo!()
     }
 
-    pub fn to_next_grapheme_boundary(&self) -> Option<Cursor<'text>> {
+    pub fn to_next_grapheme(&self) -> Cursor<'text> {
         todo!()
     }
 
-    pub fn to_prev_line_boundary(&self) -> Option<Cursor<'text>> {
+    pub fn to_prev_line(&self) -> Cursor<'text> {
         todo!()
     }
 
-    pub fn to_next_line_boundary(&self) -> Option<Cursor<'text>> {
+    pub fn to_next_line(&self) -> Cursor<'text> {
         todo!()
     }
 
-    pub fn to_start(&self) -> Option<Cursor<'text>> {
+    pub fn to_start(&self) -> Cursor<'text> {
         todo!()
     }
 
-    pub fn to_end(&self) -> Option<Cursor<'text>> {
+    pub fn to_end(&self) -> Cursor<'text> {
         todo!()
     }
 
-    pub fn to_mut<I: CursorIndex>(&mut self, index: I) -> bool {
+    pub fn to_mut<I: CursorIndex>(&mut self, index: I) {
         todo!()
     }
 
-    pub fn to_line_mut(&mut self, line: usize) -> bool {
+    pub fn to_line_mut(&mut self, line: usize) {
         self.to_mut((line, 0))
     }
 
-    pub fn to_column_mut(&mut self, column: usize) -> bool {
+    pub fn to_column_mut(&mut self, column: usize) {
         self.to_mut((self.index.line, column))
     }
 
-    pub fn to_prev_char_boundary_mut(&mut self) -> bool {
+    pub fn to_prev_char_mut(&mut self) {
         todo!()
     }
 
-    pub fn to_next_char_boundary_mut(&mut self) -> bool {
+    pub fn to_next_char_mut(&mut self) {
         todo!()
     }
 
-    pub fn to_prev_grapheme_boundary_mut(&mut self) -> bool {
+    pub fn to_prev_grapheme_mut(&mut self) {
         todo!()
     }
 
-    pub fn to_next_grapheme_boundary_mut(&mut self) -> bool {
+    pub fn to_next_grapheme_mut(&mut self) {
         todo!()
     }
 
-    pub fn to_prev_line_boundary_mut(&mut self) -> bool {
+    pub fn to_prev_line_mut(&mut self) {
         todo!()
     }
 
-    pub fn to_next_line_boundary_mut(&mut self) -> bool {
+    pub fn to_next_line_mut(&mut self) {
         todo!()
     }
 
-    pub fn to_start_mut(&mut self) -> bool {
+    pub fn to_start_mut(&mut self) {
         todo!()
     }
 
-    pub fn to_end_mut(&mut self) -> bool {
+    pub fn to_end_mut(&mut self) {
         todo!()
     }
 }
