@@ -10,6 +10,7 @@ mod utils;
 
 pub use builder::Builder;
 pub use cursor::Cursor;
+pub use cursor::CursorMut;
 pub use selection::Chunks;
 pub use selection::Selection;
 pub use text::CursorIndex;

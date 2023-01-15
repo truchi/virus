@@ -18,6 +18,11 @@ pub struct Cursor<'text> {
 }
 
 impl<'text> Cursor<'text> {
+    /// Returns a [`CursorMut`] from this [`Cursor`].
+    pub fn as_mut(&mut self) -> CursorMut<'text, '_> {
+        CursorMut { cursor: self }
+    }
+
     /// Returns the underlying [`TextRef`].
     pub fn text(&self) -> TextRef<'text> {
         self.text_ref
@@ -164,5 +169,73 @@ impl<'text> Cursor<'text> {
     /// Moves this [`Cursor`] at the end of the [`Text`](crate::text::Text).
     pub fn to_end_mut(&mut self) {
         todo!()
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                            CursorMut                                           //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+/// A mutable [`Cursor`].
+#[derive(Debug)]
+pub struct CursorMut<'text, 'cursor> {
+    /// Cursor.
+    pub(crate) cursor: &'cursor mut Cursor<'text>,
+}
+
+impl<'text, 'cursor> CursorMut<'text, 'cursor> {
+    /// Moves this [`Cursor`] to `index`.
+    fn to<I: CursorIndex>(&mut self, index: I) {
+        self.cursor.to_mut(index)
+    }
+
+    /// Moves this [`Cursor`] at the beggining of `line`.
+    fn to_line(&mut self, line: usize) {
+        self.cursor.to_line_mut(line)
+    }
+
+    /// Moves this [`Cursor`] at `column` on the current line.
+    fn to_column(&mut self, column: usize) {
+        self.cursor.to_column_mut(column)
+    }
+
+    /// Moves this [`Cursor`] at the previous char.
+    fn to_prev_char(&mut self) {
+        self.cursor.to_prev_char_mut()
+    }
+
+    /// Moves this [`Cursor`] at the next char.
+    fn to_next_char(&mut self) {
+        self.cursor.to_next_char_mut()
+    }
+
+    /// Moves this [`Cursor`] at the previous grapheme boundary.
+    fn to_prev_grapheme(&mut self) {
+        self.cursor.to_prev_grapheme_mut()
+    }
+
+    /// Moves this [`Cursor`] at the next grapheme boundary.
+    fn to_next_grapheme(&mut self) {
+        self.cursor.to_next_grapheme_mut()
+    }
+
+    /// Moves this [`Cursor`] at the previous line boundary.
+    fn to_prev_line(&mut self) {
+        self.cursor.to_prev_line_mut()
+    }
+
+    /// Moves this [`Cursor`] at the next line boundary.
+    fn to_next_line(&mut self) {
+        self.cursor.to_next_line_mut()
+    }
+
+    /// Moves this [`Cursor`] at the start of the [`Text`](crate::text::Text).
+    fn to_start(&mut self) {
+        self.cursor.to_start_mut()
+    }
+
+    /// Moves this [`Cursor`] at the end of the [`Text`](crate::text::Text).
+    fn to_end(&mut self) {
+        self.cursor.to_end_mut()
     }
 }

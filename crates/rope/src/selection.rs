@@ -1,4 +1,4 @@
-use crate::{page::PageRef, text::TextRef, Chunk, Cursor, Index};
+use crate::{page::PageRef, text::TextRef, Chunk, Cursor, CursorMut, Index};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           Selection                                            //
@@ -48,14 +48,18 @@ impl<'text> Selection<'text> {
         self.end
     }
 
-    /// Returns a mutable reference to the start [`Cursor`] of this [`Selection`].
-    pub fn start_mut(&mut self) -> &mut Cursor<'text> {
-        &mut self.start
+    /// Returns the start [`CursorMut`] of this [`Selection`].
+    pub fn start_mut(&mut self) -> CursorMut<'text, '_> {
+        CursorMut {
+            cursor: &mut self.start,
+        }
     }
 
-    /// Returns a mutable reference to the end [`Cursor`] of this [`Selection`].
-    pub fn end_mut(&mut self) -> &mut Cursor<'text> {
-        &mut self.end
+    /// Returns the end [`CursorMut`] of this [`Selection`].
+    pub fn end_mut(&mut self) -> CursorMut<'text, '_> {
+        CursorMut {
+            cursor: &mut self.end,
+        }
     }
 }
 
