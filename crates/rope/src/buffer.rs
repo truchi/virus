@@ -1,16 +1,16 @@
 use crate::utils::split_at;
 use std::{mem::size_of, sync::atomic::AtomicUsize};
 
-pub const CHUNK_CAPACITY: usize = 1_024 - 2 * size_of::<AtomicUsize>();
+pub const BUFFER_CAPACITY: usize = 1_024 - 2 * size_of::<AtomicUsize>();
 
-pub type Chunk = [u8; CHUNK_CAPACITY];
+pub type Buffer = [u8; BUFFER_CAPACITY];
 
-pub struct ChunkMut<'a, const CAPACITY: usize> {
-    chunk: &'a mut [u8; CAPACITY],
+pub struct BufferMut<'a, const CAPACITY: usize> {
+    buffer: &'a mut [u8; CAPACITY],
     bytes: &'a mut u16,
 }
 
-impl<'a, const CAPACITY: usize> ChunkMut<'a, CAPACITY> {
+impl<'a, const CAPACITY: usize> BufferMut<'a, CAPACITY> {
     pub fn len(&self) -> usize {
         *self.bytes as usize
     }
@@ -24,7 +24,7 @@ impl<'a, const CAPACITY: usize> ChunkMut<'a, CAPACITY> {
         let start = self.len();
         let end = start + str.len();
 
-        self.chunk[start..end].copy_from_slice(str.as_bytes());
+        self.buffer[start..end].copy_from_slice(str.as_bytes());
         *self.bytes += str.len() as u16;
 
         rest

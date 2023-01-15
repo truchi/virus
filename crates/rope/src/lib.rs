@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-mod chunk;
+mod buffer;
 mod cursor;
 mod page;
 mod selection;
@@ -15,32 +15,30 @@ pub use text::SelectionRange;
 pub use text::Text;
 pub use text::TextRef;
 
-pub type Byte = usize;
-pub type Line = usize;
-pub type Column = usize;
-pub type LineColumn = (usize, usize);
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                             Index                                              //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Index {
-    byte: usize,
-    line: usize,
-    column: usize,
+    pub byte: usize,
+    pub line: usize,
+    pub column: usize,
 }
 
-impl Index {
-    pub fn byte(&self) -> Byte {
-        self.byte
-    }
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                             Chunk                                              //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-    pub fn line(&self) -> Line {
-        self.line
-    }
+#[derive(Copy, Clone, Debug)]
+pub struct Chunk<'text> {
+    pub str: &'text str,
+    pub lines: usize,
+    pub index: Index,
+}
 
-    pub fn column(&self) -> Column {
-        self.column
-    }
-
-    pub fn line_column(&self) -> LineColumn {
-        (self.line, self.column)
+impl<'text> AsRef<str> for Chunk<'text> {
+    fn as_ref(&self) -> &str {
+        self.str
     }
 }

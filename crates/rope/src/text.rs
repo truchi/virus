@@ -1,4 +1,4 @@
-use crate::{page::Page, Byte, Cursor, LineColumn, Selection};
+use crate::{page::Page, Chunks, Cursor, Selection};
 use std::{
     ops::{Bound, Range, RangeFull},
     sync::Arc,
@@ -59,6 +59,10 @@ impl Text {
     pub fn selection<R: SelectionRange>(&self, range: R) -> Selection {
         self.as_ref().selection(range)
     }
+
+    pub fn chunks(&self) -> Chunks {
+        self.as_ref().chunks()
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -100,6 +104,10 @@ impl<'text> TextRef<'text> {
     pub fn selection<R: SelectionRange>(&self, range: R) -> Selection<'text> {
         range.selection(*self)
     }
+
+    pub fn chunks(&self) -> Chunks<'text> {
+        self.selection(..).chunks()
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -111,7 +119,7 @@ pub trait CursorIndex {
     fn cursor_from_cursor(self, cursor: Cursor) -> Cursor;
 }
 
-impl CursorIndex for Byte {
+impl CursorIndex for usize {
     fn cursor_from_text(self, text: TextRef) -> Cursor {
         todo!()
     }
@@ -121,7 +129,7 @@ impl CursorIndex for Byte {
     }
 }
 
-impl CursorIndex for LineColumn {
+impl CursorIndex for (usize, usize) {
     fn cursor_from_text(self, text: TextRef) -> Cursor {
         todo!()
     }

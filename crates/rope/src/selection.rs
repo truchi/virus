@@ -1,4 +1,4 @@
-use crate::{page::PageRef, text::TextRef, Cursor, Index};
+use crate::{page::PageRef, text::TextRef, Chunk, Cursor, Index};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           Selection                                            //
@@ -48,12 +48,13 @@ impl<'text> Selection<'text> {
 //                                             Chunks                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+#[derive(Clone, Debug)]
 pub struct Chunks<'text> {
     selection: Selection<'text>,
 }
 
 impl<'text> Iterator for Chunks<'text> {
-    type Item = &'text str;
+    type Item = Chunk<'text>;
 
     fn next(&mut self) -> Option<Self::Item> {
         todo!()
