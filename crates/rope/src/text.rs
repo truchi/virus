@@ -1,4 +1,4 @@
-use crate::{page::Page, Chunks, Cursor, Selection};
+use crate::{builder::Builder, page::Page, Chunks, Cursor, Selection};
 use std::{
     ops::{Bound, Range, RangeFull},
     sync::Arc,
@@ -11,9 +11,9 @@ use std::{
 /// Thread-safe, structurally shared ***Text***.
 #[derive(Clone, Default, Debug)]
 pub struct Text {
-    pages: Arc<Vec<Page>>,
-    bytes: usize,
-    lines: usize,
+    pub(crate) pages: Arc<Vec<Page>>,
+    pub(crate) bytes: usize,
+    pub(crate) lines: usize,
 }
 
 impl Text {
@@ -24,6 +24,11 @@ impl Text {
             bytes: 0,
             lines: 0,
         }
+    }
+
+    /// Creates a new empty [`Builder`].
+    pub fn builder() -> Builder {
+        Builder::new()
     }
 
     /// Returns a [`TextRef`] of `self`.

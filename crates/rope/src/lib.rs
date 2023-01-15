@@ -1,12 +1,14 @@
 #![allow(unused)]
 
 mod buffer;
+mod builder;
 mod cursor;
 mod page;
 mod selection;
 mod text;
 mod utils;
 
+pub use builder::Builder;
 pub use cursor::Cursor;
 pub use selection::Chunks;
 pub use selection::Selection;

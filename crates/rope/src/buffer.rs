@@ -1,32 +1,52 @@
 use crate::utils::split_at;
 use std::{mem::size_of, sync::atomic::AtomicUsize};
 
-pub const BUFFER_CAPACITY: usize = 1_024 - 2 * size_of::<AtomicUsize>();
+pub const CAPACITY: usize = 1_024 - 2 * size_of::<AtomicUsize>();
 
-pub type Buffer = [u8; BUFFER_CAPACITY];
+pub type Bytes = [u8; CAPACITY];
 
-pub struct BufferMut<'a, const CAPACITY: usize> {
-    buffer: &'a mut [u8; CAPACITY],
-    bytes: &'a mut u16,
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                             BufferMut                                          //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub struct BufferMut<'a> {
+    pub(crate) buffer: &'a mut Bytes,
+    pub(crate) bytes: &'a mut u16,
+    pub(crate) lines: &'a mut u16,
 }
 
-impl<'a, const CAPACITY: usize> BufferMut<'a, CAPACITY> {
+impl<'a> BufferMut<'a> {
     pub fn len(&self) -> usize {
         *self.bytes as usize
     }
 
-    pub const fn capacity(&self) -> usize {
-        CAPACITY
+    pub fn lines(&self) -> usize {
+        *self.lines as usize
     }
 
-    pub fn push<'str>(&mut self, str: &'str str) -> &'str str {
-        let (str, rest) = split_at(str, self.capacity() - self.len());
-        let start = self.len();
-        let end = start + str.len();
+    pub fn push_str<'str>(&mut self, str: &'str str) -> &'str str {
+        let len = self.len();
+        let (s, rest) = split_at(str, CAPACITY - len);
 
-        self.buffer[start..end].copy_from_slice(str.as_bytes());
-        *self.bytes += str.len() as u16;
+        self.buffer[len..][..s.len()].copy_from_slice(s.as_bytes());
+        *self.bytes += s.len() as u16;
+        *self.lines += s.matches('\n').count() as u16;
 
         rest
+    }
+
+    pub fn push_char(&mut self, char: char) -> Option<char> {
+        let len = self.len();
+        let char_len = char.len_utf8();
+
+        if len + char_len <= CAPACITY {
+            char.encode_utf8(&mut self.buffer[len..][..char_len]);
+            *self.bytes += char_len as u16;
+            *self.lines += (char == '\n') as u16;
+
+            None
+        } else {
+            Some(char)
+        }
     }
 }

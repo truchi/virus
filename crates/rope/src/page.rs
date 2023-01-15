@@ -1,4 +1,4 @@
-use crate::{buffer::Buffer, utils::utf8};
+use crate::{buffer::Bytes, utils::utf8};
 use std::sync::Arc;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -7,11 +7,11 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub struct Page {
-    buffer: Arc<Buffer>,
-    bytes: u16,
-    lines: u16,
-    byte: usize,
-    line: usize,
+    pub(crate) buffer: Arc<Bytes>,
+    pub(crate) bytes: u16,
+    pub(crate) lines: u16,
+    pub(crate) byte: usize,
+    pub(crate) line: usize,
 }
 
 impl Page {
@@ -32,7 +32,7 @@ impl Page {
 
 #[derive(Copy, Clone, Debug)]
 pub struct PageRef<'page> {
-    buffer: &'page Buffer,
+    buffer: &'page Bytes,
     bytes: u16,
     lines: u16,
     byte: usize,
