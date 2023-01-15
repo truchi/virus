@@ -11,9 +11,12 @@ use std::{
 /// Thread-safe, structurally shared ***Text***.
 #[derive(Clone, Default, Debug)]
 pub struct Text {
+    /// Pages.
     pub(crate) pages: Arc<Vec<Page>>,
+    /// Byte count.
     pub(crate) bytes: usize,
-    pub(crate) lines: usize,
+    /// Feed count.
+    pub(crate) feeds: usize,
 }
 
 impl Text {
@@ -22,7 +25,7 @@ impl Text {
         Self {
             pages: Default::default(),
             bytes: 0,
-            lines: 0,
+            feeds: 0,
         }
     }
 
@@ -36,7 +39,7 @@ impl Text {
         TextRef {
             pages: &self.pages,
             bytes: self.bytes,
-            lines: self.lines,
+            feeds: self.feeds,
         }
     }
 
@@ -51,6 +54,11 @@ impl Text {
     }
 
     /// Returns the count of `\n` in this [`Text`].
+    pub fn feeds(&self) -> usize {
+        self.as_ref().feeds()
+    }
+
+    /// Returns the count of lines in this [`Text`] (`self.feeds() + 1`).
     pub fn lines(&self) -> usize {
         self.as_ref().lines()
     }
@@ -88,9 +96,12 @@ impl Text {
 /// A reference to a [`Text`].
 #[derive(Copy, Clone, Debug)]
 pub struct TextRef<'text> {
+    /// Pages.
     pages: &'text [Page],
+    /// Byte count.
     bytes: usize,
-    lines: usize,
+    /// Feed count.
+    feeds: usize,
 }
 
 impl<'text> TextRef<'text> {
@@ -105,8 +116,13 @@ impl<'text> TextRef<'text> {
     }
 
     /// Returns the count of `\n` in this [`Text`].
+    pub fn feeds(&self) -> usize {
+        self.feeds
+    }
+
+    /// Returns the count of lines in this [`Text`] (`self.feeds() + 1`).
     pub fn lines(&self) -> usize {
-        self.lines
+        self.feeds + 1
     }
 
     /// Returns a [`Cursor`] at the start of this [`Text`].

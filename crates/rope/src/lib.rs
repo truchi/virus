@@ -24,8 +24,11 @@ pub use text::TextRef;
 /// An index in a [`Text`].
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Index {
+    /// Byte index.
     pub byte: usize,
+    /// Line index.
     pub line: usize,
+    /// Column index.
     pub column: usize,
 }
 
@@ -36,9 +39,24 @@ pub struct Index {
 /// A chunk of a [`Text`].
 #[derive(Copy, Clone, Debug)]
 pub struct Chunk<'text> {
+    /// Content of this [`Chunk`].
     pub str: &'text str,
-    pub lines: usize,
+    /// Feed (`'\n'`) count.
+    pub feeds: usize,
+    /// Index of this [`Chunk`] in its [`Text`].
     pub index: Index,
+}
+
+impl<'text> Chunk<'text> {
+    /// Returns the count of lines in this [`Chunk`] (`self.feeds + 1`).
+    pub fn lines(&self) -> usize {
+        self.feeds + 1
+    }
+
+    /// Returns the content of this [`Chunk`].
+    fn as_str(&self) -> &str {
+        self.str
+    }
 }
 
 impl<'text> AsRef<str> for Chunk<'text> {

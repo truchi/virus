@@ -10,18 +10,17 @@ pub type Bytes = [u8; CAPACITY];
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct BufferMut<'a> {
+    /// Raw bytes.
     pub(crate) buffer: &'a mut Bytes,
+    /// Byte count.
     pub(crate) bytes: &'a mut u16,
-    pub(crate) lines: &'a mut u16,
+    /// Feed count.
+    pub(crate) feeds: &'a mut u16,
 }
 
 impl<'a> BufferMut<'a> {
     pub fn len(&self) -> usize {
         *self.bytes as usize
-    }
-
-    pub fn lines(&self) -> usize {
-        *self.lines as usize
     }
 
     pub fn push_str<'str>(&mut self, str: &'str str) -> &'str str {
@@ -30,7 +29,7 @@ impl<'a> BufferMut<'a> {
 
         self.buffer[len..][..s.len()].copy_from_slice(s.as_bytes());
         *self.bytes += s.len() as u16;
-        *self.lines += s.matches('\n').count() as u16;
+        *self.feeds += s.matches('\n').count() as u16;
 
         rest
     }
@@ -42,7 +41,7 @@ impl<'a> BufferMut<'a> {
         if len + char_len <= CAPACITY {
             char.encode_utf8(&mut self.buffer[len..][..char_len]);
             *self.bytes += char_len as u16;
-            *self.lines += (char == '\n') as u16;
+            *self.feeds += (char == '\n') as u16;
 
             None
         } else {

@@ -7,9 +7,13 @@ use crate::{page::PageRef, text::TextRef, CursorIndex, Index, Selection};
 /// A cursor in a [`Text`](crate::text::Text).
 #[derive(Copy, Clone, Debug)]
 pub struct Cursor<'text> {
+    /// Underlying text.
     pub(crate) text_ref: TextRef<'text>,
+    /// Current page.
     pub(crate) page_ref: PageRef<'text>,
+    /// Current page index.
     pub(crate) page: usize,
+    /// Current index.
     pub(crate) index: Index,
 }
 

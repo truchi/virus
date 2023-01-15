@@ -7,11 +7,16 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub struct Page {
+    /// Raw bytes.
     pub(crate) buffer: Arc<Bytes>,
+    /// Byte count.
     pub(crate) bytes: u16,
-    pub(crate) lines: u16,
+    /// Feed count.
+    pub(crate) feeds: u16,
+    /// Byte offset.
     pub(crate) byte: usize,
-    pub(crate) line: usize,
+    /// Feed offset.
+    pub(crate) feed: usize,
 }
 
 impl Page {
@@ -19,9 +24,9 @@ impl Page {
         PageRef {
             buffer: &self.buffer,
             bytes: self.bytes,
-            lines: self.lines,
+            feeds: self.feeds,
             byte: self.byte,
-            line: self.line,
+            feed: self.feed,
         }
     }
 }
@@ -32,11 +37,16 @@ impl Page {
 
 #[derive(Copy, Clone, Debug)]
 pub struct PageRef<'page> {
+    /// Raw bytes.
     buffer: &'page Bytes,
+    /// Byte count.
     bytes: u16,
-    lines: u16,
+    /// Feed count.
+    feeds: u16,
+    /// Byte offset.
     byte: usize,
-    line: usize,
+    /// Feed offset.
+    feed: usize,
 }
 
 impl<'page> PageRef<'page> {

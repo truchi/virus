@@ -9,12 +9,18 @@ use std::sync::Arc;
 /// A [`Text`] builder.
 #[derive(Clone, Debug)]
 pub struct Builder {
-    text: Vec<Page>,
-    text_bytes: usize,
-    text_lines: usize,
+    /// List of pages.
+    pages: Vec<Page>,
+    /// Raw bytes (next page).
     buffer: Bytes,
-    buffer_bytes: u16,
-    buffer_lines: u16,
+    /// Byte count (in `buffer`).
+    bytes: u16,
+    /// Feed count (in `buffer`).
+    feeds: u16,
+    /// Byte offset (of `buffer`).
+    byte: usize,
+    /// Feed offset (of `buffer`).
+    feed: usize,
 }
 
 impl Default for Builder {
@@ -27,12 +33,12 @@ impl Builder {
     /// Creates a new empty [`Builder`].
     pub fn new() -> Self {
         Self {
-            text: Vec::default(),
-            text_bytes: 0,
-            text_lines: 0,
+            pages: Vec::default(),
             buffer: [0; CAPACITY],
-            buffer_bytes: 0,
-            buffer_lines: 0,
+            bytes: 0,
+            feeds: 0,
+            byte: 0,
+            feed: 0,
         }
     }
 
@@ -59,14 +65,14 @@ impl Builder {
 
     /// Returns the built [`Text`].
     pub fn build(mut self) -> Text {
-        if self.buffer_bytes != 0 {
+        if self.bytes != 0 {
             self.flush();
         }
 
         Text {
-            pages: Arc::new(self.text),
-            bytes: self.text_bytes,
-            lines: self.text_lines,
+            pages: Arc::new(self.pages),
+            bytes: self.byte,
+            feeds: self.feed,
         }
     }
 }
@@ -75,26 +81,26 @@ impl Builder {
     fn buffer_mut(&mut self) -> BufferMut {
         BufferMut {
             buffer: &mut self.buffer,
-            bytes: &mut self.buffer_bytes,
-            lines: &mut self.buffer_lines,
+            bytes: &mut self.bytes,
+            feeds: &mut self.feeds,
         }
     }
 
     fn flush(&mut self) {
-        debug_assert!(self.buffer_bytes != 0);
+        debug_assert!(self.bytes != 0);
 
         let page = Page {
             buffer: Arc::new(std::mem::replace(&mut self.buffer, [0; CAPACITY])),
-            bytes: self.buffer_bytes,
-            lines: self.buffer_lines,
-            byte: self.text_bytes,
-            line: self.text_lines,
+            bytes: self.bytes,
+            feeds: self.feeds,
+            byte: self.byte,
+            feed: self.feed,
         };
 
-        self.buffer_bytes = 0;
-        self.buffer_lines = 0;
-        self.text_bytes += page.bytes as usize;
-        self.text_lines += page.lines as usize;
-        self.text.push(page);
+        self.bytes = 0;
+        self.feeds = 0;
+        self.byte += page.bytes as usize;
+        self.feed += page.feeds as usize;
+        self.pages.push(page);
     }
 }

@@ -7,7 +7,9 @@ use crate::{page::PageRef, text::TextRef, Chunk, Cursor, Index};
 /// A selection of a [`Text`](crate::text::Text).
 #[derive(Copy, Clone, Debug)]
 pub struct Selection<'text> {
+    /// Start cursor.
     pub(crate) start: Cursor<'text>,
+    /// End cursor.
     pub(crate) end: Cursor<'text>,
 }
 
