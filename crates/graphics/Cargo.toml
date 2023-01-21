@@ -5,7 +5,5 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
-pixels.workspace = true
-winit.workspace = true
-winit_input_helper.workspace = true
-tiny-skia.workspace = true
+swash.workspace = true
+lru.workspace = true

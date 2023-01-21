@@ -1,4 +1,4 @@
-use tiny_skia::*;
+use skia::*;
 
 pub fn draw(pixmap: &mut Pixmap, delta: f32) {
     let mut paint1 = Paint::default();

@@ -1,16 +1,18 @@
 [workspace]
-resolver = "2"         # Important! wgpu needs this!
+resolver = "2"                     # Important! wgpu needs this!
 members = ["crates/*"]
+default-members = ["crates/virus"]
 
 [workspace.package]
 authors = ["Romain TRUCHI"]
 edition = "2021"
 
 [workspace.dependencies]
+lru = "0.9.0"
 pixels = "0.11"
+skia = { version = "0.8", package = "tiny-skia" }
+swash = "0.1.6"
 winit = "0.27"
-winit_input_helper = "0.13"
-tiny-skia = "0.8"
 
 [profile.dev]
 debug = false
