@@ -25,11 +25,11 @@ pub use text::TextRef;
 /// An index in a [`Text`].
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Index {
-    /// Byte index.
+    /// Byte offset.
     pub byte: usize,
-    /// Line index.
+    /// Line offset.
     pub line: usize,
-    /// Column index.
+    /// Column offset.
     pub column: usize,
 }
 
@@ -44,8 +44,10 @@ pub struct Chunk<'text> {
     pub str: &'text str,
     /// Feed (`'\n'`) count.
     pub feeds: usize,
-    /// Index of this [`Chunk`] in its [`Text`].
-    pub index: Index,
+    /// Byte offset.
+    pub byte: usize,
+    /// Line offset.
+    pub line: usize,
 }
 
 impl<'text> Chunk<'text> {

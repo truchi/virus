@@ -35,7 +35,10 @@ impl<'text> Selection<'text> {
 
     /// Returns an iterator over the [`Chunk`]s of this [`Selection`].
     pub fn chunks(&self) -> Chunks<'text> {
-        Chunks { selection: *self }
+        Chunks {
+            start: self.start,
+            end: self.end,
+        }
     }
 
     /// Returns the start [`Cursor`] of this [`Selection`].
@@ -70,13 +73,33 @@ impl<'text> Selection<'text> {
 /// An iterator over the [`Chunk`]s of a [`Selection`].
 #[derive(Clone, Debug)]
 pub struct Chunks<'text> {
-    selection: Selection<'text>,
+    pub(crate) start: Cursor<'text>, // /!\ Some fields not updated
+    pub(crate) end: Cursor<'text>,   // /!\ Some fields not updated
 }
 
 impl<'text> Iterator for Chunks<'text> {
     type Item = Chunk<'text>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        todo!()
+        if self.start.index.byte == self.end.index.byte {
+            return None;
+        }
+
+        if self.start.is_page_boundary() {
+            let page = self.start.page_ref;
+            let chunk = Chunk {
+                str: page.as_str(),
+                feeds: page.feeds as usize,
+                byte: page.byte,
+                line: page.feed,
+            };
+
+            // ???
+            self.start.page += 1;
+
+            Some(chunk)
+        } else {
+            None
+        }
     }
 }

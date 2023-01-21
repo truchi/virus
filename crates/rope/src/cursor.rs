@@ -172,6 +172,13 @@ impl<'text> Cursor<'text> {
     }
 }
 
+impl<'text> Cursor<'text> {
+    /// Returns `true` if the current position is a page boundary.
+    pub(crate) fn is_page_boundary(&self) -> bool {
+        self.index.byte == self.page_ref.byte
+    }
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            CursorMut                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //

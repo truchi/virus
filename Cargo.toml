@@ -1,16 +1,20 @@
 [workspace]
-resolver = "2"         # Important! wgpu/Bevy needs this!
+resolver = "2"         # Important! wgpu needs this!
 members = ["crates/*"]
 
-# Enable a small amount of optimization in debug mode
-[profile.dev]
-opt-level = 1
+[workspace.package]
+authors = ["Romain TRUCHI"]
+edition = "2021"
 
-# Enable high optimizations for dependencies, but not for our code:
+[workspace.dependencies]
+pixels = "0.11"
+winit = "0.27"
+winit_input_helper = "0.13"
+tiny-skia = "0.8"
+
+[profile.dev]
+debug = false
+strip = true
+
 [profile.dev.package."*"]
 opt-level = 3
-
-# [dependencies]
-# bevy = "0.9.1"
-# tree-sitter-highlight = "0.20"
-# tree-sitter-rust = "0.20"

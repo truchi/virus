@@ -38,15 +38,15 @@ impl Page {
 #[derive(Copy, Clone, Debug)]
 pub struct PageRef<'page> {
     /// Raw bytes.
-    buffer: &'page Bytes,
+    pub(crate) buffer: &'page Bytes,
     /// Byte count.
-    bytes: u16,
+    pub(crate) bytes: u16,
     /// Feed count.
-    feeds: u16,
+    pub(crate) feeds: u16,
     /// Byte offset.
-    byte: usize,
+    pub(crate) byte: usize,
     /// Feed offset.
-    feed: usize,
+    pub(crate) feed: usize,
 }
 
 impl<'page> PageRef<'page> {
