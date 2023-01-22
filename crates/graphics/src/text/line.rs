@@ -3,19 +3,41 @@ use swash::{
     scale::{image::Image, Render, ScaleContext, Source, StrikeWith},
     shape::{ShapeContext, Shaper},
     text::{
-        cluster::{CharCluster, Parser, Status, Token},
+        cluster::{CharCluster, Parser, SourceRange, Status, Token},
         Script,
     },
-    CacheKey, FontRef,
+    CacheKey, FontRef, GlyphId,
 };
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                               Glyph                                            //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+/// A shaped glyph.
+#[derive(Copy, Clone, Debug)]
+pub struct Glyph {
+    /// Glyph id.
+    pub id: GlyphId,
+    /// Glyph advance.
+    pub advance: Advance,
+    /// Range in the underlying string.
+    pub range: SourceRange,
+    /// Key of the font.
+    pub key: CacheKey,
+    /// Glyph color.
+    pub color: Rgb,
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Line                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+/// A line of shaped [`Glyph`]s.
 #[derive(Clone, Debug)]
 pub struct Line {
+    /// Glyphs.
     glyphs: Vec<Glyph>,
+    /// Font size.
     size: FontSize,
 }
 

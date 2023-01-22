@@ -10,14 +10,10 @@
 
 mod context;
 mod font;
-mod fonts;
-mod glyph;
 mod line;
 
 pub use context::*;
 pub use font::*;
-pub use fonts::*;
-pub use glyph::*;
 pub use line::*;
 
 /// Font size unit (`u8`).
