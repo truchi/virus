@@ -28,30 +28,21 @@ impl Builder {
     /// Pushes `str` to this [`Builder`]'s [`Text`].
     pub fn push_str(&mut self, mut str: &str) {
         loop {
-            let (info, rest) = unsafe { self.buffer_mut() }.push_str(str);
-            self.info += info;
+            str = unsafe { self.buffer_mut() }.push_str(str);
 
-            if rest.is_empty() {
+            if str.is_empty() {
                 return;
             } else {
                 self.flush_buffer();
-                str = rest;
             }
         }
     }
 
     /// Pushes `char` to this [`Builder`]'s [`Text`].
     pub fn push_char(&mut self, char: char) {
-        let (info, char) = unsafe { self.buffer_mut() }.push_char(char);
-        self.info += info;
-
-        if let Some(char) = char {
+        if unsafe { self.buffer_mut() }.push_char(char).is_some() {
             self.flush_buffer();
-
-            let (info, char) = unsafe { self.buffer_mut() }.push_char(char);
-            self.info += info;
-
-            debug_assert!(char.is_none());
+            unsafe { self.buffer_mut() }.push_char(char);
         }
     }
 
@@ -67,7 +58,7 @@ impl Builder {
 
 impl Builder {
     unsafe fn buffer_mut(&mut self) -> BufferMut {
-        BufferMut::from_buffer(&mut self.buffer, self.info.bytes, self.info.feeds)
+        BufferMut::from_buffer(&mut self.buffer, &mut self.info)
     }
 
     fn flush_buffer(&mut self) {

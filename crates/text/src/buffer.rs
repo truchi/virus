@@ -63,75 +63,64 @@ impl<'buffer> BufferRef<'buffer> {
 #[derive(Debug)]
 pub struct BufferMut<'buffer> {
     buffer: &'buffer mut Buffer,
-    bytes: usize,
-    feeds: usize,
+    info: &'buffer mut Info,
 }
 
 impl<'buffer> BufferMut<'buffer> {
-    pub unsafe fn from_buffer(buffer: &'buffer mut Buffer, bytes: usize, feeds: usize) -> Self {
-        debug_assert!(if let Ok(str) = std::str::from_utf8(&buffer.0[..bytes]) {
-            count_feeds(str) == feeds
-        } else {
-            false
-        });
+    pub unsafe fn from_buffer(buffer: &'buffer mut Buffer, info: &'buffer mut Info) -> Self {
+        debug_assert!(
+            if let Ok(str) = std::str::from_utf8(&buffer.0[..info.bytes]) {
+                count_feeds(str) == info.feeds
+            } else {
+                false
+            }
+        );
 
-        Self {
-            buffer,
-            bytes,
-            feeds,
-        }
+        Self { buffer, info }
     }
 
     pub fn as_str(&self) -> &str {
-        unsafe { unchecked(&self.buffer.0[..self.bytes]) }
+        unsafe { unchecked(&self.buffer.0[..self.info.bytes]) }
     }
 
     pub fn bytes(&self) -> usize {
-        self.bytes
+        self.info.bytes
     }
 
     pub fn feeds(&self) -> usize {
-        self.feeds
+        self.info.feeds
     }
 
     pub fn as_ref(&self) -> BufferRef {
         BufferRef {
             str: self.as_str(),
-            feeds: self.feeds,
+            feeds: self.feeds(),
         }
     }
 
-    pub fn push_str<'str>(&mut self, str: &'str str) -> (Info, &'str str) {
+    pub fn push_str<'str>(&mut self, str: &'str str) -> &'str str {
         let bytes = self.bytes();
         let (s, rest) = split_at(str, Buffer::CAPACITY - bytes);
 
         self.buffer.0[bytes..][..s.len()].copy_from_slice(s.as_bytes());
-        let info = Info {
-            bytes: s.len(),
-            feeds: s.matches('\n').count(),
-        };
-        self.bytes += info.bytes;
-        self.feeds += info.feeds;
+        self.info.bytes += s.len();
+        self.info.feeds += s.matches('\n').count();
 
-        (info, rest)
+        rest
     }
 
-    pub fn push_char(&mut self, char: char) -> (Info, Option<char>) {
+    pub fn push_char(&mut self, char: char) -> Option<char> {
         let bytes = self.bytes();
         let char_len = char.len_utf8();
 
         if bytes + char_len <= Buffer::CAPACITY {
             char.encode_utf8(&mut self.buffer.0[bytes..][..char_len]);
-            let info = Info {
-                bytes: char_len,
-                feeds: (char == '\n') as usize,
-            };
-            self.bytes += info.bytes;
-            self.feeds += info.feeds;
+            self.info.bytes += char_len;
+            self.info.feeds += (char == '\n') as usize;
 
-            (info, None)
+            None
         } else {
-            (Info::default(), Some(char))
+            Some(char)
         }
     }
 }
