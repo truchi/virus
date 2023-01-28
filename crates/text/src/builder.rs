@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use crate::{
     buffer::{Buffer, BufferMut},
-    child::Child,
     info::Info,
     text::Text,
     Internal, Leaf, Node,
@@ -64,7 +63,7 @@ impl Builder {
     fn flush_buffer(&mut self) {
         let buffer = std::mem::take(&mut self.buffer);
         let info = std::mem::take(&mut self.info);
-        let child = Child::new(Arc::new(Node::Leaf(Leaf::new(buffer))), info);
+        let child = Text::new(Arc::new(Node::Leaf(Leaf::new(buffer))), info);
 
         if let Some(child) = self.internal.push(child) {
             self.flush_internal();
@@ -75,7 +74,7 @@ impl Builder {
     fn flush_internal(&mut self) {
         let internal = std::mem::take(&mut self.internal);
         let info = internal.info();
-        let child = Child::new(Arc::new(Node::Internal(internal)), info);
+        let child = Text::new(Arc::new(Node::Internal(internal)), info);
 
         self.internal.push(child);
     }

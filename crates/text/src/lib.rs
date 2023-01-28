@@ -2,7 +2,6 @@
 
 pub mod buffer;
 pub mod builder;
-pub mod child;
 pub mod info;
 pub mod internal;
 pub mod text;

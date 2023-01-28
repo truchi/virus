@@ -8,6 +8,17 @@ pub struct Text {
 }
 
 impl Text {
+    pub fn new(node: Arc<Node>, info: Info) -> Self {
+        Self { node, info }
+    }
+
+    pub fn info(&self) -> Info {
+        self.info
+    }
+
+    pub fn node(&self) -> &Arc<Node> {
+        &self.node
+    }
     pub fn leaves<T: FnMut(Info, &Leaf)>(&self, f: T) {
         self.node.leaves(f, self.info);
     }

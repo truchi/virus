@@ -1,9 +1,9 @@
-use crate::{child::Child, info::Info, Node};
+use crate::{info::Info, text::Text, Node};
 use std::sync::Arc;
 
 #[derive(Clone, Default, Debug)]
 pub struct Internal {
-    children: [Option<Child>; Self::CAPACITY],
+    children: [Option<Text>; Self::CAPACITY],
     len: usize,
     info: Info,
 }
@@ -23,7 +23,7 @@ impl Internal {
         self.info
     }
 
-    pub fn push(&mut self, child: Child) -> Option<Child> {
+    pub fn push(&mut self, child: Text) -> Option<Text> {
         if self.len == Self::CAPACITY {
             Some(child)
         } else {
@@ -35,7 +35,7 @@ impl Internal {
         }
     }
 
-    pub fn children(&self) -> impl Iterator<Item = &Child> {
+    pub fn children(&self) -> impl Iterator<Item = &Text> {
         let mut i = 0;
         std::iter::from_fn(move || {
             //
