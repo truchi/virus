@@ -13,7 +13,7 @@ fn main() {
 
     let text = rope.build();
 
-    // dbg!(&text);
+    dbg!(&text);
 
     let mut i = 0;
     text.leaves(|info, leaf| {

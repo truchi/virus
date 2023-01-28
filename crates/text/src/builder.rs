@@ -46,11 +46,20 @@ impl Builder {
     }
 
     pub fn build(mut self) -> Text {
-        self.flush_buffer();
-        let info = self.internal.info();
-        Text {
-            node: Arc::new(Node::Internal(self.internal)),
-            info,
+        if self.info.bytes != 0 {
+            self.flush_buffer();
+        }
+
+        if self.internal.len() == 1 {
+            let [text, ..] = self.internal.children;
+            text.unwrap()
+        } else {
+            let info = self.internal.info();
+
+            Text {
+                node: Arc::new(Node::Internal(self.internal)),
+                info,
+            }
         }
     }
 }
@@ -61,6 +70,8 @@ impl Builder {
     }
 
     fn flush_buffer(&mut self) {
+        debug_assert!(self.info.bytes != 0);
+
         let buffer = std::mem::take(&mut self.buffer);
         let info = std::mem::take(&mut self.info);
         let child = Text::new(Arc::new(Node::Leaf(Leaf::new(buffer))), info);
@@ -72,6 +83,8 @@ impl Builder {
     }
 
     fn flush_internal(&mut self) {
+        debug_assert!(self.internal.info().bytes != 0);
+
         let internal = std::mem::take(&mut self.internal);
         let info = internal.info();
         let child = Text::new(Arc::new(Node::Internal(internal)), info);

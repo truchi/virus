@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 #[derive(Clone, Default, Debug)]
 pub struct Internal {
-    children: [Option<Text>; Self::CAPACITY],
+    pub children: [Option<Text>; Self::CAPACITY],
     len: usize,
     info: Info,
 }
@@ -17,6 +17,10 @@ impl Internal {
             len: 0,
             info: Info::default(),
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
     }
 
     pub fn info(&self) -> Info {
@@ -38,7 +42,6 @@ impl Internal {
     pub fn children(&self) -> impl Iterator<Item = &Text> {
         let mut i = 0;
         std::iter::from_fn(move || {
-            //
             if i < self.len {
                 let child = self.children[i].as_ref();
                 debug_assert!(child.is_some());
