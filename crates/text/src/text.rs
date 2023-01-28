@@ -1,19 +1,14 @@
-use crate::{info::Info, Node};
+use crate::{info::Info, Leaf, Node};
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub struct Text {
-    node: Arc<Node>,
-    info: Info,
+    pub node: Arc<Node>,
+    pub info: Info,
 }
 
 impl Text {
-    fn debug(&self) {
-        fn debug(node: Node, info: Info) {}
-
-        match self.node.as_ref() {
-            Node::Internal(internal) => todo!(),
-            Node::Leaf(leaf) => todo!(),
-        }
+    pub fn leaves<T: FnMut(Info, &Leaf)>(&self, f: T) {
+        self.node.leaves(f, self.info);
     }
 }

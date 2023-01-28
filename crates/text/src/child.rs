@@ -1,4 +1,4 @@
-use crate::{info::Info, Node};
+use crate::{info::Info, Leaf, Node};
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
@@ -10,6 +10,10 @@ pub struct Child {
 impl Child {
     pub fn new(node: Arc<Node>, info: Info) -> Self {
         Self { node, info }
+    }
+
+    pub fn node(&self) -> &Arc<Node> {
+        &self.node
     }
 
     pub fn info(&self) -> Info {

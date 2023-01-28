@@ -34,4 +34,19 @@ impl Internal {
             None
         }
     }
+
+    pub fn children(&self) -> impl Iterator<Item = &Child> {
+        let mut i = 0;
+        std::iter::from_fn(move || {
+            //
+            if i < self.len {
+                let child = self.children[i].as_ref();
+                debug_assert!(child.is_some());
+                i += 1;
+                child
+            } else {
+                None
+            }
+        })
+    }
 }

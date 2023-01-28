@@ -9,6 +9,7 @@ pub mod text;
 pub mod utils;
 
 use buffer::*;
+use info::Info;
 use internal::*;
 
 use std::sync::Arc;
@@ -19,9 +20,24 @@ pub enum Node {
     Leaf(Leaf),
 }
 
+impl Node {
+    pub fn leaves<T: FnMut(Info, &Leaf)>(&self, mut f: T, info: Info) -> T {
+        match self {
+            Node::Internal(internal) => {
+                for child in internal.children() {
+                    f = child.node().leaves(f, child.info());
+                }
+            }
+            Node::Leaf(leaf) => f(info, leaf),
+        }
+
+        f
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Leaf {
-    buffer: Buffer,
+    pub buffer: Buffer,
 }
 
 impl Leaf {

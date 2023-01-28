@@ -1,4 +1,7 @@
-use crate::utils::{count_feeds, split_at, unchecked};
+use crate::{
+    info::Info,
+    utils::{count_feeds, split_at, unchecked},
+};
 use std::{mem::size_of, sync::atomic::AtomicUsize};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -98,29 +101,37 @@ impl<'buffer> BufferMut<'buffer> {
         }
     }
 
-    pub fn push_str<'str>(&mut self, str: &'str str) -> &'str str {
+    pub fn push_str<'str>(&mut self, str: &'str str) -> (Info, &'str str) {
         let bytes = self.bytes();
         let (s, rest) = split_at(str, Buffer::CAPACITY - bytes);
 
         self.buffer.0[bytes..][..s.len()].copy_from_slice(s.as_bytes());
-        self.bytes += s.len();
-        self.feeds += s.matches('\n').count();
+        let info = Info {
+            bytes: s.len(),
+            feeds: s.matches('\n').count(),
+        };
+        self.bytes += info.bytes;
+        self.feeds += info.feeds;
 
-        rest
+        (info, rest)
     }
 
-    pub fn push_char(&mut self, char: char) -> Option<char> {
+    pub fn push_char(&mut self, char: char) -> (Info, Option<char>) {
         let bytes = self.bytes();
         let char_len = char.len_utf8();
 
         if bytes + char_len <= Buffer::CAPACITY {
             char.encode_utf8(&mut self.buffer.0[bytes..][..char_len]);
-            self.bytes += char_len;
-            self.feeds += (char == '\n') as usize;
+            let info = Info {
+                bytes: char_len,
+                feeds: (char == '\n') as usize,
+            };
+            self.bytes += info.bytes;
+            self.feeds += info.feeds;
 
-            None
+            (info, None)
         } else {
-            Some(char)
+            (Info::default(), Some(char))
         }
     }
 }

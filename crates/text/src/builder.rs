@@ -4,6 +4,7 @@ use crate::{
     buffer::{Buffer, BufferMut},
     child::Child,
     info::Info,
+    text::Text,
     Internal, Leaf, Node,
 };
 
@@ -25,23 +26,41 @@ impl Builder {
     }
 
     /// Pushes `str` to this [`Builder`]'s [`Text`].
-    pub fn push_str(&mut self, str: &str) {
+    pub fn push_str(&mut self, mut str: &str) {
         loop {
-            let str = unsafe { self.buffer_mut() }.push_str(str);
+            let (info, rest) = unsafe { self.buffer_mut() }.push_str(str);
+            self.info += info;
 
-            if str.is_empty() {
+            if rest.is_empty() {
                 return;
             } else {
                 self.flush_buffer();
+                str = rest;
             }
         }
     }
 
     /// Pushes `char` to this [`Builder`]'s [`Text`].
     pub fn push_char(&mut self, char: char) {
-        if unsafe { self.buffer_mut() }.push_char(char).is_some() {
+        let (info, char) = unsafe { self.buffer_mut() }.push_char(char);
+        self.info += info;
+
+        if let Some(char) = char {
             self.flush_buffer();
-            unsafe { self.buffer_mut() }.push_char(char);
+
+            let (info, char) = unsafe { self.buffer_mut() }.push_char(char);
+            self.info += info;
+
+            debug_assert!(char.is_none());
+        }
+    }
+
+    pub fn build(mut self) -> Text {
+        self.flush_buffer();
+        let info = self.internal.info();
+        Text {
+            node: Arc::new(Node::Internal(self.internal)),
+            info,
         }
     }
 }

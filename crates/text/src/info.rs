@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign};
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 #[derive(Copy, Clone, Default, Debug)]
 pub struct Info {
@@ -20,5 +20,22 @@ impl Add for Info {
 impl AddAssign for Info {
     fn add_assign(&mut self, info: Self) {
         *self = *self + info;
+    }
+}
+
+impl Sub for Info {
+    type Output = Self;
+
+    fn sub(self, info: Self) -> Self::Output {
+        Self {
+            bytes: self.bytes - info.bytes,
+            feeds: self.feeds - info.feeds,
+        }
+    }
+}
+
+impl SubAssign for Info {
+    fn sub_assign(&mut self, info: Self) {
+        *self = *self - info;
     }
 }
