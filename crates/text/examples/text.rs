@@ -20,7 +20,11 @@ fn main() {
         dbg!(i, info);
         i += 1;
 
-        let buff = unsafe { BufferRef::from_buffer(&leaf.buffer, info.bytes, info.feeds) };
+        let buff = unsafe { BufferRef::from_buffer(&leaf.buffer, info) };
         dbg!(buff);
     });
+
+    let cursor = text.cursor(1600);
+
+    dbg!(cursor);
 }

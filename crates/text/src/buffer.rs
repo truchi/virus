@@ -8,7 +8,7 @@ use std::{mem::size_of, sync::atomic::AtomicUsize};
 //                                              Buffer                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct Buffer([u8; Self::CAPACITY]);
 
 impl Buffer {
@@ -25,6 +25,12 @@ impl Default for Buffer {
     }
 }
 
+impl std::fmt::Debug for Buffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{:?}", unsafe { unchecked(&self.0) }))
+    }
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             BufferRef                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -36,7 +42,8 @@ pub struct BufferRef<'buffer> {
 }
 
 impl<'buffer> BufferRef<'buffer> {
-    pub unsafe fn from_buffer(buffer: &'buffer Buffer, bytes: usize, feeds: usize) -> Self {
+    pub unsafe fn from_buffer(buffer: &'buffer Buffer, info: Info) -> Self {
+        let Info { bytes, feeds } = info;
         let str = unchecked(&buffer.0[..bytes]);
 
         debug_assert!(count_feeds(str) == feeds);

@@ -39,17 +39,34 @@ impl Internal {
         }
     }
 
-    pub fn children(&self) -> impl Iterator<Item = &Text> {
-        let mut i = 0;
+    pub fn children(&self) -> impl Iterator<Item = (Info, &Text)> {
+        let mut iter = self.children[..self.len].iter();
+        let mut offset = Info::default();
+
         std::iter::from_fn(move || {
-            if i < self.len {
-                let child = self.children[i].as_ref();
-                debug_assert!(child.is_some());
-                i += 1;
-                child
+            let offset_ = offset;
+            let child = iter.next()?.as_ref();
+            debug_assert!(child.is_some());
+
+            if let Some(child) = child {
+                offset += child.info;
+                Some((offset_, child))
             } else {
+                debug_assert!(false);
                 None
             }
         })
+
+        // let mut i = 0;
+        // std::iter::from_fn(move || {
+        //     if i < self.len {
+        //         let child = self.children[i].as_ref();
+        //         debug_assert!(child.is_some());
+        //         i += 1;
+        //         child
+        //     } else {
+        //         None
+        //     }
+        // })
     }
 }
