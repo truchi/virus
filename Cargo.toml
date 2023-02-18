@@ -8,6 +8,7 @@ authors = ["Romain TRUCHI"]
 edition = "2021"
 
 [workspace.dependencies]
+virus-editor = { path = "crates/editor", package = "editor" }
 virus-graphics = { path = "crates/graphics", package = "graphics" }
 
 lru = "0.9.0"
