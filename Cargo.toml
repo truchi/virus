@@ -13,6 +13,9 @@ pixels = "0.11"
 skia = { version = "0.8", package = "tiny-skia" }
 swash = "0.1.6"
 winit = "0.27"
+tree-sitter = "0.20"
+tree-sitter-rust = "0.20"
+ropey = "1.5"
 
 [profile.dev]
 debug = false

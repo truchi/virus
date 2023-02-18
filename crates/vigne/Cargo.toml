@@ -1,9 +1,10 @@
 [package]
 name = "vigne"
 version = "0.1.0"
-edition = "2021"
+authors.workspace = true
+edition.workspace = true
 
 [dependencies]
-tree-sitter = "0.20"
-tree-sitter-rust = "0.20"
-ropey = "1.5"
+tree-sitter.workspace = true
+tree-sitter-rust.workspace = true
+ropey.workspace = true
