@@ -18,6 +18,14 @@ pub struct Cursor {
 }
 
 impl Cursor {
+    pub fn new(index: usize, line: usize, column: usize) -> Self {
+        Self {
+            index,
+            line,
+            column,
+        }
+    }
+
     pub fn index(&self) -> usize {
         self.index
     }
@@ -55,23 +63,20 @@ impl Language {
         }
     }
 
-    pub fn parser(&self) -> Option<Parser> {
-        self.tree_sitter_language().map(|language| {
-            let mut parser = Parser::new();
-            parser.set_language(language).unwrap();
-            parser
-        })
-    }
-}
-
-/// Private.
-impl Language {
-    fn tree_sitter_language(&self) -> Option<tree_sitter::Language> {
+    pub fn language(&self) -> Option<tree_sitter::Language> {
         match self {
             Self::Rust => Some(tree_sitter_rust::language()),
             Self::Yaml => None,
             Self::Markdown => None,
         }
+    }
+
+    pub fn parser(&self) -> Option<Parser> {
+        self.language().map(|language| {
+            let mut parser = Parser::new();
+            parser.set_language(language).unwrap();
+            parser
+        })
     }
 }
 
@@ -143,6 +148,42 @@ impl Document {
         Ok(())
     }
 
+    // path: Option<String>,
+    // rope: Rope,
+    // selection: Range<Cursor>,
+    // language: Option<Language>,
+    // parser: Option<Parser>,
+    // tree: Option<Tree>,
+    // dirty: bool,
+
+    pub fn path(&self) -> Option<&str> {
+        self.path.as_ref().map(|path| path.as_str())
+    }
+
+    pub fn rope(&self) -> &Rope {
+        &self.rope
+    }
+
+    pub fn selection(&self) -> Range<Cursor> {
+        self.selection.clone()
+    }
+
+    pub fn language(&self) -> Option<Language> {
+        self.language
+    }
+
+    pub fn parser(&self) -> Option<&Parser> {
+        self.parser.as_ref()
+    }
+
+    pub fn tree(&self) -> Option<&Tree> {
+        self.tree.as_ref()
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
     pub fn edit_str(&mut self, str: &str) {
         // TODO edit cursors and tree
 
@@ -191,7 +232,10 @@ impl Document {
     pub fn parse(&mut self) -> Option<&Tree> {
         if let Some(parser) = self.parser.as_mut() {
             self.tree = parser.parse_with(
-                &mut |index, _| self.rope.chunk_at_byte(index).0,
+                &mut |index, _| {
+                    let (chunk, chunk_index, ..) = self.rope.chunk_at_byte(index);
+                    &chunk[index - chunk_index..]
+                },
                 self.tree.as_ref(),
             );
         }
