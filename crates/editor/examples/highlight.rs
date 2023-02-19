@@ -1,7 +1,8 @@
-use editor::{Cursor, Document};
+use editor::Document;
 use ropey::Rope;
-use std::{borrow::Cow, cmp::Ordering, ops::Range};
+use std::{borrow::Cow, ops::Range};
 use tree_sitter::{Node, Point, Query, QueryCursor};
+use virus_common::{Cursor, Rgba};
 
 const HIGHLIGHT_QUERY: &str = include_str!("../treesitter/rust/highlights.scm");
 
@@ -32,14 +33,6 @@ fn main() {
             print!("\x1B[0;30m{cow}\x1B[0m");
         }
     }
-}
-
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
-pub struct Rgba {
-    r: u8,
-    g: u8,
-    b: u8,
-    a: u8,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]

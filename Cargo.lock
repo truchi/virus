@@ -208,6 +208,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "common"
+version = "0.1.0"
+
+[[package]]
 name = "core-foundation"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -383,6 +387,7 @@ dependencies = [
 name = "editor"
 version = "0.1.0"
 dependencies = [
+ "common",
  "ropey",
  "tree-sitter",
  "tree-sitter-rust",
@@ -553,6 +558,7 @@ dependencies = [
 name = "graphics"
 version = "0.1.0"
 dependencies = [
+ "common",
  "lru",
  "swash",
 ]

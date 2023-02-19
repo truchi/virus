@@ -1,4 +1,4 @@
-use crate::{text::*, Rgb};
+use crate::text::*;
 use swash::{
     scale::{image::Image, Render, ScaleContext, Source, StrikeWith},
     shape::{ShapeContext, Shaper},
@@ -8,6 +8,7 @@ use swash::{
     },
     CacheKey, FontRef, GlyphId,
 };
+use virus_common::Rgb;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                               Glyph                                            //
