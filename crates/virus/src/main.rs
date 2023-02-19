@@ -26,7 +26,6 @@ fn main() -> Result<(), Error> {
 
     let document =
         Document::open("/home/romain/perso/virus/crates/virus/src/main.rs".into()).unwrap();
-    dbg!(&document);
 
     let mut fps_counter = fps::FpsCounter::new();
 
