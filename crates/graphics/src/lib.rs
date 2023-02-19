@@ -1,3 +1,4 @@
+pub mod pixels_mut;
 pub mod text;
 
 /// Re-exports.
@@ -16,7 +17,7 @@ pub mod reexports {
     }
 }
 
-/// An rgb color.
+/// A RGB color.
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
 pub struct Rgb {
     r: u8,
@@ -39,4 +40,13 @@ impl Rgb {
     pub const fn grey(grey: u8) -> Self {
         Self::new(grey, grey, grey)
     }
+}
+
+/// A RGBA color.
+#[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
+pub struct Rgba {
+    r: u8,
+    g: u8,
+    b: u8,
+    a: u8,
 }

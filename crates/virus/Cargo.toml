@@ -5,8 +5,8 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
+virus-editor.workspace = true
 virus-graphics.workspace = true
 
 pixels.workspace = true
 winit.workspace = true
-skia.workspace = true

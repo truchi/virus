@@ -1,59 +1,66 @@
-use pixels::{Error, Pixels, SurfaceTexture};
-use skia::Pixmap;
-use std::time::Instant;
-use winit::dpi::LogicalSize;
-use winit::event::Event;
-use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::WindowBuilder;
-
-mod shape;
-
-const WIDTH: u32 = 500;
-const HEIGHT: u32 = 500;
+use pixels::{Error, Pixels, PixelsBuilder, SurfaceTexture};
+use virus_editor::Document;
+use virus_graphics::pixels_mut::PixelsMut;
+use winit::dpi::PhysicalSize;
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::EventLoop;
+use winit::window::{Fullscreen, Window, WindowBuilder};
 
 fn main() -> Result<(), Error> {
     let event_loop = EventLoop::new();
     let window = {
-        let size = LogicalSize::new(WIDTH as f64, HEIGHT as f64);
-        WindowBuilder::new()
-            .with_title("Hello tiny-skia")
-            .with_inner_size(size)
-            .with_min_inner_size(size)
+        let window = WindowBuilder::new()
+            .with_title("virus")
+            .with_inner_size(PhysicalSize::new(1, 1))
+            .with_fullscreen(Some(Fullscreen::Borderless(None)))
             .build(&event_loop)
-            .unwrap()
+            .unwrap();
+        window.set_cursor_visible(false);
+        window
     };
 
     let mut pixels = {
-        let window_size = window.inner_size();
-        let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
-
-        let start = Instant::now();
-        let pixels = Pixels::new(WIDTH, HEIGHT, surface_texture)?;
-        println!("Took {:?} to init wgpu :'(", start.elapsed());
-
-        pixels
+        let PhysicalSize { width, height } = window.inner_size();
+        Pixels::new(width, height, SurfaceTexture::new(width, height, &window)).unwrap()
     };
 
-    let mut drawing = Pixmap::new(WIDTH, HEIGHT).unwrap();
-    let now = Instant::now();
+    let document =
+        Document::open("/home/romain/perso/virus/crates/virus/src/main.rs".into()).unwrap();
+    dbg!(&document);
 
     let mut fps_counter = fps::FpsCounter::new();
 
     event_loop.run(move |event, _, control_flow| {
+        if let Event::WindowEvent {
+            event: WindowEvent::Resized(PhysicalSize { width, height }),
+            ..
+        } = event
+        {
+            pixels.resize_surface(width, height).unwrap();
+            pixels.resize_buffer(width, height).unwrap();
+        }
+
         // Draw the current frame
         if let Event::RedrawRequested(_) = event {
-            pixels.get_frame_mut().copy_from_slice(drawing.data());
-            if let Err(err) = pixels.render() {
-                eprintln!("pixels.render() failed: {err}");
-                *control_flow = ControlFlow::Exit;
-                return;
+            let pixels_mut = {
+                let PhysicalSize { width, height } = window.inner_size();
+                PixelsMut::new(width, height, pixels.get_frame_mut())
+            };
+
+            for (i, u) in pixels.get_frame_mut().iter_mut().enumerate() {
+                *u = match i % 4 {
+                    0 => 255,
+                    1 => 0,
+                    2 => 0,
+                    _ => 255,
+                };
             }
+
+            pixels.render().unwrap();
         }
 
         // Update internal state and request a redraw
-        shape::draw(&mut drawing, now.elapsed().as_secs_f32());
         window.request_redraw();
-
         fps_counter.tick();
     });
 }
