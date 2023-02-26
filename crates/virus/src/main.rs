@@ -1,3 +1,18 @@
+const _MULTILINE: &str = "111
+222
+222
+222
+222
+333";
+
+const _MULTILINE2: &str = "111
+222
+333";
+
+const _MULTILINE3: &str = "111
+222
+333";
+
 use pixels::{Error, Pixels, PixelsBuilder, SurfaceTexture};
 use virus_editor::Document;
 use virus_graphics::pixels_mut::PixelsMut;
@@ -67,6 +82,7 @@ fn main() -> Result<(), Error> {
 mod fps {
     use std::time::Instant;
 
+    #[derive(Debug)]
     pub struct FpsCounter {
         array: [u128; Self::CAP],
         len: usize,

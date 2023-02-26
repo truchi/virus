@@ -1,6 +1,5 @@
 use ropey::Rope;
 use std::{
-    borrow::Cow,
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Write},
     ops::Range,
@@ -244,8 +243,8 @@ impl Document {
     pub fn edit_str(&mut self, str: &str) {
         // TODO edit cursors and tree
 
-        let start = self.selection.start.index();
-        let end = self.selection.end.index();
+        let start = self.selection.start.index;
+        let end = self.selection.end.index;
         let start_char = self.rope.byte_to_char(start);
         let mut dirty = false;
 
@@ -268,8 +267,8 @@ impl Document {
     pub fn edit_char(&mut self, char: char) {
         // TODO edit cursors and tree
 
-        let start = self.selection.start.index();
-        let end = self.selection.end.index();
+        let start = self.selection.start.index;
+        let end = self.selection.end.index;
         let start_char = self.rope.byte_to_char(start);
         let mut dirty = false;
 
@@ -305,168 +304,199 @@ impl Document {
 //                                           Highlights                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Debug)]
-pub struct Highlights<'tree, 'rope, 'theme> {
-    root: Node<'tree>,
-    rope: &'rope Rope,
-    lines: Range<usize>,
-    query: Query,
-    theme: &'theme Theme,
+#[derive(Copy, Clone, Debug)]
+pub struct Highlight {
+    pub start: Cursor,
+    pub end: Cursor,
+    pub style: Option<Style>,
 }
 
-impl<'tree, 'rope, 'theme> Highlights<'tree, 'rope, 'theme> {
+/// Procuces an iterator of [`Highlight`]s.
+pub struct Highlights<'tree, 'rope> {
+    rope: &'rope Rope,
+    root: Node<'tree>,
+    start: Cursor,
+    end: Cursor,
+    query: Query,
+    theme: Theme,
+}
+
+impl<'tree, 'rope> Highlights<'tree, 'rope> {
+    /// Creates a new [`Highlights`] for `rope` with `root`,
+    /// clamped by `lines`, for `query` with `theme`.
     pub fn new(
-        root: Node<'tree>,
         rope: &'rope Rope,
+        root: Node<'tree>,
         lines: Range<usize>,
         query: Query,
-        theme: &'theme Theme,
+        theme: Theme,
     ) -> Self {
+        let Range { start, end } = lines;
+        let start = Cursor::new(rope.try_line_to_byte(start).unwrap(), start, 0);
+        let end = Cursor::new(rope.try_line_to_byte(end).unwrap(), end, 0);
+
         Self {
-            root,
             rope,
+            root,
             query,
-            lines,
+            start,
+            end,
             theme,
         }
     }
 
-    pub fn iter(
-        &self,
-    ) -> impl '_ + Iterator<Item = (Range<Cursor>, Cow<'rope, str>, Option<&'theme Style>)> {
-        let items = {
-            struct Item<'a> {
-                node: Node<'a>,
+    /// Returns an iterator of [`Highlight`]s.
+    pub fn iter(&self) -> impl '_ + Iterator<Item = Highlight> {
+        // Use `tree-sitter` to get a sorted list of catpures for `self.query`
+        let captures = if (self.start.line..self.end.line).is_empty() {
+            vec![]
+        } else {
+            #[derive(Debug)] // TODO remove
+            struct Capture {
+                start: Cursor,
+                end: Cursor,
                 pattern: usize,
                 capture: usize,
             }
 
-            // We want all captures ordered by start index,
-            // favoring lower pattern index when captured multiple times.
-            // This is what Helix does, and we use their queries.
-            // Seems like pattern are writen in that specific order.
-            let mut items = Vec::<Item>::new();
+            let mut captures = Vec::<Capture>::new();
+            let mut cursor = {
+                let start = Point::new(self.start.line, 0);
+                let end = Point::new(self.end.line, 0);
+                let mut cursor = QueryCursor::new();
+                cursor.set_point_range(start..end);
+                cursor
+            };
+            let it = cursor
+                .matches(&self.query, self.root, |node: Node| {
+                    self.rope
+                        .get_byte_slice(node.byte_range())
+                        .unwrap()
+                        .chunks()
+                        .map(|chunk| chunk.as_bytes())
+                })
+                .map(|captures| {
+                    captures.captures.into_iter().map(move |capture| Capture {
+                        start: Cursor::new(
+                            capture.node.start_byte(),
+                            capture.node.start_position().row,
+                            capture.node.start_position().column,
+                        ),
+                        end: Cursor::new(
+                            capture.node.end_byte(),
+                            capture.node.end_position().row,
+                            capture.node.end_position().column,
+                        ),
+                        pattern: captures.pattern_index,
+                        capture: capture.index as usize,
+                    })
+                })
+                .flatten();
 
-            let mut cursor = QueryCursor::new();
-            cursor.set_point_range(Point::new(self.lines.start, 0)..Point::new(self.lines.end, 0));
-
-            let matches = cursor.matches(&self.query, self.root, |node: Node| {
-                self.rope
-                    .get_byte_slice(node.byte_range())
-                    .unwrap()
-                    .chunks()
-                    .map(|chunk| chunk.as_bytes())
-            });
-
-            for captures in matches {
-                let pattern = captures.pattern_index;
-
-                for capture in captures.captures {
-                    let node = capture.node;
-                    let capture = capture.index as usize;
-
-                    match items
-                        .binary_search_by_key(&node.start_byte(), |item| item.node.start_byte())
-                    {
-                        Ok(index) => {
-                            // Favoring lower index pattern.
-                            if items[index].pattern > pattern {
-                                items[index].capture = capture
-                            }
+            for capture in it {
+                // We want all captures ordered by start index,
+                // favoring lower pattern index when captured multiple times.
+                // This is what `Helix` does, and we use their queries.
+                // It seems like patterns are written in that specific order.
+                match captures
+                    .binary_search_by_key(&capture.start.index, |capture| capture.start.index)
+                {
+                    Ok(index) => {
+                        // Favoring lower index pattern
+                        if captures[index].pattern > capture.pattern {
+                            captures[index].capture = capture.capture
                         }
-                        Err(index) => {
-                            // Captures must not overlap, otherwise what can we do?
-                            debug_assert!(
-                                if let Some(prev) = index.checked_sub(1) {
-                                    if let Some(prev) = items.get(prev) {
-                                        prev.node.end_byte() <= node.start_byte()
-                                    } else {
-                                        true
-                                    }
-                                } else {
-                                    true
-                                },
-                                "overlapping capture",
-                            );
+                    }
+                    Err(index) => {
+                        // Captures must not overlap, otherwise what can we do?
+                        debug_assert!(
+                            index
+                                .checked_sub(1)
+                                .map(|prev| captures[prev].end.index <= capture.start.index)
+                                .unwrap_or(true),
+                            "overlapping capture",
+                        );
 
-                            items.insert(
-                                index,
-                                Item {
-                                    node,
-                                    pattern,
-                                    capture,
-                                },
-                            );
-                        }
+                        captures.insert(index, capture);
                     }
                 }
             }
 
-            items
+            captures
         };
 
-        let mut cursor = Cursor::default();
-        let mut items = items.into_iter().peekable();
+        // Intersperse with in-between selections
+        let highlights = {
+            let mut prev = Option::<Highlight>::None;
+            let mut highlights = captures
+                .into_iter()
+                .map(|highlight| Highlight {
+                    start: highlight.start,
+                    end: highlight.end,
+                    style: self
+                        .theme
+                        .get(&self.query.capture_names()[highlight.capture])
+                        .copied(),
+                })
+                .peekable();
 
-        std::iter::from_fn(move || {
-            if let Some(item) = items.peek() {
-                let start = Cursor::new(
-                    item.node.start_byte(),
-                    item.node.start_position().row,
-                    item.node.start_position().column,
-                );
-                let end = Cursor::new(
-                    item.node.end_byte(),
-                    item.node.end_position().row,
-                    item.node.end_position().column,
-                );
-                assert!(cursor.index() <= start.index());
+            std::iter::from_fn(move || {
+                if let Some(prev) = prev.take() {
+                    let next = highlights.peek()?;
 
-                // Before item
-                if cursor.index() != start.index() {
-                    let selection = cursor..start;
-                    cursor = start;
-
-                    Some((selection.clone(), self.cow(selection), None))
+                    Some(Highlight {
+                        start: prev.end,
+                        end: next.start,
+                        style: None,
+                    })
+                } else {
+                    prev = highlights.next();
+                    prev
                 }
-                // Item
-                else {
-                    let selection = start..end;
-                    cursor = end;
+            })
+            .filter(|highlight| highlight.start.index != highlight.end.index)
+        };
 
-                    Some((
-                        selection.clone(),
-                        self.cow(selection),
-                        self.style(items.next().unwrap().capture),
-                    ))
+        // Slice highlights to line boundaries
+        let highlights = {
+            let mut highlights = highlights;
+            let mut next = highlights.next();
+
+            std::iter::from_fn(move || {
+                let highlight = next?;
+
+                if highlight.start.line == highlight.end.line {
+                    next = highlights.next();
+                    Some(highlight)
+                } else {
+                    // FIXME: this supposes `\n` boundaries!
+                    let index = self
+                        .rope
+                        .try_line_to_byte(highlight.start.line + 1)
+                        .unwrap()
+                        - /* eol */ 1;
+
+                    next = Some(Highlight {
+                        start: Cursor::new(index + /* eol */ 1, highlight.start.line + 1, 0),
+                        end: highlight.end,
+                        style: highlight.style,
+                    });
+                    Some(Highlight {
+                        start: highlight.start,
+                        end: Cursor::new(
+                            index,
+                            highlight.start.line,
+                            highlight.start.column + (index - highlight.start.index),
+                        ),
+                        style: highlight.style,
+                    })
                 }
-            } else {
-                let end = Cursor::new(self.rope.len_bytes(), self.rope.len_lines(), 0);
+            })
+            .filter(|highlight| highlight.start.index != highlight.end.index)
+        };
 
-                // After last item
-                if cursor.index() < end.index() {
-                    let selection = cursor..end;
-                    cursor = end;
-
-                    Some((selection.clone(), self.cow(selection), None))
-                }
-                // Done
-                else {
-                    None
-                }
-            }
-        })
-    }
-
-    fn cow(&self, selection: Range<Cursor>) -> Cow<'rope, str> {
-        Cow::from(
-            self.rope
-                .get_byte_slice(selection.start.index()..selection.end.index())
-                .unwrap(),
-        )
-    }
-
-    fn style(&self, capture: usize) -> Option<&'theme Style> {
-        self.theme.get(&self.query.capture_names()[capture])
+        // Finally, filter out highlights not in the requested line range
+        highlights
+            .filter(|highlight| (self.start.line..self.end.line).contains(&highlight.start.line))
     }
 }

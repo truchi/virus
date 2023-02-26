@@ -5,9 +5,9 @@
 /// A `(index , line, column)` cursor.
 #[derive(Copy, Clone, Default, Debug)]
 pub struct Cursor {
-    index: usize,
-    line: usize,
-    column: usize,
+    pub index: usize,
+    pub line: usize,
+    pub column: usize,
 }
 
 impl Cursor {
@@ -17,18 +17,6 @@ impl Cursor {
             line,
             column,
         }
-    }
-
-    pub fn index(&self) -> usize {
-        self.index
-    }
-
-    pub fn line(&self) -> usize {
-        self.line
-    }
-
-    pub fn column(&self) -> usize {
-        self.column
     }
 }
 
