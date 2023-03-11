@@ -85,6 +85,41 @@ impl Rgba {
     pub const fn without_alpha(&self) -> Rgb {
         Rgb::new(self.r, self.g, self.b)
     }
+
+    pub fn scale_alpha(&self, factor: u8) -> Self {
+        Self {
+            r: self.r,
+            g: self.g,
+            b: self.b,
+            a: (self.a as f32 * factor as f32 / u8::MAX as f32).round() as u8,
+        }
+    }
+
+    pub fn over(&self, other: Self) -> Self {
+        let one = u8::MAX as f32;
+
+        let self_r = self.r as f32;
+        let self_b = self.b as f32;
+        let self_g = self.g as f32;
+        let self_a = self.a as f32;
+
+        let other_r = other.r as f32;
+        let other_b = other.b as f32;
+        let other_g = other.g as f32;
+        let other_a = other.a as f32;
+
+        let a = self_a + other_a * (one - self_a);
+        let r = (self_r * self_a + other_r * other_a * (one - self_a)) / a;
+        let g = (self_g * self_a + other_g * other_a * (one - self_a)) / a;
+        let b = (self_b * self_a + other_b * other_a * (one - self_a)) / a;
+
+        Self {
+            r: r.round() as u8,
+            g: g.round() as u8,
+            b: b.round() as u8,
+            a: a.round() as u8,
+        }
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //

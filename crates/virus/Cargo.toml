@@ -5,6 +5,7 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
+virus-common.workspace = true
 virus-editor.workspace = true
 virus-graphics.workspace = true
 
