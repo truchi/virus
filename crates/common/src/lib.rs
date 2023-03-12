@@ -95,7 +95,7 @@ impl Rgba {
         }
     }
 
-    pub fn over(&self, other: Self) -> Self {
+    pub fn over(&self, other: Rgb) -> Rgb {
         let self_r = self.r as f32 / u8::MAX as f32;
         let self_g = self.g as f32 / u8::MAX as f32;
         let self_b = self.b as f32 / u8::MAX as f32;
@@ -104,18 +104,15 @@ impl Rgba {
         let other_r = other.r as f32 / u8::MAX as f32;
         let other_g = other.g as f32 / u8::MAX as f32;
         let other_b = other.b as f32 / u8::MAX as f32;
-        let other_a = other.a as f32 / u8::MAX as f32;
 
-        let r = self_r * self_a + other_r * other_a * (1. - self_a);
-        let g = self_g * self_a + other_g * other_a * (1. - self_a);
-        let b = self_b * self_a + other_b * other_a * (1. - self_a);
-        let a = self_a + other_a * (1. - self_a);
+        let r = self_r * self_a + other_r * (1. - self_a);
+        let g = self_g * self_a + other_g * (1. - self_a);
+        let b = self_b * self_a + other_b * (1. - self_a);
 
-        Self {
-            r: (u8::MAX as f32 * r / a).round() as u8,
-            g: (u8::MAX as f32 * g / a).round() as u8,
-            b: (u8::MAX as f32 * b / a).round() as u8,
-            a: (u8::MAX as f32 * a).round() as u8,
+        Rgb {
+            r: (u8::MAX as f32 * r).round() as u8,
+            g: (u8::MAX as f32 * g).round() as u8,
+            b: (u8::MAX as f32 * b).round() as u8,
         }
     }
 }

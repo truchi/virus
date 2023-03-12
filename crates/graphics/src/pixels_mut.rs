@@ -1,9 +1,6 @@
 use crate::text::{Context, FontSize, Line};
-use swash::{
-    scale::image::{Content, Image},
-    CacheKey,
-};
-use virus_common::{Rgb, Rgba, Style};
+use swash::scale::image::{Content, Image};
+use virus_common::{Rgb, Style};
 
 #[derive(Debug)]
 pub struct PixelsMut<'pixels> {
@@ -47,7 +44,7 @@ impl<'pixels> PixelsMut<'pixels> {
         }
     }
 
-    pub fn rgba(&mut self, top: u32, left: u32) -> Option<&mut [u8]> {
+    pub fn pixel_mut(&mut self, top: u32, left: u32) -> Option<&mut [u8]> {
         let top = top as usize;
         let left = left as usize;
         let width = self.width as usize;
@@ -143,16 +140,18 @@ impl<'pixels> Surface<'pixels> {
                     continue;
                 }
 
-                let dest = self.pixels.rgba(dest_top as u32, dest_left as u32).unwrap();
-                let Rgba { r, g, b, a } = style
+                let dest = self
+                    .pixels
+                    .pixel_mut(dest_top as u32, dest_left as u32)
+                    .unwrap();
+                let Rgb { r, g, b } = style
                     .foreground
                     .scale_alpha(mask)
-                    .over(Rgba::new(dest[0], dest[1], dest[2], dest[3]));
+                    .over(Rgb::new(dest[0], dest[1], dest[2]));
 
                 dest[0] = r;
                 dest[1] = g;
                 dest[2] = b;
-                dest[3] = a;
             }
         }
     }
