@@ -21,8 +21,15 @@ tree-sitter-rust = "0.20"
 ropey = "1.5"
 
 [profile.dev]
+# Remove debug stuff in the binary
 debug = false
 strip = true
 
+# Trying to improve dev performance, but I don't see any effects...
 [profile.dev.package."*"]
+debug = false
+strip = true
 opt-level = 3
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
