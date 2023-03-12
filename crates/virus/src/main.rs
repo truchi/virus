@@ -116,7 +116,8 @@ fn main() -> Result<(), Error> {
                 &mut surface,
                 &mut context,
                 key,
-                1500 + { scroll_time.elapsed().as_millis() / 10 } as u32,
+                0,
+                // 1500 + { scroll_time.elapsed().as_millis() / 10 } as u32,
                 0,
             );
 
@@ -191,8 +192,8 @@ impl DocumentView {
                 // We cow to make sure ligatures are not split between rope chunks
                 &Cow::from(rope.get_byte_slice(start.index..end.index).unwrap()),
                 font,
-                // TODO Theme.default and Style in Glyph
-                style.unwrap_or_default().foreground.without_alpha(),
+                // TODO Theme.default
+                style.unwrap_or_default(),
             );
         }
 

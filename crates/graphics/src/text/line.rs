@@ -8,7 +8,7 @@ use swash::{
     },
     CacheKey, FontRef, GlyphId,
 };
-use virus_common::Rgb;
+use virus_common::Style;
 
 // TODO make Glyph/Line/Shaper generic over glyph data (instead of Rgb)
 
@@ -27,8 +27,8 @@ pub struct Glyph {
     pub range: SourceRange,
     /// Key of the font.
     pub key: CacheKey,
-    /// Glyph color.
-    pub color: Rgb,
+    /// Glyph style.
+    pub style: Style,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -106,7 +106,7 @@ impl<'a> LineShaper<'a> {
     /// Feeds `str` to the `LineShaper` with font `key` and `color`.
     ///
     /// Not able to produce ligature across calls to this function.
-    pub fn push(&mut self, str: &str, key: CacheKey, color: Rgb) {
+    pub fn push(&mut self, str: &str, key: CacheKey, style: Style) {
         let font = self.fonts.get(key).expect("Font not found");
         let emoji = self.fonts.emoji();
         let font_key = font.key;
@@ -126,12 +126,12 @@ impl<'a> LineShaper<'a> {
                 (FontOrEmoji::Font, FontOrEmoji::Font) => shaper,
                 (FontOrEmoji::Emoji, FontOrEmoji::Emoji) => shaper,
                 (FontOrEmoji::Font, FontOrEmoji::Emoji) => {
-                    Self::flush(&mut self.line, shaper, key, color);
+                    Self::flush(&mut self.line, shaper, key, style);
                     (key, font_or_emoji) = (font_key, FontOrEmoji::Font);
                     Self::build(self.shape, font, self.line.size)
                 }
                 (FontOrEmoji::Emoji, FontOrEmoji::Font) => {
-                    Self::flush(&mut self.line, shaper, key, color);
+                    Self::flush(&mut self.line, shaper, key, style);
                     (key, font_or_emoji) = (emoji_key, FontOrEmoji::Emoji);
                     Self::build(self.shape, emoji, self.line.size)
                 }
@@ -143,7 +143,7 @@ impl<'a> LineShaper<'a> {
             self.offset += range.end - range.start;
         }
 
-        Self::flush(&mut self.line, shaper, key, color);
+        Self::flush(&mut self.line, shaper, key, style);
     }
 
     /// Returns the shaped `Line`.
@@ -190,7 +190,7 @@ impl<'a> LineShaper<'a> {
         }
     }
 
-    fn flush(line: &mut Line, shaper: Shaper, key: CacheKey, color: Rgb) {
+    fn flush(line: &mut Line, shaper: Shaper, key: CacheKey, style: Style) {
         shaper.shape_with(|cluster| {
             for glyph in cluster.glyphs {
                 line.glyphs.push(Glyph {
@@ -198,7 +198,7 @@ impl<'a> LineShaper<'a> {
                     advance: glyph.advance,
                     range: cluster.source,
                     key,
-                    color,
+                    style,
                 });
             }
         });

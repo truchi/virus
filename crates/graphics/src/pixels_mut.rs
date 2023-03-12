@@ -92,12 +92,12 @@ impl<'pixels> Surface<'pixels> {
                 top + size as i32,
                 left + advance as i32,
                 image,
-                glyph.color.with_alpha(255),
+                glyph.style,
             );
         }
     }
 
-    pub fn draw_image(&mut self, top: i32, left: i32, image: &Image, color: Rgba) {
+    pub fn draw_image(&mut self, top: i32, left: i32, image: &Image, style: Style) {
         debug_assert!(image.content == Content::Mask);
 
         // Swash image has placement
@@ -144,7 +144,8 @@ impl<'pixels> Surface<'pixels> {
                 }
 
                 let dest = self.pixels.rgba(dest_top as u32, dest_left as u32).unwrap();
-                let Rgba { r, g, b, a } = color
+                let Rgba { r, g, b, a } = style
+                    .foreground
                     .scale_alpha(mask)
                     .over(Rgba::new(dest[0], dest[1], dest[2], dest[3]));
 
