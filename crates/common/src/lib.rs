@@ -96,28 +96,26 @@ impl Rgba {
     }
 
     pub fn over(&self, other: Self) -> Self {
-        let one = u8::MAX as f32;
+        let self_r = self.r as f32 / u8::MAX as f32;
+        let self_g = self.g as f32 / u8::MAX as f32;
+        let self_b = self.b as f32 / u8::MAX as f32;
+        let self_a = self.a as f32 / u8::MAX as f32;
 
-        let self_r = self.r as f32;
-        let self_b = self.b as f32;
-        let self_g = self.g as f32;
-        let self_a = self.a as f32;
+        let other_r = other.r as f32 / u8::MAX as f32;
+        let other_g = other.g as f32 / u8::MAX as f32;
+        let other_b = other.b as f32 / u8::MAX as f32;
+        let other_a = other.a as f32 / u8::MAX as f32;
 
-        let other_r = other.r as f32;
-        let other_b = other.b as f32;
-        let other_g = other.g as f32;
-        let other_a = other.a as f32;
-
-        let a = self_a + other_a * (one - self_a);
-        let r = (self_r * self_a + other_r * other_a * (one - self_a)) / a;
-        let g = (self_g * self_a + other_g * other_a * (one - self_a)) / a;
-        let b = (self_b * self_a + other_b * other_a * (one - self_a)) / a;
+        let r = self_r * self_a + other_r * other_a * (1. - self_a);
+        let g = self_g * self_a + other_g * other_a * (1. - self_a);
+        let b = self_b * self_a + other_b * other_a * (1. - self_a);
+        let a = self_a + other_a * (1. - self_a);
 
         Self {
-            r: r.round() as u8,
-            g: g.round() as u8,
-            b: b.round() as u8,
-            a: a.round() as u8,
+            r: (u8::MAX as f32 * r / a).round() as u8,
+            g: (u8::MAX as f32 * g / a).round() as u8,
+            b: (u8::MAX as f32 * b / a).round() as u8,
+            a: (u8::MAX as f32 * a).round() as u8,
         }
     }
 }

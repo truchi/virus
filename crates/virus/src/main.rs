@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 const _MULTILINE: &str = "111
 222
 222
@@ -18,7 +20,7 @@ mod fps;
 use std::borrow::Cow;
 
 use pixels::{Error, Pixels, SurfaceTexture};
-use virus_common::{Rgb, Rgba, Style};
+use virus_common::{Rgba, Style};
 use virus_editor::{Document, Highlight, Highlights, Theme};
 use virus_graphics::{
     pixels_mut::{PixelsMut, Surface},
@@ -79,7 +81,7 @@ fn main() -> Result<(), Error> {
 
     let mut fps_counter = fps::FpsCounter::new();
 
-    let mut scroll_time = std::time::Instant::now();
+    let scroll_time = std::time::Instant::now();
 
     event_loop.run(move |event, _, _control_flow| {
         if let Event::WindowEvent {
@@ -99,13 +101,12 @@ fn main() -> Result<(), Error> {
             };
 
             for (i, u) in pixels_mut.pixels_mut().iter_mut().enumerate() {
-                // *u = match i % 4 {
-                //     0 => 200,
-                //     1 => 200,
-                //     2 => 200,
-                //     _ => 255,
-                // };
-                *u = 100;
+                *u = match i % 4 {
+                    0 => 100,
+                    1 => 100,
+                    2 => 100,
+                    _ => 255,
+                };
             }
 
             let width = pixels_mut.width();
@@ -116,8 +117,7 @@ fn main() -> Result<(), Error> {
                 &mut surface,
                 &mut context,
                 key,
-                0,
-                // 1500 + { scroll_time.elapsed().as_millis() / 10 } as u32,
+                1500 + { scroll_time.elapsed().as_millis() / 10 } as u32,
                 0,
             );
 
@@ -163,6 +163,7 @@ impl DocumentView {
             start_line..end_line,
             self.document.query(HIGHLIGHT_QUERY).unwrap(),
             dracula(),
+            // uni(68, 71, 90, 200),
         );
 
         let mut prev_line = None;
@@ -209,6 +210,56 @@ impl DocumentView {
     }
 }
 
+fn uni(r: u8, g: u8, b: u8, a: u8) -> Theme {
+    let current = Style {
+        foreground: Rgba { r, g, b, a },
+        ..Default::default()
+    };
+
+    Theme {
+        default: current,
+        attribute: current,
+        comment: current,
+        constant: current,
+        constant_builtin_boolean: current,
+        constant_character: current,
+        constant_character_escape: current,
+        constant_numeric_float: current,
+        constant_numeric_integer: current,
+        constructor: current,
+        function: current,
+        function_macro: current,
+        function_method: current,
+        keyword: current,
+        keyword_control: current,
+        keyword_control_conditional: current,
+        keyword_control_import: current,
+        keyword_control_repeat: current,
+        keyword_control_return: current,
+        keyword_function: current,
+        keyword_operator: current,
+        keyword_special: current,
+        keyword_storage: current,
+        keyword_storage_modifier: current,
+        keyword_storage_modifier_mut: current,
+        keyword_storage_modifier_ref: current,
+        keyword_storage_type: current,
+        label: current,
+        namespace: current,
+        operator: current,
+        punctuation_bracket: current,
+        punctuation_delimiter: current,
+        special: current,
+        string: current,
+        r#type: current,
+        type_builtin: current,
+        type_enum_variant: current,
+        variable: current,
+        variable_builtin: current,
+        variable_other_member: current,
+        variable_parameter: current,
+    }
+}
 fn dracula() -> Theme {
     fn style(r: u8, g: u8, b: u8) -> Style {
         Style {
