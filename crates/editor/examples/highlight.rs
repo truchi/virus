@@ -16,6 +16,8 @@ fn main() {
     let tree = document.tree().unwrap();
 
     let theme = dracula();
+    let lines = rope.len_lines();
+
     let highlights = Highlights::new(
         rope,
         tree.root_node(),
@@ -27,6 +29,7 @@ fn main() {
     let mut line = 0;
 
     for highlight in highlights.iter() {
+        assert!(highlight.start.index != highlight.end.index);
         assert!(highlight.start.line == highlight.end.line);
         assert!(highlight.end.column != 0);
 
@@ -34,9 +37,7 @@ fn main() {
             line = highlight.start.line;
             println!();
         }
-
         let cow = rope.byte_slice(highlight.start.index..highlight.end.index);
-
         let r = highlight.style.unwrap_or_default().foreground.r;
         let g = highlight.style.unwrap_or_default().foreground.g;
         let b = highlight.style.unwrap_or_default().foreground.b;

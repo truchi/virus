@@ -438,36 +438,58 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
             captures
         };
 
+        // Filter on line range and crop overlapping captures
+        let highlights = captures
+            .into_iter()
+            .map(|highlight| Highlight {
+                start: highlight.start,
+                end: highlight.end,
+                style: self
+                    .theme
+                    .get(&self.query.capture_names()[highlight.capture])
+                    .copied(),
+            })
+            .filter(|highlight| self.start.index < highlight.end.index)
+            .filter(|highlight| highlight.start.index < self.end.index)
+            .map(|highlight| Highlight {
+                start: if self.start.index < highlight.start.index {
+                    highlight.start
+                } else {
+                    self.start
+                },
+                end: if highlight.end.index < self.end.index {
+                    highlight.end
+                } else {
+                    self.end
+                },
+                style: highlight.style,
+            })
+            .peekable();
+
         // Intersperse with in-between selections
         let highlights = {
-            let mut prev = Option::<Highlight>::None;
-            let mut highlights = captures
-                .into_iter()
-                .map(|highlight| Highlight {
-                    start: highlight.start,
-                    end: highlight.end,
-                    style: self
-                        .theme
-                        .get(&self.query.capture_names()[highlight.capture])
-                        .copied(),
-                })
-                .peekable();
+            let mut highlights = highlights;
+            let mut prev = Highlight {
+                start: self.start,
+                end: self.start,
+                style: None,
+            };
 
             std::iter::from_fn(move || {
-                if let Some(prev) = prev.take() {
-                    let next = highlights.peek()?;
+                let next = highlights.peek()?;
 
-                    Some(Highlight {
+                if prev.end.index == next.start.index {
+                    prev = highlights.next()?;
+                    Some(prev)
+                } else {
+                    prev = Highlight {
                         start: prev.end,
                         end: next.start,
                         style: None,
-                    })
-                } else {
-                    prev = highlights.next();
-                    prev
+                    };
+                    Some(prev)
                 }
             })
-            .filter(|highlight| highlight.start.index != highlight.end.index)
         };
 
         // Slice highlights to line boundaries
@@ -508,8 +530,16 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
             .filter(|highlight| highlight.start.index != highlight.end.index)
         };
 
-        // Finally, filter out highlights not in the requested line range
-        highlights
-            .filter(|highlight| (self.start.line..self.end.line).contains(&highlight.start.line))
+        // That was hard! Let's make sure we made it right:
+        highlights.inspect(|highlight| {
+            // In the requested line range
+            debug_assert!((self.start.line..self.end.line).contains(&highlight.start.line));
+            debug_assert!((self.start.line..self.end.line).contains(&highlight.end.line));
+            // One-line
+            debug_assert!(highlight.start.line == highlight.end.line);
+            // Not empty
+            debug_assert!(highlight.start.index != highlight.end.index);
+            debug_assert!(highlight.end.column != 0);
+        })
     }
 }
