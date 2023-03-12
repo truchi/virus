@@ -192,8 +192,7 @@ impl DocumentView {
                 // We cow to make sure ligatures are not split between rope chunks
                 &Cow::from(rope.get_byte_slice(start.index..end.index).unwrap()),
                 font,
-                // TODO Theme.default
-                style.unwrap_or_default(),
+                style,
             );
         }
 
@@ -236,8 +235,9 @@ fn dracula() -> Theme {
     let yellow = style(241, 250, 140);
 
     Theme {
+        default: green,
         attribute: green,
-        comment: current,
+        comment,
         constant: green,
         constant_builtin_boolean: purple,
         constant_character: purple,

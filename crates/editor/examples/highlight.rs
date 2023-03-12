@@ -38,9 +38,9 @@ fn main() {
             println!();
         }
         let cow = rope.byte_slice(highlight.start.index..highlight.end.index);
-        let r = highlight.style.unwrap_or_default().foreground.r;
-        let g = highlight.style.unwrap_or_default().foreground.g;
-        let b = highlight.style.unwrap_or_default().foreground.b;
+        let r = highlight.style.foreground.r;
+        let g = highlight.style.foreground.g;
+        let b = highlight.style.foreground.b;
         print!("\x1B[38;2;{r};{g};{b}m{cow}\x1B[0m");
     }
 
@@ -73,8 +73,9 @@ fn dracula() -> Theme {
     let yellow = style(241, 250, 140);
 
     Theme {
+        default: green,
         attribute: green,
-        comment: current,
+        comment,
         constant: green,
         constant_builtin_boolean: purple,
         constant_character: purple,

@@ -13,6 +13,7 @@ use virus_common::{Cursor, Style};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
 pub struct Theme {
+    pub default: Style,
     pub attribute: Style,
     pub comment: Style,
     pub constant: Style,
@@ -56,49 +57,53 @@ pub struct Theme {
 }
 
 impl Theme {
-    pub fn get(&self, key: &str) -> Option<&Style> {
+    pub fn default(&self) -> &Style {
+        &self.default
+    }
+
+    pub fn get(&self, key: &str) -> &Style {
         match key {
-            "attribute" => Some(&self.attribute),
-            "comment" => Some(&self.comment),
-            "constant" => Some(&self.constant),
-            "constant.builtin.boolean" => Some(&self.constant_builtin_boolean),
-            "constant.character" => Some(&self.constant_character),
-            "constant.character.escape" => Some(&self.constant_character_escape),
-            "constant.numeric.float" => Some(&self.constant_numeric_float),
-            "constant.numeric.integer" => Some(&self.constant_numeric_integer),
-            "constructor" => Some(&self.constructor),
-            "function" => Some(&self.function),
-            "function.macro" => Some(&self.function_macro),
-            "function.method" => Some(&self.function_method),
-            "keyword" => Some(&self.keyword),
-            "keyword.control" => Some(&self.keyword_control),
-            "keyword.control.conditional" => Some(&self.keyword_control_conditional),
-            "keyword.control.import" => Some(&self.keyword_control_import),
-            "keyword.control.repeat" => Some(&self.keyword_control_repeat),
-            "keyword.control.return" => Some(&self.keyword_control_return),
-            "keyword.function" => Some(&self.keyword_function),
-            "keyword.operator" => Some(&self.keyword_operator),
-            "keyword.special" => Some(&self.keyword_special),
-            "keyword.storage" => Some(&self.keyword_storage),
-            "keyword.storage.modifier" => Some(&self.keyword_storage_modifier),
-            "keyword.storage.modifier.mut" => Some(&self.keyword_storage_modifier_mut),
-            "keyword.storage.modifier.ref" => Some(&self.keyword_storage_modifier_ref),
-            "keyword.storage.type" => Some(&self.keyword_storage_type),
-            "label" => Some(&self.label),
-            "namespace" => Some(&self.namespace),
-            "operator" => Some(&self.operator),
-            "punctuation.bracket" => Some(&self.punctuation_bracket),
-            "punctuation.delimiter" => Some(&self.punctuation_delimiter),
-            "special" => Some(&self.special),
-            "string" => Some(&self.string),
-            "type" => Some(&self.r#type),
-            "type.builtin" => Some(&self.type_builtin),
-            "type.enum.variant" => Some(&self.type_enum_variant),
-            "variable" => Some(&self.variable),
-            "variable.builtin" => Some(&self.variable_builtin),
-            "variable.other.member" => Some(&self.variable_other_member),
-            "variable.parameter" => Some(&self.variable_parameter),
-            _ => None,
+            "attribute" => &self.attribute,
+            "comment" => &self.comment,
+            "constant" => &self.constant,
+            "constant.builtin.boolean" => &self.constant_builtin_boolean,
+            "constant.character" => &self.constant_character,
+            "constant.character.escape" => &self.constant_character_escape,
+            "constant.numeric.float" => &self.constant_numeric_float,
+            "constant.numeric.integer" => &self.constant_numeric_integer,
+            "constructor" => &self.constructor,
+            "function" => &self.function,
+            "function.macro" => &self.function_macro,
+            "function.method" => &self.function_method,
+            "keyword" => &self.keyword,
+            "keyword.control" => &self.keyword_control,
+            "keyword.control.conditional" => &self.keyword_control_conditional,
+            "keyword.control.import" => &self.keyword_control_import,
+            "keyword.control.repeat" => &self.keyword_control_repeat,
+            "keyword.control.return" => &self.keyword_control_return,
+            "keyword.function" => &self.keyword_function,
+            "keyword.operator" => &self.keyword_operator,
+            "keyword.special" => &self.keyword_special,
+            "keyword.storage" => &self.keyword_storage,
+            "keyword.storage.modifier" => &self.keyword_storage_modifier,
+            "keyword.storage.modifier.mut" => &self.keyword_storage_modifier_mut,
+            "keyword.storage.modifier.ref" => &self.keyword_storage_modifier_ref,
+            "keyword.storage.type" => &self.keyword_storage_type,
+            "label" => &self.label,
+            "namespace" => &self.namespace,
+            "operator" => &self.operator,
+            "punctuation.bracket" => &self.punctuation_bracket,
+            "punctuation.delimiter" => &self.punctuation_delimiter,
+            "special" => &self.special,
+            "string" => &self.string,
+            "type" => &self.r#type,
+            "type.builtin" => &self.type_builtin,
+            "type.enum.variant" => &self.type_enum_variant,
+            "variable" => &self.variable,
+            "variable.builtin" => &self.variable_builtin,
+            "variable.other.member" => &self.variable_other_member,
+            "variable.parameter" => &self.variable_parameter,
+            _ => &self.default,
         }
     }
 }
@@ -316,7 +321,7 @@ impl Document {
 pub struct Highlight {
     pub start: Cursor,
     pub end: Cursor,
-    pub style: Option<Style>,
+    pub style: Style,
 }
 
 /// Procuces an iterator of [`Highlight`]s.
@@ -444,10 +449,9 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
             .map(|highlight| Highlight {
                 start: highlight.start,
                 end: highlight.end,
-                style: self
+                style: *self
                     .theme
-                    .get(&self.query.capture_names()[highlight.capture])
-                    .copied(),
+                    .get(&self.query.capture_names()[highlight.capture]),
             })
             .filter(|highlight| self.start.index < highlight.end.index)
             .filter(|highlight| highlight.start.index < self.end.index)
@@ -472,7 +476,7 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
             let mut prev = Highlight {
                 start: self.start,
                 end: self.start,
-                style: None,
+                style: *self.theme.default(),
             };
 
             std::iter::from_fn(move || {
@@ -485,7 +489,7 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
                     prev = Highlight {
                         start: prev.end,
                         end: next.start,
-                        style: None,
+                        style: *self.theme.default(),
                     };
                     Some(prev)
                 }
