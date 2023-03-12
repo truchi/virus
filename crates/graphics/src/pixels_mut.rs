@@ -1,5 +1,9 @@
-use swash::scale::image::{Content, Image};
-use virus_common::{Rgb, Rgba};
+use crate::text::{Context, FontSize, Line};
+use swash::{
+    scale::image::{Content, Image},
+    CacheKey,
+};
+use virus_common::{Rgb, Rgba, Style};
 
 #[derive(Debug)]
 pub struct PixelsMut<'pixels> {
@@ -62,6 +66,37 @@ pub struct Surface<'pixels> {
 }
 
 impl<'pixels> Surface<'pixels> {
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+
+    pub fn height(&self) -> u32 {
+        self.height
+    }
+
+    pub fn draw_line(
+        &mut self,
+        context: &mut Context,
+        top: i32,
+        left: i32,
+        line: &Line,
+        size: FontSize,
+    ) {
+        let mut scaler = line.scaler(context);
+
+        while let Some((advance, glyph, image)) = scaler.next() {
+            let Some(image) = image else { continue; };
+
+            self.draw_image(
+                // We have to render at the baseline!
+                top + size as i32,
+                left + advance as i32,
+                image,
+                glyph.color.with_alpha(255),
+            );
+        }
+    }
+
     pub fn draw_image(&mut self, top: i32, left: i32, image: &Image, color: Rgba) {
         debug_assert!(image.content == Content::Mask);
 

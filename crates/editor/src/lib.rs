@@ -240,6 +240,14 @@ impl Document {
         self.dirty
     }
 
+    pub fn query(&self, query: &str) -> Option<Query> {
+        self.language
+            .map(|language| language.language())
+            .flatten()
+            .map(|language| Query::new(language, query).ok())
+            .flatten()
+    }
+
     pub fn edit_str(&mut self, str: &str) {
         // TODO edit cursors and tree
 
@@ -332,6 +340,11 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
         theme: Theme,
     ) -> Self {
         let Range { start, end } = lines;
+
+        let lines = rope.len_lines();
+        let end = end.min(lines);
+        let start = start.min(end);
+
         let start = Cursor::new(rope.try_line_to_byte(start).unwrap(), start, 0);
         let end = Cursor::new(rope.try_line_to_byte(end).unwrap(), end, 0);
 
