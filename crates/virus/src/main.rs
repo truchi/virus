@@ -102,9 +102,9 @@ fn main() -> Result<(), Error> {
 
             for (i, u) in pixels_mut.pixels_mut().iter_mut().enumerate() {
                 *u = match i % 4 {
-                    0 => 100,
-                    1 => 100,
-                    2 => 100,
+                    0 => 0,
+                    1 => 0,
+                    2 => 0,
                     _ => 255,
                 };
             }
@@ -153,6 +153,7 @@ impl DocumentView {
 
         let line_height_f32 = self.line_height();
         let line_height_i32 = line_height_f32.round() as i32;
+        let line_height_u32 = line_height_i32 as u32;
         let start_line = (scroll_top as f32 / line_height_f32).floor() as usize;
         let end_line = 1 + start_line + (surface.height() as f32 / line_height_f32).ceil() as usize;
 
@@ -181,7 +182,7 @@ impl DocumentView {
                         line as i32 * line_height_i32 - scroll_top as i32,
                         0,
                         &shaped,
-                        self.font_size,
+                        line_height_u32,
                     );
                 }
 
@@ -204,7 +205,7 @@ impl DocumentView {
                 line as i32 * line_height_i32 - scroll_top as i32,
                 0,
                 &shaped,
-                self.font_size,
+                line_height_u32,
             );
         }
     }
@@ -213,6 +214,12 @@ impl DocumentView {
 fn uni(r: u8, g: u8, b: u8, a: u8) -> Theme {
     let current = Style {
         foreground: Rgba { r, g, b, a },
+        background: Rgba {
+            r: u8::MAX - r,
+            g: u8::MAX - g,
+            b: u8::MAX - b,
+            a,
+        },
         ..Default::default()
     };
 
@@ -260,6 +267,7 @@ fn uni(r: u8, g: u8, b: u8, a: u8) -> Theme {
         variable_parameter: current,
     }
 }
+
 fn dracula() -> Theme {
     fn style(r: u8, g: u8, b: u8) -> Style {
         Style {
@@ -267,6 +275,12 @@ fn dracula() -> Theme {
                 r,
                 g,
                 b,
+                a: u8::MAX,
+            },
+            background: Rgba {
+                r: u8::MAX - r,
+                g: u8::MAX - g,
+                b: u8::MAX - b,
                 a: u8::MAX,
             },
             ..Default::default()
@@ -286,7 +300,7 @@ fn dracula() -> Theme {
     let yellow = style(241, 250, 140);
 
     Theme {
-        default: green,
+        default: style(255, 255, 255),
         attribute: green,
         comment,
         constant: green,

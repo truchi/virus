@@ -1,6 +1,6 @@
-use crate::text::{Context, FontSize, Line};
+use crate::text::{Context, Line};
 use swash::scale::image::{Content, Image};
-use virus_common::{Rgb, Style};
+use virus_common::{Rgb, Rgba};
 
 #[derive(Debug)]
 pub struct PixelsMut<'pixels> {
@@ -24,6 +24,18 @@ impl<'pixels> PixelsMut<'pixels> {
 
     pub fn height(&self) -> u32 {
         self.height
+    }
+
+    pub fn clamp_top(&self, top: i32) -> i32 {
+        top.max(0).min(self.height as i32)
+    }
+
+    pub fn clamp_left(&self, left: i32) -> i32 {
+        left.max(0).min(self.width as i32)
+    }
+
+    pub fn clamp(&self, top: i32, left: i32) -> (i32, i32) {
+        (self.clamp_top(top), self.clamp_left(left))
     }
 
     pub fn pixels(&self) -> &[u8] {
@@ -71,30 +83,77 @@ impl<'pixels> Surface<'pixels> {
         self.height
     }
 
+    pub fn clamp_rel_top(&self, top: i32) -> i32 {
+        top.max(0).min(self.height as i32)
+    }
+
+    pub fn clamp_rel_left(&self, left: i32) -> i32 {
+        left.max(0).min(self.width as i32)
+    }
+
+    pub fn clamp_rel(&self, top: i32, left: i32) -> (i32, i32) {
+        (self.clamp_rel_top(top), self.clamp_rel_left(left))
+    }
+
+    pub fn clamp_abs_top(&self, top: i32) -> i32 {
+        self.pixels.clamp_top(self.top + self.clamp_rel_top(top))
+    }
+
+    pub fn clamp_abs_left(&self, left: i32) -> i32 {
+        self.pixels
+            .clamp_left(self.left + self.clamp_rel_left(left))
+    }
+
+    pub fn clamp_abs(&self, top: i32, left: i32) -> (i32, i32) {
+        (self.clamp_abs_top(top), self.clamp_abs_left(left))
+    }
+
     pub fn draw_line(
         &mut self,
         context: &mut Context,
         top: i32,
         left: i32,
         line: &Line,
-        size: FontSize,
+        height: u32,
     ) {
         let mut scaler = line.scaler(context);
 
         while let Some((advance, glyph, image)) = scaler.next() {
             let Some(image) = image else { continue; };
 
+            self.draw_rect(
+                top,
+                left + advance as i32,
+                glyph.advance as u32,
+                height,
+                glyph.style.background,
+            );
             self.draw_image(
                 // We have to render at the baseline!
-                top + size as i32,
+                top + line.size() as i32,
                 left + advance as i32,
                 image,
-                glyph.style,
+                glyph.style.foreground,
             );
         }
     }
 
-    pub fn draw_image(&mut self, top: i32, left: i32, image: &Image, style: Style) {
+    pub fn draw_rect(&mut self, top: i32, left: i32, width: u32, height: u32, color: Rgba) {
+        let (top1, left1) = self.clamp_abs(top, left);
+        let (top2, left2) = self.clamp_abs(top + height as i32, left + width as i32);
+
+        for top in top1..top2 {
+            for left in left1..left2 {
+                let pixel = self.pixels.pixel_mut(top as u32, left as u32).unwrap();
+                let Rgb { r, g, b } = color.over(Rgb::new(pixel[0], pixel[1], pixel[2]));
+                pixel[0] = r;
+                pixel[1] = g;
+                pixel[2] = b;
+            }
+        }
+    }
+
+    pub fn draw_image(&mut self, top: i32, left: i32, image: &Image, color: Rgba) {
         debug_assert!(image.content == Content::Mask);
 
         // Swash image has placement
@@ -103,32 +162,12 @@ impl<'pixels> Surface<'pixels> {
         let width = image.placement.width as i32;
         let height = image.placement.height as i32;
 
-        // Clamp in `Surface`
-        let (rel_top1, rel_top2) = (top, top + height);
-        let (rel_left1, rel_left2) = (left, left + width);
-        let (rel_top1, rel_top2) = (
-            clamp(rel_top1, 0, self.height as i32),
-            clamp(rel_top2, 0, self.height as i32),
-        );
-        let (rel_left1, rel_left2) = (
-            clamp(rel_left1, 0, self.width as i32),
-            clamp(rel_left2, 0, self.width as i32),
-        );
+        // Clamps
+        let (top1, left1) = self.clamp_abs(top, left);
+        let (top2, left2) = self.clamp_abs(top + height, left + width);
 
-        // Clamp in `PixelsMut`
-        let (abs_top1, abs_top2) = (self.top + rel_top1, self.top + rel_top2);
-        let (abs_left1, abs_left2) = (self.left + rel_left1, self.left + rel_left2);
-        let (abs_top1, abs_top2) = (
-            clamp(abs_top1, 0, self.pixels.height as i32),
-            clamp(abs_top2, 0, self.pixels.height as i32),
-        );
-        let (abs_left1, abs_left2) = (
-            clamp(abs_left1, 0, self.pixels.width as i32),
-            clamp(abs_left2, 0, self.pixels.width as i32),
-        );
-
-        for dest_top in abs_top1..abs_top2 {
-            for dest_left in abs_left1..abs_left2 {
+        for dest_top in top1..top2 {
+            for dest_left in left1..left2 {
                 let mask = {
                     let top = dest_top - self.top - top;
                     let left = dest_left - self.left - left;
@@ -144,8 +183,7 @@ impl<'pixels> Surface<'pixels> {
                     .pixels
                     .pixel_mut(dest_top as u32, dest_left as u32)
                     .unwrap();
-                let Rgb { r, g, b } = style
-                    .foreground
+                let Rgb { r, g, b } = color
                     .scale_alpha(mask)
                     .over(Rgb::new(dest[0], dest[1], dest[2]));
 
@@ -155,8 +193,4 @@ impl<'pixels> Surface<'pixels> {
             }
         }
     }
-}
-
-fn clamp(i: i32, min: i32, max: i32) -> i32 {
-    i.max(min).min(max)
 }
