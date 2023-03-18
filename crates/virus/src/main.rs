@@ -105,7 +105,7 @@ fn main() -> Result<(), Error> {
                 *u = match i % 4 {
                     0 => 0,
                     1 => 0,
-                    2 => 0,
+                    2 => 255,
                     _ => 255,
                 };
             }
@@ -113,13 +113,23 @@ fn main() -> Result<(), Error> {
             let width = pixels_mut.width();
             let height = pixels_mut.height();
 
-            document_view.render(
-                &mut pixels_mut.surface(0, 0, width, height),
-                &mut context,
-                key,
-                1500 + { scroll_time.elapsed().as_millis() / 10 } as u32,
-                0,
-            );
+            if pixels_mut.pixels().len() == 4 {
+                return;
+            }
+
+            let p = 100;
+            let (w, h) = (width - 2 * p, height - 2 * p);
+            let mut s = pixels_mut.surface(p as i32, p as i32, w, h);
+            s.draw_rect(0, 0, w, h, Rgba::new(0, 255, 0, 255));
+            s.draw_circle(h as i32 / 2, w as i32 / 2, w / 2, Rgba::new(255, 0, 0, 255));
+
+            // document_view.render(
+            //     &mut pixels_mut.surface(0, 0, width, height),
+            //     &mut context,
+            //     key,
+            //     1500 + { scroll_time.elapsed().as_millis() / 10 } as u32,
+            //     0,
+            // );
 
             pixels.render().unwrap();
         }

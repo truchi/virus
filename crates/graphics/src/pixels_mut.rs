@@ -218,4 +218,66 @@ impl<'pixels> Surface<'pixels> {
             }
         }
     }
+
+    pub fn draw_circle(&mut self, top: i32, left: i32, radius: u32, color: Rgba) {
+        let (center_top, center_left) = (top, left);
+        let rel_widths = 0..self.width as i32;
+        let rel_heights = 0..self.height as i32;
+        let abs_widths = 0..self.pixels.width as i32;
+        let abs_heights = 0..self.pixels.height as i32;
+
+        let center = |(top, left)| (center_top + top, center_left + left);
+        let position = |(top, left)| (self.top + top, self.left + left);
+        let clamp_rel =
+            |(top, left): &(i32, i32)| rel_heights.contains(&top) && rel_widths.contains(&left);
+        let clamp_abs =
+            |(top, left): &(i32, i32)| abs_heights.contains(&top) && abs_widths.contains(&left);
+
+        for (top, left) in bresenham(radius)
+            .map(center)
+            .filter(clamp_rel)
+            .map(position)
+            .filter(clamp_abs)
+        {
+            self.pixels.over(top as u32, left as u32, color);
+        }
+    }
+}
+
+fn bresenham(radius: u32) -> impl Iterator<Item = (i32, i32)> {
+    let r = radius as i32;
+
+    let mut x = r;
+    let mut y = 0;
+    let mut e = -r;
+
+    std::iter::from_fn(move || {
+        if y > x {
+            None
+        } else {
+            let top_left = (-y, x);
+
+            e += 2 * y + 1;
+            y += 1;
+
+            if e >= 0 {
+                e -= 2 * x - 1;
+                x -= 1;
+            }
+
+            Some(top_left)
+        }
+    })
+    .flat_map(|(top, left)| {
+        [
+            (top, left),
+            (top, -left),
+            (-top, left),
+            (-top, -left),
+            (left, top),
+            (left, -top),
+            (-left, top),
+            (-left, -top),
+        ]
+    })
 }
