@@ -43,6 +43,7 @@ const FIRA: &str =
     "/home/romain/.local/share/fonts/FiraCodeNerdFont/Fira Code Regular Nerd Font Complete Mono.ttf";
 const EMOJI: &str = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf";
 
+// 🚀
 fn main() -> Result<(), Error> {
     let fira = Font::from_file(FIRA).unwrap();
     let ubuntu = Font::from_file(UBUNTU).unwrap();
@@ -112,9 +113,8 @@ fn main() -> Result<(), Error> {
             let width = pixels_mut.width();
             let height = pixels_mut.height();
 
-            let mut surface = pixels_mut.surface(0, 0, width, height);
             document_view.render(
-                &mut surface,
+                &mut pixels_mut.surface(0, 0, width, height),
                 &mut context,
                 key,
                 1500 + { scroll_time.elapsed().as_millis() / 10 } as u32,

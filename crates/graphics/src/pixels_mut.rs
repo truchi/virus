@@ -57,12 +57,25 @@ impl<'pixels> PixelsMut<'pixels> {
     }
 
     pub fn pixel_mut(&mut self, top: u32, left: u32) -> Option<&mut [u8]> {
-        let top = top as usize;
-        let left = left as usize;
-        let width = self.width as usize;
-        let index = left + top * width;
+        let index = left as usize + top as usize * self.width as usize;
 
         self.pixels.get_mut(4 * index..4 * (index + 1))
+    }
+
+    pub fn over(&mut self, top: u32, left: u32, color: Rgba) {
+        if top >= self.height || left >= self.width {
+            return;
+        }
+
+        let pixel = {
+            let index = left as usize + top as usize * self.width as usize;
+            self.pixels.get_mut(4 * index..4 * (index + 1)).unwrap()
+        };
+
+        let Rgb { r, g, b } = color.over(Rgb::new(pixel[0], pixel[1], pixel[2]));
+        pixel[0] = r;
+        pixel[1] = g;
+        pixel[2] = b;
     }
 }
 
@@ -121,20 +134,17 @@ impl<'pixels> Surface<'pixels> {
         while let Some((advance, glyph, image)) = scaler.next() {
             let Some(image) = image else { continue; };
 
-            self.draw_rect(
-                top,
-                left + advance as i32,
-                glyph.advance as u32,
-                height,
-                glyph.style.background,
-            );
-            self.draw_image(
-                // We have to render at the baseline!
-                top + line.size() as i32,
-                left + advance as i32,
-                image,
-                glyph.style.foreground,
-            );
+            let baseline = top + line.size() as i32;
+            let left = left + advance as i32;
+            let (foreground, background) = (glyph.style.foreground, glyph.style.background);
+
+            self.draw_rect(top, left, glyph.advance as u32, height, background);
+
+            match image.content {
+                Content::Mask => self.draw_image_mask(baseline, left, image, foreground),
+                Content::Color => self.draw_image_color(baseline, left, image),
+                Content::SubpixelMask => unreachable!(),
+            };
         }
     }
 
@@ -144,16 +154,12 @@ impl<'pixels> Surface<'pixels> {
 
         for top in top1..top2 {
             for left in left1..left2 {
-                let pixel = self.pixels.pixel_mut(top as u32, left as u32).unwrap();
-                let Rgb { r, g, b } = color.over(Rgb::new(pixel[0], pixel[1], pixel[2]));
-                pixel[0] = r;
-                pixel[1] = g;
-                pixel[2] = b;
+                self.pixels.over(top as u32, left as u32, color);
             }
         }
     }
 
-    pub fn draw_image(&mut self, top: i32, left: i32, image: &Image, color: Rgba) {
+    pub fn draw_image_mask(&mut self, top: i32, left: i32, image: &Image, color: Rgba) {
         debug_assert!(image.content == Content::Mask);
 
         // Swash image has placement
@@ -179,17 +185,36 @@ impl<'pixels> Surface<'pixels> {
                     continue;
                 }
 
-                let dest = self
-                    .pixels
-                    .pixel_mut(dest_top as u32, dest_left as u32)
-                    .unwrap();
-                let Rgb { r, g, b } = color
-                    .scale_alpha(mask)
-                    .over(Rgb::new(dest[0], dest[1], dest[2]));
+                self.pixels
+                    .over(dest_top as u32, dest_left as u32, color.scale_alpha(mask));
+            }
+        }
+    }
 
-                dest[0] = r;
-                dest[1] = g;
-                dest[2] = b;
+    pub fn draw_image_color(&mut self, top: i32, left: i32, image: &Image) {
+        debug_assert!(image.content == Content::Color);
+
+        // Swash image has placement
+        let top = top - image.placement.top;
+        let left = left + image.placement.left;
+        let width = image.placement.width as i32;
+        let height = image.placement.height as i32;
+
+        // Clamps
+        let (top1, left1) = self.clamp_abs(top, left);
+        let (top2, left2) = self.clamp_abs(top + height, left + width);
+
+        for dest_top in top1..top2 {
+            for dest_left in left1..left2 {
+                let src = {
+                    let top = dest_top - self.top - top;
+                    let left = dest_left - self.left - left;
+                    let index = (left + top * width) as usize;
+                    let pixel = image.data.get(4 * index..4 * (index + 1)).unwrap();
+                    Rgba::new(pixel[0], pixel[1], pixel[2], pixel[3])
+                };
+
+                self.pixels.over(dest_top as u32, dest_left as u32, src);
             }
         }
     }
