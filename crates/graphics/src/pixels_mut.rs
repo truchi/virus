@@ -233,7 +233,31 @@ impl<'pixels> Surface<'pixels> {
         let clamp_abs =
             |(top, left): &(i32, i32)| abs_heights.contains(&top) && abs_widths.contains(&left);
 
-        for (top, left) in bresenham(radius)
+        for (top, left) in full(bresenham(radius))
+            .map(center)
+            .filter(clamp_rel)
+            .map(position)
+            .filter(clamp_abs)
+        {
+            self.pixels.over(top as u32, left as u32, color);
+        }
+    }
+
+    pub fn draw_circle_thick(&mut self, top: i32, left: i32, radius: u32, width: u32, color: Rgba) {
+        let (center_top, center_left) = (top, left);
+        let rel_widths = 0..self.width as i32;
+        let rel_heights = 0..self.height as i32;
+        let abs_widths = 0..self.pixels.width as i32;
+        let abs_heights = 0..self.pixels.height as i32;
+
+        let center = |(top, left)| (center_top + top, center_left + left);
+        let position = |(top, left)| (self.top + top, self.left + left);
+        let clamp_rel =
+            |(top, left): &(i32, i32)| rel_heights.contains(&top) && rel_widths.contains(&left);
+        let clamp_abs =
+            |(top, left): &(i32, i32)| abs_heights.contains(&top) && abs_widths.contains(&left);
+
+        for (top, left) in full(bresenham_thick(radius, radius + width))
             .map(center)
             .filter(clamp_rel)
             .map(position)
@@ -268,7 +292,32 @@ fn bresenham(radius: u32) -> impl Iterator<Item = (i32, i32)> {
             Some(top_left)
         }
     })
-    .flat_map(|(top, left)| {
+}
+
+fn bresenham_thick(inner: u32, outer: u32) -> impl Iterator<Item = (i32, i32)> {
+    debug_assert!(inner <= outer);
+
+    let mut inners = bresenham(inner);
+    let mut outers = bresenham(outer);
+    let mut last_inner_left = 0;
+
+    std::iter::from_fn(move || match (inners.next(), outers.next()) {
+        (Some((inner_top, inner_left)), Some((outer_top, outer_left))) => {
+            debug_assert!(inner_top == outer_top);
+            debug_assert!(inner_left <= outer_left);
+
+            last_inner_left = inner_left;
+            Some((outer_top, inner_left..outer_left))
+        }
+        (None, Some((outer_top, outer_left))) => Some((outer_top, last_inner_left..outer_left)),
+        (Some(_), None) => unreachable!(),
+        _ => None,
+    })
+    .flat_map(|(top, lefts)| lefts.map(move |left| (top, left)))
+}
+
+fn full<T: Iterator<Item = (i32, i32)>>(it: T) -> impl Iterator<Item = (i32, i32)> {
+    it.flat_map(|(top, left)| {
         [
             (top, left),
             (top, -left),

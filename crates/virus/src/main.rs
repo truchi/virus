@@ -43,6 +43,8 @@ const FIRA: &str =
     "/home/romain/.local/share/fonts/FiraCodeNerdFont/Fira Code Regular Nerd Font Complete Mono.ttf";
 const EMOJI: &str = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf";
 
+const SCALE: u32 = 1;
+
 // 🚀
 fn main() -> Result<(), Error> {
     let fira = Font::from_file(FIRA).unwrap();
@@ -90,15 +92,17 @@ fn main() -> Result<(), Error> {
             ..
         } = event
         {
-            pixels.resize_surface(width, height).unwrap();
-            pixels.resize_buffer(width, height).unwrap();
+            if width != 1 {
+                pixels.resize_surface(width, height).unwrap();
+                pixels.resize_buffer(width / SCALE, height / SCALE).unwrap();
+            }
         }
 
         // Draw the current frame
         if let Event::RedrawRequested(_) = event {
             let mut pixels_mut = {
                 let PhysicalSize { width, height } = window.inner_size();
-                PixelsMut::new(width, height, pixels.get_frame_mut())
+                PixelsMut::new(width / SCALE, height / SCALE, pixels.get_frame_mut())
             };
 
             for (i, u) in pixels_mut.pixels_mut().iter_mut().enumerate() {
@@ -121,7 +125,19 @@ fn main() -> Result<(), Error> {
             let (w, h) = (width - 2 * p, height - 2 * p);
             let mut s = pixels_mut.surface(p as i32, p as i32, w, h);
             s.draw_rect(0, 0, w, h, Rgba::new(0, 255, 0, 255));
-            s.draw_circle(h as i32 / 2, w as i32 / 2, w / 2, Rgba::new(255, 0, 0, 255));
+            s.draw_circle_thick(
+                h as i32 / 2,
+                w as i32 / 2,
+                h / 2,
+                10,
+                Rgba::new(255, 0, 0, 255),
+            );
+            s.draw_circle(
+                h as i32 / 2,
+                w as i32 / 2,
+                h / 4,
+                Rgba::new(255, 0, 255, 255),
+            );
 
             // document_view.render(
             //     &mut pixels_mut.surface(0, 0, width, height),
