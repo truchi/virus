@@ -27,6 +27,7 @@ use virus_graphics::{
     reexports::swash::CacheKey,
     text::{Context, Font, FontSize, Fonts, Line},
 };
+use virus_ui::document_view::DocumentView;
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
@@ -45,6 +46,8 @@ const EMOJI: &str = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf";
 
 const SCALE: u32 = 1;
 
+const HIGHLIGHT_QUERY: &str = include_str!("../../editor/treesitter/rust/highlights.scm");
+
 // 🚀
 fn main() -> Result<(), Error> {
     let fira = Font::from_file(FIRA).unwrap();
@@ -59,11 +62,7 @@ fn main() -> Result<(), Error> {
 
     let mut document = Document::open(std::env::args().nth(1).unwrap()).unwrap();
     document.parse();
-    let document_view = DocumentView {
-        document,
-        font_size: 40,
-        line_height_factor: 1.25,
-    };
+    let mut document_view = DocumentView::new(HIGHLIGHT_QUERY.into(), dracula(), key, 40, 50);
 
     let event_loop = EventLoop::new();
     let window = {
@@ -109,7 +108,7 @@ fn main() -> Result<(), Error> {
                 *u = match i % 4 {
                     0 => 0,
                     1 => 0,
-                    2 => 255,
+                    2 => 0,
                     _ => 255,
                 };
             }
@@ -121,31 +120,13 @@ fn main() -> Result<(), Error> {
                 return;
             }
 
-            let p = 100;
-            let (w, h) = (width - 2 * p, height - 2 * p);
-            let mut s = pixels_mut.surface(p as i32, p as i32, w, h);
-            s.draw_rect(0, 0, w, h, Rgba::new(0, 255, 0, 255));
-            s.draw_circle_thick(
-                h as i32 / 2,
-                w as i32 / 2,
-                h / 2,
-                10,
-                Rgba::new(255, 0, 0, 255),
+            let scroll_top = 100 + { scroll_time.elapsed().as_millis() / 10 } as u32;
+            document_view.render(
+                &mut pixels_mut.surface(0, 0, width, height),
+                &mut context,
+                &document,
+                scroll_top,
             );
-            s.draw_circle(
-                h as i32 / 2,
-                w as i32 / 2,
-                h / 4,
-                Rgba::new(255, 0, 255, 255),
-            );
-
-            // document_view.render(
-            //     &mut pixels_mut.surface(0, 0, width, height),
-            //     &mut context,
-            //     key,
-            //     1500 + { scroll_time.elapsed().as_millis() / 10 } as u32,
-            //     0,
-            // );
 
             pixels.render().unwrap();
         }
@@ -156,86 +137,9 @@ fn main() -> Result<(), Error> {
     });
 }
 
-struct DocumentView {
-    document: Document,
-    font_size: FontSize,
-    line_height_factor: f32,
-}
-
-impl DocumentView {
-    fn line_height(&self) -> f32 {
-        self.line_height_factor * self.font_size as f32
-    }
-
-    fn render(
-        &self,
-        surface: &mut Surface,
-        context: &mut Context,
-        font: CacheKey,
-        scroll_top: u32,
-        scroll_left: u32,
-    ) {
-        const HIGHLIGHT_QUERY: &str = include_str!("../../editor/treesitter/rust/highlights.scm");
-
-        let line_height_f32 = self.line_height();
-        let line_height_i32 = line_height_f32.round() as i32;
-        let line_height_u32 = line_height_i32 as u32;
-        let start_line = (scroll_top as f32 / line_height_f32).floor() as usize;
-        let end_line = 1 + start_line + (surface.height() as f32 / line_height_f32).ceil() as usize;
-
-        let rope = self.document.rope();
-        let highlights = Highlights::new(
-            rope,
-            self.document.tree().unwrap().root_node(),
-            start_line..end_line,
-            self.document.query(HIGHLIGHT_QUERY).unwrap(),
-            dracula(),
-            // uni(68, 71, 90, 200),
-        );
-
-        let mut prev_line = None;
-        let mut shaper = Line::shaper(context, self.font_size);
-
-        for Highlight { start, end, style } in highlights.iter() {
-            let line = start.line;
-            debug_assert!(start.line == end.line);
-
-            if prev_line != Some(line) {
-                if let Some(line) = prev_line {
-                    let shaped = shaper.line();
-                    surface.draw_line(
-                        context,
-                        line as i32 * line_height_i32 - scroll_top as i32,
-                        0,
-                        &shaped,
-                        line_height_u32,
-                    );
-                }
-
-                prev_line = Some(line);
-                shaper = Line::shaper(context, self.font_size);
-            }
-
-            shaper.push(
-                // We cow to make sure ligatures are not split between rope chunks
-                &Cow::from(rope.get_byte_slice(start.index..end.index).unwrap()),
-                font,
-                style,
-            );
-        }
-
-        if let Some(line) = prev_line {
-            let shaped = shaper.line();
-            surface.draw_line(
-                context,
-                line as i32 * line_height_i32 - scroll_top as i32,
-                0,
-                &shaped,
-                line_height_u32,
-            );
-        }
-    }
-}
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 fn uni(r: u8, g: u8, b: u8, a: u8) -> Theme {
     let current = Style {
@@ -303,12 +207,12 @@ fn dracula() -> Theme {
                 b,
                 a: u8::MAX,
             },
-            background: Rgba {
-                r: u8::MAX - r,
-                g: u8::MAX - g,
-                b: u8::MAX - b,
-                a: u8::MAX,
-            },
+            // background: Rgba {
+            //     r: u8::MAX - r,
+            //     g: u8::MAX - g,
+            //     b: u8::MAX - b,
+            //     a: u8::MAX,
+            // },
             ..Default::default()
         }
     }

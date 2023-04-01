@@ -1,5 +1,5 @@
 [package]
-name = "virus"
+name = "ui"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
@@ -8,7 +8,6 @@ edition.workspace = true
 virus-common.workspace = true
 virus-editor.workspace = true
 virus-graphics.workspace = true
-virus-ui.workspace = true
 
-pixels.workspace = true
-winit.workspace = true
+ropey.workspace = true
+swash.workspace = true

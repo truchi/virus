@@ -139,12 +139,7 @@ impl<'pixels> Surface<'pixels> {
             let (foreground, background) = (glyph.style.foreground, glyph.style.background);
 
             self.draw_rect(top, left, glyph.advance as u32, height, background);
-
-            match image.content {
-                Content::Mask => self.draw_image_mask(baseline, left, image, foreground),
-                Content::Color => self.draw_image_color(baseline, left, image),
-                Content::SubpixelMask => unreachable!(),
-            };
+            self.draw_image(baseline, left, image, foreground);
         }
     }
 
@@ -156,6 +151,14 @@ impl<'pixels> Surface<'pixels> {
             for left in left1..left2 {
                 self.pixels.over(top as u32, left as u32, color);
             }
+        }
+    }
+
+    pub fn draw_image(&mut self, top: i32, left: i32, image: &Image, color: Rgba) {
+        match image.content {
+            Content::Mask => self.draw_image_mask(top, left, image, color),
+            Content::Color => self.draw_image_color(top, left, image),
+            Content::SubpixelMask => unreachable!(),
         }
     }
 
