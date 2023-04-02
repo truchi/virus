@@ -19,6 +19,8 @@ use virus_common::Style;
 pub struct Glyph {
     /// Glyph id.
     pub id: GlyphId,
+    /// Glyph advance ofsset.
+    pub offset: Advance,
     /// Glyph advance.
     pub advance: Advance,
     /// Range in the underlying string.
@@ -79,7 +81,8 @@ pub struct LineShaper<'a> {
     fonts: &'a Fonts,
     shape: &'a mut ShapeContext,
     line: Line,
-    offset: u32,
+    bytes: u32,
+    advance: Advance,
 }
 
 impl<'a> LineShaper<'a> {
@@ -97,7 +100,8 @@ impl<'a> LineShaper<'a> {
                 glyphs: Vec::new(),
                 size,
             },
-            offset: 0,
+            bytes: 0,
+            advance: 0.,
         }
     }
 
@@ -116,7 +120,7 @@ impl<'a> LineShaper<'a> {
         let mut shaper = Self::build(self.shape, font, self.line.size);
         let mut parser = Parser::new(
             Self::SCRIPT,
-            str.char_indices().map(Self::token(self.offset)),
+            str.char_indices().map(Self::token(self.bytes)),
         );
 
         while parser.next(&mut cluster) {
@@ -124,12 +128,12 @@ impl<'a> LineShaper<'a> {
                 (FontOrEmoji::Font, FontOrEmoji::Font) => shaper,
                 (FontOrEmoji::Emoji, FontOrEmoji::Emoji) => shaper,
                 (FontOrEmoji::Font, FontOrEmoji::Emoji) => {
-                    Self::flush(&mut self.line, shaper, key, style);
+                    Self::flush(&mut self.line, &mut self.advance, shaper, key, style);
                     (key, font_or_emoji) = (font_key, FontOrEmoji::Font);
                     Self::build(self.shape, font, self.line.size)
                 }
                 (FontOrEmoji::Emoji, FontOrEmoji::Font) => {
-                    Self::flush(&mut self.line, shaper, key, style);
+                    Self::flush(&mut self.line, &mut self.advance, shaper, key, style);
                     (key, font_or_emoji) = (emoji_key, FontOrEmoji::Emoji);
                     Self::build(self.shape, emoji, self.line.size)
                 }
@@ -138,10 +142,10 @@ impl<'a> LineShaper<'a> {
             shaper.add_cluster(&cluster);
 
             let range = cluster.range();
-            self.offset += range.end - range.start;
+            self.bytes += range.end - range.start;
         }
 
-        Self::flush(&mut self.line, shaper, key, style);
+        Self::flush(&mut self.line, &mut self.advance, shaper, key, style);
     }
 
     /// Returns the shaped `Line`.
@@ -188,16 +192,18 @@ impl<'a> LineShaper<'a> {
         }
     }
 
-    fn flush(line: &mut Line, shaper: Shaper, key: CacheKey, style: Style) {
+    fn flush(line: &mut Line, advance: &mut Advance, shaper: Shaper, key: CacheKey, style: Style) {
         shaper.shape_with(|cluster| {
             for glyph in cluster.glyphs {
                 line.glyphs.push(Glyph {
                     id: glyph.id,
+                    offset: *advance,
                     advance: glyph.advance,
                     range: cluster.source,
                     key,
                     style,
                 });
+                *advance += glyph.advance;
             }
         });
     }
