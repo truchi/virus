@@ -422,7 +422,7 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
                     Ok(index) => {
                         // Favoring lower index pattern
                         if captures[index].pattern > capture.pattern {
-                            captures[index].capture = capture.capture
+                            captures[index] = capture
                         }
                     }
                     Err(index) => {

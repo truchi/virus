@@ -1,4 +1,4 @@
-// #![allow(unused)]
+#![allow(unused)]
 
 const _MULTILINE: &str = "111
 222
@@ -120,7 +120,7 @@ fn main() -> Result<(), Error> {
                 return;
             }
 
-            let scroll_top = 100 + { scroll_time.elapsed().as_millis() / 10 } as u32;
+            let scroll_top = { scroll_time.elapsed().as_millis() / 100 } as u32;
             document_view.render(
                 &mut pixels_mut.surface(0, 0, width, height),
                 &mut context,
