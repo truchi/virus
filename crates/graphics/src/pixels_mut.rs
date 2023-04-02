@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use crate::text::{Context, Line};
 use swash::scale::image::{Content, Image};
 use virus_common::{Rgb, Rgba};
@@ -268,6 +270,36 @@ impl<'pixels> Surface<'pixels> {
         {
             self.pixels.over(top as u32, left as u32, color);
         }
+    }
+
+    pub fn draw_horizontal_line(
+        &mut self,
+        top: i32,
+        Range { start, end }: Range<i32>,
+        color: Rgba,
+    ) {
+        let start = self.clamp_abs_left(start);
+        let end = self.clamp_abs_left(end);
+
+        for left in start..end {
+            self.pixels.over(top as u32, left as u32, color);
+        }
+    }
+
+    pub fn draw_vertical_line(&mut self, Range { start, end }: Range<i32>, left: i32, color: Rgba) {
+        let start = self.clamp_abs_top(start);
+        let end = self.clamp_abs_top(end);
+
+        for top in start..end {
+            self.pixels.over(top as u32, left as u32, color);
+        }
+    }
+
+    pub fn stroke_rect(&mut self, top: i32, left: i32, width: u32, height: u32, color: Rgba) {
+        self.draw_horizontal_line(top, left..left + width as i32, color);
+        self.draw_horizontal_line(top + height as i32, left..left + width as i32, color);
+        self.draw_vertical_line(top..top + height as i32, left, color);
+        self.draw_vertical_line(top..top + height as i32, left + width as i32, color);
     }
 }
 
