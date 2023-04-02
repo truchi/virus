@@ -1,4 +1,4 @@
-#![allow(unused)]
+// #![allow(unused)]
 
 const _MULTILINE: &str = "111
 222

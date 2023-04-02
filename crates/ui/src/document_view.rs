@@ -17,6 +17,7 @@ pub struct DocumentView {
     font_size: FontSize,
     line_height: LineHeight,
     rope: Rope,
+    range: Range<usize>,
     lines: Vec<(usize, Line)>,
 }
 
@@ -35,23 +36,37 @@ impl DocumentView {
             font_size,
             line_height,
             rope: Default::default(),
+            range: 0..0,
             lines: Vec::default(),
         }
     }
 
     pub fn prepare(
         &mut self,
-        surface: &mut Surface,
         context: &mut Context,
         document: &Document,
-        lines: Range<usize>,
+        Range { start, end }: Range<usize>,
     ) {
+        // No need to prepare if same rope and similar range
+        if self.rope.is_instance(document.rope())
+            && self.range.contains(&start)
+            && self.range.contains(&(end - 1))
+        {
+            return;
+        }
+
+        // Apply margins
+        let margin = (end - start) / 2;
+        let start = start.saturating_sub(margin);
+        let end = (end + margin).max(self.rope.len_lines());
+
         self.lines.clear();
+        self.range = start..end;
 
         let highlights = Highlights::new(
             document.rope(),
             document.tree().unwrap().root_node(),
-            lines,
+            start..end,
             document.query(&self.query).unwrap(),
             self.theme,
         );
@@ -97,11 +112,10 @@ impl DocumentView {
         document: &Document,
         scroll_top: u32,
     ) {
-        let line_height = self.line_height as f32;
-        let start = (scroll_top as f32 / line_height).floor() as usize;
-        let end = 1 + start + (surface.height() as f32 / line_height).ceil() as usize;
+        let start = (scroll_top as f32 / self.line_height as f32).floor() as usize;
+        let len = (surface.height() as f32 / self.line_height as f32).ceil() as usize;
 
-        self.prepare(surface, context, document, start..end);
+        self.prepare(context, document, start..start + len + 1);
 
         for (index, line) in &self.lines {
             surface.draw_line(
