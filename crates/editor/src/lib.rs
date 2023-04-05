@@ -229,6 +229,10 @@ impl Document {
         self.selection.clone()
     }
 
+    pub fn selection_mut(&mut self) -> &mut Range<Cursor> {
+        &mut self.selection
+    }
+
     pub fn language(&self) -> Option<Language> {
         self.language
     }

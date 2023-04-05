@@ -20,7 +20,7 @@ mod fps;
 use std::borrow::Cow;
 
 use pixels::{Error, Pixels, SurfaceTexture};
-use virus_common::{Rgba, Style};
+use virus_common::{Cursor, Rgba, Style};
 use virus_editor::{Document, Highlight, Highlights, Theme};
 use virus_graphics::{
     pixels_mut::{PixelsMut, Surface},
@@ -121,6 +121,16 @@ fn main() -> Result<(), Error> {
             }
 
             let scroll_top = { scroll_time.elapsed().as_millis() / 100 } as u32;
+
+            // document.selection_mut().start = Cursor::new(0, 37, 6);
+            // document.selection_mut().end = Cursor::new(0, 37, 18);
+            // document.selection_mut().start = Cursor::new(0, 37, 6);
+            // document.selection_mut().end = Cursor::new(0, 38, 20);
+            // document.selection_mut().start = Cursor::new(0, 37, 6);
+            // document.selection_mut().end = Cursor::new(0, 38, 2);
+            document.selection_mut().start = Cursor::new(0, 37, 6);
+            document.selection_mut().end = Cursor::new(0, 39, 2);
+
             document_view.render(
                 &mut pixels_mut.surface(0, 0, width, height),
                 &mut context,
