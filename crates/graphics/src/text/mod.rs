@@ -19,5 +19,8 @@ pub use line::*;
 /// Font size unit (`u8`).
 pub type FontSize = u8;
 
+/// LineHeight unit (`u32`).
+pub type LineHeight = u32;
+
 /// Advance unit (`f32`).
 pub type Advance = f32;

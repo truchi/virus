@@ -5,11 +5,8 @@ use virus_common::Rgba;
 use virus_editor::{Document, Highlight, Highlights, Theme};
 use virus_graphics::{
     pixels_mut::Surface,
-    text::{Context, FontSize, Line},
+    text::{Context, FontSize, Line, LineHeight},
 };
-
-/// LineHeight unit (`u32`).
-pub type LineHeight = u32;
 
 pub struct DocumentView {
     query: String,
@@ -144,14 +141,17 @@ impl DocumentView {
         document: &Document,
         scroll_top: u32,
     ) {
+        use virus_graphics::pixels_mut::Quadrant::*;
+
         let color = Rgba::WHITE;
         let selection = document.selection();
+        let surface_width = surface.width();
+
+        let line_top = |line| line as i32 * self.line_height as i32 - scroll_top as i32;
 
         // Not sure what is best when glyph ranges and cursor columns don't align...!
         // This includes overlapping glyphs on both ends.
-        // Note that we could be more clever when looking for end position,
-        // by starting from the end when it's closer.
-        let get_range = |line| {
+        let line_range = |line| {
             // TODO: what if not in there (empty line)?
             let glyphs = self
                 .lines
@@ -161,26 +161,21 @@ impl DocumentView {
                 .1
                 .glyphs();
 
-            // TODO: buggy at line boundaries
+            // NOTE: we could try to guess which end to start from
+            // TODO: buggy at line boundaries?
             let start = || {
                 glyphs
                     .iter()
                     .find(|glyph| glyph.range.end as usize > selection.start.column)
                     .map(|glyph| glyph.offset)
-                    .unwrap_or(0.)
+                    .unwrap_or(0.) as u32
             };
             let end = || {
                 glyphs
                     .iter()
                     .find(|glyph| glyph.range.end as usize >= selection.end.column)
                     .map(|glyph| glyph.offset + glyph.advance)
-                    .unwrap_or(0.)
-            };
-            let last = || {
-                glyphs
-                    .last()
-                    .map(|glyph| glyph.offset + glyph.advance)
-                    .unwrap_or(0.)
+                    .unwrap_or(0.) as u32
             };
 
             if line == selection.start.line {
@@ -189,56 +184,91 @@ impl DocumentView {
                     (start(), end())
                 } else {
                     // First line
-                    (start(), last())
+                    (start(), surface_width)
                 }
             } else if line == selection.end.line {
                 // Last line
-                (0., if selection.end.column == 0 { 0. } else { end() })
+                (0, if selection.end.column == 0 { 0 } else { end() })
             } else {
                 // Middle line
-                (0., last())
+                debug_assert!(false); // We don't do middle lines
+                (0, surface_width)
             }
         };
 
-        let line_pos = |line| line as i32 * self.line_height as i32 - scroll_top as i32;
+        let start_line = selection.start.line;
+        let end_line = selection.end.line;
+        let full = self.line_height;
+        let half = self.line_height / 2;
+        let quarter = self.line_height / 4;
 
-        let mut prev = None;
-
-        for line in selection.start.line..=selection.end.line {
-            let top = line_pos(line);
-            let bottom = line_pos(line + 1);
-            let (start, end) = get_range(line);
+        // Single line
+        if selection.start.line == selection.end.line {
+            let top = line_top(start_line);
+            let (start, end) = line_range(start_line);
+            let width = end - start;
+            let radius = quarter.min(width / 2);
             let left = start as i32;
+
+            surface.stroke_rect(top, left, width, full, radius, color);
+
+            return;
+        }
+
+        // Two non-overlapping lines
+        if selection.start.line + 1 == selection.end.line
+            && selection.start.column > selection.end.column
+        {
+            let top = line_top(start_line);
+            let bottom = top + full as i32;
+            let (start, end) = line_range(start_line);
+            let width = end - start;
+            let radius = quarter.min(width / 2);
+            let left = start as i32;
+
+            surface.stroke_corner(TopLeft, top, left, width, half, radius, color);
+            surface.stroke_corner(BottomLeft, bottom, left, width, half, radius, color);
+
+            let top = line_top(end_line);
+            let bottom = top + full as i32;
+            let (start, end) = line_range(end_line);
+            let width = end - start;
+            let radius = quarter.min(width / 2);
             let right = end as i32;
 
-            surface.draw_vertical_line(top..bottom, left, color);
-            surface.draw_vertical_line(top..bottom, right, color);
+            surface.stroke_corner(TopRight, top, right, width, half, radius, color);
+            surface.stroke_corner(BottomRight, bottom, right, width, half, radius, color);
 
-            if let Some((_, prev_left, prev_right)) = prev {
-                debug_assert!(left <= prev_left);
-
-                if right < prev_left {
-                    surface.draw_horizontal_line(top, left..right, color);
-                    surface.draw_horizontal_line(top, prev_left..prev_right, color);
-                } else if right == prev_left {
-                    surface.draw_horizontal_line(top, left..prev_right, color);
-                } else if right <= prev_right {
-                    surface.draw_horizontal_line(top, left..prev_left, color);
-                    surface.draw_horizontal_line(top, right..prev_right, color);
-                } else {
-                    surface.draw_horizontal_line(top, left..prev_left, color);
-                    surface.draw_horizontal_line(top, prev_right..right, color);
-                }
-            } else {
-                surface.draw_horizontal_line(top, left..right, color);
-            }
-
-            prev = Some((line, left, right));
+            return;
         }
 
-        if let Some((line, left, right)) = prev {
-            let bottom = line_pos(line + 1);
-            surface.draw_horizontal_line(bottom, left..right, color);
-        }
+        // Two (overlapping) lines or more
+        let top1 = line_top(start_line);
+        let bottom1 = top1 + full as i32;
+        let (start1, end1) = line_range(start_line);
+        let left1 = start1 as i32;
+        debug_assert!(end1 == surface_width);
+
+        let top2 = line_top(end_line);
+        let bottom2 = top2 + full as i32;
+        let (start2, end2) = line_range(end_line);
+        let right2 = end2 as i32;
+        debug_assert!(start2 == 0);
+
+        let width = surface_width - start1;
+        let radius = quarter.min(width / 2);
+        surface.stroke_corner(TopLeft, top1, left1, width, half, radius, color);
+
+        let width = surface_width - end2;
+        let radius = quarter.min(width / 2);
+        surface.stroke_corner(TopLeft, top2, right2, width, half, radius, color);
+
+        let width = start1;
+        let radius = quarter.min(width / 2);
+        surface.stroke_corner(BottomRight, bottom1, left1, width, half, radius, color);
+
+        let width = end2;
+        let radius = quarter.min(width / 2);
+        surface.stroke_corner(BottomRight, bottom2, right2, width, half, radius, color);
     }
 }

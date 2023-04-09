@@ -1,8 +1,41 @@
+use crate::text::{Context, Line, LineHeight};
 use std::ops::Range;
-
-use crate::text::{Context, Line};
 use swash::scale::image::{Content, Image};
 use virus_common::{Rgb, Rgba};
+
+#[derive(Copy, Clone, Debug)]
+pub enum Quadrant {
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
+impl Quadrant {
+    fn with<T: Iterator<Item = (i32, i32)>>(&self, it: T) -> impl Iterator<Item = (i32, i32)> {
+        type F = fn((i32, i32)) -> [(i32, i32); 2];
+
+        fn top_left((top, left): (i32, i32)) -> [(i32, i32); 2] {
+            [(top, -left), (-left, top)]
+        }
+        fn top_right((top, left): (i32, i32)) -> [(i32, i32); 2] {
+            [(top, left), (-left, -top)]
+        }
+        fn bottom_left((top, left): (i32, i32)) -> [(i32, i32); 2] {
+            [(left, top), (-top, -left)]
+        }
+        fn bottom_right((top, left): (i32, i32)) -> [(i32, i32); 2] {
+            [(left, -top), (-top, left)]
+        }
+
+        match self {
+            Self::TopLeft => it.flat_map(top_left as F),
+            Self::TopRight => it.flat_map(top_right as F),
+            Self::BottomLeft => it.flat_map(bottom_left as F),
+            Self::BottomRight => it.flat_map(bottom_right as F),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct PixelsMut<'pixels> {
@@ -129,7 +162,7 @@ impl<'pixels> Surface<'pixels> {
         top: i32,
         left: i32,
         line: &Line,
-        height: u32,
+        height: LineHeight,
     ) {
         let mut scaler = line.scaler(context);
 
@@ -224,6 +257,38 @@ impl<'pixels> Surface<'pixels> {
         }
     }
 
+    pub fn draw_quadrant(
+        &mut self,
+        quadrant: Quadrant,
+        top: i32,
+        left: i32,
+        radius: u32,
+        color: Rgba,
+    ) {
+        let (center_top, center_left) = (top, left);
+        let rel_widths = 0..self.width as i32;
+        let rel_heights = 0..self.height as i32;
+        let abs_widths = 0..self.pixels.width as i32;
+        let abs_heights = 0..self.pixels.height as i32;
+
+        let center = |(top, left)| (center_top + top, center_left + left);
+        let position = |(top, left)| (self.top + top, self.left + left);
+        let clamp_rel =
+            |(top, left): &(i32, i32)| rel_heights.contains(&top) && rel_widths.contains(&left);
+        let clamp_abs =
+            |(top, left): &(i32, i32)| abs_heights.contains(&top) && abs_widths.contains(&left);
+
+        for (top, left) in quadrant
+            .with(bresenham(radius))
+            .map(center)
+            .filter(clamp_rel)
+            .map(position)
+            .filter(clamp_abs)
+        {
+            self.pixels.over(top as u32, left as u32, color);
+        }
+    }
+
     pub fn draw_circle(&mut self, top: i32, left: i32, radius: u32, color: Rgba) {
         let (center_top, center_left) = (top, left);
         let rel_widths = 0..self.width as i32;
@@ -295,11 +360,94 @@ impl<'pixels> Surface<'pixels> {
         }
     }
 
-    pub fn stroke_rect(&mut self, top: i32, left: i32, width: u32, height: u32, color: Rgba) {
-        self.draw_horizontal_line(top, left..left + width as i32, color);
-        self.draw_horizontal_line(top + height as i32, left..left + width as i32, color);
-        self.draw_vertical_line(top..top + height as i32, left, color);
-        self.draw_vertical_line(top..top + height as i32, left + width as i32, color);
+    pub fn stroke_rect(
+        &mut self,
+        top: i32,
+        left: i32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        color: Rgba,
+    ) {
+        let width = width as i32;
+        let height = height as i32;
+        let iradius = radius as i32;
+        let right = left + width;
+        let bottom = top + height;
+        let ctop = top + iradius;
+        let cbottom = bottom - iradius;
+        let cleft = left + iradius;
+        let cright = right - iradius;
+
+        self.draw_horizontal_line(top, cleft..cright, color);
+        self.draw_horizontal_line(bottom, cleft..cright, color);
+        self.draw_vertical_line(ctop..cbottom, left, color);
+        self.draw_vertical_line(ctop..cbottom, right, color);
+        self.draw_quadrant(Quadrant::TopLeft, ctop, cleft, radius, color);
+        self.draw_quadrant(Quadrant::TopRight, ctop, cright, radius, color);
+        self.draw_quadrant(Quadrant::BottomLeft, cbottom, cleft, radius, color);
+        self.draw_quadrant(Quadrant::BottomRight, cbottom, cright, radius, color);
+    }
+
+    pub fn stroke_corner(
+        &mut self,
+        quadrant: Quadrant,
+        top: i32,
+        left: i32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        color: Rgba,
+    ) {
+        debug_assert!(width >= radius);
+        debug_assert!(height >= radius);
+
+        match quadrant {
+            Quadrant::TopLeft => {
+                let bottom = top + height as i32;
+                let right = left + width as i32;
+                let ctop = top + radius as i32;
+                let cleft = left + radius as i32;
+
+                self.draw_quadrant(quadrant, ctop, cleft, radius, color);
+                self.draw_vertical_line(ctop..bottom, left, color);
+                self.draw_horizontal_line(top, cleft..right, color);
+            }
+            Quadrant::TopRight => {
+                let bottom = top + height as i32;
+                let right = left;
+                let left = right - width as i32;
+                let ctop = top + radius as i32;
+                let cright = right - radius as i32;
+
+                self.draw_quadrant(quadrant, ctop, cright, radius, color);
+                self.draw_vertical_line(ctop..bottom, right, color);
+                self.draw_horizontal_line(top, left..cright, color);
+            }
+            Quadrant::BottomLeft => {
+                let bottom = top;
+                let top = bottom - height as i32;
+                let right = left + width as i32;
+                let cbottom = bottom - radius as i32;
+                let cleft = left + radius as i32;
+
+                self.draw_quadrant(quadrant, cbottom, cleft, radius, color);
+                self.draw_vertical_line(top..cbottom, left, color);
+                self.draw_horizontal_line(bottom, cleft..right, color);
+            }
+            Quadrant::BottomRight => {
+                let bottom = top;
+                let top = bottom - height as i32;
+                let right = left;
+                let left = right - width as i32;
+                let cbottom = bottom - radius as i32;
+                let cright = right - radius as i32;
+
+                self.draw_quadrant(quadrant, cbottom, cright, radius, color);
+                self.draw_vertical_line(top..cbottom, right, color);
+                self.draw_horizontal_line(bottom, left..cright, color);
+            }
+        }
     }
 }
 
