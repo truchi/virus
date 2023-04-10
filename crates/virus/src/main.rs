@@ -16,6 +16,7 @@ const _MULTILINE3: &str = "111
 333";
 
 mod fps;
+mod virus;
 
 use std::borrow::Cow;
 
@@ -86,64 +87,88 @@ fn main() -> Result<(), Error> {
     let scroll_time = std::time::Instant::now();
 
     event_loop.run(move |event, _, _control_flow| {
-        if let Event::WindowEvent {
-            event: WindowEvent::Resized(PhysicalSize { width, height }),
-            ..
-        } = event
-        {
-            if width != 1 {
-                pixels.resize_surface(width, height).unwrap();
-                pixels.resize_buffer(width / SCALE, height / SCALE).unwrap();
+        match event {
+            //
+            // Before events
+            //
+            Event::NewEvents(_) => {}
+            //
+            // Window, keyboard, mouse, DnD, ...
+            //
+            Event::WindowEvent { event, .. } => {
+                if let WindowEvent::Resized(PhysicalSize { width, height }) = &event {
+                    if *width != 1 {
+                        pixels.resize_surface(*width, *height).unwrap();
+                        pixels.resize_buffer(width / SCALE, height / SCALE).unwrap();
+                    }
+                }
             }
-        }
+            //
+            // ???
+            //
+            Event::DeviceEvent { event, .. } => {}
+            //
+            // Neat! But unused for now
+            //
+            Event::UserEvent(_) => {}
+            //
+            // ???
+            //
+            Event::Suspended | Event::Resumed => {}
+            //
+            // After events: state update
+            //
+            Event::MainEventsCleared => {
+                window.request_redraw();
+                fps_counter.tick();
+            }
+            //
+            // Drawing happens here
+            //
+            Event::RedrawRequested(_) => {
+                let now = std::time::Instant::now();
 
-        // Draw the current frame
-        if let Event::RedrawRequested(_) = event {
-            let mut pixels_mut = {
-                let PhysicalSize { width, height } = window.inner_size();
-                PixelsMut::new(width / SCALE, height / SCALE, pixels.get_frame_mut())
-            };
-
-            for (i, u) in pixels_mut.pixels_mut().iter_mut().enumerate() {
-                *u = match i % 4 {
-                    0 => 0,
-                    1 => 0,
-                    2 => 0,
-                    _ => 255,
+                let mut pixels_mut = {
+                    let PhysicalSize { width, height } = window.inner_size();
+                    PixelsMut::new(width / SCALE, height / SCALE, pixels.get_frame_mut())
                 };
+
+                for (i, u) in pixels_mut.pixels_mut().iter_mut().enumerate() {
+                    *u = match i % 4 {
+                        0 => 0,
+                        1 => 0,
+                        2 => 0,
+                        _ => 255,
+                    };
+                }
+
+                let width = pixels_mut.width();
+                let height = pixels_mut.height();
+
+                if pixels_mut.pixels().len() == 4 {
+                    return;
+                }
+
+                let scroll_top = { scroll_time.elapsed().as_millis() / 100 } as u32;
+                document_view.render(
+                    &mut pixels_mut.surface(0, 0, width, height),
+                    &mut context,
+                    &document,
+                    scroll_top,
+                );
+
+                pixels.render().unwrap();
+                // dbg!(now.elapsed());
             }
-
-            let width = pixels_mut.width();
-            let height = pixels_mut.height();
-
-            if pixels_mut.pixels().len() == 4 {
-                return;
-            }
-
-            let scroll_top = { scroll_time.elapsed().as_millis() / 100 } as u32;
-
-            // document.selection_mut().start = Cursor::new(0, 37, 6);
-            // document.selection_mut().end = Cursor::new(0, 37, 18);
-            // document.selection_mut().start = Cursor::new(0, 37, 6);
-            // document.selection_mut().end = Cursor::new(0, 38, 20);
-            // document.selection_mut().start = Cursor::new(0, 37, 6);
-            // document.selection_mut().end = Cursor::new(0, 38, 2);
-            document.selection_mut().start = Cursor::new(0, 37, 6);
-            document.selection_mut().end = Cursor::new(0, 39, 2);
-
-            document_view.render(
-                &mut pixels_mut.surface(0, 0, width, height),
-                &mut context,
-                &document,
-                scroll_top,
-            );
-
-            pixels.render().unwrap();
+            //
+            // After drawing
+            //
+            Event::RedrawEventsCleared => {}
+            //
+            // Before quit
+            //
+            Event::LoopDestroyed => {}
         }
-
-        // Update internal state and request a redraw
-        window.request_redraw();
-        fps_counter.tick();
     });
 }
 
