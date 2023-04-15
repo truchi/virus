@@ -53,13 +53,6 @@ impl DocumentView {
             return;
         }
 
-        // FIXME: why?????!!!!!!!!! rrrrrrrrrrr
-        // println!("prepare");
-        // dbg!(self.rope.is_instance(document.rope()));
-        // dbg!(self.rope == *document.rope());
-        // dbg!(self.range.contains(&start));
-        // dbg!(self.range.contains(&(end - 1)));
-
         // Apply margins
         let margin = (end - start) / 2;
         let start = start.saturating_sub(margin);
@@ -67,6 +60,7 @@ impl DocumentView {
 
         self.lines.clear();
         self.range = start..end;
+        self.rope = document.rope().clone();
 
         let highlights = Highlights::new(
             document.rope(),

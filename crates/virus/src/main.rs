@@ -31,7 +31,7 @@ use virus_graphics::{
 use virus_ui::document_view::DocumentView;
 use winit::{
     dpi::PhysicalSize,
-    event::{Event, WindowEvent},
+    event::{Event, KeyboardInput, WindowEvent},
     event_loop::EventLoop,
     window::{Fullscreen, WindowBuilder},
 };
@@ -120,7 +120,6 @@ fn main() -> Result<(), Error> {
             //
             Event::MainEventsCleared => {
                 window.request_redraw();
-                fps_counter.tick();
             }
             //
             // Drawing happens here
@@ -158,6 +157,7 @@ fn main() -> Result<(), Error> {
                 );
 
                 pixels.render().unwrap();
+                fps_counter.tick();
                 // dbg!(now.elapsed());
             }
             //
