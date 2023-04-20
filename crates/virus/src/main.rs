@@ -15,12 +15,16 @@ const _MULTILINE3: &str = "111
 222
 333";
 
+mod events;
 mod fps;
 mod virus;
 
-use std::borrow::Cow;
-
+use events::{Event, Events};
 use pixels::{Error, Pixels, SurfaceTexture};
+use std::{
+    borrow::Cow,
+    time::{Duration, Instant},
+};
 use virus_common::{Cursor, Rgba, Style};
 use virus_editor::{Document, Highlight, Highlights, Theme};
 use virus_graphics::{
@@ -30,8 +34,8 @@ use virus_graphics::{
 };
 use virus_ui::document_view::DocumentView;
 use winit::{
-    dpi::PhysicalSize,
-    event::{Event, KeyboardInput, WindowEvent},
+    dpi::{PhysicalPosition, PhysicalSize},
+    event::VirtualKeyCode,
     event_loop::EventLoop,
     window::{Fullscreen, WindowBuilder},
 };
@@ -58,7 +62,6 @@ fn main() -> Result<(), Error> {
 
     let font = recursive;
     let key = font.key();
-
     let mut context = Context::new(Fonts::new([font], emoji));
 
     let mut document = Document::open(std::env::args().nth(1).unwrap()).unwrap();
@@ -73,60 +76,46 @@ fn main() -> Result<(), Error> {
             .with_fullscreen(Some(Fullscreen::Borderless(None)))
             .build(&event_loop)
             .unwrap();
-        // window.set_cursor_visible(false);
+        window.set_cursor_visible(false);
         window
     };
+    let mut events = Events::new(window.id());
 
     let mut pixels = {
         let PhysicalSize { width, height } = window.inner_size();
         Pixels::new(width, height, SurfaceTexture::new(width, height, &window)).unwrap()
     };
-
     let mut fps_counter = fps::FpsCounter::new();
-
     let scroll_time = std::time::Instant::now();
 
-    event_loop.run(move |event, _, _control_flow| {
-        match event {
-            //
-            // Before events
-            //
-            Event::NewEvents(_) => {}
-            //
-            // Window, keyboard, mouse, DnD, ...
-            //
-            Event::WindowEvent { event, .. } => {
-                if let WindowEvent::Resized(PhysicalSize { width, height }) = &event {
-                    if *width != 1 {
-                        pixels.resize_surface(*width, *height).unwrap();
-                        pixels.resize_buffer(width / SCALE, height / SCALE).unwrap();
-                    }
+    event_loop.run(move |event, _, control_flow| {
+        let event = match events.update(&event) {
+            Some(event) => event,
+            None => return,
+        };
+
+        match dbg!(event) {
+            Event::Char(_) => {}
+            Event::Pressed(VirtualKeyCode::Escape) => {
+                control_flow.set_exit();
+            }
+            Event::Pressed(_) => {}
+            Event::Released(_) => {}
+            Event::Resized(PhysicalSize { width, height }) => {
+                if width != 1 {
+                    pixels.resize_surface(width, height).unwrap();
+                    pixels.resize_buffer(width / SCALE, height / SCALE).unwrap();
                 }
             }
-            //
-            // ???
-            //
-            Event::DeviceEvent { event, .. } => {}
-            //
-            // Neat! But unused for now
-            //
-            Event::UserEvent(_) => {}
-            //
-            // ???
-            //
-            Event::Suspended | Event::Resumed => {}
-            //
-            // After events: state update
-            //
-            Event::MainEventsCleared => {
+            Event::Moved(_) => {}
+            Event::Focused => {}
+            Event::Unfocused => {}
+            Event::Close => {}
+            Event::Closed => {}
+            Event::Update => {
                 window.request_redraw();
             }
-            //
-            // Drawing happens here
-            //
-            Event::RedrawRequested(_) => {
-                let now = std::time::Instant::now();
-
+            Event::Redraw => {
                 let mut pixels_mut = {
                     let PhysicalSize { width, height } = window.inner_size();
                     PixelsMut::new(width / SCALE, height / SCALE, pixels.get_frame_mut())
@@ -158,16 +147,8 @@ fn main() -> Result<(), Error> {
 
                 pixels.render().unwrap();
                 fps_counter.tick();
-                // dbg!(now.elapsed());
             }
-            //
-            // After drawing
-            //
-            Event::RedrawEventsCleared => {}
-            //
-            // Before quit
-            //
-            Event::LoopDestroyed => {}
+            Event::Quit => {}
         }
     });
 }
