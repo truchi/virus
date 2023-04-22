@@ -456,11 +456,11 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
             vec![]
         } else {
             #[derive(Debug)] // TODO remove
-            struct Capture {
+            struct Capture<'a> {
                 start: Cursor,
                 end: Cursor,
                 pattern: usize,
-                capture: usize,
+                name: &'a str,
             }
 
             let mut captures = Vec::<Capture>::new();
@@ -492,7 +492,7 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
                             capture.node.end_position().column,
                         ),
                         pattern: captures.pattern_index,
-                        capture: capture.index as usize,
+                        name: &self.query.capture_names()[capture.index as usize],
                     })
                 })
                 .flatten();
@@ -526,7 +526,16 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
                 }
             }
 
-            captures
+            if captures.is_empty() {
+                vec![Capture {
+                    start: Cursor::START,
+                    end: Cursor::new(self.rope.len_bytes(), self.rope.len_lines(), 0),
+                    pattern: usize::MAX,
+                    name: "",
+                }]
+            } else {
+                captures
+            }
         };
 
         // Filter on line range and crop overlapping captures
@@ -535,9 +544,7 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
             .map(|highlight| Highlight {
                 start: highlight.start,
                 end: highlight.end,
-                style: *self
-                    .theme
-                    .get(&self.query.capture_names()[highlight.capture]),
+                style: *self.theme.get(highlight.name),
             })
             .filter(|highlight| self.start.index < highlight.end.index)
             .filter(|highlight| highlight.start.index < self.end.index)
