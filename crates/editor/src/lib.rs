@@ -5,7 +5,7 @@ use std::{
     ops::Range,
 };
 use tree_sitter::{Node, Parser, Point, Query, QueryCursor, Tree};
-use virus_common::{Cursor, Style};
+use virus_common::{Cursor, Rgba, Style};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Theme                                             //
@@ -104,6 +104,76 @@ impl Theme {
             "variable.other.member" => &self.variable_other_member,
             "variable.parameter" => &self.variable_parameter,
             _ => &self.default,
+        }
+    }
+
+    pub fn dracula() -> Self {
+        fn style(r: u8, g: u8, b: u8) -> Style {
+            Style {
+                foreground: Rgba {
+                    r,
+                    g,
+                    b,
+                    a: u8::MAX,
+                },
+                ..Default::default()
+            }
+        }
+
+        let _background = style(40, 42, 54);
+        let _current = style(68, 71, 90);
+        let foreground = style(248, 248, 242);
+        let comment = style(98, 114, 164);
+        let cyan = style(139, 233, 253);
+        let green = style(80, 250, 123);
+        let orange = style(255, 184, 108);
+        let pink = style(255, 121, 198);
+        let purple = style(189, 147, 249);
+        let red = style(255, 85, 85);
+        let yellow = style(241, 250, 140);
+
+        Theme {
+            default: style(255, 255, 255),
+            attribute: green,
+            comment,
+            constant: green,
+            constant_builtin_boolean: purple,
+            constant_character: purple,
+            constant_character_escape: purple,
+            constant_numeric_float: purple,
+            constant_numeric_integer: purple,
+            constructor: foreground,
+            function: pink,
+            function_macro: pink,
+            function_method: pink,
+            keyword: red,
+            keyword_control: red,
+            keyword_control_conditional: red,
+            keyword_control_import: red,
+            keyword_control_repeat: red,
+            keyword_control_return: red,
+            keyword_function: red,
+            keyword_operator: red,
+            keyword_special: red,
+            keyword_storage: red,
+            keyword_storage_modifier: red,
+            keyword_storage_modifier_mut: red,
+            keyword_storage_modifier_ref: red,
+            keyword_storage_type: red,
+            label: foreground,
+            namespace: foreground,
+            operator: foreground,
+            punctuation_bracket: yellow,
+            punctuation_delimiter: yellow,
+            special: yellow,
+            string: cyan,
+            r#type: cyan,
+            type_builtin: cyan,
+            type_enum_variant: cyan,
+            variable: orange,
+            variable_builtin: orange,
+            variable_other_member: orange,
+            variable_parameter: orange,
         }
     }
 }
