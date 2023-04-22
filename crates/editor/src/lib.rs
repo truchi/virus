@@ -251,6 +251,18 @@ pub struct Document {
 }
 
 impl Document {
+    pub fn empty(language: Option<Language>) -> Self {
+        Self {
+            path: None,
+            rope: Default::default(),
+            selection: Cursor::START..Cursor::START,
+            language,
+            parser: language.map(|language| language.parser()).flatten(),
+            tree: None,
+            dirty: false,
+        }
+    }
+
     pub fn open(path: String) -> std::io::Result<Self> {
         let rope = Rope::from_reader(&mut BufReader::new(File::open(&path)?))?;
         let (language, parser) = if let Ok(language) = Language::try_from(path.as_str()) {

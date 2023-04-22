@@ -151,9 +151,8 @@ impl DocumentView {
                 .lines
                 .iter()
                 .find(|(index, _)| *index == line)
-                .unwrap()
-                .1
-                .glyphs();
+                .map(|(_, line)| line.glyphs())
+                .unwrap_or_default();
 
             // NOTE: we could try to guess which end to start from
             // TODO: buggy at line boundaries?

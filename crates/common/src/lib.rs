@@ -11,6 +11,12 @@ pub struct Cursor {
 }
 
 impl Cursor {
+    pub const START: Self = Self {
+        index: 0,
+        line: 0,
+        column: 0,
+    };
+
     pub fn new(index: usize, line: usize, column: usize) -> Self {
         Self {
             index,

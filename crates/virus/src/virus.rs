@@ -1,6 +1,6 @@
 use crate::events::{Event, Events};
 use pixels::{Pixels, SurfaceTexture};
-use virus_editor::{Document, Theme};
+use virus_editor::{Document, Language, Theme};
 use virus_graphics::{
     pixels_mut::PixelsMut,
     text::{Context, Font, Fonts},
@@ -65,7 +65,7 @@ impl Virus {
             Pixels::new(width, height, SurfaceTexture::new(width, height, &window)).unwrap()
         };
 
-        let mut document = Document::open(std::env::args().nth(1).unwrap()).unwrap();
+        let mut document = Document::empty(Some(Language::Rust));
         document.parse();
         let mut document_view =
             DocumentView::new(HIGHLIGHT_QUERY.into(), Theme::dracula(), key, 40, 50);
