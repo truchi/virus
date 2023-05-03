@@ -243,7 +243,7 @@ impl TryFrom<&str> for Language {
 pub struct Document {
     path: Option<String>,
     rope: Rope,
-    selection: Range<Cursor>,
+    selection: Range<Cursor>, // Byte cursor, but ropey uses char indices...
     language: Option<Language>,
     parser: Option<Parser>,
     tree: Option<Tree>,
@@ -345,43 +345,36 @@ impl Document {
         let start = self.selection.start.index;
         let end = self.selection.end.index;
         let start_char = self.rope.byte_to_char(start);
-        let mut dirty = false;
 
         if start != end {
             let end_char = self.rope.byte_to_char(end);
             self.rope.remove(start_char..end_char);
-            dirty = true;
+            self.dirty = true;
         }
 
         if !str.is_empty() {
             self.rope.insert(start_char, str);
-            dirty = true;
-        }
-
-        if dirty {
             self.dirty = true;
         }
     }
 
     pub fn edit_char(&mut self, char: char) {
-        // TODO edit cursors and tree
-
         let start = self.selection.start.index;
         let end = self.selection.end.index;
         let start_char = self.rope.byte_to_char(start);
-        let mut dirty = false;
 
         if start != end {
             let end_char = self.rope.byte_to_char(end);
             self.rope.remove(start_char..end_char);
-            dirty = true;
+            self.dirty = true;
         }
 
         self.rope.insert_char(start_char, char);
 
-        if dirty {
-            self.dirty = true;
-        }
+        let cursor = self.cursor_at_index(end + char.len_utf8());
+        self.selection = cursor..cursor;
+
+        // TODO edit tree
     }
 
     pub fn parse(&mut self) -> Option<&Tree> {
@@ -396,6 +389,16 @@ impl Document {
         }
 
         self.tree.as_ref()
+    }
+
+    fn cursor_at_index(&self, index: usize) -> Cursor {
+        let line = self.rope.byte_to_line(index);
+
+        Cursor {
+            index,
+            line,
+            column: index - self.rope.line_to_byte(line),
+        }
     }
 }
 
@@ -436,8 +439,8 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
         let end = end.min(lines);
         let start = start.min(end);
 
-        let start = Cursor::new(rope.try_line_to_byte(start).unwrap(), start, 0);
-        let end = Cursor::new(rope.try_line_to_byte(end).unwrap(), end, 0);
+        let start = Cursor::new(rope.line_to_byte(start), start, 0);
+        let end = Cursor::new(rope.line_to_byte(end), end, 0);
 
         Self {
             rope,
@@ -455,7 +458,6 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
         let captures = if (self.start.line..self.end.line).is_empty() {
             vec![]
         } else {
-            #[derive(Debug)] // TODO remove
             struct Capture<'a> {
                 start: Cursor,
                 end: Cursor,
@@ -528,8 +530,8 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
 
             if captures.is_empty() {
                 vec![Capture {
-                    start: Cursor::START,
-                    end: Cursor::new(self.rope.len_bytes(), self.rope.len_lines(), 0),
+                    start: self.start,
+                    end: self.end,
                     pattern: usize::MAX,
                     name: "",
                 }]
@@ -560,12 +562,11 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
                     self.end
                 },
                 style: highlight.style,
-            })
-            .peekable();
+            });
 
         // Intersperse with in-between selections
         let highlights = {
-            let mut highlights = highlights;
+            let mut highlights = highlights.peekable();
             let mut prev = Highlight {
                 start: self.start,
                 end: self.start,
@@ -575,17 +576,17 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
             std::iter::from_fn(move || {
                 let next = highlights.peek()?;
 
-                if prev.end.index == next.start.index {
-                    prev = highlights.next()?;
-                    Some(prev)
+                prev = if prev.end.index == next.start.index {
+                    highlights.next()?
                 } else {
-                    prev = Highlight {
+                    Highlight {
                         start: prev.end,
                         end: next.start,
                         style: *self.theme.default(),
-                    };
-                    Some(prev)
-                }
+                    }
+                };
+
+                Some(prev)
             })
         };
 
@@ -601,24 +602,25 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
                     next = highlights.next();
                     Some(highlight)
                 } else {
-                    // FIXME: this supposes `\n` boundaries!
-                    let index = self
+                    // NOTE: this does not take line breaks into account!
+                    // It could be nice to remove the line break (if any) from the item,
+                    // but this should not be a real issue.
+                    let end = self
                         .rope
                         .try_line_to_byte(highlight.start.line + 1)
-                        .unwrap()
-                        - /* eol */ 1;
+                        .unwrap();
 
                     next = Some(Highlight {
-                        start: Cursor::new(index + /* eol */ 1, highlight.start.line + 1, 0),
+                        start: Cursor::new(end, highlight.start.line + 1, 0),
                         end: highlight.end,
                         style: highlight.style,
                     });
                     Some(Highlight {
                         start: highlight.start,
                         end: Cursor::new(
-                            index,
+                            end,
                             highlight.start.line,
-                            highlight.start.column + (index - highlight.start.index),
+                            highlight.start.column + (end - highlight.start.index),
                         ),
                         style: highlight.style,
                     })

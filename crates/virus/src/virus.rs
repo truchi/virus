@@ -88,8 +88,12 @@ impl Virus {
                 None => return,
             };
 
-            match dbg!(event) {
-                Event::Char(_) => {}
+            // dbg!(event);
+            match event {
+                Event::Char(char) => {
+                    self.document.edit_char(char);
+                    self.document.parse();
+                }
                 Event::Pressed(VirtualKeyCode::Escape) => {
                     control_flow.set_exit();
                 }
