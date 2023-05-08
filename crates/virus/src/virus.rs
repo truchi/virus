@@ -88,9 +88,12 @@ impl Virus {
                 None => return,
             };
 
-            // dbg!(event);
             match event {
                 Event::Char(char) => {
+                    // TODO handle backspace
+
+                    let char = if char == '\r' { '\n' } else { char };
+
                     self.document.edit_char(char);
                     self.document.parse();
                 }

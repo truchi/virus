@@ -161,7 +161,12 @@ impl DocumentView {
                     .iter()
                     .find(|glyph| glyph.range.end as usize > selection.start.column)
                     .map(|glyph| glyph.offset)
-                    .unwrap_or(0.) as u32
+                    .unwrap_or(
+                        glyphs
+                            .last()
+                            .map(|glyph| glyph.offset + glyph.advance)
+                            .unwrap_or_default(),
+                    ) as u32
             };
             let end = || {
                 glyphs
