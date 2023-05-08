@@ -1,3 +1,5 @@
+use tree_sitter::{InputEdit, Point};
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Cursor                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -22,6 +24,26 @@ impl Cursor {
             index,
             line,
             column,
+        }
+    }
+
+    pub fn input_edit(start: Self, old_end: Self, new_end: Self) -> InputEdit {
+        InputEdit {
+            start_byte: start.index,
+            old_end_byte: old_end.index,
+            new_end_byte: new_end.index,
+            start_position: start.into(),
+            old_end_position: old_end.into(),
+            new_end_position: new_end.into(),
+        }
+    }
+}
+
+impl From<Cursor> for Point {
+    fn from(cursor: Cursor) -> Self {
+        Self {
+            row: cursor.line,
+            column: cursor.column,
         }
     }
 }

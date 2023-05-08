@@ -371,10 +371,17 @@ impl Document {
 
         self.rope.insert_char(start_char, char);
 
-        let cursor = self.cursor_at_index(end + char.len_utf8());
-        self.selection = cursor..cursor;
+        let new = self.cursor_at_index(end + char.len_utf8());
 
-        // TODO edit tree
+        if let Some(tree) = &mut self.tree {
+            tree.edit(&Cursor::input_edit(
+                self.selection.start,
+                self.selection.end,
+                new,
+            ));
+        }
+
+        self.selection = new..new;
     }
 
     pub fn parse(&mut self) -> Option<&Tree> {
