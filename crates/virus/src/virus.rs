@@ -90,11 +90,26 @@ impl Virus {
 
             match event {
                 Event::Char(char) => {
-                    // TODO handle backspace
+                    const TAB: char = '\t';
+                    const ENTER: char = '\r';
+                    const BACKSPACE: char = '\u{8}';
+                    const ESCAPE: char = '\u{1b}';
 
-                    let char = if char == '\r' { '\n' } else { char };
+                    dbg!(char);
+                    match char {
+                        ESCAPE => return, // Handled as `Pressed`
+                        TAB => return,    // TODO
+                        ENTER => {
+                            self.document.edit_char('\n');
+                        }
+                        BACKSPACE => {
+                            self.document.backspace();
+                        }
+                        _ => {
+                            self.document.edit_char(char);
+                        }
+                    }
 
-                    self.document.edit_char(char);
                     self.document.parse();
                 }
                 Event::Pressed(VirtualKeyCode::Escape) => {

@@ -5,7 +5,7 @@ use tree_sitter::{InputEdit, Point};
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// A `(index , line, column)` cursor.
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Eq, Ord, Default, Debug)]
 pub struct Cursor {
     pub index: usize,
     pub line: usize,
@@ -36,6 +36,49 @@ impl Cursor {
             old_end_position: old_end.into(),
             new_end_position: new_end.into(),
         }
+    }
+}
+
+impl PartialEq for Cursor {
+    fn eq(&self, other: &Self) -> bool {
+        let index = self.index == other.index;
+
+        debug_assert!(if index {
+            self.line == other.line && self.column == other.column
+        } else {
+            self.line != other.line || self.column != other.column
+        });
+
+        index
+    }
+}
+
+impl PartialOrd for Cursor {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let index = self.index.cmp(&other.index);
+
+        debug_assert!({
+            use std::cmp::Ordering::*;
+
+            let line = self.line.cmp(&other.line);
+            let column = self.column.cmp(&other.column);
+
+            match index {
+                Less => match line {
+                    Less => true,
+                    Equal => column == Less,
+                    Greater => false,
+                },
+                Equal => line == Equal && column == Equal,
+                Greater => match line {
+                    Less => false,
+                    Equal => column == Greater,
+                    Greater => true,
+                },
+            }
+        });
+
+        Some(index)
     }
 }
 

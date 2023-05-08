@@ -371,17 +371,33 @@ impl Document {
 
         self.rope.insert_char(start_char, char);
 
-        let new = self.cursor_at_index(end + char.len_utf8());
+        let cursor = self.cursor_at_index(end + char.len_utf8()); // FIXME start instead of end?
+        self.edit_tree(self.selection.start, self.selection.end, cursor);
+        self.selection = cursor..cursor;
+    }
 
-        if let Some(tree) = &mut self.tree {
-            tree.edit(&Cursor::input_edit(
-                self.selection.start,
-                self.selection.end,
-                new,
-            ));
+    pub fn backspace(&mut self) -> Result<(), ()> {
+        if self.selection.start != self.selection.end {
+            return Err(());
         }
 
-        self.selection = new..new;
+        // Disgusting: we have to go from byte to char index, then from char to byte index...
+
+        let char_index = self.rope.byte_to_char(self.selection.start.index);
+
+        if char_index == 0 {
+            return Ok(());
+        }
+
+        if let Some(prev_char_index) = char_index.checked_sub(1) {
+            self.rope.remove(prev_char_index..char_index);
+
+            let cursor = self.cursor_at_index(self.rope.char_to_byte(prev_char_index));
+            self.edit_tree(cursor, self.selection.end, cursor);
+            self.selection = cursor..cursor;
+        }
+
+        Ok(())
     }
 
     pub fn parse(&mut self) -> Option<&Tree> {
@@ -405,6 +421,12 @@ impl Document {
             index,
             line,
             column: index - self.rope.line_to_byte(line),
+        }
+    }
+
+    fn edit_tree(&mut self, start: Cursor, old_end: Cursor, new_end: Cursor) {
+        if let Some(tree) = &mut self.tree {
+            tree.edit(&Cursor::input_edit(start, old_end, new_end));
         }
     }
 }
