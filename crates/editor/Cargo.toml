@@ -10,3 +10,4 @@ virus-common.workspace = true
 tree-sitter.workspace = true
 tree-sitter-rust.workspace = true
 ropey.workspace = true
+unicode-segmentation.workspace = true
