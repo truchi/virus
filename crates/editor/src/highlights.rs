@@ -1,7 +1,7 @@
 use crate::theme::Theme;
 use ropey::Rope;
 use std::ops::Range;
-use tree_sitter::{Node, Point, Query, QueryCursor};
+use tree_sitter::{Node, Query, QueryCursor};
 use virus_common::{Cursor, Style};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -46,7 +46,23 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
         let start = start.min(end);
 
         let start = Cursor::new(rope.line_to_byte(start), start, 0);
-        let end = Cursor::new(rope.line_to_byte(end), end, 0);
+        let end = if let Some(line) = end.checked_sub(1) {
+            let bytes = rope.len_bytes();
+            let start = rope.try_line_to_byte(line).unwrap();
+
+            let col = {
+                let end = if line == lines - 1 {
+                    bytes
+                } else {
+                    rope.try_line_to_byte(line + 1).unwrap() - /* \n */ 1
+                };
+                end - start
+            };
+
+            Cursor::new(start + col, line, col)
+        } else {
+            Cursor::START
+        };
 
         Self {
             rope,
@@ -61,9 +77,7 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
     /// Returns an iterator of [`Highlight`]s.
     pub fn iter(&self) -> impl '_ + Iterator<Item = Highlight> {
         // Use `tree-sitter` to get a sorted list of catpures for `self.query`
-        let captures = if (self.start.line..self.end.line).is_empty() {
-            vec![]
-        } else {
+        let captures = {
             struct Capture<'a> {
                 start: Cursor,
                 end: Cursor,
@@ -73,10 +87,8 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
 
             let mut captures = Vec::<Capture>::new();
             let mut cursor = {
-                let start = Point::new(self.start.line, 0);
-                let end = Point::new(self.end.line, 0);
                 let mut cursor = QueryCursor::new();
-                cursor.set_point_range(start..end);
+                cursor.set_point_range(self.start.into()..self.end.into());
                 cursor
             };
             let it = cursor
@@ -157,12 +169,12 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
             .filter(|highlight| self.start.index < highlight.end.index)
             .filter(|highlight| highlight.start.index < self.end.index)
             .map(|highlight| Highlight {
-                start: if self.start.index < highlight.start.index {
+                start: if self.start.index <= highlight.start.index {
                     highlight.start
                 } else {
                     self.start
                 },
-                end: if highlight.end.index < self.end.index {
+                end: if highlight.end.index <= self.end.index {
                     highlight.end
                 } else {
                     self.end
@@ -179,7 +191,7 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
                 style: *self.theme.default(),
             };
 
-            std::iter::from_fn(move || {
+            let mut highlights = std::iter::from_fn(move || {
                 let next = highlights.peek()?;
 
                 prev = if prev.end.index == next.start.index {
@@ -193,6 +205,22 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
                 };
 
                 Some(prev)
+            });
+
+            // Add last highlight to end of text
+            let mut last = None;
+
+            std::iter::from_fn(move || {
+                if let Some(highlight) = highlights.next() {
+                    last = Some(highlight.end);
+                    Some(highlight)
+                } else {
+                    Some(Highlight {
+                        start: last.take()?,
+                        end: self.end,
+                        style: *self.theme.default(),
+                    })
+                }
             })
         };
 
