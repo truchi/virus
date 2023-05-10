@@ -2,7 +2,11 @@ use ropey::Rope;
 use std::{borrow::Cow, ops::Range};
 use swash::CacheKey;
 use virus_common::Rgba;
-use virus_editor::{Document, Highlight, Highlights, Theme};
+use virus_editor::{
+    document::Document,
+    highlights::{Highlight, Highlights},
+    theme::Theme,
+};
 use virus_graphics::{
     pixels_mut::Surface,
     text::{Context, FontSize, Line, LineHeight},

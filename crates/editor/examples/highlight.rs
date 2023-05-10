@@ -1,4 +1,4 @@
-use editor::{Document, Highlights, Theme};
+use editor::{document::Document, highlights::Highlights, theme::Theme};
 use tree_sitter::Query;
 use virus_common::{Rgba, Style};
 

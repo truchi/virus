@@ -1,6 +1,6 @@
 use crate::events::{Event, Events};
 use pixels::{Pixels, SurfaceTexture};
-use virus_editor::{Document, Language, Theme};
+use virus_editor::{document::Document, language::Language, theme::Theme};
 use virus_graphics::{
     pixels_mut::PixelsMut,
     text::{Context, Font, Fonts},
