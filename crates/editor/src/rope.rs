@@ -63,7 +63,7 @@ impl RopeExt for Rope {
         // Find the previous grapheme cluster boundary
         loop {
             match graphemes.prev_boundary(chunk, offset) {
-                Ok(None) => return Cursor::START,
+                Ok(None) => return Cursor::ZERO,
                 Ok(Some(index)) => return self.cursor_at_index(index),
                 Err(GraphemeIncomplete::PrevChunk) => {
                     let (a, b, _, _) = self.chunk_at_byte(offset - 1);

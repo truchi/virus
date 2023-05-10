@@ -61,7 +61,7 @@ impl<'tree, 'rope> Highlights<'tree, 'rope> {
 
             Cursor::new(start + col, line, col)
         } else {
-            Cursor::START
+            Cursor::ZERO
         };
 
         Self {

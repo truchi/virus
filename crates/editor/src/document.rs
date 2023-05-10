@@ -28,7 +28,7 @@ impl Document {
         Self {
             path: None,
             rope: Default::default(),
-            selection: Cursor::START..Cursor::START,
+            selection: Cursor::ZERO..Cursor::ZERO,
             language,
             parser: language.map(|language| language.parser()).flatten(),
             tree: None,
