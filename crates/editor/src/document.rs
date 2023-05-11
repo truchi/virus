@@ -143,26 +143,22 @@ impl Document {
     }
 
     pub fn backspace(&mut self) -> Result<(), ()> {
-        if self.selection.start != self.selection.end {
+        let (start, end) = (self.selection.start, self.selection.end);
+
+        if start != end {
             return Err(());
         }
 
-        // Disgusting: we have to go from byte to char index, then from char to byte index...
+        let end = self.selection.end;
+        let start = self.rope.prev_grapheme(end);
 
-        let char_index = self.rope.byte_to_char(self.selection.start.index);
+        if start != end {
+            self.rope
+                .remove(self.rope.byte_to_char(start.index)..self.rope.byte_to_char(end.index));
+            self.dirty = true;
 
-        if char_index == 0 {
-            return Ok(());
-        }
-
-        if let Some(prev_char_index) = char_index.checked_sub(1) {
-            self.rope.remove(prev_char_index..char_index);
-
-            let cursor = self
-                .rope
-                .cursor_at_index(self.rope.char_to_byte(prev_char_index));
-            self.edit_tree(cursor, self.selection.end, cursor);
-            self.selection = cursor..cursor;
+            self.edit_tree(start, end, start);
+            self.selection = start..start;
         }
 
         Ok(())
