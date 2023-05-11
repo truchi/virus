@@ -7,9 +7,9 @@ use virus_graphics::{
 };
 use virus_ui::document_view::DocumentView;
 use winit::{
-    dpi::PhysicalSize,
+    dpi::{PhysicalPosition, PhysicalSize},
     event::VirtualKeyCode,
-    event_loop::EventLoop,
+    event_loop::{ControlFlow, EventLoop},
     window::{Fullscreen, Window, WindowBuilder},
 };
 
@@ -28,7 +28,6 @@ const SCALE: u32 = 1;
 
 pub struct Virus {
     window: Window,
-    event_loop: EventLoop<()>,
     events: Events,
     context: Context,
     document: Document,
@@ -37,27 +36,9 @@ pub struct Virus {
 }
 
 impl Virus {
-    pub fn new() -> Self {
-        let fira = Font::from_file(FIRA).unwrap();
-        let ubuntu = Font::from_file(UBUNTU).unwrap();
-        let recursive = Font::from_file(RECURSIVE).unwrap();
-        let emoji = Font::from_file(EMOJI).unwrap();
-
-        let font = recursive;
+    fn new(window: Window, font: Font, emoji: Font) -> Self {
         let key = font.key();
         let mut context = Context::new(Fonts::new([font], emoji));
-
-        let event_loop = EventLoop::new();
-        let window = {
-            let window = WindowBuilder::new()
-                .with_title("virus")
-                .with_inner_size(PhysicalSize::new(1, 1))
-                .with_fullscreen(Some(Fullscreen::Borderless(None)))
-                .build(&event_loop)
-                .unwrap();
-            window.set_cursor_visible(false);
-            window
-        };
         let mut events = Events::new(window.id());
 
         let mut pixels = {
@@ -72,7 +53,6 @@ impl Virus {
 
         Self {
             window,
-            event_loop,
             events,
             context,
             document,
@@ -81,91 +61,145 @@ impl Virus {
         }
     }
 
-    pub fn run(mut self) {
-        self.event_loop.run(move |event, _, control_flow| {
-            let event = match self.events.update(&event) {
+    pub fn run(title: &str) {
+        let event_loop = EventLoop::new();
+        let window = {
+            let window = WindowBuilder::new()
+                .with_title(title)
+                .with_inner_size(PhysicalSize::new(1, 1))
+                .with_fullscreen(Some(Fullscreen::Borderless(None)))
+                .build(&event_loop)
+                .unwrap();
+            window.set_cursor_visible(false);
+            window
+        };
+
+        let font = {
+            let fira = Font::from_file(FIRA).unwrap();
+            let ubuntu = Font::from_file(UBUNTU).unwrap();
+            let recursive = Font::from_file(RECURSIVE).unwrap();
+
+            recursive
+        };
+        let emoji = Font::from_file(EMOJI).unwrap();
+
+        let mut virus = Self::new(window, font, emoji);
+
+        event_loop.run(move |event, _, flow| {
+            let event = match virus.events.update(&event) {
                 Some(event) => event,
                 None => return,
             };
 
             match event {
-                Event::Char(char) => {
-                    const TAB: char = '\t';
-                    const ENTER: char = '\r';
-                    const BACKSPACE: char = '\u{8}';
-                    const ESCAPE: char = '\u{1b}';
-
-                    dbg!(char);
-                    match char {
-                        ESCAPE => return, // Handled as `Pressed`
-                        TAB => return,    // TODO
-                        ENTER => {
-                            self.document.edit_char('\n');
-                        }
-                        BACKSPACE => {
-                            self.document.backspace();
-                        }
-                        _ => {
-                            self.document.edit_char(char);
-                        }
-                    }
-
-                    self.document.parse();
-                }
-                Event::Pressed(VirtualKeyCode::Escape) => {
-                    control_flow.set_exit();
-                }
-                Event::Pressed(_) => {}
-                Event::Released(_) => {}
-                Event::Resized(PhysicalSize { width, height }) => {
-                    if width != 1 {
-                        self.pixels.resize_surface(width, height).unwrap();
-                        self.pixels
-                            .resize_buffer(width / SCALE, height / SCALE)
-                            .unwrap();
-                    }
-                }
-                Event::Moved(_) => {}
-                Event::Focused => {}
-                Event::Unfocused => {}
-                Event::Close => {}
-                Event::Closed => {}
-                Event::Update => {
-                    self.window.request_redraw();
-                }
-                Event::Redraw => {
-                    let mut pixels_mut = {
-                        let PhysicalSize { width, height } = self.window.inner_size();
-                        PixelsMut::new(width / SCALE, height / SCALE, self.pixels.get_frame_mut())
-                    };
-
-                    for (i, u) in pixels_mut.pixels_mut().iter_mut().enumerate() {
-                        *u = match i % 4 {
-                            0 => 0,
-                            1 => 0,
-                            2 => 0,
-                            _ => 255,
-                        };
-                    }
-
-                    let width = pixels_mut.width();
-                    let height = pixels_mut.height();
-
-                    if pixels_mut.pixels().len() == 4 {
-                        return;
-                    }
-
-                    self.document_view.render(
-                        &mut pixels_mut.surface(0, 0, width, height),
-                        &mut self.context,
-                        &self.document,
-                        0,
-                    );
-
-                    self.pixels.render().unwrap();
-                }
-                Event::Quit => {}
+                Event::Char(char) => virus.on_char(char, flow),
+                Event::Pressed(key) => virus.on_pressed(key, flow),
+                Event::Released(key) => virus.on_released(key, flow),
+                Event::Resized(size) => virus.on_resized(size, flow),
+                Event::Moved(position) => virus.on_moved(position, flow),
+                Event::Focused => virus.on_focused(flow),
+                Event::Unfocused => virus.on_unfocused(flow),
+                Event::Close => virus.on_close(flow),
+                Event::Closed => virus.on_closed(flow),
+                Event::Update => virus.on_update(flow),
+                Event::Redraw => virus.on_redraw(flow),
+                Event::Quit => virus.on_quit(flow),
             }
         });
     }
+}
+
+/// Event handlers.
+impl Virus {
+    fn on_char(&mut self, char: char, flow: &mut ControlFlow) {
+        const TAB: char = '\t';
+        const ENTER: char = '\r';
+        const BACKSPACE: char = '\u{8}';
+        const ESCAPE: char = '\u{1b}';
+
+        dbg!(char);
+        match char {
+            ESCAPE => return, // Handled as `Pressed`
+            TAB => return,    // TODO
+            ENTER => {
+                self.document.edit_char('\n');
+            }
+            BACKSPACE => {
+                self.document.backspace();
+            }
+            _ => {
+                self.document.edit_char(char);
+            }
+        }
+
+        self.document.parse();
+    }
+
+    fn on_pressed(&mut self, key: VirtualKeyCode, flow: &mut ControlFlow) {
+        match key {
+            VirtualKeyCode::Escape => flow.set_exit(),
+            _ => {}
+        }
+    }
+
+    fn on_released(&mut self, key: VirtualKeyCode, flow: &mut ControlFlow) {}
+
+    fn on_resized(&mut self, size: PhysicalSize<u32>, flow: &mut ControlFlow) {
+        let (width, height) = (size.width, size.height);
+
+        if width != 1 {
+            self.pixels.resize_surface(width, height).unwrap();
+            self.pixels
+                .resize_buffer(width / SCALE, height / SCALE)
+                .unwrap();
+        }
+    }
+
+    fn on_moved(&mut self, position: PhysicalPosition<i32>, flow: &mut ControlFlow) {}
+
+    fn on_focused(&mut self, flow: &mut ControlFlow) {}
+
+    fn on_unfocused(&mut self, flow: &mut ControlFlow) {}
+
+    fn on_close(&mut self, flow: &mut ControlFlow) {}
+
+    fn on_closed(&mut self, flow: &mut ControlFlow) {}
+
+    fn on_update(&mut self, flow: &mut ControlFlow) {
+        self.window.request_redraw();
+    }
+
+    fn on_redraw(&mut self, flow: &mut ControlFlow) {
+        let mut pixels_mut = {
+            let PhysicalSize { width, height } = self.window.inner_size();
+            PixelsMut::new(width / SCALE, height / SCALE, self.pixels.get_frame_mut())
+        };
+
+        for (i, u) in pixels_mut.pixels_mut().iter_mut().enumerate() {
+            *u = match i % 4 {
+                0 => 0,
+                1 => 0,
+                2 => 0,
+                _ => 255,
+            };
+        }
+
+        let width = pixels_mut.width();
+        let height = pixels_mut.height();
+
+        if pixels_mut.pixels().len() == 4 {
+            return;
+        }
+
+        self.document_view.render(
+            &mut pixels_mut.surface(0, 0, width, height),
+            &mut self.context,
+            &self.document,
+            0,
+        );
+
+        self.pixels.render().unwrap();
+    }
+
+    fn on_quit(&mut self, flow: &mut ControlFlow) {}
 }

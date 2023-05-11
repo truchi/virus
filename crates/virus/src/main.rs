@@ -5,5 +5,5 @@ mod virus;
 
 // 🚀
 fn main() {
-    virus::Virus::new().run()
+    virus::Virus::run("virus")
 }
