@@ -27,7 +27,7 @@ impl Cursor {
         }
     }
 
-    pub fn input_edit(start: Self, old_end: Self, new_end: Self) -> InputEdit {
+    pub fn into_input_edit(start: Self, old_end: Self, new_end: Self) -> InputEdit {
         InputEdit {
             start_byte: start.index,
             old_end_byte: old_end.index,
@@ -36,6 +36,32 @@ impl Cursor {
             old_end_position: old_end.into(),
             new_end_position: new_end.into(),
         }
+    }
+
+    pub fn from_input_edit(
+        input_edit: InputEdit,
+    ) -> (
+        Self, // Start
+        Self, // Old end
+        Self, // New end
+    ) {
+        (
+            Self::new(
+                input_edit.start_byte,
+                input_edit.start_position.row,
+                input_edit.start_position.column,
+            ),
+            Self::new(
+                input_edit.old_end_byte,
+                input_edit.old_end_position.row,
+                input_edit.old_end_position.column,
+            ),
+            Self::new(
+                input_edit.new_end_byte,
+                input_edit.new_end_position.row,
+                input_edit.new_end_position.column,
+            ),
+        )
     }
 }
 

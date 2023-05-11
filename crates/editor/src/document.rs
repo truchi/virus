@@ -1,4 +1,4 @@
-use crate::language::Language;
+use crate::{language::Language, rope::RopeExt};
 use ropey::Rope;
 use std::{
     fs::{File, OpenOptions},
@@ -132,20 +132,13 @@ impl Document {
     }
 
     pub fn edit_char(&mut self, char: char) {
-        let start = self.selection.start.index;
-        let end = self.selection.end.index;
-        let start_char = self.rope.byte_to_char(start);
+        let (start, end) = (self.selection.start, self.selection.end);
 
-        if start != end {
-            let end_char = self.rope.byte_to_char(end);
-            self.rope.remove(start_char..end_char);
-            self.dirty = true;
-        }
+        self.rope.edit_char(start..end, char);
+        self.dirty = true;
 
-        self.rope.insert_char(start_char, char);
-
-        let cursor = self.cursor_at_index(end + char.len_utf8()); // FIXME start instead of end?
-        self.edit_tree(self.selection.start, self.selection.end, cursor);
+        let cursor = self.rope.cursor_at_index(start.index + char.len_utf8());
+        self.edit_tree(start, end, cursor);
         self.selection = cursor..cursor;
     }
 
@@ -165,7 +158,9 @@ impl Document {
         if let Some(prev_char_index) = char_index.checked_sub(1) {
             self.rope.remove(prev_char_index..char_index);
 
-            let cursor = self.cursor_at_index(self.rope.char_to_byte(prev_char_index));
+            let cursor = self
+                .rope
+                .cursor_at_index(self.rope.char_to_byte(prev_char_index));
             self.edit_tree(cursor, self.selection.end, cursor);
             self.selection = cursor..cursor;
         }
@@ -187,19 +182,9 @@ impl Document {
         self.tree.as_ref()
     }
 
-    fn cursor_at_index(&self, index: usize) -> Cursor {
-        let line = self.rope.byte_to_line(index);
-
-        Cursor {
-            index,
-            line,
-            column: index - self.rope.line_to_byte(line),
-        }
-    }
-
     fn edit_tree(&mut self, start: Cursor, old_end: Cursor, new_end: Cursor) {
         if let Some(tree) = &mut self.tree {
-            tree.edit(&Cursor::input_edit(start, old_end, new_end));
+            tree.edit(&Cursor::into_input_edit(start, old_end, new_end));
         }
     }
 }

@@ -1,4 +1,5 @@
 use ropey::Rope;
+use std::ops::Range;
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 use virus_common::Cursor;
 
@@ -22,6 +23,9 @@ pub trait RopeExt {
 
     /// Returns whether the given `cursor` is a grapheme boundary.
     fn is_grapheme(&self, cursor: Cursor) -> bool;
+
+    /// Replaces `selection` with `char`.
+    fn edit_char(&mut self, selection: Range<Cursor>, char: char);
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -126,34 +130,23 @@ impl RopeExt for Rope {
             match graphemes.is_boundary(chunk, offset) {
                 Ok(n) => return n,
                 Err(GraphemeIncomplete::PreContext(index)) => {
-                    let (chunck, offset, _, _) = self.chunk_at_byte(index - 1);
-                    graphemes.provide_context(chunck, offset);
+                    let (chunk, offset, _, _) = self.chunk_at_byte(index - 1);
+                    graphemes.provide_context(chunk, offset);
                 }
                 _ => unreachable!(),
             }
         }
     }
-}
 
-impl RopeExt for &Rope {
-    fn cursor_at_index(&self, index: usize) -> Cursor {
-        (*self).cursor_at_index(index)
-    }
+    fn edit_char(&mut self, selection: Range<Cursor>, char: char) {
+        let (start, end) = (selection.start.index, selection.end.index);
+        let start_char = self.try_byte_to_char(start).unwrap();
 
-    fn cursor_at_end(&self) -> Cursor {
-        (*self).cursor_at_end()
-    }
+        if start != end {
+            self.try_remove(start_char..self.byte_to_char(end)).unwrap();
+        }
 
-    fn prev_grapheme(&self, cursor: Cursor) -> Cursor {
-        (*self).prev_grapheme(cursor)
-    }
-
-    fn next_grapheme(&self, cursor: Cursor) -> Cursor {
-        (*self).next_grapheme(cursor)
-    }
-
-    fn is_grapheme(&self, cursor: Cursor) -> bool {
-        (*self).is_grapheme(cursor)
+        self.try_insert_char(start_char, char).unwrap();
     }
 }
 
