@@ -8,7 +8,7 @@ use virus_graphics::{
 use virus_ui::document_view::DocumentView;
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
-    event::VirtualKeyCode,
+    event::{ModifiersState, VirtualKeyCode},
     event_loop::{ControlFlow, EventLoop},
     window::{Fullscreen, Window, WindowBuilder},
 };
@@ -90,20 +90,21 @@ impl Virus {
                 Some(event) => event,
                 None => return,
             };
+            let modifiers = virus.events.modifiers();
 
             match event {
-                Event::Char(char) => virus.on_char(char, flow),
-                Event::Pressed(key) => virus.on_pressed(key, flow),
-                Event::Released(key) => virus.on_released(key, flow),
-                Event::Resized(size) => virus.on_resized(size, flow),
-                Event::Moved(position) => virus.on_moved(position, flow),
-                Event::Focused => virus.on_focused(flow),
-                Event::Unfocused => virus.on_unfocused(flow),
-                Event::Close => virus.on_close(flow),
-                Event::Closed => virus.on_closed(flow),
-                Event::Update => virus.on_update(flow),
-                Event::Redraw => virus.on_redraw(flow),
-                Event::Quit => virus.on_quit(flow),
+                Event::Char(char) => virus.on_char(char, modifiers, flow),
+                Event::Pressed(key) => virus.on_pressed(key, modifiers, flow),
+                Event::Released(key) => virus.on_released(key, modifiers, flow),
+                Event::Resized(size) => virus.on_resized(size, modifiers, flow),
+                Event::Moved(position) => virus.on_moved(position, modifiers, flow),
+                Event::Focused => virus.on_focused(modifiers, flow),
+                Event::Unfocused => virus.on_unfocused(modifiers, flow),
+                Event::Close => virus.on_close(modifiers, flow),
+                Event::Closed => virus.on_closed(modifiers, flow),
+                Event::Update => virus.on_update(modifiers, flow),
+                Event::Redraw => virus.on_redraw(modifiers, flow),
+                Event::Quit => virus.on_quit(modifiers, flow),
             }
         });
     }
@@ -111,7 +112,7 @@ impl Virus {
 
 /// Event handlers.
 impl Virus {
-    fn on_char(&mut self, char: char, flow: &mut ControlFlow) {
+    fn on_char(&mut self, char: char, modifiers: ModifiersState, flow: &mut ControlFlow) {
         const TAB: char = '\t';
         const ENTER: char = '\r';
         const BACKSPACE: char = '\u{8}';
@@ -135,16 +136,32 @@ impl Virus {
         self.document.parse();
     }
 
-    fn on_pressed(&mut self, key: VirtualKeyCode, flow: &mut ControlFlow) {
+    fn on_pressed(
+        &mut self,
+        key: VirtualKeyCode,
+        modifiers: ModifiersState,
+        flow: &mut ControlFlow,
+    ) {
         match key {
             VirtualKeyCode::Escape => flow.set_exit(),
             _ => {}
         }
     }
 
-    fn on_released(&mut self, key: VirtualKeyCode, flow: &mut ControlFlow) {}
+    fn on_released(
+        &mut self,
+        key: VirtualKeyCode,
+        modifiers: ModifiersState,
+        flow: &mut ControlFlow,
+    ) {
+    }
 
-    fn on_resized(&mut self, size: PhysicalSize<u32>, flow: &mut ControlFlow) {
+    fn on_resized(
+        &mut self,
+        size: PhysicalSize<u32>,
+        modifiers: ModifiersState,
+        flow: &mut ControlFlow,
+    ) {
         let (width, height) = (size.width, size.height);
 
         if width != 1 {
@@ -155,21 +172,27 @@ impl Virus {
         }
     }
 
-    fn on_moved(&mut self, position: PhysicalPosition<i32>, flow: &mut ControlFlow) {}
+    fn on_moved(
+        &mut self,
+        position: PhysicalPosition<i32>,
+        modifiers: ModifiersState,
+        flow: &mut ControlFlow,
+    ) {
+    }
 
-    fn on_focused(&mut self, flow: &mut ControlFlow) {}
+    fn on_focused(&mut self, modifiers: ModifiersState, flow: &mut ControlFlow) {}
 
-    fn on_unfocused(&mut self, flow: &mut ControlFlow) {}
+    fn on_unfocused(&mut self, modifiers: ModifiersState, flow: &mut ControlFlow) {}
 
-    fn on_close(&mut self, flow: &mut ControlFlow) {}
+    fn on_close(&mut self, modifiers: ModifiersState, flow: &mut ControlFlow) {}
 
-    fn on_closed(&mut self, flow: &mut ControlFlow) {}
+    fn on_closed(&mut self, modifiers: ModifiersState, flow: &mut ControlFlow) {}
 
-    fn on_update(&mut self, flow: &mut ControlFlow) {
+    fn on_update(&mut self, modifiers: ModifiersState, flow: &mut ControlFlow) {
         self.window.request_redraw();
     }
 
-    fn on_redraw(&mut self, flow: &mut ControlFlow) {
+    fn on_redraw(&mut self, modifiers: ModifiersState, flow: &mut ControlFlow) {
         let mut pixels_mut = {
             let PhysicalSize { width, height } = self.window.inner_size();
             PixelsMut::new(width / SCALE, height / SCALE, self.pixels.get_frame_mut())
@@ -201,5 +224,5 @@ impl Virus {
         self.pixels.render().unwrap();
     }
 
-    fn on_quit(&mut self, flow: &mut ControlFlow) {}
+    fn on_quit(&mut self, modifiers: ModifiersState, flow: &mut ControlFlow) {}
 }
