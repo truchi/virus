@@ -117,6 +117,8 @@ impl Virus {
         const ENTER: char = '\r';
         const BACKSPACE: char = '\u{8}';
         const ESCAPE: char = '\u{1b}';
+        const LEFT: char = 'j';
+        const RIGHT: char = 'l';
 
         dbg!(char);
         match char {
@@ -127,6 +129,12 @@ impl Virus {
             }
             BACKSPACE => {
                 self.document.backspace();
+            }
+            LEFT if modifiers.alt() => {
+                self.document.move_prev();
+            }
+            RIGHT if modifiers.alt() => {
+                self.document.move_next();
             }
             _ => {
                 self.document.edit_char(char);

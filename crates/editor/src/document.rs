@@ -130,6 +130,25 @@ impl Document {
     }
 }
 
+/// Movements.
+impl Document {
+    pub fn move_prev(&mut self) {
+        let (start, end) = (self.selection.start, self.selection.end);
+        debug_assert!(start == end);
+
+        let cursor = self.rope.prev_grapheme(start);
+        self.selection = cursor..cursor;
+    }
+
+    pub fn move_next(&mut self) {
+        let (start, end) = (self.selection.start, self.selection.end);
+        debug_assert!(start == end);
+
+        let cursor = self.rope.next_grapheme(start);
+        self.selection = cursor..cursor;
+    }
+}
+
 /// Edition.
 impl Document {
     pub fn edit_str(&mut self, str: &str) {
