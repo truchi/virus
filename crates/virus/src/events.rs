@@ -120,4 +120,24 @@ impl Events {
             WinitEvent::LoopDestroyed => Some(Event::Quit),
         }
     }
+
+    // Returns true if the shift key is pressed.
+    pub fn shift(&self) -> bool {
+        self.modifiers.shift()
+    }
+
+    // Returns true if the control key is pressed.
+    pub fn ctrl(&self) -> bool {
+        self.modifiers.ctrl()
+    }
+
+    // Returns true if the alt key is pressed.
+    pub fn alt(&self) -> bool {
+        self.modifiers.alt()
+    }
+
+    // Returns true if the logo key is pressed.
+    pub fn logo(&self) -> bool {
+        self.modifiers.logo()
+    }
 }
