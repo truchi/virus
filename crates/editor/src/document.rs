@@ -72,6 +72,23 @@ impl Document {
         Ok(())
     }
 
+    pub fn parse(&mut self) -> Option<&Tree> {
+        if let Some(parser) = self.parser.as_mut() {
+            self.tree = parser.parse_with(
+                &mut |index, _| {
+                    let (chunk, chunk_index, ..) = self.rope.chunk_at_byte(index);
+                    &chunk[index - chunk_index..]
+                },
+                self.tree.as_ref(),
+            );
+        }
+
+        self.tree.as_ref()
+    }
+}
+
+/// Getters.
+impl Document {
     pub fn path(&self) -> Option<&str> {
         self.path.as_ref().map(|path| path.as_str())
     }
@@ -111,7 +128,10 @@ impl Document {
             .map(|language| Query::new(language, query).ok())
             .flatten()
     }
+}
 
+/// Edition.
+impl Document {
     pub fn edit_str(&mut self, str: &str) {
         // TODO edit cursors and tree
 
@@ -163,21 +183,10 @@ impl Document {
 
         Ok(())
     }
+}
 
-    pub fn parse(&mut self) -> Option<&Tree> {
-        if let Some(parser) = self.parser.as_mut() {
-            self.tree = parser.parse_with(
-                &mut |index, _| {
-                    let (chunk, chunk_index, ..) = self.rope.chunk_at_byte(index);
-                    &chunk[index - chunk_index..]
-                },
-                self.tree.as_ref(),
-            );
-        }
-
-        self.tree.as_ref()
-    }
-
+/// Private.
+impl Document {
     fn edit_tree(&mut self, start: Cursor, old_end: Cursor, new_end: Cursor) {
         if let Some(tree) = &mut self.tree {
             tree.edit(&Cursor::into_input_edit(start, old_end, new_end));
