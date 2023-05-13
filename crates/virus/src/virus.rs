@@ -47,7 +47,9 @@ impl Virus {
         };
 
         let mut document = Document::empty(Some(Language::Rust));
+        let mut document = Document::open(std::env::args().skip(1).next().unwrap()).unwrap();
         document.parse();
+
         let mut document_view =
             DocumentView::new(HIGHLIGHT_QUERY.into(), Theme::dracula(), key, 40, 50);
 
@@ -119,6 +121,7 @@ impl Virus {
         const ESCAPE: char = '\u{1b}';
         const LEFT: char = 'j';
         const RIGHT: char = 'l';
+        const SAVE: char = 's';
 
         dbg!(char);
         match char {
@@ -135,6 +138,9 @@ impl Virus {
             }
             RIGHT if modifiers.alt() => {
                 self.document.move_next();
+            }
+            SAVE if modifiers.alt() => {
+                self.document.save();
             }
             _ => {
                 self.document.edit_char(char);
