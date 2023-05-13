@@ -119,6 +119,8 @@ impl Virus {
         const ENTER: char = '\r';
         const BACKSPACE: char = '\u{8}';
         const ESCAPE: char = '\u{1b}';
+        const UP: char = 'i';
+        const DOWN: char = 'k';
         const LEFT: char = 'j';
         const RIGHT: char = 'l';
         const SAVE: char = 's';
@@ -132,6 +134,12 @@ impl Virus {
             }
             BACKSPACE => {
                 self.document.backspace();
+            }
+            UP if modifiers.alt() => {
+                self.document.move_up();
+            }
+            DOWN if modifiers.alt() => {
+                self.document.move_down();
             }
             LEFT if modifiers.alt() => {
                 self.document.move_prev();

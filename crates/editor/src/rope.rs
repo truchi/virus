@@ -1,6 +1,8 @@
 use ropey::Rope;
+use std::cmp::Ordering::*;
 use std::ops::Range;
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
+use unicode_width::UnicodeWidthChar;
 use virus_common::Cursor;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -15,6 +17,12 @@ pub trait RopeExt {
     /// Returns a cursor at the end of the text.
     fn cursor_at_end(&self) -> Cursor;
 
+    /// Finds the grapheme visually above `cursor`.
+    fn grapheme_above(&self, cursor: Cursor) -> Cursor;
+
+    /// Finds the grapheme visually below `cursor`.
+    fn grapheme_below(&self, cursor: Cursor) -> Cursor;
+
     /// Finds the previous grapheme boundary after the given `cursor`.
     fn prev_grapheme(&self, cursor: Cursor) -> Cursor;
 
@@ -26,31 +34,55 @@ pub trait RopeExt {
 
     /// Replaces `selection` with `char`.
     fn edit_char(&mut self, selection: Range<Cursor>, char: char);
+
+    /// Returns the visual width from the start of its line to `cursor`.
+    fn width(&self, cursor: Cursor) -> usize;
+
+    /// Returns the cursor on `line` at visual `width`.
+    fn find_width(&self, line: usize, width: usize) -> Cursor;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                          Implementations                                       //
+//                                          Implementation                                        //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 impl RopeExt for Rope {
     fn cursor_at_index(&self, index: usize) -> Cursor {
         let line = self.byte_to_line(index);
+        let column = index - self.line_to_byte(line);
 
         Cursor {
             index,
             line,
-            column: index - self.line_to_byte(line),
+            column,
         }
     }
 
     fn cursor_at_end(&self) -> Cursor {
         let index = self.len_bytes();
         let line = self.len_lines() - 1;
+        let column = index - self.line_to_byte(line);
 
         Cursor {
             index,
             line,
-            column: index - self.line_to_byte(line),
+            column,
+        }
+    }
+
+    fn grapheme_above(&self, cursor: Cursor) -> Cursor {
+        if cursor.line == 0 {
+            cursor
+        } else {
+            self.find_width(cursor.line - 1, self.width(cursor))
+        }
+    }
+
+    fn grapheme_below(&self, cursor: Cursor) -> Cursor {
+        if cursor.line == self.len_lines() - 1 {
+            cursor
+        } else {
+            self.find_width(cursor.line + 1, self.width(cursor))
         }
     }
 
@@ -147,6 +179,52 @@ impl RopeExt for Rope {
         }
 
         self.try_insert_char(start_char, char).unwrap();
+    }
+
+    fn width(&self, cursor: Cursor) -> usize {
+        let line = self.line_to_byte(cursor.line);
+        let slice = self.byte_slice(line..line + cursor.column);
+
+        slice
+            .chars()
+            .map(|char| char.width().unwrap_or_default())
+            .sum()
+    }
+
+    fn find_width(&self, line: usize, width: usize) -> Cursor {
+        debug_assert!(line < self.len_lines() - 1);
+
+        // Get this line
+        let start = self.line_to_byte(line);
+        let end = self.line_to_byte(line + 1);
+        let slice = self.byte_slice(start..end);
+
+        // Find the cursor at that width on the line (falling back left)
+        let mut w = 0;
+        let mut cursor = Cursor::new(start, line, 0);
+
+        for char in slice.chars() {
+            let prev = cursor;
+            cursor.column += char.len_utf8();
+            cursor.index += char.len_utf8();
+            w += char.width().unwrap_or_default();
+
+            match w.cmp(&width) {
+                Less => continue,
+                Equal => break,
+                Greater => {
+                    cursor = prev;
+                    break;
+                }
+            }
+        }
+
+        // Ensure grapheme boundary
+        if self.is_grapheme(cursor) {
+            cursor
+        } else {
+            self.prev_grapheme(cursor)
+        }
     }
 }
 

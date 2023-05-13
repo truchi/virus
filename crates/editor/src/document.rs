@@ -132,6 +132,22 @@ impl Document {
 
 /// Movements.
 impl Document {
+    pub fn move_up(&mut self) {
+        let (start, end) = (self.selection.start, self.selection.end);
+        debug_assert!(start == end);
+
+        let cursor = self.rope.grapheme_above(start);
+        self.selection = cursor..cursor;
+    }
+
+    pub fn move_down(&mut self) {
+        let (start, end) = (self.selection.start, self.selection.end);
+        debug_assert!(start == end);
+
+        let cursor = self.rope.grapheme_below(start);
+        self.selection = cursor..cursor;
+    }
+
     pub fn move_prev(&mut self) {
         let (start, end) = (self.selection.start, self.selection.end);
         debug_assert!(start == end);
