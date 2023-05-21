@@ -3,7 +3,7 @@ use pixels::{Pixels, SurfaceTexture};
 use virus_editor::{document::Document, language::Language, theme::Theme};
 use virus_graphics::{
     pixels_mut::PixelsMut,
-    text::{Context, Font, Fonts},
+    text::{Context, Font, FontKey, FontStyle, FontWeight, Fonts},
 };
 use virus_ui::document_view::DocumentView;
 use winit::{
@@ -12,15 +12,6 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::{Fullscreen, Window, WindowBuilder},
 };
-
-const RECURSIVE_VF: &str =
-    "/home/romain/.local/share/fonts/Recursive/Recursive_Desktop/Recursive_VF_1.084.ttf";
-const RECURSIVE: &str =
-    "/home/romain/.local/share/fonts/Recursive/Recursive_Code/RecMonoDuotone/RecMonoDuotone-Regular-1.084.ttf";
-const UBUNTU: &str = "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf";
-const FIRA: &str =
-    "/home/romain/.local/share/fonts/FiraCodeNerdFont/Fira Code Regular Nerd Font Complete Mono.ttf";
-const EMOJI: &str = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf";
 
 const HIGHLIGHT_QUERY: &str = include_str!("../../editor/treesitter/rust/highlights.scm");
 
@@ -36,9 +27,8 @@ pub struct Virus {
 }
 
 impl Virus {
-    fn new(window: Window, font: Font, emoji: Font) -> Self {
-        let key = font.key();
-        let mut context = Context::new(Fonts::new([font], emoji));
+    fn new(window: Window, fonts: Fonts, key: FontKey) -> Self {
+        let mut context = Context::new(fonts);
         let mut events = Events::new(window.id());
 
         let mut pixels = {
@@ -64,6 +54,78 @@ impl Virus {
     }
 
     pub fn run(title: &str) {
+        const EMOJI: &str = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf";
+        const UBUNTU: &str = "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf";
+        const FIRA_LIGHT: &str = "/home/romain/.local/share/fonts/FiraCodeNerdFont/Fira Code Light Nerd Font Complete Mono.ttf";
+        const FIRA_REGULAR: &str = "/home/romain/.local/share/fonts/FiraCodeNerdFont/Fira Code Regular Nerd Font Complete Mono.ttf";
+        const FIRA_MEDIUM: &str = "/home/romain/.local/share/fonts/FiraCodeNerdFont/Fira Code Medium Nerd Font Complete Mono.ttf";
+        const FIRA_BOLD: &str = "/home/romain/.local/share/fonts/FiraCodeNerdFont/Fira Code Bold Nerd Font Complete Mono.ttf";
+        const RECURSIVE_REGULAR: &str = "/home/romain/.local/share/fonts/Recursive/Recursive_Code/RecMonoDuotone/RecMonoDuotone-Regular-1.084.ttf";
+        const RECURSIVE_BOLD: &str = "/home/romain/.local/share/fonts/Recursive/Recursive_Code/RecMonoDuotone/RecMonoDuotone-Bold-1.084.ttf";
+        const RECURSIVE_ITALIC: &str = "/home/romain/.local/share/fonts/Recursive/Recursive_Code/RecMonoDuotone/RecMonoDuotone-Italic-1.084.ttf";
+        const RECURSIVE_BOLD_ITALIC: &str = "/home/romain/.local/share/fonts/Recursive/Recursive_Code/RecMonoDuotone/RecMonoDuotone-BoldItalic-1.084.ttf";
+        const JETBRAINS_THIN: &str =
+            "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Thin.ttf";
+        const JETBRAINS_EXTRA_LIGHT : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-ExtraLight.ttf";
+        const JETBRAINS_LIGHT: &str =
+            "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Light.ttf";
+        const JETBRAINS_REGULAR : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Regular.ttf";
+        const JETBRAINS_MEDIUM : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Medium.ttf";
+        const JETBRAINS_BOLD: &str =
+            "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Bold.ttf";
+        const JETBRAINS_SEMI_BOLD : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-SemiBold.ttf";
+        const JETBRAINS_EXTRA_BOLD : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-ExtraBold.ttf";
+        const JETBRAINS_THIN_ITALIC : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-ThinItalic.ttf";
+        const JETBRAINS_EXTRA_LIGHT_ITALIC : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-ExtraLightItalic.ttf";
+        const JETBRAINS_LIGHT_ITALIC : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-LightItalic.ttf";
+        const JETBRAINS_ITALIC : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Italic.ttf";
+        const JETBRAINS_MEDIUM_ITALIC : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-MediumItalic.ttf";
+        const JETBRAINS_BOLD_ITALIC : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-BoldItalic.ttf";
+        const JETBRAINS_SEMI_BOLD_ITALIC : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-SemiBoldItalic.ttf";
+        const JETBRAINS_EXTRA_BOLD_ITALIC : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-ExtraBoldItalic.ttf";
+        const VICTOR_THIN: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-Thin.ttf";
+        const VICTOR_EXTRA_LIGHT: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-ExtraLight.ttf";
+        const VICTOR_LIGHT: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-Light.ttf";
+        const VICTOR_REGULAR: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-Regular.ttf";
+        const VICTOR_MEDIUM: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-Medium.ttf";
+        const VICTOR_SEMI_BOLD: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-SemiBold.ttf";
+        const VICTOR_BOLD: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-Bold.ttf";
+        const VICTOR_THIN_ITALIC: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-ThinItalic.ttf";
+        const VICTOR_EXTRA_LIGHT_ITALIC: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-ExtraLightItalic.ttf";
+        const VICTOR_LIGHT_ITALIC: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-LightItalic.ttf";
+        const VICTOR_ITALIC: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-Italic.ttf";
+        const VICTOR_MEDIUM_ITALIC: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-MediumItalic.ttf";
+        const VICTOR_SEMI_BOLD_ITALIC: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-SemiBoldItalic.ttf";
+        const VICTOR_BOLD_ITALIC: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-BoldItalic.ttf";
+        const VICTOR_THIN_OBLIQUE: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-ThinOblique.ttf";
+        const VICTOR_EXTRA_LIGHT_OBLIQUE: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-ExtraLightOblique.ttf";
+        const VICTOR_LIGHT_OBLIQUE: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-LightOblique.ttf";
+        const VICTOR_OBLIQUE: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-Oblique.ttf";
+        const VICTOR_MEDIUM_OBLIQUE: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-MediumOblique.ttf";
+        const VICTOR_SEMI_BOLD_OBLIQUE: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-SemiBoldOblique.ttf";
+        const VICTOR_BOLD_OBLIQUE: &str =
+            "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-BoldOblique.ttf";
+
         let event_loop = EventLoop::new();
         let window = {
             let window = WindowBuilder::new()
@@ -76,16 +138,128 @@ impl Virus {
             window
         };
 
-        let font = {
-            let fira = Font::from_file(FIRA).unwrap();
-            let ubuntu = Font::from_file(UBUNTU).unwrap();
-            let recursive = Font::from_file(RECURSIVE).unwrap();
+        let mut fonts = Fonts::new(Font::from_file(EMOJI).unwrap());
 
-            recursive
-        };
-        let emoji = Font::from_file(EMOJI).unwrap();
+        let emoji = fonts.set(Font::from_file(EMOJI).unwrap());
+        let ubuntu = fonts.set(Font::from_file(UBUNTU).unwrap());
+        let fira_light = fonts.set(Font::from_file(FIRA_LIGHT).unwrap());
+        let fira_regular = fonts.set(Font::from_file(FIRA_REGULAR).unwrap());
+        let fira_medium = fonts.set(Font::from_file(FIRA_MEDIUM).unwrap());
+        let fira_bold = fonts.set(Font::from_file(FIRA_BOLD).unwrap());
+        let recursive_regular = fonts.set(Font::from_file(RECURSIVE_REGULAR).unwrap());
+        let recursive_bold = fonts.set(Font::from_file(RECURSIVE_BOLD).unwrap());
+        let recursive_italic = fonts.set(Font::from_file(RECURSIVE_ITALIC).unwrap());
+        let recursive_bold_italic = fonts.set(Font::from_file(RECURSIVE_BOLD_ITALIC).unwrap());
+        let jetbrains_thin = fonts.set(Font::from_file(JETBRAINS_THIN).unwrap());
+        let jetbrains_extra_light = fonts.set(Font::from_file(JETBRAINS_EXTRA_LIGHT).unwrap());
+        let jetbrains_light = fonts.set(Font::from_file(JETBRAINS_LIGHT).unwrap());
+        let jetbrains_regular = fonts.set(Font::from_file(JETBRAINS_REGULAR).unwrap());
+        let jetbrains_medium = fonts.set(Font::from_file(JETBRAINS_MEDIUM).unwrap());
+        let jetbrains_bold = fonts.set(Font::from_file(JETBRAINS_BOLD).unwrap());
+        let jetbrains_semi_bold = fonts.set(Font::from_file(JETBRAINS_SEMI_BOLD).unwrap());
+        let jetbrains_extra_bold = fonts.set(Font::from_file(JETBRAINS_EXTRA_BOLD).unwrap());
+        let jetbrains_thin_italic = fonts.set(Font::from_file(JETBRAINS_THIN_ITALIC).unwrap());
+        let jetbrains_extra_light_italic =
+            fonts.set(Font::from_file(JETBRAINS_EXTRA_LIGHT_ITALIC).unwrap());
+        let jetbrains_light_italic = fonts.set(Font::from_file(JETBRAINS_LIGHT_ITALIC).unwrap());
+        let jetbrains_italic = fonts.set(Font::from_file(JETBRAINS_ITALIC).unwrap());
+        let jetbrains_medium_italic = fonts.set(Font::from_file(JETBRAINS_MEDIUM_ITALIC).unwrap());
+        let jetbrains_bold_italic = fonts.set(Font::from_file(JETBRAINS_BOLD_ITALIC).unwrap());
+        let jetbrains_semi_bold_italic =
+            fonts.set(Font::from_file(JETBRAINS_SEMI_BOLD_ITALIC).unwrap());
+        let jetbrains_extra_bold_italic =
+            fonts.set(Font::from_file(JETBRAINS_EXTRA_BOLD_ITALIC).unwrap());
+        let victor_thin = fonts.set(Font::from_file(VICTOR_THIN).unwrap());
+        let victor_extra_light = fonts.set(Font::from_file(VICTOR_EXTRA_LIGHT).unwrap());
+        let victor_light = fonts.set(Font::from_file(VICTOR_LIGHT).unwrap());
+        let victor_regular = fonts.set(Font::from_file(VICTOR_REGULAR).unwrap());
+        let victor_medium = fonts.set(Font::from_file(VICTOR_MEDIUM).unwrap());
+        let victor_semi_bold = fonts.set(Font::from_file(VICTOR_SEMI_BOLD).unwrap());
+        let victor_bold = fonts.set(Font::from_file(VICTOR_BOLD).unwrap());
+        let victor_thin_italic = fonts.set(Font::from_file(VICTOR_THIN_ITALIC).unwrap());
+        let victor_extra_light_italic =
+            fonts.set(Font::from_file(VICTOR_EXTRA_LIGHT_ITALIC).unwrap());
+        let victor_light_italic = fonts.set(Font::from_file(VICTOR_LIGHT_ITALIC).unwrap());
+        let victor_italic = fonts.set(Font::from_file(VICTOR_ITALIC).unwrap());
+        let victor_medium_italic = fonts.set(Font::from_file(VICTOR_MEDIUM_ITALIC).unwrap());
+        let victor_semi_bold_italic = fonts.set(Font::from_file(VICTOR_SEMI_BOLD_ITALIC).unwrap());
+        let victor_bold_italic = fonts.set(Font::from_file(VICTOR_BOLD_ITALIC).unwrap());
+        let victor_thin_oblique = fonts.set(Font::from_file(VICTOR_THIN_OBLIQUE).unwrap());
+        let victor_extra_light_oblique =
+            fonts.set(Font::from_file(VICTOR_EXTRA_LIGHT_OBLIQUE).unwrap());
+        let victor_light_oblique = fonts.set(Font::from_file(VICTOR_LIGHT_OBLIQUE).unwrap());
+        let victor_oblique = fonts.set(Font::from_file(VICTOR_OBLIQUE).unwrap());
+        let victor_medium_oblique = fonts.set(Font::from_file(VICTOR_MEDIUM_OBLIQUE).unwrap());
+        let victor_semi_bold_oblique =
+            fonts.set(Font::from_file(VICTOR_SEMI_BOLD_OBLIQUE).unwrap());
+        let victor_bold_oblique = fonts.set(Font::from_file(VICTOR_BOLD_OBLIQUE).unwrap());
 
-        let mut virus = Self::new(window, font, emoji);
+        use FontStyle::*;
+        use FontWeight::*;
+
+        fonts.set(
+            (&[
+                (Thin, Normal, victor_thin),
+                (ExtraLight, Normal, victor_extra_light),
+                (Light, Normal, victor_light),
+                (Regular, Normal, victor_regular),
+                (Medium, Normal, victor_medium),
+                (SemiBold, Normal, victor_semi_bold),
+                (Bold, Normal, victor_bold),
+                (Thin, Italic, victor_thin_italic),
+                (ExtraLight, Italic, victor_extra_light_italic),
+                (Light, Italic, victor_light_italic),
+                (Regular, Italic, victor_italic),
+                (Medium, Italic, victor_medium_italic),
+                (SemiBold, Italic, victor_semi_bold_italic),
+                (Bold, Italic, victor_bold_italic),
+                (Thin, Oblique, victor_thin_oblique),
+                (ExtraLight, Oblique, victor_extra_light_oblique),
+                (Light, Oblique, victor_light_oblique),
+                (Regular, Oblique, victor_oblique),
+                (Medium, Oblique, victor_medium_oblique),
+                (SemiBold, Oblique, victor_semi_bold_oblique),
+                (Bold, Oblique, victor_bold_oblique),
+            ]) as &[_],
+        );
+        fonts.set(
+            (&[
+                (Light, Normal, fira_light),
+                (Regular, Normal, fira_regular),
+                (Medium, Normal, fira_medium),
+                (Bold, Normal, fira_bold),
+            ]) as &[_],
+        );
+        fonts.set(
+            (&[
+                (Regular, Normal, recursive_regular),
+                (Bold, Normal, recursive_bold),
+                (Regular, Italic, recursive_italic),
+                (Bold, Italic, recursive_bold_italic),
+            ]) as &[_],
+        );
+        fonts.set(
+            (&[
+                (Thin, Normal, jetbrains_thin),
+                (ExtraLight, Normal, jetbrains_extra_light),
+                (Light, Normal, jetbrains_light),
+                (Regular, Normal, jetbrains_regular),
+                (Medium, Normal, jetbrains_medium),
+                (SemiBold, Normal, jetbrains_semi_bold),
+                (Bold, Normal, jetbrains_bold),
+                (ExtraBold, Normal, jetbrains_extra_bold),
+                (Thin, Italic, jetbrains_thin_italic),
+                (ExtraLight, Italic, jetbrains_extra_light_italic),
+                (Light, Italic, jetbrains_light_italic),
+                (Regular, Italic, jetbrains_italic),
+                (Medium, Italic, jetbrains_medium_italic),
+                (SemiBold, Italic, jetbrains_semi_bold_italic),
+                (Bold, Italic, jetbrains_bold_italic),
+                (ExtraBold, Italic, jetbrains_extra_bold_italic),
+            ]) as &[_],
+        );
+
+        let mut virus = Self::new(window, fonts, jetbrains_regular);
 
         event_loop.run(move |event, _, flow| {
             let event = match virus.events.update(&event) {
