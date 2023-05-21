@@ -29,6 +29,49 @@ pub enum FontWeight {
     Black,
 }
 
+impl FontWeight {
+    pub fn fallbacks(&self) -> &'static [Self] {
+        use FontWeight::*;
+
+        match self {
+            // Descending, then ascending
+            Thin => &[
+                Thin, ExtraLight, Light, Regular, Medium, SemiBold, Bold, ExtraBold, Black,
+            ],
+            ExtraLight => &[
+                ExtraLight, Thin, Light, Regular, Medium, SemiBold, Bold, ExtraBold, Black,
+            ],
+            Light => &[
+                Light, ExtraLight, Thin, Regular, Medium, SemiBold, Bold, ExtraBold, Black,
+            ],
+
+            // Up, then descending, then ascending
+            Regular => &[
+                Regular, Medium, Light, ExtraLight, Thin, SemiBold, Bold, ExtraBold, Black,
+            ],
+
+            // Down, then ascending, then descending
+            Medium => &[
+                Medium, Regular, SemiBold, Bold, ExtraBold, Black, Light, ExtraLight, Thin,
+            ],
+
+            // Ascending, then descending
+            SemiBold => &[
+                SemiBold, Bold, ExtraBold, Black, Medium, Regular, Light, ExtraLight, Thin,
+            ],
+            Bold => &[
+                Bold, ExtraBold, Black, SemiBold, Medium, Regular, Light, ExtraLight, Thin,
+            ],
+            ExtraBold => &[
+                ExtraBold, Black, Bold, SemiBold, Medium, Regular, Light, ExtraLight, Thin,
+            ],
+            Black => &[
+                Black, ExtraBold, Bold, SemiBold, Medium, Regular, Light, ExtraLight, Thin,
+            ],
+        }
+    }
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              FontStyle                                         //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -43,6 +86,18 @@ pub enum FontStyle {
     Italic,
     /// Oblique.
     Oblique,
+}
+
+impl FontStyle {
+    pub fn fallbacks(&self) -> &'static [Self] {
+        use FontStyle::*;
+
+        match self {
+            Normal => &[Normal, Oblique, Italic],
+            Italic => &[Italic, Oblique, Normal],
+            Oblique => &[Oblique, Italic, Normal],
+        }
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -166,7 +221,31 @@ pub struct FontFamilyKey(u64);
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// A font family.
-pub type FontFamily = HashMap<(FontWeight, FontStyle), FontKey>;
+#[derive(Clone, Eq, PartialEq, Default, Debug)]
+pub struct FontFamily(HashMap<(FontWeight, FontStyle), FontKey>);
+
+impl FontFamily {
+    pub fn get(&self, weight: FontWeight, style: FontStyle) -> Option<FontKey> {
+        for &style in style.fallbacks() {
+            for &weight in weight.fallbacks() {
+                if let Some(key) = self.0.get(&(weight, style)) {
+                    return Some(*key);
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn insert(
+        &mut self,
+        weight: FontWeight,
+        style: FontStyle,
+        key: FontKey,
+    ) -> Option<FontKey> {
+        self.0.insert((weight, style), key)
+    }
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                               Fonts                                            //
@@ -174,7 +253,7 @@ pub type FontFamily = HashMap<(FontWeight, FontStyle), FontKey>;
 
 /// [`Font`] collection.
 ///
-/// Contains multiple [`Font`]s and an emoji fallback.
+/// Contains multiple [`Font`]s, organized in [`FontFamily`], and an emoji font fallback.
 pub struct Fonts {
     /// Fonts in the collection.
     fonts: HashMap<FontKey, Font>,
@@ -216,6 +295,13 @@ impl Fonts {
     pub fn emoji(&self) -> FontRef {
         self.emoji.as_ref()
     }
+
+    /// Returns the next [`FontFamilyKey`].
+    fn family_key(&self) -> FontFamilyKey {
+        let key = FontFamilyKey(self.families.len() as u64);
+        debug_assert!(self.families.contains_key(&key));
+        key
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -238,11 +324,7 @@ impl FontsGet for FontKey {
 
 impl FontsGet for (FontFamilyKey, FontWeight, FontStyle) {
     fn get(self, fonts: &Fonts) -> Option<FontRef> {
-        fonts
-            .families
-            .get(&self.0)?
-            .get(&(self.1, self.2))?
-            .get(fonts)
+        fonts.families.get(&self.0)?.get(self.1, self.2)?.get(fonts)
     }
 }
 
@@ -293,12 +375,12 @@ impl FontsSet for (FontFamilyKey, FontWeight, FontStyle, FontKey) {
     fn set(self, fonts: &mut Fonts) -> Self::Output {
         let (family_key, weight, style, font_key) = self;
 
-        debug_assert!(fonts.families.contains_key(&family_key));
+        debug_assert!(fonts.fonts.contains_key(&font_key));
         fonts
             .families
             .entry(family_key)
             .or_default()
-            .insert((weight, style), font_key);
+            .insert(weight, style, font_key);
 
         family_key
     }
@@ -308,12 +390,7 @@ impl FontsSet for (FontWeight, FontStyle, FontKey) {
     type Output = FontFamilyKey;
 
     fn set(self, fonts: &mut Fonts) -> Self::Output {
-        fonts.set((
-            FontFamilyKey(fonts.families.len() as u64),
-            self.0,
-            self.1,
-            self.2,
-        ))
+        fonts.set((fonts.family_key(), self.0, self.1, self.2))
     }
 }
 
@@ -333,6 +410,6 @@ impl FontsSet for &[(FontWeight, FontStyle, FontKey)] {
     type Output = FontFamilyKey;
 
     fn set(self, fonts: &mut Fonts) -> Self::Output {
-        fonts.set((FontFamilyKey(fonts.families.len() as u64), self))
+        fonts.set((fonts.family_key(), self))
     }
 }
