@@ -16,19 +16,18 @@ fn main() {
     let tree = document.tree().unwrap();
 
     let theme = dracula();
-    let lines = rope.len_lines();
+    let _lines = rope.len_lines();
 
     let highlights = Highlights::new(
         rope,
         tree.root_node(),
         0..117,
-        Query::new(language.language().unwrap(), HIGHLIGHT_QUERY).unwrap(),
-        theme,
+        &Query::new(language.language().unwrap(), HIGHLIGHT_QUERY).unwrap(),
     );
 
     let mut line = 0;
 
-    for highlight in highlights.iter() {
+    for highlight in highlights.highlights() {
         assert!(highlight.start.index != highlight.end.index);
         assert!(highlight.start.line == highlight.end.line);
         assert!(highlight.end.column != 0);
@@ -38,9 +37,10 @@ fn main() {
             println!();
         }
         let cow = rope.byte_slice(highlight.start.index..highlight.end.index);
-        let r = highlight.style.foreground.r;
-        let g = highlight.style.foreground.g;
-        let b = highlight.style.foreground.b;
+        let style = theme[highlight.key];
+        let r = style.foreground.r;
+        let g = style.foreground.g;
+        let b = style.foreground.b;
         print!("\x1B[38;2;{r};{g};{b}m{cow}\x1B[0m");
     }
 
@@ -60,8 +60,8 @@ fn dracula() -> Theme {
         }
     }
 
-    let background = style(40, 42, 54);
-    let current = style(68, 71, 90);
+    let _background = style(40, 42, 54);
+    let _current = style(68, 71, 90);
     let foreground = style(248, 248, 242);
     let comment = style(98, 114, 164);
     let cyan = style(139, 233, 253);

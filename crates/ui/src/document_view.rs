@@ -70,16 +70,15 @@ impl DocumentView {
             document.rope(),
             document.tree().unwrap().root_node(),
             start..end,
-            document.query(&self.query).unwrap(),
-            self.theme,
+            &document.query(&self.query).unwrap(),
         );
 
         let mut prev_line = None;
         let mut shaper = Line::shaper(context, self.font_size);
 
-        for Highlight { start, end, style } in highlights.iter() {
-            let line = start.line;
+        for Highlight { start, end, key } in highlights.highlights() {
             debug_assert!(start.line == end.line);
+            let line = start.line;
 
             if prev_line != Some(line) {
                 if let Some(line) = prev_line {
@@ -99,7 +98,7 @@ impl DocumentView {
                         .unwrap(),
                 ),
                 self.font,
-                style,
+                self.theme[key],
             );
         }
 
