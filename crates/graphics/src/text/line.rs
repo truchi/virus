@@ -19,7 +19,7 @@ use virus_common::Style;
 pub struct Glyph {
     /// Glyph id.
     pub id: GlyphId,
-    /// Glyph advance ofsset.
+    /// Glyph advance offset.
     pub offset: Advance,
     /// Glyph advance.
     pub advance: Advance,
