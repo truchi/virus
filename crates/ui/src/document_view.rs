@@ -1,6 +1,5 @@
 use ropey::Rope;
 use std::{borrow::Cow, ops::Range};
-use swash::CacheKey;
 use virus_editor::{
     document::Document,
     highlights::{Highlight, Highlights},
@@ -9,13 +8,13 @@ use virus_editor::{
 use virus_graphics::{
     colors::Rgba,
     pixels_mut::Surface,
-    text::{Context, FontSize, Line, LineHeight},
+    text::{Context, FontKey, FontSize, Line, LineHeight},
 };
 
 pub struct DocumentView {
     query: String,
     theme: Theme,
-    font: CacheKey,
+    font: FontKey,
     font_size: FontSize,
     line_height: LineHeight,
     rope: Rope,
@@ -27,7 +26,7 @@ impl DocumentView {
     pub fn new(
         query: String,
         theme: Theme,
-        font: CacheKey,
+        font: FontKey,
         font_size: FontSize,
         line_height: LineHeight,
     ) -> Self {

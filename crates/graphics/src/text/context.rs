@@ -4,7 +4,7 @@ use std::num::NonZeroUsize;
 use swash::{
     scale::{image::Image, ScaleContext},
     shape::ShapeContext,
-    CacheKey, GlyphId,
+    GlyphId,
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -12,7 +12,7 @@ use swash::{
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// Glyph cache.
-pub type Glyphs = LruCache<(CacheKey, GlyphId, FontSize), Option<Image>>;
+pub type Glyphs = LruCache<(FontKey, GlyphId, FontSize), Option<Image>>;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Context                                            //
