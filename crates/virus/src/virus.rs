@@ -75,7 +75,6 @@ impl Virus {
                 Some(event) => event,
                 None => return,
             };
-            let modifiers = virus.events.modifiers();
 
             match event {
                 Event::Char(char) => virus.on_char(char, flow),
@@ -85,7 +84,6 @@ impl Virus {
                 Event::Moved(position) => virus.on_moved(position, flow),
                 Event::Focused => virus.on_focused(flow),
                 Event::Unfocused => virus.on_unfocused(flow),
-                Event::Update => virus.on_update(flow),
                 Event::Redraw => virus.on_redraw(flow),
                 Event::Close => virus.on_close(flow),
                 Event::Closed => virus.on_closed(flow),
@@ -110,7 +108,6 @@ impl Virus {
 
         let modifiers = self.events.modifiers();
 
-        dbg!(char);
         match char {
             ESCAPE => return, // Handled as `Pressed`
             TAB => return,    // TODO
@@ -141,6 +138,7 @@ impl Virus {
         }
 
         self.document.parse();
+        self.window.request_redraw();
     }
 
     fn on_pressed(&mut self, key: VirtualKeyCode, flow: &mut ControlFlow) {
@@ -168,10 +166,6 @@ impl Virus {
     fn on_focused(&mut self, flow: &mut ControlFlow) {}
 
     fn on_unfocused(&mut self, flow: &mut ControlFlow) {}
-
-    fn on_update(&mut self, flow: &mut ControlFlow) {
-        self.window.request_redraw();
-    }
 
     fn on_redraw(&mut self, flow: &mut ControlFlow) {
         let mut pixels_mut = {
