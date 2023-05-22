@@ -109,8 +109,8 @@ impl<'a> LineShaper<'a> {
     ///
     /// Not able to produce ligature across calls to this function.
     pub fn push(&mut self, str: &str, key: CacheKey, style: Style) {
-        let font = self.fonts.get(key).expect("Font not found");
-        let emoji = self.fonts.emoji();
+        let font = self.fonts.get(key).expect("Font not found").as_ref();
+        let emoji = self.fonts.emoji().as_ref();
         let font_key = font.key;
         let emoji_key = emoji.key;
 
@@ -252,7 +252,7 @@ impl<'a> LineScaler<'a> {
     pub fn next<'b>(&'b mut self) -> Option<(Advance, Glyph, Option<&'b Image>)> {
         let advance = self.advance;
         let glyph = self.glyphs.next()?;
-        let font = self.fonts.get(glyph.key).expect("font");
+        let font = self.fonts.get(glyph.key).expect("font").as_ref();
         let image = self
             .cache
             .get_or_insert((glyph.key, glyph.id, self.size), || {

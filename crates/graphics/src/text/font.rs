@@ -112,6 +112,7 @@ pub type FontKey = CacheKey;
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// A font.
+#[derive(Debug)] // TODO
 pub struct Font {
     /// Font data.
     data: Vec<u8>,
@@ -217,7 +218,7 @@ impl Font {
 pub struct FontFamilyKey(u64);
 
 impl FontFamilyKey {
-    /// For tests only!
+    /// 🚨 For tests only!
     pub fn __new(u64: u64) -> Self {
         Self(u64)
     }
@@ -228,14 +229,38 @@ impl FontFamilyKey {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// A font family.
-#[derive(Clone, Eq, PartialEq, Default, Debug)]
-pub struct FontFamily(HashMap<(FontWeight, FontStyle), FontKey>);
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct FontFamily {
+    key: FontFamilyKey,
+    name: String,
+    fonts: HashMap<(FontWeight, FontStyle), FontKey>,
+}
 
 impl FontFamily {
+    /// Creates a new `FontFamily` with `name`.
+    pub fn new(key: FontFamilyKey, name: String) -> Self {
+        Self {
+            key,
+            name,
+            fonts: Default::default(),
+        }
+    }
+
+    /// Returns the key of this `FontFamily`.
+    pub fn key(&self) -> FontFamilyKey {
+        self.key
+    }
+
+    /// Returns the name of this `FontFamily`.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// TODO
     pub fn get(&self, weight: FontWeight, style: FontStyle) -> Option<FontKey> {
         for &style in style.fallbacks() {
             for &weight in weight.fallbacks() {
-                if let Some(key) = self.0.get(&(weight, style)) {
+                if let Some(key) = self.fonts.get(&(weight, style)) {
                     return Some(*key);
                 }
             }
@@ -244,13 +269,11 @@ impl FontFamily {
         None
     }
 
-    pub fn insert(
-        &mut self,
-        weight: FontWeight,
-        style: FontStyle,
-        key: FontKey,
-    ) -> Option<FontKey> {
-        self.0.insert((weight, style), key)
+    /// Inserts `key` for `weight` and `style`.
+    ///
+    /// The key should exist in the [`Fonts`].
+    pub fn insert(&mut self, weight: FontWeight, style: FontStyle, key: FontKey) {
+        self.fonts.insert((weight, style), key);
     }
 }
 
@@ -260,7 +283,11 @@ impl FontFamily {
 
 /// [`Font`] collection.
 ///
-/// Contains multiple [`Font`]s, organized in [`FontFamily`], and an emoji font fallback.
+/// Contains multiple [`Font`]s, organized in [`FontFamily`]s, and an emoji font fallback.
+///
+/// `FontFamilyKey`s ***must not*** be reused in other `Fonts`.
+/// `Font`s ***must*** be inserted before linking to their family.
+#[derive(Debug)]
 pub struct Fonts {
     /// Fonts in the collection.
     fonts: HashMap<FontKey, Font>,
@@ -280,33 +307,39 @@ impl Fonts {
         }
     }
 
+    /// Returns the fonts map.
     pub fn fonts(&self) -> &HashMap<FontKey, Font> {
         &self.fonts
     }
 
+    /// Returns the families map.
     pub fn families(&self) -> &HashMap<FontFamilyKey, FontFamily> {
         &self.families
     }
 
-    /// Returns a `FontRef` from a `key`.
-    pub fn get<I: FontsGet>(&self, key: I) -> Option<FontRef> {
+    /// Indexes in the collection.
+    pub fn get<I: FontsGet>(&self, key: I) -> Option<I::Output<'_>> {
         key.get(self)
     }
 
-    /// Returns a `FontRef` from a `key`.
+    /// Inserts in the collection.
     pub fn set<I: FontsSet>(&mut self, key: I) -> I::Output {
         key.set(self)
     }
 
     /// Returns a `FontRef` to the emoji font.
-    pub fn emoji(&self) -> FontRef {
-        self.emoji.as_ref()
+    pub fn emoji(&self) -> &Font {
+        &self.emoji
     }
 
-    /// Returns the next [`FontFamilyKey`].
+    /// Returns the next [`FontFamilyKey`] available for this `self.families`.
     fn family_key(&self) -> FontFamilyKey {
         let key = FontFamilyKey(self.families.len() as u64);
-        debug_assert!(self.families.contains_key(&key));
+
+        // Family keys are not global.
+        // `Fonts` neither, but should be constructed only once.
+        debug_assert!(!self.families.contains_key(&key));
+
         key
     }
 }
@@ -315,23 +348,46 @@ impl Fonts {
 //                                             FontsGet                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+/// Overloads for [`Fonts::get`].
 pub trait FontsGet {
-    fn get(self, fonts: &Fonts) -> Option<FontRef>;
+    type Output<'fonts>;
+
+    fn get<'fonts>(self, fonts: &'fonts Fonts) -> Option<Self::Output<'fonts>>;
 }
 
 impl FontsGet for FontKey {
-    fn get(self, fonts: &Fonts) -> Option<FontRef> {
+    type Output<'fonts> = &'fonts Font;
+
+    fn get<'fonts>(self, fonts: &'fonts Fonts) -> Option<Self::Output<'fonts>> {
         if self == fonts.emoji.key() {
-            Some(fonts.emoji.as_ref())
+            Some(&fonts.emoji)
         } else {
-            fonts.fonts.get(&self).map(|font| font.as_ref())
+            fonts.fonts.get(&self)
         }
     }
 }
 
+impl FontsGet for FontFamilyKey {
+    type Output<'fonts> = &'fonts FontFamily;
+
+    fn get<'fonts>(self, fonts: &'fonts Fonts) -> Option<Self::Output<'fonts>> {
+        fonts.families.get(&self)
+    }
+}
+
 impl FontsGet for (FontFamilyKey, FontWeight, FontStyle) {
-    fn get(self, fonts: &Fonts) -> Option<FontRef> {
-        fonts.families.get(&self.0)?.get(self.1, self.2)?.get(fonts)
+    type Output<'fonts> = &'fonts Font;
+
+    fn get<'fonts>(self, fonts: &'fonts Fonts) -> Option<Self::Output<'fonts>> {
+        fonts.get(fonts.get(self.0)?.get(self.1, self.2)?)
+    }
+}
+
+impl FontsGet for &str {
+    type Output<'fonts> = &'fonts FontFamily;
+
+    fn get<'fonts>(self, fonts: &'fonts Fonts) -> Option<Self::Output<'fonts>> {
+        fonts.families.values().find(|family| family.name == self)
     }
 }
 
@@ -339,6 +395,7 @@ impl FontsGet for (FontFamilyKey, FontWeight, FontStyle) {
 //                                             FontsSet                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+/// Overloads for [`Fonts::set`].
 pub trait FontsSet {
     type Output;
 
@@ -350,55 +407,40 @@ impl FontsSet for Font {
 
     fn set(self, fonts: &mut Fonts) -> Self::Output {
         let key = self.key;
-
-        debug_assert!(!fonts.fonts.contains_key(&key));
         fonts.fonts.insert(key, self);
-
         key
     }
 }
 
 impl FontsSet for (FontFamilyKey, FontWeight, FontStyle, FontKey) {
-    type Output = FontFamilyKey;
+    type Output = (FontFamilyKey, FontKey);
 
     fn set(self, fonts: &mut Fonts) -> Self::Output {
         let (family_key, weight, style, font_key) = self;
 
-        debug_assert!(fonts.fonts.contains_key(&font_key));
+        // Font and family must exist
+        debug_assert!(fonts.get(font_key).is_some());
+        debug_assert!(fonts.get(family_key).is_some());
+
         fonts
             .families
             .entry(family_key)
-            .or_default()
-            .insert(weight, style, font_key);
+            .and_modify(|family| family.insert(weight, style, font_key));
 
-        family_key
+        (family_key, font_key)
     }
 }
 
-impl FontsSet for (FontWeight, FontStyle, FontKey) {
+impl FontsSet for String {
     type Output = FontFamilyKey;
 
     fn set(self, fonts: &mut Fonts) -> Self::Output {
-        fonts.set((fonts.family_key(), self.0, self.1, self.2))
-    }
-}
-
-impl FontsSet for (FontFamilyKey, &[(FontWeight, FontStyle, FontKey)]) {
-    type Output = FontFamilyKey;
-
-    fn set(self, fonts: &mut Fonts) -> Self::Output {
-        for &(weight, style, font_key) in self.1 {
-            fonts.set((self.0, weight, style, font_key));
+        if let Some(family) = fonts.get(self.as_str()) {
+            family.key
+        } else {
+            let key = fonts.family_key();
+            fonts.families.insert(key, FontFamily::new(key, self));
+            key
         }
-
-        self.0
-    }
-}
-
-impl FontsSet for &[(FontWeight, FontStyle, FontKey)] {
-    type Output = FontFamilyKey;
-
-    fn set(self, fonts: &mut Fonts) -> Self::Output {
-        fonts.set((fonts.family_key(), self))
     }
 }
