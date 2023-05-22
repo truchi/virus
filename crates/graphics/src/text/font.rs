@@ -112,7 +112,6 @@ pub type FontKey = CacheKey;
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// A font.
-#[derive(Debug)] // TODO
 pub struct Font {
     /// Font data.
     data: Vec<u8>,
@@ -206,6 +205,12 @@ impl Font {
         for (_, string) in strings {
             println!("    [{:?}] {}", string.id(), string.to_string());
         }
+    }
+}
+
+impl std::fmt::Debug for Font {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.key, f)
     }
 }
 
