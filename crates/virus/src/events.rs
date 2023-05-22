@@ -22,10 +22,10 @@ pub enum Event {
     Moved(PhysicalPosition<i32>),
     Focused,
     Unfocused,
-    Close,
-    Closed,
     Update,
     Redraw,
+    Close,
+    Closed,
     Quit,
 }
 

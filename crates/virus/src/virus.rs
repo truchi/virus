@@ -85,10 +85,10 @@ impl Virus {
                 Event::Moved(position) => virus.on_moved(position, flow),
                 Event::Focused => virus.on_focused(flow),
                 Event::Unfocused => virus.on_unfocused(flow),
-                Event::Close => virus.on_close(flow),
-                Event::Closed => virus.on_closed(flow),
                 Event::Update => virus.on_update(flow),
                 Event::Redraw => virus.on_redraw(flow),
+                Event::Close => virus.on_close(flow),
+                Event::Closed => virus.on_closed(flow),
                 Event::Quit => virus.on_quit(flow),
             }
         });
@@ -169,10 +169,6 @@ impl Virus {
 
     fn on_unfocused(&mut self, flow: &mut ControlFlow) {}
 
-    fn on_close(&mut self, flow: &mut ControlFlow) {}
-
-    fn on_closed(&mut self, flow: &mut ControlFlow) {}
-
     fn on_update(&mut self, flow: &mut ControlFlow) {
         self.window.request_redraw();
     }
@@ -208,6 +204,10 @@ impl Virus {
 
         self.pixels.render().unwrap();
     }
+
+    fn on_close(&mut self, flow: &mut ControlFlow) {}
+
+    fn on_closed(&mut self, flow: &mut ControlFlow) {}
 
     fn on_quit(&mut self, flow: &mut ControlFlow) {}
 }
