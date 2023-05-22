@@ -3,33 +3,11 @@ use swash::{
     scale::{image::Image, Render, ScaleContext, Source, StrikeWith},
     shape::{ShapeContext, Shaper},
     text::{
-        cluster::{CharCluster, Parser, SourceRange, Status, Token},
+        cluster::{CharCluster, Parser, Status, Token},
         Script,
     },
-    CacheKey, FontRef, GlyphId,
+    FontRef,
 };
-use virus_common::Style;
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                               Glyph                                            //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-/// A shaped glyph.
-#[derive(Copy, Clone, Debug)]
-pub struct Glyph {
-    /// Glyph id.
-    pub id: GlyphId,
-    /// Glyph advance offset.
-    pub offset: Advance,
-    /// Glyph advance.
-    pub advance: Advance,
-    /// Range in the underlying string.
-    pub range: SourceRange,
-    /// Key of the font.
-    pub key: CacheKey,
-    /// Glyph style.
-    pub style: Style,
-}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Line                                              //
@@ -108,7 +86,7 @@ impl<'a> LineShaper<'a> {
     /// Feeds `str` to the `LineShaper` with font `key` and `color`.
     ///
     /// Not able to produce ligature across calls to this function.
-    pub fn push(&mut self, str: &str, key: CacheKey, style: Style) {
+    pub fn push(&mut self, str: &str, key: FontKey, style: Styles) {
         let font = self.fonts.get(key).expect("Font not found").as_ref();
         let emoji = self.fonts.emoji().as_ref();
         let font_key = font.key;
@@ -192,7 +170,7 @@ impl<'a> LineShaper<'a> {
         }
     }
 
-    fn flush(line: &mut Line, advance: &mut Advance, shaper: Shaper, key: CacheKey, style: Style) {
+    fn flush(line: &mut Line, advance: &mut Advance, shaper: Shaper, key: FontKey, style: Styles) {
         shaper.shape_with(|cluster| {
             for glyph in cluster.glyphs {
                 line.glyphs.push(Glyph {

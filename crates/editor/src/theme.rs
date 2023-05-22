@@ -1,6 +1,5 @@
 use std::ops::Index;
-
-use virus_common::{Rgba, Style};
+use virus_graphics::{colors::Rgba, text::Styles};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             ThemeKey                                           //
@@ -106,57 +105,57 @@ impl ThemeKey {
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
 pub struct Theme {
-    pub default: Style,
-    pub attribute: Style,
-    pub comment: Style,
-    pub constant: Style,
-    pub constant_builtin_boolean: Style,
-    pub constant_character: Style,
-    pub constant_character_escape: Style,
-    pub constant_numeric_float: Style,
-    pub constant_numeric_integer: Style,
-    pub constructor: Style,
-    pub function: Style,
-    pub function_macro: Style,
-    pub function_method: Style,
-    pub keyword: Style,
-    pub keyword_control: Style,
-    pub keyword_control_conditional: Style,
-    pub keyword_control_import: Style,
-    pub keyword_control_repeat: Style,
-    pub keyword_control_return: Style,
-    pub keyword_function: Style,
-    pub keyword_operator: Style,
-    pub keyword_special: Style,
-    pub keyword_storage: Style,
-    pub keyword_storage_modifier: Style,
-    pub keyword_storage_modifier_mut: Style,
-    pub keyword_storage_modifier_ref: Style,
-    pub keyword_storage_type: Style,
-    pub label: Style,
-    pub namespace: Style,
-    pub operator: Style,
-    pub punctuation_bracket: Style,
-    pub punctuation_delimiter: Style,
-    pub special: Style,
-    pub string: Style,
-    pub r#type: Style,
-    pub type_builtin: Style,
-    pub type_enum_variant: Style,
-    pub variable: Style,
-    pub variable_builtin: Style,
-    pub variable_other_member: Style,
-    pub variable_parameter: Style,
+    pub default: Styles,
+    pub attribute: Styles,
+    pub comment: Styles,
+    pub constant: Styles,
+    pub constant_builtin_boolean: Styles,
+    pub constant_character: Styles,
+    pub constant_character_escape: Styles,
+    pub constant_numeric_float: Styles,
+    pub constant_numeric_integer: Styles,
+    pub constructor: Styles,
+    pub function: Styles,
+    pub function_macro: Styles,
+    pub function_method: Styles,
+    pub keyword: Styles,
+    pub keyword_control: Styles,
+    pub keyword_control_conditional: Styles,
+    pub keyword_control_import: Styles,
+    pub keyword_control_repeat: Styles,
+    pub keyword_control_return: Styles,
+    pub keyword_function: Styles,
+    pub keyword_operator: Styles,
+    pub keyword_special: Styles,
+    pub keyword_storage: Styles,
+    pub keyword_storage_modifier: Styles,
+    pub keyword_storage_modifier_mut: Styles,
+    pub keyword_storage_modifier_ref: Styles,
+    pub keyword_storage_type: Styles,
+    pub label: Styles,
+    pub namespace: Styles,
+    pub operator: Styles,
+    pub punctuation_bracket: Styles,
+    pub punctuation_delimiter: Styles,
+    pub special: Styles,
+    pub string: Styles,
+    pub r#type: Styles,
+    pub type_builtin: Styles,
+    pub type_enum_variant: Styles,
+    pub variable: Styles,
+    pub variable_builtin: Styles,
+    pub variable_other_member: Styles,
+    pub variable_parameter: Styles,
 }
 
 impl Theme {
-    pub fn default(&self) -> &Style {
+    pub fn default(&self) -> &Styles {
         &self.default
     }
 
     pub fn dracula() -> Self {
-        fn style(r: u8, g: u8, b: u8) -> Style {
-            Style {
+        fn style(r: u8, g: u8, b: u8) -> Styles {
+            Styles {
                 foreground: Rgba {
                     r,
                     g,
@@ -226,7 +225,7 @@ impl Theme {
 }
 
 impl Index<ThemeKey> for Theme {
-    type Output = Style;
+    type Output = Styles;
 
     fn index(&self, key: ThemeKey) -> &Self::Output {
         match key {

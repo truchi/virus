@@ -1,7 +1,9 @@
-use crate::text::{Context, Line, LineHeight};
+use crate::{
+    colors::{Rgb, Rgba},
+    text::{Context, Line, LineHeight},
+};
 use std::ops::Range;
 use swash::scale::image::{Content, Image};
-use virus_common::{Rgb, Rgba};
 
 #[derive(Copy, Clone, Debug)]
 pub enum Quadrant {

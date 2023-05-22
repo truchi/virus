@@ -391,6 +391,7 @@ name = "editor"
 version = "0.1.0"
 dependencies = [
  "common",
+ "graphics",
  "ropey",
  "tree-sitter",
  "tree-sitter-rust",
