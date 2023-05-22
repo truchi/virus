@@ -216,6 +216,13 @@ impl Font {
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct FontFamilyKey(u64);
 
+impl FontFamilyKey {
+    /// For tests only!
+    pub fn __new(u64: u64) -> Self {
+        Self(u64)
+    }
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             FontFamily                                         //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -325,24 +332,6 @@ impl FontsGet for FontKey {
 impl FontsGet for (FontFamilyKey, FontWeight, FontStyle) {
     fn get(self, fonts: &Fonts) -> Option<FontRef> {
         fonts.families.get(&self.0)?.get(self.1, self.2)?.get(fonts)
-    }
-}
-
-impl FontsGet for (FontFamilyKey, FontWeight) {
-    fn get(self, fonts: &Fonts) -> Option<FontRef> {
-        (self.0, self.1, Default::default()).get(fonts)
-    }
-}
-
-impl FontsGet for (FontFamilyKey, FontStyle) {
-    fn get(self, fonts: &Fonts) -> Option<FontRef> {
-        (self.0, Default::default(), self.1).get(fonts)
-    }
-}
-
-impl FontsGet for FontFamilyKey {
-    fn get(self, fonts: &Fonts) -> Option<FontRef> {
-        (self, Default::default(), Default::default()).get(fonts)
     }
 }
 
