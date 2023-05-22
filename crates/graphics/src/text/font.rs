@@ -242,7 +242,7 @@ pub struct FontFamily {
 }
 
 impl FontFamily {
-    /// Creates a new `FontFamily` with `name`.
+    /// Creates a new family with `name`.
     pub fn new(key: FontFamilyKey, name: String) -> Self {
         Self {
             key,
@@ -251,17 +251,22 @@ impl FontFamily {
         }
     }
 
-    /// Returns the key of this `FontFamily`.
+    /// Returns the key of this family.
     pub fn key(&self) -> FontFamilyKey {
         self.key
     }
 
-    /// Returns the name of this `FontFamily`.
+    /// Returns the name of this family.
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// TODO
+    /// Returns the fonts in this family.
+    pub fn fonts(&self) -> &HashMap<(FontWeight, FontStyle), FontKey> {
+        &self.fonts
+    }
+
+    /// Returns the best match for `weight` and `style` in this family.
     pub fn get(&self, weight: FontWeight, style: FontStyle) -> Option<FontKey> {
         for &style in style.fallbacks() {
             for &weight in weight.fallbacks() {
