@@ -173,7 +173,7 @@ impl<'pixels> Surface<'pixels> {
 
             let baseline = top + line.size() as i32;
             let left = left + advance as i32;
-            let (foreground, background) = (glyph.style.foreground, glyph.style.background);
+            let (foreground, background) = (glyph.styles.foreground, glyph.styles.background);
 
             self.draw_rect(top, left, glyph.advance as u32, height, background);
             self.draw_image(baseline, left, image, foreground);

@@ -86,8 +86,12 @@ impl<'a> LineShaper<'a> {
     /// Feeds `str` to the `LineShaper` with font `key` and `color`.
     ///
     /// Not able to produce ligature across calls to this function.
-    pub fn push(&mut self, str: &str, key: FontKey, style: Styles) {
-        let font = self.fonts.get(key).expect("Font not found").as_ref();
+    pub fn push(&mut self, str: &str, styles: Styles) {
+        let font = self
+            .fonts
+            .get(styles.font)
+            .expect("Font not found")
+            .as_ref();
         let emoji = self.fonts.emoji().as_ref();
         let font_key = font.key;
         let emoji_key = emoji.key;
@@ -106,12 +110,12 @@ impl<'a> LineShaper<'a> {
                 (FontOrEmoji::Font, FontOrEmoji::Font) => shaper,
                 (FontOrEmoji::Emoji, FontOrEmoji::Emoji) => shaper,
                 (FontOrEmoji::Font, FontOrEmoji::Emoji) => {
-                    Self::flush(&mut self.line, &mut self.advance, shaper, key, style);
+                    Self::flush(&mut self.line, &mut self.advance, shaper, key, styles);
                     (key, font_or_emoji) = (font_key, FontOrEmoji::Font);
                     Self::build(self.shape, font, self.line.size)
                 }
                 (FontOrEmoji::Emoji, FontOrEmoji::Font) => {
-                    Self::flush(&mut self.line, &mut self.advance, shaper, key, style);
+                    Self::flush(&mut self.line, &mut self.advance, shaper, key, styles);
                     (key, font_or_emoji) = (emoji_key, FontOrEmoji::Emoji);
                     Self::build(self.shape, emoji, self.line.size)
                 }
@@ -123,7 +127,7 @@ impl<'a> LineShaper<'a> {
             self.bytes += range.end - range.start;
         }
 
-        Self::flush(&mut self.line, &mut self.advance, shaper, key, style);
+        Self::flush(&mut self.line, &mut self.advance, shaper, key, styles);
     }
 
     /// Returns the shaped `Line`.
@@ -170,7 +174,10 @@ impl<'a> LineShaper<'a> {
         }
     }
 
-    fn flush(line: &mut Line, advance: &mut Advance, shaper: Shaper, key: FontKey, style: Styles) {
+    fn flush(line: &mut Line, advance: &mut Advance, shaper: Shaper, key: FontKey, styles: Styles) {
+        let mut styles = styles;
+        styles.font = key;
+
         shaper.shape_with(|cluster| {
             for glyph in cluster.glyphs {
                 line.glyphs.push(Glyph {
@@ -178,8 +185,7 @@ impl<'a> LineShaper<'a> {
                     offset: *advance,
                     advance: glyph.advance,
                     range: cluster.source,
-                    key,
-                    style,
+                    styles,
                 });
                 *advance += glyph.advance;
             }
@@ -230,20 +236,19 @@ impl<'a> LineScaler<'a> {
     pub fn next<'b>(&'b mut self) -> Option<(Advance, Glyph, Option<&'b Image>)> {
         let advance = self.advance;
         let glyph = self.glyphs.next()?;
-        let font = self.fonts.get(glyph.key).expect("font").as_ref();
-        let image = self
-            .cache
-            .get_or_insert((glyph.key, glyph.id, self.size), || {
-                self.render.render(
-                    &mut self
-                        .scale
-                        .builder(font)
-                        .size(self.size as f32)
-                        .hint(Self::HINT)
-                        .build(),
-                    glyph.id,
-                )
-            });
+        let key = glyph.styles.font;
+        let font = self.fonts.get(key).expect("font").as_ref();
+        let image = self.cache.get_or_insert((key, glyph.id, self.size), || {
+            self.render.render(
+                &mut self
+                    .scale
+                    .builder(font)
+                    .size(self.size as f32)
+                    .hint(Self::HINT)
+                    .build(),
+                glyph.id,
+            )
+        });
 
         self.advance += glyph.advance;
         Some((advance, *glyph, image.as_ref()))

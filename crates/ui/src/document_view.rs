@@ -8,13 +8,12 @@ use virus_editor::{
 use virus_graphics::{
     colors::Rgba,
     pixels_mut::Surface,
-    text::{Context, FontKey, FontSize, Line, LineHeight},
+    text::{Context, FontSize, Line, LineHeight},
 };
 
 pub struct DocumentView {
     query: String,
     theme: Theme,
-    font: FontKey,
     font_size: FontSize,
     line_height: LineHeight,
     rope: Rope,
@@ -23,17 +22,10 @@ pub struct DocumentView {
 }
 
 impl DocumentView {
-    pub fn new(
-        query: String,
-        theme: Theme,
-        font: FontKey,
-        font_size: FontSize,
-        line_height: LineHeight,
-    ) -> Self {
+    pub fn new(query: String, theme: Theme, font_size: FontSize, line_height: LineHeight) -> Self {
         Self {
             query,
             theme,
-            font,
             font_size,
             line_height,
             rope: Default::default(),
@@ -96,7 +88,6 @@ impl DocumentView {
                         .get_byte_slice(start.index..end.index)
                         .unwrap(),
                 ),
-                self.font,
                 self.theme[key],
             );
         }

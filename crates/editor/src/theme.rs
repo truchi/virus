@@ -103,7 +103,7 @@ impl ThemeKey {
 //                                              Theme                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Theme {
     pub default: Styles,
     pub attribute: Styles,
@@ -153,33 +153,46 @@ impl Theme {
         &self.default
     }
 
-    pub fn dracula() -> Self {
-        fn style(r: u8, g: u8, b: u8) -> Styles {
+    /// Stupid shit for tests!
+    pub fn dracula(fonts: &virus_graphics::text::Fonts) -> Self {
+        fn style(r: u8, g: u8, b: u8, font: virus_graphics::text::FontKey) -> Styles {
             Styles {
+                font,
                 foreground: Rgba {
                     r,
                     g,
                     b,
                     a: u8::MAX,
                 },
-                ..Default::default()
+                background: Default::default(),
+                underline: Default::default(),
+                strike: Default::default(),
             }
         }
 
-        let _background = style(40, 42, 54);
-        let _current = style(68, 71, 90);
-        let foreground = style(248, 248, 242);
-        let comment = style(98, 114, 164);
-        let cyan = style(139, 233, 253);
-        let green = style(80, 250, 123);
-        let orange = style(255, 184, 108);
-        let pink = style(255, 121, 198);
-        let purple = style(189, 147, 249);
-        let red = style(255, 85, 85);
-        let yellow = style(241, 250, 140);
+        use virus_graphics::text::FontStyle::*;
+        use virus_graphics::text::FontWeight::*;
+
+        let victor = fonts.get("Victor").unwrap().key();
+        let regular = fonts.get((victor, Regular, Normal)).unwrap().key();
+        let bold = fonts.get((victor, Bold, Normal)).unwrap().key();
+        let italic = fonts.get((victor, Regular, Italic)).unwrap().key();
+        let oblique = fonts.get((victor, Regular, Oblique)).unwrap().key();
+
+        let _background = style(40, 42, 54, regular);
+        let _current = style(68, 71, 90, regular);
+        let foreground = style(248, 248, 242, regular);
+        let comment = style(98, 114, 164, italic);
+        let cyan = style(139, 233, 253, bold);
+        let green = style(80, 250, 123, bold);
+        let orange = style(255, 184, 108, regular);
+        let pink = style(255, 121, 198, oblique);
+        let purple = style(189, 147, 249, regular);
+        let red = style(255, 85, 85, regular);
+        let yellow = style(241, 250, 140, regular);
 
         Theme {
-            default: style(255, 255, 255),
+            default: style(255, 255, 255, regular),
             attribute: green,
             comment,
             constant: green,

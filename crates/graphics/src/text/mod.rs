@@ -55,10 +55,8 @@ pub struct Glyph {
     pub advance: Advance,
     /// Range in the underlying string.
     pub range: SourceRange,
-    /// Key of the font.
-    pub key: FontKey,
-    /// Glyph style.
-    pub style: Styles,
+    /// Glyph styles.
+    pub styles: Styles,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -66,12 +64,11 @@ pub struct Glyph {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// Glyph styles.
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Styles {
+    pub font: FontKey,
     pub foreground: Rgba,
     pub background: Rgba,
-    pub bold: bool,
-    pub italic: bool,
     pub underline: bool,
     pub strike: bool,
 }

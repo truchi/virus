@@ -30,10 +30,7 @@ pub struct Virus {
 
 impl Virus {
     fn new(window: Window, fonts: Fonts) -> Self {
-        let key = fonts
-            .get((fonts.get("JetBrains").unwrap().key(), Regular, Normal))
-            .unwrap()
-            .key();
+        let theme = Theme::dracula(&fonts);
         let mut context = Context::new(fonts);
         let mut events = Events::new(window.id());
 
@@ -46,8 +43,7 @@ impl Virus {
         let mut document = Document::open(std::env::args().skip(1).next().unwrap()).unwrap();
         document.parse();
 
-        let mut document_view =
-            DocumentView::new(HIGHLIGHT_QUERY.into(), Theme::dracula(), key, 40, 50);
+        let mut document_view = DocumentView::new(HIGHLIGHT_QUERY.into(), theme, 40, 50);
 
         Self {
             window,
