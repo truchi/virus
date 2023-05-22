@@ -16,7 +16,7 @@ virus-ui = { path = "crates/ui", package = "ui" }
 lru = "0.9.0"
 pixels = "0.11"
 swash = "0.1.6"
-winit = "0.27"
+winit = "0.28"
 tree-sitter = "0.20"
 tree-sitter-rust = "0.20"
 ropey = "1.6"
