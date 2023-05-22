@@ -236,8 +236,11 @@ impl FontFamilyKey {
 /// A font family.
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct FontFamily {
+    /// Family key.
     key: FontFamilyKey,
+    /// Family name.
     name: String,
+    /// Family fonts.
     fonts: HashMap<(FontWeight, FontStyle), FontKey>,
 }
 
