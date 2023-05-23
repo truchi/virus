@@ -50,8 +50,8 @@ impl Events {
         self.modifiers
     }
 
-    pub fn update<T>(&mut self, event: &WinitEvent<T>) -> Option<Event> {
-        match event {
+    pub fn update<T: std::fmt::Debug>(&mut self, event: &WinitEvent<T>) -> Option<Event> {
+        match dbg!(event) {
             WinitEvent::NewEvents(_) => None,
             WinitEvent::WindowEvent { window_id, event } => {
                 if self.window_id == *window_id {

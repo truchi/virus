@@ -71,10 +71,16 @@ impl Virus {
         let mut virus = Self::new(window, fonts());
 
         event_loop.run(move |event, _, flow| {
+            flow.set_wait_timeout(std::time::Duration::from_secs(2));
+
             let event = match virus.events.update(&event) {
                 Some(event) => event,
                 None => return,
             };
+
+            // Add Event::Timeout for fixed timesteps -> request redraw
+            // Let on_redraw try to figure if in animation or not, anyway no big deal if we draw at 30pfs
+            // Can we be elegant with flow?
 
             match event {
                 Event::Char(char) => virus.on_char(char, flow),
@@ -138,7 +144,7 @@ impl Virus {
         }
 
         self.document.parse();
-        self.window.request_redraw();
+        // self.window.request_redraw();
     }
 
     fn on_pressed(&mut self, key: VirtualKeyCode, flow: &mut ControlFlow) {
