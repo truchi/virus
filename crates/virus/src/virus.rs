@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::events::{Event, Events};
 use virus_editor::document::Document;
 use virus_ui::ui::Ui;
@@ -17,6 +19,7 @@ pub struct Virus {
     events: Events,
     document: Document,
     ui: Ui,
+    last_render: Option<Instant>,
 }
 
 impl Virus {
@@ -31,6 +34,7 @@ impl Virus {
             events,
             document,
             ui,
+            last_render: None,
         }
     }
 
@@ -103,6 +107,12 @@ impl Virus {
             UP if modifiers.alt() => {
                 self.document.move_up();
             }
+            'I' if modifiers.alt() => {
+                self.ui.scroll_up();
+            }
+            'K' if modifiers.alt() => {
+                self.ui.scroll_down();
+            }
             DOWN if modifiers.alt() => {
                 self.document.move_down();
             }
@@ -144,7 +154,17 @@ impl Virus {
     fn on_unfocused(&mut self, flow: &mut ControlFlow) {}
 
     fn on_redraw(&mut self, flow: &mut ControlFlow) {
+        let now = Instant::now();
+        let delta = now - self.last_render.unwrap_or(now);
+
+        self.ui.update(delta);
         self.ui.render(&self.document);
+
+        if self.ui.is_animating() {
+            self.window.request_redraw();
+        }
+
+        self.last_render = Some(now);
     }
 
     fn on_close(&mut self, flow: &mut ControlFlow) {}

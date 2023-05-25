@@ -34,6 +34,10 @@ impl DocumentView {
         }
     }
 
+    pub fn line_height(&self) -> LineHeight {
+        self.line_height
+    }
+
     pub fn prepare(
         &mut self,
         context: &mut Context,

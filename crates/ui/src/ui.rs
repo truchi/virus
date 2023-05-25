@@ -1,4 +1,9 @@
-use crate::document_view::DocumentView;
+use std::time::Duration;
+
+use crate::{
+    document_view::DocumentView,
+    tween::{Tween, Tweened},
+};
 use pixels::{Pixels, SurfaceTexture};
 use virus_editor::{document::Document, theme::Theme};
 use virus_graphics::{
@@ -20,6 +25,7 @@ pub struct Ui {
     pixels: Pixels,
     context: Context,
     document_view: DocumentView,
+    scroll_top: Tweened<u32>,
 }
 
 impl Ui {
@@ -42,7 +48,28 @@ impl Ui {
             pixels,
             context,
             document_view,
+            scroll_top: Tweened::new(0),
         }
+    }
+
+    pub fn is_animating(&self) -> bool {
+        self.scroll_top.is_animating()
+    }
+
+    pub fn scroll_up(&mut self) {
+        self.scroll_top.to(
+            self.scroll_top.end().saturating_sub(500),
+            Duration::from_secs(1),
+            Tween::ExpoOut,
+        );
+    }
+
+    pub fn scroll_down(&mut self) {
+        self.scroll_top.to(
+            self.scroll_top.end() + 500,
+            Duration::from_secs(1),
+            Tween::ExpoOut,
+        );
     }
 
     pub fn resize(&mut self, size: PhysicalSize<u32>) {
@@ -50,6 +77,10 @@ impl Ui {
         self.height = size.height;
         self.pixels.resize_surface(self.width, self.height).unwrap();
         self.pixels.resize_buffer(self.width, self.height).unwrap();
+    }
+
+    pub fn update(&mut self, delta: Duration) {
+        self.scroll_top.step(delta);
     }
 
     pub fn render(&mut self, document: &Document) {
@@ -60,7 +91,7 @@ impl Ui {
             &mut pixels_mut.surface(0, 0, self.width, self.height),
             &mut self.context,
             document,
-            0,
+            self.scroll_top.current(),
         );
 
         self.pixels.render().unwrap();

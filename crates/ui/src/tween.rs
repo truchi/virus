@@ -120,6 +120,7 @@ impl<T: TweenValue> Tweened<T> {
 
     /// Returns the delta between the start and the end values.
     pub fn delta(&self) -> T {
+        // TODO OVERFLOW!!!!!
         self.end - self.start
     }
 
