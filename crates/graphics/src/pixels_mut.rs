@@ -93,6 +93,17 @@ impl<'pixels> PixelsMut<'pixels> {
         }
     }
 
+    pub fn clear(&mut self, color: Rgb) {
+        for (i, channel) in self.pixels_mut().iter_mut().enumerate() {
+            *channel = match i % 4 {
+                0 => color.r,
+                1 => color.g,
+                2 => color.b,
+                _ => u8::MAX,
+            };
+        }
+    }
+
     pub fn pixel_mut(&mut self, top: u32, left: u32) -> Option<&mut [u8]> {
         let index = left as usize + top as usize * self.width as usize;
 

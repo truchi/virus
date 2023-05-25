@@ -2,6 +2,7 @@ use crate::document_view::DocumentView;
 use pixels::{Pixels, SurfaceTexture};
 use virus_editor::{document::Document, theme::Theme};
 use virus_graphics::{
+    colors::Rgb,
     pixels_mut::PixelsMut,
     text::{Context, Font, Fonts},
 };
@@ -53,21 +54,7 @@ impl Ui {
 
     pub fn render(&mut self, document: &Document) {
         let mut pixels_mut = PixelsMut::new(self.width, self.height, self.pixels.frame_mut());
-
-        // TODO: PixelsMut::clear(color)
-        for (i, u) in pixels_mut.pixels_mut().iter_mut().enumerate() {
-            *u = match i % 4 {
-                0 => 0,
-                1 => 0,
-                2 => 0,
-                _ => 255,
-            };
-        }
-
-        // ???
-        if pixels_mut.pixels().len() == 4 {
-            return;
-        }
+        pixels_mut.clear(Rgb::BLACK);
 
         self.document_view.render(
             &mut pixels_mut.surface(0, 0, self.width, self.height),
