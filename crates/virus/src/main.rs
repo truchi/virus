@@ -1,6 +1,7 @@
 #![allow(unused)]
 
 mod events;
+mod fps;
 mod virus;
 
 // 🚀

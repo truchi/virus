@@ -7,8 +7,6 @@ edition.workspace = true
 [dependencies]
 virus-common.workspace = true
 virus-editor.workspace = true
-virus-graphics.workspace = true
 virus-ui.workspace = true
 
-pixels.workspace = true
 winit.workspace = true
