@@ -22,6 +22,7 @@ tree-sitter-rust = "0.20"
 ropey = "1.6"
 unicode-segmentation = "1.10"
 unicode-width = "0.1"
+tween = "2.0.1"
 
 [profile.dev]
 # Remove debug stuff in the binary

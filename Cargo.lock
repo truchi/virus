@@ -1319,6 +1319,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "44dcf002ae3b32cd25400d6df128c5babec3927cd1eb7ce813cfff20eb6c3746"
 
 [[package]]
+name = "tween"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90aba0c5c9d07e12084c38dcbf0f4b16f74801b588650ad633f9d7e9a0143952"
+
+[[package]]
 name = "ui"
 version = "0.1.0"
 dependencies = [
@@ -1328,6 +1334,7 @@ dependencies = [
  "pixels",
  "ropey",
  "swash",
+ "tween",
  "winit",
 ]
 
