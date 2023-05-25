@@ -14,7 +14,7 @@ virus-graphics = { path = "crates/graphics", package = "graphics" }
 virus-ui = { path = "crates/ui", package = "ui" }
 
 lru = "0.9.0"
-pixels = "0.11"
+pixels = "0.12"
 swash = "0.1.6"
 winit = "0.28"
 tree-sitter = "0.20"

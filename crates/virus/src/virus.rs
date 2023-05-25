@@ -144,7 +144,7 @@ impl Virus {
         }
 
         self.document.parse();
-        // self.window.request_redraw();
+        self.window.request_redraw();
     }
 
     fn on_pressed(&mut self, key: VirtualKeyCode, flow: &mut ControlFlow) {
@@ -176,7 +176,7 @@ impl Virus {
     fn on_redraw(&mut self, flow: &mut ControlFlow) {
         let mut pixels_mut = {
             let PhysicalSize { width, height } = self.window.inner_size();
-            PixelsMut::new(width / SCALE, height / SCALE, self.pixels.get_frame_mut())
+            PixelsMut::new(width / SCALE, height / SCALE, self.pixels.frame_mut())
         };
 
         for (i, u) in pixels_mut.pixels_mut().iter_mut().enumerate() {
