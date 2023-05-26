@@ -58,16 +58,16 @@ impl Ui {
 
     pub fn scroll_up(&mut self) {
         self.scroll_top.to(
-            self.scroll_top.end().saturating_sub(500),
-            Duration::from_secs(1),
+            self.scroll_top.end().saturating_sub(self.height / 2),
+            Duration::from_secs(2),
             Tween::ExpoOut,
         );
     }
 
     pub fn scroll_down(&mut self) {
         self.scroll_top.to(
-            self.scroll_top.end() + 500,
-            Duration::from_secs(1),
+            self.scroll_top.end() + self.height / 2,
+            Duration::from_secs(2),
             Tween::ExpoOut,
         );
     }
