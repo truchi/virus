@@ -1,6 +1,5 @@
-use std::time::Instant;
-
 use crate::events::{Event, Events};
+use std::time::Instant;
 use virus_editor::document::Document;
 use virus_ui::ui::Ui;
 use winit::{
@@ -24,7 +23,7 @@ pub struct Virus {
 
 impl Virus {
     fn new(window: Window) -> Self {
-        let events = Events::new(window.id());
+        let events = Events::new();
         let ui = Ui::new(&window);
         let mut document = Document::open(std::env::args().skip(1).next().unwrap()).unwrap();
         document.parse();
@@ -52,16 +51,12 @@ impl Virus {
         });
 
         event_loop.run(move |event, _, flow| {
-            flow.set_wait_timeout(std::time::Duration::from_secs(2));
+            // flow.set_wait_timeout(std::time::Duration::from_millis(1_000));
 
-            let event = match virus.events.update(&event) {
+            let event = match virus.events.update(&event, &virus.window) {
                 Some(event) => event,
                 None => return,
             };
-
-            // Add Event::Timeout for fixed timesteps -> request redraw
-            // Let on_redraw try to figure if in animation or not, anyway no big deal if we draw at 30pfs
-            // Can we be elegant with flow?
 
             match event {
                 Event::Char(char) => virus.on_char(char, flow),
@@ -131,7 +126,6 @@ impl Virus {
         }
 
         self.document.parse();
-        self.window.request_redraw();
     }
 
     fn on_pressed(&mut self, key: VirtualKeyCode, flow: &mut ControlFlow) {
@@ -156,15 +150,18 @@ impl Virus {
     fn on_redraw(&mut self, flow: &mut ControlFlow) {
         let now = Instant::now();
         let delta = now - self.last_render.unwrap_or(now);
+        self.last_render = Some(now);
 
         self.ui.update(delta);
         self.ui.render(&self.document);
 
         if self.ui.is_animating() {
-            self.window.request_redraw();
+            println!(">IS ANIMATING<");
+            flow.set_wait_timeout(std::time::Duration::from_millis(10_000));
+        } else {
+            println!(">NOT ANIMATING<");
+            flow.set_wait();
         }
-
-        self.last_render = Some(now);
     }
 
     fn on_close(&mut self, flow: &mut ControlFlow) {}

@@ -6,7 +6,7 @@ use winit::{
         ElementState, Event as WinitEvent, KeyboardInput, ModifiersState, VirtualKeyCode,
         WindowEvent,
     },
-    window::WindowId,
+    window::{Window, WindowId},
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -34,14 +34,12 @@ pub enum Event {
 
 #[derive(Debug)]
 pub struct Events {
-    window_id: WindowId,
     modifiers: ModifiersState,
 }
 
 impl Events {
-    pub fn new(window_id: WindowId) -> Self {
+    pub fn new() -> Self {
         Self {
-            window_id,
             modifiers: Default::default(),
         }
     }
@@ -50,11 +48,25 @@ impl Events {
         self.modifiers
     }
 
-    pub fn update<T: std::fmt::Debug>(&mut self, event: &WinitEvent<T>) -> Option<Event> {
-        match event {
-            WinitEvent::NewEvents(_) => None,
+    pub fn update<T: std::fmt::Debug>(
+        &mut self,
+        winit_event: &WinitEvent<T>,
+        window: &Window,
+    ) -> Option<Event> {
+        match winit_event {
+            WinitEvent::NewEvents(_) => {
+                println!("=======================================================================");
+            }
+            _ => {}
+        }
+
+        let event = match winit_event {
+            WinitEvent::NewEvents(_) => {
+                dbg!(std::time::Instant::now());
+                None
+            }
             WinitEvent::WindowEvent { window_id, event } => {
-                if self.window_id == *window_id {
+                if window.id() == *window_id {
                     match event {
                         WindowEvent::Resized(size) => Some(Event::Resized(*size)),
                         WindowEvent::Moved(position) => Some(Event::Moved(*position)),
@@ -120,10 +132,28 @@ impl Events {
             WinitEvent::UserEvent(_) => None,
             WinitEvent::Suspended => None,
             WinitEvent::Resumed => None,
-            WinitEvent::MainEventsCleared => None,
+            WinitEvent::MainEventsCleared => {
+                window.request_redraw();
+                None
+            }
             WinitEvent::RedrawRequested(_) => Some(Event::Redraw),
             WinitEvent::RedrawEventsCleared => None,
             WinitEvent::LoopDestroyed => Some(Event::Quit),
+        };
+
+        if let Some(event) = event {
+            println!("\x1B[0;32m{event:#?}\x1B[0m");
+        } else {
+            println!("\x1B[0;31m{winit_event:#?}\x1B[0m");
         }
+
+        match winit_event {
+            WinitEvent::RedrawEventsCleared => {
+                println!("=======================================================================");
+            }
+            _ => {}
+        }
+
+        event
     }
 }
