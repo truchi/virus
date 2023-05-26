@@ -51,8 +51,6 @@ impl Virus {
         });
 
         event_loop.run(move |event, _, flow| {
-            // flow.set_wait_timeout(std::time::Duration::from_millis(1_000));
-
             let event = match virus.events.update(&event, &virus.window) {
                 Some(event) => event,
                 None => return,

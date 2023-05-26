@@ -174,25 +174,31 @@ impl Theme {
         use virus_graphics::text::FontWeight::*;
 
         let victor = fonts.get("Victor").unwrap().key();
-        let regular = fonts.get((victor, Regular, Normal)).unwrap().key();
-        let bold = fonts.get((victor, Bold, Normal)).unwrap().key();
-        let italic = fonts.get((victor, Regular, Italic)).unwrap().key();
-        let oblique = fonts.get((victor, Regular, Oblique)).unwrap().key();
+        let victor_regular = fonts.get((victor, Regular, Normal)).unwrap().key();
+        let victor_bold = fonts.get((victor, Bold, Normal)).unwrap().key();
+        let victor_italic = fonts.get((victor, Regular, Italic)).unwrap().key();
+        let victor_oblique = fonts.get((victor, Regular, Oblique)).unwrap().key();
 
-        let _background = style(40, 42, 54, regular);
-        let _current = style(68, 71, 90, regular);
-        let foreground = style(248, 248, 242, regular);
-        let comment = style(98, 114, 164, italic);
-        let cyan = style(139, 233, 253, bold);
-        let green = style(80, 250, 123, bold);
-        let orange = style(255, 184, 108, regular);
-        let pink = style(255, 121, 198, oblique);
-        let purple = style(189, 147, 249, regular);
-        let red = style(255, 85, 85, regular);
-        let yellow = style(241, 250, 140, regular);
+        let fira = fonts.get("FiraCode").unwrap().key();
+        let _fira_light = fonts.get((fira, Light, Normal)).unwrap().key();
+        let _fira_regular = fonts.get((fira, Regular, Normal)).unwrap().key();
+        let _fira_medium = fonts.get((fira, Medium, Normal)).unwrap().key();
+        let _fira_bold = fonts.get((fira, Bold, Normal)).unwrap().key();
+
+        let _background = style(40, 42, 54, victor_regular);
+        let _current = style(68, 71, 90, victor_regular);
+        let foreground = style(248, 248, 242, victor_regular);
+        let comment = style(98, 114, 164, victor_italic);
+        let cyan = style(139, 233, 253, victor_bold);
+        let green = style(80, 250, 123, victor_bold);
+        let orange = style(255, 184, 108, victor_regular);
+        let pink = style(255, 121, 198, victor_oblique);
+        let purple = style(189, 147, 249, victor_regular);
+        let red = style(255, 85, 85, victor_regular);
+        let yellow = style(241, 250, 140, victor_regular);
 
         Theme {
-            default: style(255, 255, 255, regular),
+            default: style(255, 255, 255, victor_regular),
             attribute: green,
             comment,
             constant: green,

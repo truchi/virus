@@ -83,7 +83,7 @@ impl<'a> LineShaper<'a> {
         }
     }
 
-    /// Feeds `str` to the `LineShaper` with font `key` and `color`.
+    /// Feeds `str` to the `LineShaper` with font `styles`.
     ///
     /// Not able to produce ligature across calls to this function.
     pub fn push(&mut self, str: &str, styles: Styles) {
