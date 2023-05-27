@@ -122,7 +122,7 @@ pub struct Font {
 impl Font {
     /// Returns a `Font` from `path`.
     ///
-    /// Does not support collections. Currently, only the first font in the file is used.
+    /// Does not support collections. Only the first font in the file is used.
     pub fn from_file<P: AsRef<Path>>(path: P) -> Option<Self> {
         let data = std::fs::read(path).ok()?;
         let font = FontRef::from_index(&data, 0)?;
@@ -233,8 +233,8 @@ pub struct FontFamily {
     key: FontFamilyKey,
     /// Family name.
     name: String,
-    /// Family fonts.
-    fonts: HashMap<(FontWeight, FontStyle), FontKey>,
+    /// Family variants.
+    variants: HashMap<(FontWeight, FontStyle), FontKey>,
 }
 
 impl FontFamily {
@@ -243,7 +243,7 @@ impl FontFamily {
         Self {
             key,
             name,
-            fonts: Default::default(),
+            variants: Default::default(),
         }
     }
 
@@ -257,29 +257,22 @@ impl FontFamily {
         &self.name
     }
 
-    /// Returns the fonts in this family.
-    pub fn fonts(&self) -> &HashMap<(FontWeight, FontStyle), FontKey> {
-        &self.fonts
+    /// Returns the variants in this family.
+    pub fn variants(&self) -> &HashMap<(FontWeight, FontStyle), FontKey> {
+        &self.variants
     }
 
     /// Returns the best match for `weight` and `style` in this family.
-    pub fn get(&self, weight: FontWeight, style: FontStyle) -> Option<FontKey> {
+    pub fn best_match(&self, weight: FontWeight, style: FontStyle) -> Option<FontKey> {
         for &style in style.fallbacks() {
             for &weight in weight.fallbacks() {
-                if let Some(key) = self.fonts.get(&(weight, style)) {
+                if let Some(key) = self.variants.get(&(weight, style)) {
                     return Some(*key);
                 }
             }
         }
 
         None
-    }
-
-    /// Inserts `key` for `weight` and `style`.
-    ///
-    /// The key should exist in the [`Fonts`].
-    pub fn insert(&mut self, weight: FontWeight, style: FontStyle, key: FontKey) {
-        self.fonts.insert((weight, style), key);
     }
 }
 
@@ -292,7 +285,6 @@ impl FontFamily {
 /// Contains multiple [`Font`]s, organized in [`FontFamily`]s, and an emoji font fallback.
 ///
 /// `FontFamilyKey`s ***must not*** be reused in other `Fonts`.
-/// `Font`s ***must*** be inserted before linking to their family.
 #[derive(Debug)]
 pub struct Fonts {
     /// Fonts in the collection.
@@ -329,7 +321,7 @@ impl Fonts {
     }
 
     /// Inserts in the collection.
-    pub fn set<I: FontsSet>(&mut self, key: I) -> I::Output {
+    pub fn set<I: FontsSet>(&mut self, key: I) -> Result<I::Output, I::Error> {
         key.set(self)
     }
 
@@ -385,7 +377,7 @@ impl FontsGet for (FontFamilyKey, FontWeight, FontStyle) {
     type Output<'fonts> = &'fonts Font;
 
     fn get<'fonts>(self, fonts: &'fonts Fonts) -> Option<Self::Output<'fonts>> {
-        fonts.get(fonts.get(self.0)?.get(self.1, self.2)?)
+        fonts.get(fonts.get(self.0)?.best_match(self.1, self.2)?)
     }
 }
 
@@ -404,49 +396,79 @@ impl FontsGet for &str {
 /// Overloads for [`Fonts::set`].
 pub trait FontsSet {
     type Output;
+    type Error;
 
-    fn set(self, fonts: &mut Fonts) -> Self::Output;
+    fn set(self, fonts: &mut Fonts) -> Result<Self::Output, Self::Error>;
+}
+
+#[derive(Debug)]
+pub enum InsertFontError {
+    FontExists(Font),
 }
 
 impl FontsSet for Font {
     type Output = FontKey;
+    type Error = InsertFontError;
 
-    fn set(self, fonts: &mut Fonts) -> Self::Output {
+    fn set(self, fonts: &mut Fonts) -> Result<Self::Output, Self::Error> {
         let key = self.key;
-        fonts.fonts.insert(key, self);
-        key
+
+        if fonts.get(key).is_some() {
+            Err(Self::Error::FontExists(self))
+        } else {
+            fonts.fonts.insert(key, self);
+            Ok(key)
+        }
     }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum InsertVariantError {
+    FamilyNotFound,
+    FontNotFound,
+    VariantExists(FontKey),
 }
 
 impl FontsSet for (FontFamilyKey, FontWeight, FontStyle, FontKey) {
     type Output = (FontFamilyKey, FontKey);
+    type Error = InsertVariantError;
 
-    fn set(self, fonts: &mut Fonts) -> Self::Output {
+    fn set(self, fonts: &mut Fonts) -> Result<Self::Output, Self::Error> {
         let (family_key, weight, style, font_key) = self;
 
-        // Font and family must exist
-        debug_assert!(fonts.get(font_key).is_some());
-        debug_assert!(fonts.get(family_key).is_some());
-
-        fonts
-            .families
-            .entry(family_key)
-            .and_modify(|family| family.insert(weight, style, font_key));
-
-        (family_key, font_key)
+        if fonts.get(font_key).is_none() {
+            Err(Self::Error::FontNotFound)
+        } else {
+            if let Some(family) = fonts.families.get_mut(&family_key) {
+                if let Some(variant) = family.variants.get(&(weight, style)) {
+                    Err(Self::Error::VariantExists(*variant))
+                } else {
+                    family.variants.insert((weight, style), font_key);
+                    Ok((family_key, font_key))
+                }
+            } else {
+                Err(Self::Error::FamilyNotFound)
+            }
+        }
     }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum CreateFamilyError {
+    NameExists(FontFamilyKey),
 }
 
 impl FontsSet for String {
     type Output = FontFamilyKey;
+    type Error = CreateFamilyError;
 
-    fn set(self, fonts: &mut Fonts) -> Self::Output {
+    fn set(self, fonts: &mut Fonts) -> Result<Self::Output, Self::Error> {
         if let Some(family) = fonts.get(self.as_str()) {
-            family.key
+            Err(Self::Error::NameExists(family.key()))
         } else {
             let key = fonts.family_key();
             fonts.families.insert(key, FontFamily::new(key, self));
-            key
+            Ok(key)
         }
     }
 }
