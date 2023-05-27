@@ -472,3 +472,72 @@ impl FontsSet for String {
         }
     }
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                               Tests                                            //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fonts() {
+        use CreateFamilyError::*;
+        use FontStyle::*;
+        use FontWeight::*;
+        use InsertFontError::*;
+        use InsertVariantError::*;
+
+        fn key() -> FontKey {
+            FontKey::new()
+        }
+
+        fn font(key: FontKey) -> Font {
+            Font { data: vec![], key }
+        }
+
+        let emoji = key();
+
+        // Create fonts
+        let mut fonts = Fonts::new(font(emoji));
+
+        // Emoji font exists
+        assert!(fonts.get(emoji).unwrap().key() == emoji);
+
+        // Insert font
+        let regular = fonts.set(font(key())).unwrap();
+
+        // Font exists
+        assert!(fonts.get(regular).unwrap().key() == regular);
+
+        // Re-insert font fails
+        let err = fonts.set(font(regular)).unwrap_err();
+        assert!(matches!(err, FontExists(font) if font.key() == regular));
+
+        // Create family
+        let family = fonts.set("Family".to_owned()).unwrap();
+
+        // Family exists
+        assert!(fonts.get(family).unwrap().key() == family);
+        assert!(fonts.get("Family").unwrap().key() == family);
+
+        // Re-create family fails
+        assert!(fonts.set("Family".to_owned()) == Err(NameExists(family)));
+
+        // Insert unknown font in family fails
+        assert!(fonts.set((family, Regular, Normal, key())) == Err(FontNotFound));
+
+        // Insert variant
+        assert!(fonts.set((family, Regular, Normal, regular)) == Ok((family, regular)));
+
+        // Re-insert variant fails
+        assert!(fonts.set((family, Regular, Normal, regular)) == Err(VariantExists(regular)));
+
+        // Variant exists
+        assert!(fonts.get((family, Regular, Normal)).unwrap().key() == regular);
+
+        // Variant falls back
+        assert!(fonts.get((family, Regular, Italic)).unwrap().key() == regular);
+    }
+}
