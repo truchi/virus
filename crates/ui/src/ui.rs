@@ -14,6 +14,7 @@ use virus_graphics::{
 use winit::{dpi::PhysicalSize, window::Window};
 
 const HIGHLIGHT_QUERY: &str = include_str!("../../editor/treesitter/rust/highlights.scm");
+const SCROLL_DURATION: Duration = Duration::from_millis(500);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                                 Ui                                             //
@@ -59,17 +60,22 @@ impl Ui {
     pub fn scroll_up(&mut self) {
         self.scroll_top.to(
             self.scroll_top.end().saturating_sub(self.height / 2),
-            Duration::from_secs(2),
+            SCROLL_DURATION,
             Tween::ExpoOut,
         );
     }
 
     pub fn scroll_down(&mut self) {
-        self.scroll_top.to(
-            self.scroll_top.end() + self.height / 2,
-            Duration::from_secs(2),
-            Tween::ExpoOut,
-        );
+        let line_height = self.document_view.line_height();
+        let rope_lines = self.document_view.rope().len_lines() as u32 - 1;
+        let screen_height_in_lines = self.height / line_height;
+
+        if rope_lines > screen_height_in_lines {
+            let end = self.scroll_top.end() + screen_height_in_lines / 2 * line_height;
+            let end = end.min((rope_lines - screen_height_in_lines) * line_height);
+
+            self.scroll_top.to(end, SCROLL_DURATION, Tween::ExpoOut);
+        }
     }
 
     pub fn resize(&mut self, size: PhysicalSize<u32>) {

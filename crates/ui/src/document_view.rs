@@ -38,6 +38,10 @@ impl DocumentView {
         self.line_height
     }
 
+    pub fn rope(&self) -> &Rope {
+        &self.rope
+    }
+
     pub fn prepare(
         &mut self,
         context: &mut Context,
