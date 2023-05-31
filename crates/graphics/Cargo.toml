@@ -9,3 +9,7 @@ virus-common.workspace = true
 
 swash.workspace = true
 lru.workspace = true
+wgpu.workspace = true
+winit.workspace = true
+pollster.workspace = true
+bytemuck.workspace = true
