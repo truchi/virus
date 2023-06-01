@@ -110,6 +110,10 @@ impl<K: Eq + Hash> Atlas<K> {
 
     /// Clears the `Altas`.
     pub fn clear(&mut self) {
-        *self = Self::new(self.width);
+        self.data.clear();
+        self.positions.clear();
+        self.x = 0;
+        self.y = 0;
+        self.h = 0;
     }
 }
