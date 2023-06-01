@@ -1,20 +1,23 @@
 #![allow(unused)]
 
-use crate::text::Context;
-use std::num::NonZeroU32;
+pub mod atlas;
+
+use crate::{colors::Rgba, text::Context};
+use std::{collections::HashMap, hash::Hash, num::NonZeroU32};
 use swash::scale::image::{Content, Image};
 use wgpu::{
     include_wgsl,
     util::{BufferInitDescriptor, DeviceExt},
     vertex_attr_array, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingResource, BindingType, BlendState, Buffer, BufferAddress,
-    BufferUsages, ColorTargetState, ColorWrites, CommandEncoderDescriptor, Device, Extent3d, Face,
-    FragmentState, FrontFace, ImageCopyTexture, ImageDataLayout, Instance,
-    PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, Queue, RenderPassColorAttachment,
-    RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions,
-    SamplerBindingType, ShaderStages, Surface, SurfaceConfiguration, TextureDescriptor,
-    TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureViewDimension,
-    VertexAttribute, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
+    BufferUsages, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor, Device, Extent3d,
+    Face, FragmentState, FrontFace, ImageCopyTexture, ImageDataLayout, Instance, LoadOp,
+    Operations, PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, Queue,
+    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
+    RequestAdapterOptions, SamplerBindingType, ShaderStages, Surface, SurfaceConfiguration,
+    TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages,
+    TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexFormat, VertexState,
+    VertexStepMode,
 };
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
@@ -237,8 +240,8 @@ impl Wgpu {
                 color_attachments: &[Some(RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                    ops: Operations {
+                        load: LoadOp::Clear(Color {
                             r: 0.0,
                             g: 0.0,
                             b: 0.0,
@@ -292,4 +295,38 @@ impl Graphics {
     pub fn render(&mut self) {
         self.wgpu.render();
     }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                              Text...                                           //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct Vertex {
+    position: [f32; 3],
+    is_mask: bool,
+    texture: [f32; 2],
+    color: [f32; 4],
+}
+
+unsafe impl bytemuck::Zeroable for Vertex {}
+unsafe impl bytemuck::Pod for Vertex {}
+
+#[derive(Default, Debug)]
+pub struct TextPipelineData {
+    mask_texture: (),
+    color_texture: (),
+    vertex_buffer: Vec<Vertex>,
+    index_buffer: Vec<u16>,
+}
+
+impl TextPipelineData {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn insert(&mut self, [x, y, z]: [u32; 3], image: &Image, color: Rgba) {}
+
+    pub fn clear(&mut self) {}
 }
