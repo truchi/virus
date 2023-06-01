@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-pub mod atlas;
+mod atlas;
 
 use crate::{colors::Rgba, text::Context};
 use std::{collections::HashMap, hash::Hash, num::NonZeroU32};
