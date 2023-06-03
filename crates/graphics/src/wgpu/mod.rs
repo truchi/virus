@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-mod atlas;
+pub mod atlas;
 
 use self::atlas::Atlas;
 use crate::{
