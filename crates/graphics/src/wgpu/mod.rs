@@ -1,7 +1,6 @@
 #![allow(unused)]
 
-pub mod atlas;
-pub mod atlas3;
+mod atlas;
 
 use self::atlas::Atlas;
 use crate::{
@@ -490,8 +489,8 @@ impl TextPipeline {
 
         Self {
             pipeline: todo!(),
-            mask_texture: Atlas::new(Self::ATLAS_WIDTH),
-            color_texture: Atlas::new(Self::ATLAS_WIDTH),
+            mask_texture: todo!(),
+            color_texture: todo!(),
             vertex_buffer: Vec::new(),
             index_buffer: Vec::new(),
         }
@@ -546,15 +545,17 @@ impl TextPipeline {
             let (ty, texture) = match image.content {
                 Content::Mask => (
                     Vertex::MASK_GLYPH_TYPE,
-                    self.mask_texture
-                        .set(key, [width as usize, height as usize], &image.data)
-                        .unwrap(),
+                    // self.mask_texture
+                    //     .set(key, [width as usize, height as usize], &image.data)
+                    //     .unwrap(),
+                    todo!(),
                 ),
                 Content::Color => (
                     Vertex::COLOR_GLYPH_TYPE,
-                    self.mask_texture
-                        .set(key, [4 * width as usize, height as usize], &image.data)
-                        .unwrap(),
+                    // self.mask_texture
+                    //     .set(key, [4 * width as usize, height as usize], &image.data)
+                    //     .unwrap(),
+                    todo!(),
                 ),
                 Content::SubpixelMask => unreachable!(),
             };
@@ -564,7 +565,8 @@ impl TextPipeline {
                 [top, left],
                 [width, height],
                 depth,
-                [texture[0] as u32, texture[1] as u32],
+                // [texture[0] as u32, texture[1] as u32],
+                todo!(),
                 glyph.styles.foreground,
             ));
         }
