@@ -1,160 +1,267 @@
 #![allow(unused)]
 
-use std::collections::HashMap;
-
 use graphics::{
     colors::Rgba,
     text::{Context, Font, FontKey, FontStyle, FontWeight, Fonts, Line, Styles},
-    wgpu::atlas::{Atlas, Atlas2},
+    wgpu::atlas3::Atlas,
 };
 use image::{GrayImage, ImageFormat};
+use std::collections::{HashMap, HashSet};
 use swash::scale::image::Content;
 
 const OUTPUT_FOLDER: &str = "/home/romain/Desktop/atlas/";
 
 fn main() {
     const BACKGROUND: u8 = 127;
-    const WIDTH: usize = 3840 / 2;
-    const HEIGHT: usize = 2400 / 2;
+    const WIDTH: usize = 500;
+    const HEIGHT: usize = 500;
+    const ROW: usize = HEIGHT / 5;
 
     let text = include_str!("./atlas.rs");
-    let font_sizes = [20, 30, 40, 50];
     let (fonts, keys) = fonts();
 
-    let mut sizes = HashMap::new();
+    let mut items = HashMap::<_, [u32; 4]>::new();
     let mut texture = {
         let mut texture = Vec::<u8>::with_capacity(WIDTH * HEIGHT);
         texture.resize(WIDTH * HEIGHT, BACKGROUND);
         texture
     };
-    let mut atlas = Atlas2::new(WIDTH / 10, WIDTH, HEIGHT);
+    let mut atlas = Atlas::new(ROW as u32, WIDTH as u32, HEIGHT as u32);
     let mut context = Context::new(fonts);
 
-    dbg!(atlas.column());
-    dbg!(atlas.width());
-    dbg!(atlas.height());
+    let lines =
+        std::iter::repeat(text).flat_map(|text| text.lines().filter(|line| !line.is_empty()));
+    let keys = std::iter::repeat(&keys[..])
+        .flat_map(|keys| keys.into_iter().take(3))
+        .cloned();
+    let sizes = std::iter::repeat([50]).flat_map(|sizes| sizes);
 
-    let mut i = 0;
-    let mut key_index = 0;
-    let mut font_size_index = 0;
+    let lines = &mut lines.zip(keys.zip(sizes));
 
-    'outer: for line in text.lines().take(600) {
-        key_index += 1;
-        font_size_index += 1;
-        let font = keys[key_index % keys.len()];
-        let font_size = font_sizes[font_size_index % font_sizes.len()];
+    for f in 0..50 {
+        atlas.next_frame();
 
-        let mut shaper = Line::shaper(&mut context, font_size);
-        shaper.push(
-            line,
-            Styles {
-                font,
-                foreground: Default::default(),
-                background: Default::default(),
-                underline: false,
-                strike: false,
-            },
-        );
-        let line = shaper.line();
-        let mut scaler = line.scaler(&mut context);
+        for (l, (str, (font, size))) in lines.take(20).enumerate() {
+            let mut shaper = Line::shaper(&mut context, size);
+            shaper.push(
+                str,
+                Styles {
+                    font,
+                    foreground: Default::default(),
+                    background: Default::default(),
+                    underline: false,
+                    strike: false,
+                },
+            );
 
-        while let Some((_, glyph, image)) = scaler.next() {
-            if let Some(image) = image {
-                let [width, height] = [
-                    image.placement.width as usize,
-                    image.placement.height as usize,
-                ];
+            let line = shaper.line();
+            let mut scaler = line.scaler(&mut context);
 
-                if width == 0 || height == 0 || image.content != Content::Mask {
-                    continue;
-                }
+            while let Some((_, glyph, image)) = scaler.next() {
+                if let Some(image) = image {
+                    let [width, height] = [image.placement.width, image.placement.height];
 
-                let key = (font, glyph.id, font_size);
-
-                if atlas.get(&key).is_none() {
-                    let item = if let Some(item) = atlas.insert(key, [width, height]) {
-                        item
-                    } else {
-                        break 'outer;
-                    };
-
-                    sizes.insert(key, [width, height]);
-
-                    // let item = item.clone();
-                    // dbg!(&atlas.buckets);
-                    // dbg!(&item);
-
-                    if item.x() + width > WIDTH {
-                        panic!("!!!!!!!!!!!!!!!!!");
-                    } else if item.y() + height > HEIGHT {
-                        panic!("?????????????????");
+                    if image.content != Content::Mask || width == 0 || height == 0 {
+                        continue;
                     }
 
-                    continue;
+                    let key = (font, glyph.id, size);
+                    let was_there = atlas.get(&key).is_some();
+                    let before = atlas.keys().copied().collect::<HashSet<_>>();
 
-                    // Copy
-                    {
-                        let mut start = item.x() + item.y() * WIDTH;
+                    let [x, y] = if let Some(item) = atlas.insert(key, [width, height]) {
+                        item
+                    } else {
+                        panic!("CANNOT INSERT");
+                    };
 
-                        for row in image.data.chunks_exact(width) {
-                            texture[start..start + width].copy_from_slice(row);
+                    // Remove de-allocated
+                    let after = atlas.keys().copied().collect::<HashSet<_>>();
+                    let deallocateds = before.difference(&after);
+
+                    for deallocated in deallocateds {
+                        let [x, y, width, height] = items.remove(deallocated).unwrap();
+
+                        let mut start = x as usize + y as usize * WIDTH;
+
+                        for _ in 0..height {
+                            texture[start..start + width as usize].fill(BACKGROUND);
                             start += WIDTH;
                         }
                     }
 
-                    // Save
-                    {
-                        GrayImage::from_raw(WIDTH as u32, HEIGHT as u32, texture.clone())
-                            .unwrap()
-                            .save_with_format(
-                                format!("{OUTPUT_FOLDER}atlas-{i}.png"),
-                                ImageFormat::Png,
-                            )
-                            .unwrap();
-                        i += 1;
+                    // Copy
+                    if !was_there {
+                        let mut start = x as usize + y as usize * WIDTH;
+
+                        for row in image.data.chunks_exact(width as usize) {
+                            texture[start..start + width as usize].copy_from_slice(row);
+                            start += WIDTH;
+                        }
                     }
 
-                    // if i > 15 {
-                    // std::io::stdin().read_line(&mut String::new()).unwrap();
-                    // }
+                    // Insert in items
+                    items.insert(key, [x, y, width, height]);
                 }
-            }
-        }
-    }
-
-    return;
-
-    while let Some(first) = atlas.first().cloned() {
-        let [width, height] = sizes.get(&first).unwrap();
-        let item = atlas.remove(&first).unwrap();
-
-        continue;
-
-        // Copy
-        {
-            let mut start = item.x() + item.y() * WIDTH;
-
-            for _ in 0..*height {
-                texture[start..start + width].fill(BACKGROUND);
-                start += WIDTH;
             }
         }
 
         // Save
-        {
+        if true {
             GrayImage::from_raw(WIDTH as u32, HEIGHT as u32, texture.clone())
                 .unwrap()
                 .save_with_format(
-                    format!("{OUTPUT_FOLDER}atlas-remove-{i}.png"),
+                    format!("{OUTPUT_FOLDER}atlas-frame-{f}.png"), // -line-{l}
                     ImageFormat::Png,
                 )
                 .unwrap();
-            i += 1;
         }
     }
-
-    dbg!(atlas);
 }
+
+// fn main() {
+//     const BACKGROUND: u8 = 127;
+//     const WIDTH: usize = 3840 / 2;
+//     const HEIGHT: usize = 2400 / 2;
+
+//     let text = include_str!("./atlas.rs");
+//     let font_sizes = [20, 30, 40, 50];
+//     let (fonts, keys) = fonts();
+
+//     let mut sizes = HashMap::new();
+//     let mut texture = {
+//         let mut texture = Vec::<u8>::with_capacity(WIDTH * HEIGHT);
+//         texture.resize(WIDTH * HEIGHT, BACKGROUND);
+//         texture
+//     };
+//     let mut atlas = Atlas2::new(WIDTH / 10, WIDTH, HEIGHT);
+//     let mut context = Context::new(fonts);
+
+//     dbg!(atlas.column());
+//     dbg!(atlas.width());
+//     dbg!(atlas.height());
+
+//     let mut i = 0;
+//     let mut key_index = 0;
+//     let mut font_size_index = 0;
+
+//     'outer: for line in text.lines().take(600) {
+//         key_index += 1;
+//         font_size_index += 1;
+//         let font = keys[key_index % keys.len()];
+//         let font_size = font_sizes[font_size_index % font_sizes.len()];
+
+//         let mut shaper = Line::shaper(&mut context, font_size);
+//         shaper.push(
+//             line,
+//             Styles {
+//                 font,
+//                 foreground: Default::default(),
+//                 background: Default::default(),
+//                 underline: false,
+//                 strike: false,
+//             },
+//         );
+//         let line = shaper.line();
+//         let mut scaler = line.scaler(&mut context);
+
+//         while let Some((_, glyph, image)) = scaler.next() {
+//             if let Some(image) = image {
+//                 let [width, height] = [
+//                     image.placement.width as usize,
+//                     image.placement.height as usize,
+//                 ];
+
+//                 if width == 0 || height == 0 || image.content != Content::Mask {
+//                     continue;
+//                 }
+
+//                 let key = (font, glyph.id, font_size);
+
+//                 if atlas.get(&key).is_none() {
+//                     let item = if let Some(item) = atlas.insert(key, [width, height]) {
+//                         item
+//                     } else {
+//                         break 'outer;
+//                     };
+
+//                     sizes.insert(key, [width, height]);
+
+//                     // let item = item.clone();
+//                     // dbg!(&atlas.buckets);
+//                     // dbg!(&item);
+
+//                     if item.x() + width > WIDTH {
+//                         panic!("!!!!!!!!!!!!!!!!!");
+//                     } else if item.y() + height > HEIGHT {
+//                         panic!("?????????????????");
+//                     }
+
+//                     continue;
+
+//                     // Copy
+//                     {
+//                         let mut start = item.x() + item.y() * WIDTH;
+
+//                         for row in image.data.chunks_exact(width) {
+//                             texture[start..start + width].copy_from_slice(row);
+//                             start += WIDTH;
+//                         }
+//                     }
+
+//                     // Save
+//                     {
+//                         GrayImage::from_raw(WIDTH as u32, HEIGHT as u32, texture.clone())
+//                             .unwrap()
+//                             .save_with_format(
+//                                 format!("{OUTPUT_FOLDER}atlas-{i}.png"),
+//                                 ImageFormat::Png,
+//                             )
+//                             .unwrap();
+//                         i += 1;
+//                     }
+
+//                     // if i > 15 {
+//                     // std::io::stdin().read_line(&mut String::new()).unwrap();
+//                     // }
+//                 }
+//             }
+//         }
+//     }
+
+//     return;
+
+//     while let Some(first) = atlas.first().cloned() {
+//         let [width, height] = sizes.get(&first).unwrap();
+//         let item = atlas.remove(&first).unwrap();
+
+//         continue;
+
+//         // Copy
+//         {
+//             let mut start = item.x() + item.y() * WIDTH;
+
+//             for _ in 0..*height {
+//                 texture[start..start + width].fill(BACKGROUND);
+//                 start += WIDTH;
+//             }
+//         }
+
+//         // Save
+//         {
+//             GrayImage::from_raw(WIDTH as u32, HEIGHT as u32, texture.clone())
+//                 .unwrap()
+//                 .save_with_format(
+//                     format!("{OUTPUT_FOLDER}atlas-remove-{i}.png"),
+//                     ImageFormat::Png,
+//                 )
+//                 .unwrap();
+//             i += 1;
+//         }
+//     }
+
+//     dbg!(atlas);
+// }
 
 fn fonts() -> (Fonts, Vec<FontKey>) {
     use FontStyle::*;
