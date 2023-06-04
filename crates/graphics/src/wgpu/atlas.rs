@@ -109,14 +109,14 @@ impl<K: Eq + Hash> Atlas<K> {
         }
     }
 
-    /// Inserts an item for `key` with `[width, height]` and returns its position in the atlas,
-    /// or `None` if allocation fails.
+    /// Inserts an item for `key` with `[width, height]`
+    /// and returns its position in the atlas and a `is_new` flag, or `None` if allocation fails.
     ///
     /// Re-uses the position if `key` is already present.
     /// De-allocates oldest items automatically, when needed.
     ///
     /// If allocation fails, call [`Atlas::clear()`] before the next frame, or try a larger atlas.
-    pub fn insert(&mut self, mut key: K, [width, height]: [u32; 2]) -> Option<[u32; 2]> {
+    pub fn insert(&mut self, mut key: K, [width, height]: [u32; 2]) -> Option<([u32; 2], bool)> {
         // Check dimensions
         if width > self.width || height > self.row {
             return None;
@@ -127,13 +127,13 @@ impl<K: Eq + Hash> Atlas<K> {
             // Update bucket's frame
             self.buckets[item.bucket as usize].frame = self.frame;
 
-            return Some([item.x, item.y]);
+            return Some(([item.x, item.y], false));
         }
 
         // Insert or deallocate oldest bucket and retry (or fail)
         loop {
             match self.try_insert(key, [width, height]) {
-                Ok(item) => return Some([item.x, item.y]),
+                Ok(item) => return Some(([item.x, item.y], true)),
                 Err(k) => {
                     self.try_deallocate()?;
                     key = k;

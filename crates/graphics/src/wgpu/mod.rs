@@ -476,7 +476,7 @@ impl TextPipeline {
             let width = image.placement.width;
             let height = image.placement.height;
 
-            let (ty, [x, y], texture, channels) = match image.content {
+            let (ty, ([x, y], is_new), texture, channels) = match image.content {
                 Content::Mask => (
                     Vertex::MASK_GLYPH_TYPE,
                     self.mask_atlas.insert(key, [width, height]).unwrap(),
@@ -492,25 +492,27 @@ impl TextPipeline {
                 Content::SubpixelMask => unreachable!(),
             };
 
-            queue.write_texture(
-                ImageCopyTexture {
-                    texture,
-                    mip_level: 0,
-                    origin: Origin3d { x, y, z: 0 },
-                    aspect: TextureAspect::All,
-                },
-                &image.data,
-                ImageDataLayout {
-                    offset: 0,
-                    bytes_per_row: Some(width * channels),
-                    rows_per_image: Some(height),
-                },
-                Extent3d {
-                    width,
-                    height,
-                    depth_or_array_layers: 1,
-                },
-            );
+            if is_new {
+                queue.write_texture(
+                    ImageCopyTexture {
+                        texture,
+                        mip_level: 0,
+                        origin: Origin3d { x, y, z: 0 },
+                        aspect: TextureAspect::All,
+                    },
+                    &image.data,
+                    ImageDataLayout {
+                        offset: 0,
+                        bytes_per_row: Some(width * channels),
+                        rows_per_image: Some(height),
+                    },
+                    Extent3d {
+                        width,
+                        height,
+                        depth_or_array_layers: 1,
+                    },
+                );
+            }
 
             self.insert_quad(Vertex::quad(
                 ty,

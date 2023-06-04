@@ -83,6 +83,10 @@ pub fn main() {
             state.window().request_redraw();
         }
         Event::RedrawRequested(window_id) if window_id == state.window().id() => {
+            if start.elapsed().as_secs() > 10 {
+                std::process::exit(0);
+            }
+
             let now = Instant::now();
 
             if now - last_redraw > FRAME {
@@ -115,10 +119,8 @@ pub fn main() {
                 }
 
                 state.update();
-                dbg!(now.elapsed());
-                let now2 = Instant::now();
                 state.render();
-                dbg!(now2.elapsed());
+                dbg!(now.elapsed());
             }
         }
         _ => {}
