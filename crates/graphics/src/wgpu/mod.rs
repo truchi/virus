@@ -422,8 +422,8 @@ impl TextPipeline {
             color_atlas,
             mask_texture,
             color_texture,
-            vertices: Vec::new(),
-            indices: Vec::new(),
+            vertices: Vec::with_capacity(1_024),
+            indices: Vec::with_capacity(1_024),
             vertex_buffer,
             index_buffer,
         }
@@ -550,27 +550,23 @@ impl TextPipeline {
     }
 
     fn insert_quad(&mut self, [top_left, top_right, bottom_left, bottom_right]: [Vertex; 4]) {
-        self.vertices.reserve(4);
-        self.indices.reserve(6);
-
         let i = self.vertices.len() as u32;
 
-        self.vertices.push(top_left);
-        self.vertices.push(top_right);
-        self.vertices.push(bottom_left);
-        self.vertices.push(bottom_right);
+        self.vertices
+            .extend_from_slice(&[top_left, top_right, bottom_left, bottom_right]);
 
         let top_left = i;
         let top_right = i + 1;
         let bottom_left = i + 2;
         let bottom_right = i + 3;
 
-        self.indices.push(top_left);
-        self.indices.push(bottom_right);
-        self.indices.push(top_right);
-
-        self.indices.push(top_left);
-        self.indices.push(bottom_left);
-        self.indices.push(bottom_right);
+        self.indices.extend_from_slice(&[
+            top_left,
+            bottom_right,
+            top_right,
+            top_left,
+            bottom_left,
+            bottom_right,
+        ]);
     }
 }

@@ -29,6 +29,7 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
+// Is it maxed at 60fps?
 const FRAME: Duration = Duration::from_millis(1);
 
 // =================================================================================================
@@ -51,6 +52,30 @@ pub fn main() {
     let mut state = Graphics::new(window);
     let mut start = Instant::now();
     let mut last_redraw = Instant::now();
+
+    let font_size = 100;
+    let line_height = (font_size as f32 * 1.25).floor() as u32;
+    let lines = {
+        let mut lines = vec![];
+
+        for (i, line) in include_str!("./wgpu.rs").lines().enumerate() {
+            let mut shaper = Line::shaper(&mut context, font_size);
+            shaper.push(
+                line,
+                Styles {
+                    font,
+                    foreground: Rgba::new(255, 255, 0, 255),
+                    background: Rgba::new(0, 255, 0, 255),
+                    underline: false,
+                    strike: false,
+                },
+            );
+
+            lines.push(shaper.line());
+        }
+
+        lines
+    };
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
@@ -83,7 +108,7 @@ pub fn main() {
             state.window().request_redraw();
         }
         Event::RedrawRequested(window_id) if window_id == state.window().id() => {
-            if start.elapsed().as_secs() > 10 {
+            if start.elapsed().as_secs() > 3 {
                 std::process::exit(0);
             }
 
@@ -92,35 +117,22 @@ pub fn main() {
             if now - last_redraw > FRAME {
                 last_redraw = now;
 
-                let font_size = 100;
-                let line_height = (font_size as f32 * 1.25).floor() as u32;
+                let scroll = start.elapsed().as_millis() as i32;
+                let scroll = 0;
 
-                for (i, line) in include_str!("./wgpu.rs").lines().enumerate() {
-                    let mut shaper = Line::shaper(&mut context, font_size);
-                    shaper.push(
-                        line,
-                        Styles {
-                            font,
-                            foreground: Rgba::new(255, 255, 0, 255),
-                            background: Rgba::new(0, 255, 0, 255),
-                            underline: false,
-                            strike: false,
-                        },
-                    );
-                    let line = shaper.line();
+                for (i, line) in lines.iter().enumerate() {
                     state.add_line(
                         &mut context,
-                        i as i32 * line_height as i32 - start.elapsed().as_millis() as i32,
+                        i as i32 * line_height as i32 - scroll,
                         0,
                         0,
-                        &line,
+                        line,
                         line_height,
                     );
                 }
 
                 state.update();
                 state.render();
-                dbg!(now.elapsed());
             }
         }
         _ => {}
