@@ -11,17 +11,18 @@ use swash::{scale::image::Content, GlyphId};
 use wgpu::{
     include_wgsl,
     util::{BufferInitDescriptor, DeviceExt},
-    vertex_attr_array, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
-    BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, BlendState,
-    Buffer, BufferAddress, BufferUsages, Color, ColorTargetState, ColorWrites,
-    CommandEncoderDescriptor, Device, Extent3d, Face, FragmentState, FrontFace, ImageCopyTexture,
-    ImageDataLayout, Instance, LoadOp, Operations, Origin3d, PipelineLayout,
-    PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, Queue, RenderPass,
-    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
-    RequestAdapterOptions, SamplerBindingType, ShaderModule, ShaderModuleDescriptor, ShaderStages,
-    Surface, SurfaceConfiguration, Texture, TextureAspect, TextureDescriptor, TextureDimension,
-    TextureFormat, TextureSampleType, TextureUsages, TextureViewDimension, VertexAttribute,
-    VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
+    vertex_attr_array, AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry,
+    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
+    BlendState, Buffer, BufferAddress, BufferDescriptor, BufferUsages, Color, ColorTargetState,
+    ColorWrites, CommandEncoderDescriptor, Device, Extent3d, Face, FilterMode, FragmentState,
+    FrontFace, ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, LoadOp, Operations,
+    Origin3d, PipelineLayout, PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, Queue,
+    RenderPass, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
+    RenderPipelineDescriptor, RequestAdapterOptions, SamplerBindingType, SamplerDescriptor,
+    ShaderModule, ShaderModuleDescriptor, ShaderStages, Surface, SurfaceConfiguration, Texture,
+    TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType,
+    TextureUsages, TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexFormat,
+    VertexState, VertexStepMode,
 };
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
@@ -157,7 +158,7 @@ impl Graphics {
                     resolve_target: None,
                     ops: Operations {
                         load: LoadOp::Clear(Color {
-                            r: 0.0,
+                            r: 1.0,
                             g: 0.0,
                             b: 0.0,
                             a: 1.0,
@@ -167,7 +168,8 @@ impl Graphics {
                 })],
                 depth_stencil_attachment: None,
             });
-            self.text_pipeline.render(&mut render_pass);
+            self.text_pipeline
+                .render(&self.wgpu.queue, &mut render_pass);
         }
 
         self.wgpu.queue.submit([encoder.finish()]);
@@ -191,7 +193,7 @@ pub struct Vertex {
     /// Texture coordinates.
     texture: [u32; 2],
     /// Rgba color.
-    color: [u8; 4],
+    color: [u32; 4],
 }
 
 unsafe impl bytemuck::Zeroable for Vertex {}
@@ -201,24 +203,14 @@ impl Vertex {
     pub const BACKGROUND_RECTANGLE_TYPE: u32 = 0;
     pub const MASK_GLYPH_TYPE: u32 = 1;
     pub const COLOR_GLYPH_TYPE: u32 = 2;
+    pub const ATTRIBUTES: [VertexAttribute; 4] =
+        vertex_attr_array![0 => Uint32, 1 => Sint32x3, 2 => Uint32x2, 3 => Uint32x4];
 
-    // TODO
     pub fn vertex_buffer_layout() -> VertexBufferLayout<'static> {
         VertexBufferLayout {
             array_stride: std::mem::size_of::<Vertex>() as BufferAddress,
             step_mode: VertexStepMode::Vertex,
-            attributes: &[
-                VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: VertexFormat::Float32x3,
-                },
-                VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>() as BufferAddress,
-                    shader_location: 1,
-                    format: VertexFormat::Float32x3,
-                },
-            ],
+            attributes: &Self::ATTRIBUTES,
         }
     }
 
@@ -227,7 +219,12 @@ impl Vertex {
             ty,
             position,
             texture,
-            color: [color.r, color.g, color.b, color.a],
+            color: [
+                color.r as u32,
+                color.g as u32,
+                color.b as u32,
+                color.a as u32,
+            ],
         }
     }
 
@@ -236,17 +233,19 @@ impl Vertex {
         [top, left]: [i32; 2],
         [width, height]: [u32; 2],
         depth: i32,
-        texture: [u32; 2],
+        [x, y]: [u32; 2],
         color: Rgba,
     ) -> [Self; 4] {
         let right = left + width as i32;
         let bottom = top + height as i32;
+        let x2 = x + width;
+        let y2 = y + height;
 
         [
-            Vertex::new(ty, [top, left, depth], texture, color),
-            Vertex::new(ty, [top, right, depth], texture, color),
-            Vertex::new(ty, [bottom, left, depth], texture, color),
-            Vertex::new(ty, [bottom, right, depth], texture, color),
+            Vertex::new(ty, [left, top, depth], [x, y], color),
+            Vertex::new(ty, [right, top, depth], [x2, y], color),
+            Vertex::new(ty, [left, bottom, depth], [x, y2], color),
+            Vertex::new(ty, [right, bottom, depth], [x2, y2], color),
         ]
     }
 }
@@ -262,18 +261,21 @@ pub struct TextPipeline {
     vertices: Vec<Vertex>,
     indices: Vec<u32>,
     vertex_buffer: Buffer,
+    index_buffer: Buffer,
 }
 
 impl TextPipeline {
+    pub const ALTAS_ROW_HEIGHT: u32 = 200;
+
     pub fn new(device: &Device, format: TextureFormat) -> Self {
         let limits = device.limits();
         let [width, height] = [
-            limits.max_texture_dimension_2d / 10,
-            limits.max_texture_dimension_2d / 10,
+            limits.max_texture_dimension_2d,
+            limits.max_texture_dimension_2d,
         ];
 
-        let mut mask_atlas = Atlas::new(100, width, height);
-        let mut color_atlas = Atlas::new(100, width, height);
+        let mut mask_atlas = Atlas::new(Self::ALTAS_ROW_HEIGHT, width, height);
+        let mut color_atlas = Atlas::new(Self::ALTAS_ROW_HEIGHT, width, height);
         mask_atlas.next_frame();
         color_atlas.next_frame();
 
@@ -303,7 +305,7 @@ impl TextPipeline {
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("[TextPipeline] texture bind group layout"),
             entries: &[
-                // Texture
+                // Mask texture
                 BindGroupLayoutEntry {
                     binding: 0,
                     visibility: ShaderStages::FRAGMENT,
@@ -314,9 +316,20 @@ impl TextPipeline {
                     },
                     count: None,
                 },
-                // Sampler
+                // Color texture
                 BindGroupLayoutEntry {
                     binding: 1,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: TextureViewDimension::D2,
+                        sample_type: TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                // Sampler
+                BindGroupLayoutEntry {
+                    binding: 2,
                     visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Sampler(SamplerBindingType::Filtering),
                     count: None,
@@ -327,17 +340,35 @@ impl TextPipeline {
             label: Some("Texture bind group"),
             layout: &bind_group_layout,
             entries: &[
-                // Texture
+                // Mask texture
                 BindGroupEntry {
                     binding: 0,
                     resource: BindingResource::TextureView(
                         &mask_texture.create_view(&Default::default()),
                     ),
                 },
-                // Sampler
+                // Color texture
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Sampler(&device.create_sampler(&Default::default())),
+                    resource: BindingResource::TextureView(
+                        &color_texture.create_view(&Default::default()),
+                    ),
+                },
+                // Sampler
+                BindGroupEntry {
+                    binding: 2,
+                    // resource: BindingResource::Sampler(&device.create_sampler(&Default::default())),
+                    resource: BindingResource::Sampler(&device.create_sampler(
+                        &SamplerDescriptor {
+                            label: Some("[TextPipeline] Sampler"),
+                            min_filter: FilterMode::Nearest,
+                            mag_filter: FilterMode::Nearest,
+                            mipmap_filter: FilterMode::Nearest,
+                            lod_min_clamp: 0f32,
+                            lod_max_clamp: 0f32,
+                            ..Default::default()
+                        },
+                    )),
                 },
             ],
         });
@@ -354,16 +385,16 @@ impl TextPipeline {
             vertex: VertexState {
                 module: &shader_module,
                 entry_point: "vertex",
-                buffers: &[VertexBufferLayout {
-                    array_stride: 5 * std::mem::size_of::<f32>() as wgpu::BufferAddress,
-                    step_mode: VertexStepMode::Vertex,
-                    attributes: &vertex_attr_array![0 => Float32x3, 1 => Float32x2],
-                }],
+                buffers: &[Vertex::vertex_buffer_layout()],
             },
             fragment: Some(FragmentState {
                 module: &shader_module,
                 entry_point: "fragment",
-                targets: &[Some(format.into())],
+                targets: &[Some(ColorTargetState {
+                    format,
+                    blend: Some(BlendState::ALPHA_BLENDING),
+                    write_mask: ColorWrites::ALL,
+                })],
             }),
             primitive: Default::default(),
             depth_stencil: None,
@@ -371,33 +402,17 @@ impl TextPipeline {
             multiview: None,
         });
 
-        const VERTICES: &[f32] = &[
-            /* FIRST TRIANGLE */
-            /* Top left */
-            -1.0, 1.0, 0.0, // position
-            0.0, 0.0, // texture coordinates
-            /* Top right */
-            1.0, 1.0, 0.0, // position
-            1.0, 0.0, // texture coordinates
-            /* Bottom right */
-            1.0, -1.0, 0.0, // position
-            1.0, 1.0, // texture coordinates
-            /* SECOND TRIANGLE */
-            /* Top left */
-            -1.0, 1.0, 0.0, // position
-            0.0, 0.0, // texture coordinates
-            /* Bottom right */
-            1.0, -1.0, 0.0, // position
-            1.0, 1.0, // texture coordinates
-            /* Bottom left */
-            -1.0, -1.0, 0.0, // position
-            0.0, 1.0, // texture coordinates
-        ];
-
-        let vertex_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("Vertex buffer"),
-            contents: bytemuck::cast_slice(VERTICES),
-            usage: BufferUsages::VERTEX,
+        let vertex_buffer = device.create_buffer(&BufferDescriptor {
+            label: Some("[TextPipeline] Vertex buffer"),
+            size: limits.max_buffer_size,
+            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let index_buffer = device.create_buffer(&BufferDescriptor {
+            label: Some("[TextPipeline] Index buffer"),
+            size: limits.max_buffer_size,
+            usage: BufferUsages::INDEX | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
         });
 
         Self {
@@ -410,6 +425,7 @@ impl TextPipeline {
             vertices: Vec::new(),
             indices: Vec::new(),
             vertex_buffer,
+            index_buffer,
         }
     }
 
@@ -507,11 +523,20 @@ impl TextPipeline {
         }
     }
 
-    pub fn render<'pass>(&'pass mut self, render_pass: &mut RenderPass<'pass>) {
+    pub fn render<'pass>(&'pass mut self, queue: &Queue, render_pass: &mut RenderPass<'pass>) {
+        queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
+        queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&self.indices));
+
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.draw(0..6, 0..1);
+        render_pass.set_index_buffer(self.index_buffer.slice(..), IndexFormat::Uint32);
+        render_pass.draw_indexed(0..self.indices.len() as u32, 0, 0..1);
+
+        self.mask_atlas.next_frame();
+        self.color_atlas.next_frame();
+        self.vertices.clear();
+        self.indices.clear();
     }
 
     // TODO remove?

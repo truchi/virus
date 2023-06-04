@@ -1,3 +1,5 @@
+//! 😍
+
 #![allow(unused)]
 
 use graphics::{
@@ -27,7 +29,7 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-const FRAME: Duration = Duration::from_millis(200);
+const FRAME: Duration = Duration::from_millis(1);
 
 // =================================================================================================
 
@@ -45,20 +47,9 @@ pub fn main() {
         ))
         .unwrap()
         .key();
-    let mut shaper = Line::shaper(&mut context, 40);
-    shaper.push(
-        "fn main() -> Result<(), ()> {}",
-        Styles {
-            font,
-            foreground: Rgba::new(255, 0, 0, 255),
-            background: Rgba::new(0, 255, 0, 255),
-            underline: false,
-            strike: false,
-        },
-    );
-    let line = shaper.line();
 
     let mut state = Graphics::new(window);
+    let mut start = Instant::now();
     let mut last_redraw = Instant::now();
 
     event_loop.run(move |event, _, control_flow| match event {
@@ -97,9 +88,37 @@ pub fn main() {
             if now - last_redraw > FRAME {
                 last_redraw = now;
 
+                let font_size = 100;
+                let line_height = (font_size as f32 * 1.25).floor() as u32;
+
+                for (i, line) in include_str!("./wgpu.rs").lines().enumerate() {
+                    let mut shaper = Line::shaper(&mut context, font_size);
+                    shaper.push(
+                        line,
+                        Styles {
+                            font,
+                            foreground: Rgba::new(255, 255, 0, 255),
+                            background: Rgba::new(0, 255, 0, 255),
+                            underline: false,
+                            strike: false,
+                        },
+                    );
+                    let line = shaper.line();
+                    state.add_line(
+                        &mut context,
+                        i as i32 * line_height as i32 - start.elapsed().as_millis() as i32,
+                        0,
+                        0,
+                        &line,
+                        line_height,
+                    );
+                }
+
                 state.update();
-                state.add_line(&mut context, 0, 0, 0, &line, 50);
+                dbg!(now.elapsed());
+                let now2 = Instant::now();
                 state.render();
+                dbg!(now2.elapsed());
             }
         }
         _ => {}
