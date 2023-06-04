@@ -47,7 +47,7 @@ pub fn main() {
         .key();
     let mut shaper = Line::shaper(&mut context, 40);
     shaper.push(
-        "a",
+        "fn main() -> Result<(), ()> {}",
         Styles {
             font,
             foreground: Rgba::new(255, 0, 0, 255),
@@ -57,10 +57,8 @@ pub fn main() {
         },
     );
     let line = shaper.line();
-    let mut scaler = line.scaler(&mut context);
-    let image = scaler.next().unwrap().2.unwrap();
 
-    let mut state = Graphics::new(window, image);
+    let mut state = Graphics::new(window);
     let mut last_redraw = Instant::now();
 
     event_loop.run(move |event, _, control_flow| match event {
@@ -100,6 +98,7 @@ pub fn main() {
                 last_redraw = now;
 
                 state.update();
+                state.add_line(&mut context, 0, 0, 0, &line, 50);
                 state.render();
             }
         }
