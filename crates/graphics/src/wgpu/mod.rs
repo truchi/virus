@@ -387,9 +387,11 @@ impl TextVertex {
     }
 }
 
+type TextPipelineSizes = [[u32; 2]; 2];
+
 #[derive(Debug)]
 pub struct TextPipeline {
-    sizes: [u32; 4],
+    sizes: TextPipelineSizes,
     vertices: Vec<TextVertex>,
     indices: Vec<u32>,
     size_uniform: Buffer,
@@ -419,7 +421,7 @@ impl TextPipeline {
 
         let size_uniform = device.create_buffer(&BufferDescriptor {
             label: Some("[TextPipeline] Size uniform"),
-            size: std::mem::size_of::<[u32; 4]>() as BufferAddress,
+            size: std::mem::size_of::<TextPipelineSizes>() as BufferAddress,
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -582,7 +584,7 @@ impl TextPipeline {
         });
 
         Self {
-            sizes: [config.width, config.height, width, height],
+            sizes: [[config.width, config.height], [width, height]],
             vertices: Vec::with_capacity(1_024),
             indices: Vec::with_capacity(1_024),
             size_uniform,
@@ -598,8 +600,7 @@ impl TextPipeline {
     }
 
     pub fn resize(&mut self, size: PhysicalSize<u32>) {
-        self.sizes[0] = size.width;
-        self.sizes[1] = size.height;
+        self.sizes[0] = [size.width, size.height];
     }
 
     pub fn insert(
@@ -774,8 +775,10 @@ impl LineVertex {
     }
 }
 
+type LinePipelineSizes = [[u32; 2]; 1];
+
 pub struct LinePipeline {
-    sizes: [u32; 2],
+    sizes: LinePipelineSizes,
     vertices: Vec<LineVertex>,
     size_uniform: Buffer,
     vertex_buffer: Buffer,
@@ -793,7 +796,7 @@ impl LinePipeline {
 
         let size_uniform = device.create_buffer(&BufferDescriptor {
             label: Some("[LinePipeline] Size uniform"),
-            size: std::mem::size_of::<[u32; 2]>() as BufferAddress,
+            size: std::mem::size_of::<LinePipelineSizes>() as BufferAddress,
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -878,7 +881,7 @@ impl LinePipeline {
         });
 
         Self {
-            sizes: [config.width, config.height],
+            sizes: [[config.width, config.height]],
             vertices: Vec::with_capacity(1_024),
             size_uniform,
             vertex_buffer,
@@ -888,24 +891,23 @@ impl LinePipeline {
     }
 
     pub fn resize(&mut self, size: PhysicalSize<u32>) {
-        self.sizes = [size.width, size.height];
+        self.sizes[0] = [size.width, size.height];
     }
 
     pub fn polyline<T: IntoIterator<Item = ([i32; 2], Rgba)>>(&mut self, points: T) {
-        let polyline = || {
-            let mut points = points.into_iter();
-            let mut prev = points.next()?;
-
-            for curr in points {
-                self.vertices.push(LineVertex::new(prev.0, prev.1));
-                self.vertices.push(LineVertex::new(curr.0, curr.1));
-                prev = curr;
-            }
-
-            Option::<()>::None
+        let mut points = points.into_iter();
+        let mut prev = if let Some(prev) = points.next() {
+            prev
+        } else {
+            debug_assert!(false);
+            return;
         };
 
-        polyline();
+        for curr in points {
+            self.vertices.push(LineVertex::new(prev.0, prev.1));
+            self.vertices.push(LineVertex::new(curr.0, curr.1));
+            prev = curr;
+        }
     }
 
     pub fn render<'pass>(&'pass mut self, queue: &Queue, render_pass: &mut RenderPass<'pass>) {
