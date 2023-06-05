@@ -14,16 +14,16 @@ use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     vertex_attr_array, AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry,
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
-    BlendState, Buffer, BufferAddress, BufferDescriptor, BufferUsages, Color, ColorTargetState,
-    ColorWrites, CommandEncoderDescriptor, Device, Extent3d, Face, FilterMode, FragmentState,
-    FrontFace, ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, LoadOp, Operations,
-    Origin3d, PipelineLayout, PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, Queue,
-    RenderPass, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
-    RenderPipelineDescriptor, RequestAdapterOptions, SamplerBindingType, SamplerDescriptor,
-    ShaderModule, ShaderModuleDescriptor, ShaderStages, Surface, SurfaceConfiguration, Texture,
-    TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType,
-    TextureUsages, TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexFormat,
-    VertexState, VertexStepMode,
+    BlendState, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, Color,
+    ColorTargetState, ColorWrites, CommandEncoderDescriptor, Device, Extent3d, Face, FilterMode,
+    FragmentState, FrontFace, ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, LoadOp,
+    Operations, Origin3d, PipelineLayout, PipelineLayoutDescriptor, PrimitiveState,
+    PrimitiveTopology, Queue, RenderPass, RenderPassColorAttachment, RenderPassDescriptor,
+    RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions, SamplerBindingType,
+    SamplerDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, Surface,
+    SurfaceConfiguration, Texture, TextureAspect, TextureDescriptor, TextureDimension,
+    TextureFormat, TextureSampleType, TextureUsages, TextureViewDimension, VertexAttribute,
+    VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
 };
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
@@ -100,8 +100,8 @@ pub struct Graphics {
 impl Graphics {
     pub fn new(window: Window) -> Self {
         let wgpu = Wgpu::new(window);
-        let text_pipeline = TextPipeline::new(&wgpu.device, wgpu.config.format);
-        let line_pipeline = LinePipeline::new(&wgpu.device, wgpu.config.format);
+        let text_pipeline = TextPipeline::new(&wgpu.device, &wgpu.config);
+        let line_pipeline = LinePipeline::new(&wgpu.device, &wgpu.config);
 
         Self {
             wgpu,
@@ -115,7 +115,9 @@ impl Graphics {
     }
 
     pub fn resize(&mut self, size: PhysicalSize<u32>) {
-        self.wgpu.resize(size)
+        self.wgpu.resize(size);
+        self.text_pipeline.resize(size);
+        self.line_pipeline.resize(size);
     }
 
     pub fn input(&mut self, _event: &WindowEvent) -> bool {
@@ -387,27 +389,56 @@ impl TextVertex {
 
 #[derive(Debug)]
 pub struct TextPipeline {
-    bind_group: BindGroup,
-    pipeline: RenderPipeline,
+    sizes: [u32; 4],
+    vertices: Vec<TextVertex>,
+    indices: Vec<u32>,
+    size_uniform: Buffer,
+    vertex_buffer: Buffer,
+    index_buffer: Buffer,
     mask_atlas: Atlas<(FontKey, GlyphId, FontSize)>,
     color_atlas: Atlas<(FontKey, GlyphId, FontSize)>,
     mask_texture: Texture,
     color_texture: Texture,
-    vertices: Vec<TextVertex>,
-    indices: Vec<u32>,
-    vertex_buffer: Buffer,
-    index_buffer: Buffer,
+    bind_group: BindGroup,
+    pipeline: RenderPipeline,
 }
 
 impl TextPipeline {
     pub const ALTAS_ROW_HEIGHT: u32 = 200;
 
-    pub fn new(device: &Device, format: TextureFormat) -> Self {
+    pub fn new(device: &Device, config: &SurfaceConfiguration) -> Self {
         let limits = device.limits();
         let [width, height] = [
             limits.max_texture_dimension_2d,
             limits.max_texture_dimension_2d,
         ];
+
+        //
+        // Buffers
+        //
+
+        let size_uniform = device.create_buffer(&BufferDescriptor {
+            label: Some("[TextPipeline] Size uniform"),
+            size: std::mem::size_of::<[u32; 4]>() as BufferAddress,
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let vertex_buffer = device.create_buffer(&BufferDescriptor {
+            label: Some("[TextPipeline] Vertex buffer"),
+            size: limits.max_buffer_size,
+            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let index_buffer = device.create_buffer(&BufferDescriptor {
+            label: Some("[TextPipeline] Index buffer"),
+            size: limits.max_buffer_size,
+            usage: BufferUsages::INDEX | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        //
+        // Atlases and textures
+        //
 
         let mut mask_atlas = Atlas::new(Self::ALTAS_ROW_HEIGHT, width, height);
         let mut color_atlas = Atlas::new(Self::ALTAS_ROW_HEIGHT, width, height);
@@ -437,21 +468,25 @@ impl TextPipeline {
             TextureFormat::Rgba8Unorm,
         ));
 
+        //
+        // Bind group
+        //
+
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("[TextPipeline] Texture bind group layout"),
             entries: &[
-                // Mask texture
+                // Size uniform
                 BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: TextureViewDimension::D2,
-                        sample_type: TextureSampleType::Float { filterable: true },
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
                     },
                     count: None,
                 },
-                // Color texture
+                // Mask texture
                 BindGroupLayoutEntry {
                     binding: 1,
                     visibility: ShaderStages::FRAGMENT,
@@ -462,9 +497,20 @@ impl TextPipeline {
                     },
                     count: None,
                 },
-                // Sampler
+                // Color texture
                 BindGroupLayoutEntry {
                     binding: 2,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: TextureViewDimension::D2,
+                        sample_type: TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                // Sampler
+                BindGroupLayoutEntry {
+                    binding: 3,
                     visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Sampler(SamplerBindingType::Filtering),
                     count: None,
@@ -475,38 +521,36 @@ impl TextPipeline {
             label: Some("[TextPipeline] Texture bind group"),
             layout: &bind_group_layout,
             entries: &[
-                // Mask texture
+                // Size uniform
                 BindGroupEntry {
                     binding: 0,
+                    resource: size_uniform.as_entire_binding(),
+                },
+                // Mask texture
+                BindGroupEntry {
+                    binding: 1,
                     resource: BindingResource::TextureView(
                         &mask_texture.create_view(&Default::default()),
                     ),
                 },
                 // Color texture
                 BindGroupEntry {
-                    binding: 1,
+                    binding: 2,
                     resource: BindingResource::TextureView(
                         &color_texture.create_view(&Default::default()),
                     ),
                 },
                 // Sampler
                 BindGroupEntry {
-                    binding: 2,
-                    // resource: BindingResource::Sampler(&device.create_sampler(&Default::default())),
-                    resource: BindingResource::Sampler(&device.create_sampler(
-                        &SamplerDescriptor {
-                            label: Some("[TextPipeline] Sampler"),
-                            min_filter: FilterMode::Nearest,
-                            mag_filter: FilterMode::Nearest,
-                            mipmap_filter: FilterMode::Nearest,
-                            lod_min_clamp: 0f32,
-                            lod_max_clamp: 0f32,
-                            ..Default::default()
-                        },
-                    )),
+                    binding: 3,
+                    resource: BindingResource::Sampler(&device.create_sampler(&Default::default())),
                 },
             ],
         });
+
+        //
+        // Pipeline
+        //
 
         let shader_module = device.create_shader_module(include_wgsl!("text.wgsl"));
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -526,7 +570,7 @@ impl TextPipeline {
                 module: &shader_module,
                 entry_point: "fragment",
                 targets: &[Some(ColorTargetState {
-                    format,
+                    format: config.format,
                     blend: Some(BlendState::ALPHA_BLENDING),
                     write_mask: ColorWrites::ALL,
                 })],
@@ -537,31 +581,25 @@ impl TextPipeline {
             multiview: None,
         });
 
-        let vertex_buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("[TextPipeline] Vertex buffer"),
-            size: limits.max_buffer_size,
-            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let index_buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("[TextPipeline] Index buffer"),
-            size: limits.max_buffer_size,
-            usage: BufferUsages::INDEX | BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
         Self {
-            bind_group,
-            pipeline,
+            sizes: [config.width, config.height, width, height],
+            vertices: Vec::with_capacity(1_024),
+            indices: Vec::with_capacity(1_024),
+            size_uniform,
+            vertex_buffer,
+            index_buffer,
             mask_atlas,
             color_atlas,
             mask_texture,
             color_texture,
-            vertices: Vec::with_capacity(1_024),
-            indices: Vec::with_capacity(1_024),
-            vertex_buffer,
-            index_buffer,
+            bind_group,
+            pipeline,
         }
+    }
+
+    pub fn resize(&mut self, size: PhysicalSize<u32>) {
+        self.sizes[0] = size.width;
+        self.sizes[1] = size.height;
     }
 
     pub fn insert(
@@ -658,6 +696,7 @@ impl TextPipeline {
     }
 
     pub fn render<'pass>(&'pass mut self, queue: &Queue, render_pass: &mut RenderPass<'pass>) {
+        queue.write_buffer(&self.size_uniform, 0, bytemuck::cast_slice(&self.sizes));
         queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
         queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&self.indices));
 
@@ -667,10 +706,10 @@ impl TextPipeline {
         render_pass.set_index_buffer(self.index_buffer.slice(..), IndexFormat::Uint32);
         render_pass.draw_indexed(0..self.indices.len() as u32, 0, 0..1);
 
-        self.mask_atlas.next_frame();
-        self.color_atlas.next_frame();
         self.vertices.clear();
         self.indices.clear();
+        self.mask_atlas.next_frame();
+        self.color_atlas.next_frame();
     }
 
     fn insert_quad(&mut self, [top_left, top_right, bottom_left, bottom_right]: [TextVertex; 4]) {
@@ -736,19 +775,75 @@ impl LineVertex {
 }
 
 pub struct LinePipeline {
-    pipeline: RenderPipeline,
+    sizes: [u32; 2],
     vertices: Vec<LineVertex>,
+    size_uniform: Buffer,
     vertex_buffer: Buffer,
+    bind_group: BindGroup,
+    pipeline: RenderPipeline,
 }
 
 impl LinePipeline {
-    pub fn new(device: &Device, format: TextureFormat) -> Self {
+    pub fn new(device: &Device, config: &SurfaceConfiguration) -> Self {
         let limits = device.limits();
+
+        //
+        // Buffers
+        //
+
+        let size_uniform = device.create_buffer(&BufferDescriptor {
+            label: Some("[LinePipeline] Size uniform"),
+            size: std::mem::size_of::<[u32; 2]>() as BufferAddress,
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let vertex_buffer = device.create_buffer(&BufferDescriptor {
+            label: Some("[LinePipeline] Vertex buffer"),
+            size: limits.max_buffer_size,
+            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        //
+        // Bind group
+        //
+
+        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("[TextPipeline] Texture bind group layout"),
+            entries: &[
+                // Size uniform
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        });
+        let bind_group = device.create_bind_group(&BindGroupDescriptor {
+            label: Some("[TextPipeline] Texture bind group"),
+            layout: &bind_group_layout,
+            entries: &[
+                // Size uniform
+                BindGroupEntry {
+                    binding: 0,
+                    resource: size_uniform.as_entire_binding(),
+                },
+            ],
+        });
+
+        //
+        // Pipeline
+        //
 
         let shader_module = device.create_shader_module(include_wgsl!("lines.wgsl"));
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("[LinePipeline] Pipeline layout"),
-            bind_group_layouts: &[],
+            bind_group_layouts: &[&bind_group_layout],
             push_constant_ranges: &[],
         });
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
@@ -763,7 +858,7 @@ impl LinePipeline {
                 module: &shader_module,
                 entry_point: "fragment",
                 targets: &[Some(ColorTargetState {
-                    format,
+                    format: config.format,
                     blend: Some(BlendState::ALPHA_BLENDING),
                     write_mask: ColorWrites::ALL,
                 })],
@@ -782,18 +877,18 @@ impl LinePipeline {
             multiview: None,
         });
 
-        let vertex_buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("[LinePipeline] Vertex buffer"),
-            size: limits.max_buffer_size,
-            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
         Self {
-            pipeline,
-            vertex_buffer,
+            sizes: [config.width, config.height],
             vertices: Vec::with_capacity(1_024),
+            size_uniform,
+            vertex_buffer,
+            bind_group,
+            pipeline,
         }
+    }
+
+    pub fn resize(&mut self, size: PhysicalSize<u32>) {
+        self.sizes = [size.width, size.height];
     }
 
     pub fn polyline<T: IntoIterator<Item = ([i32; 2], Rgba)>>(&mut self, points: T) {
@@ -814,9 +909,11 @@ impl LinePipeline {
     }
 
     pub fn render<'pass>(&'pass mut self, queue: &Queue, render_pass: &mut RenderPass<'pass>) {
+        queue.write_buffer(&self.size_uniform, 0, bytemuck::cast_slice(&self.sizes));
         queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
 
         render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.draw(0..self.vertices.len() as u32, 0..1);
 

@@ -2,6 +2,10 @@
 //                                               Vertex                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+struct Sizes {
+    surface: vec2<u32>,
+}
+
 struct VertexInput {
     @location(0) position: vec2<i32>,
     @location(1) color: vec4<u32>,
@@ -12,12 +16,14 @@ struct VertexOutput {
     @location(0) color: vec4<f32>,
 }
 
+@group(0) @binding(0) var<uniform> sizes: Sizes;
+
 @vertex
 fn vertex(input: VertexInput) -> VertexOutput {
     var output: VertexOutput;
     output.position = vec4<f32>(
-        f32(input.position.x) / 3840.0 - 1.0,
-        1.0 - f32(input.position.y) / 2272.0,
+        f32(input.position.x) / f32(sizes.surface.x) - 1.0,
+        1.0 - f32(input.position.y) / f32(sizes.surface.y),
         0.0,
         1.0,
     );

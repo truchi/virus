@@ -2,6 +2,11 @@
 //                                               Vertex                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+struct Sizes {
+    surface: vec2<u32>,
+    texture: vec2<u32>,
+}
+
 struct VertexInput {
     @location(0) ty: u32,
     @location(1) position: vec3<i32>,
@@ -16,17 +21,19 @@ struct VertexOutput {
     @location(2) color: vec4<f32>,
 }
 
+@group(0) @binding(0) var<uniform> sizes: Sizes;
+
 @vertex
 fn vertex(input: VertexInput) -> VertexOutput {
     var output: VertexOutput;
     output.ty = input.ty;
     output.texture = vec2<f32>(
-        f32(input.texture.x) / 8192.0,
-        f32(input.texture.y) / 8192.0,
+        f32(input.texture.x) / f32(sizes.texture.x),
+        f32(input.texture.y) / f32(sizes.texture.y),
     );
     output.position = vec4<f32>(
-        f32(input.position.x) / 3840.0 - 1.0,
-        1.0 - f32(input.position.y) / 2272.0,
+        f32(input.position.x) / f32(sizes.surface.x) - 1.0,
+        1.0 - f32(input.position.y) / f32(sizes.surface.y),
         f32(input.position.z),
         1.0,
     );
@@ -44,9 +51,9 @@ fn vertex(input: VertexInput) -> VertexOutput {
 //                                              Fragment                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-@group(0) @binding(0) var mask_texture: texture_2d<f32>;
-@group(0) @binding(1) var color_texture: texture_2d<f32>;
-@group(0) @binding(2) var texture_sampler: sampler;
+@group(0) @binding(1) var mask_texture: texture_2d<f32>;
+@group(0) @binding(2) var color_texture: texture_2d<f32>;
+@group(0) @binding(3) var texture_sampler: sampler;
 
 @fragment
 fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {

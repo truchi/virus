@@ -26,7 +26,7 @@ use wgpu::{
 use winit::{
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    window::{Window, WindowBuilder},
+    window::{Fullscreen, Window, WindowBuilder},
 };
 
 // Is it maxed at 60fps?
@@ -36,7 +36,10 @@ const FRAME: Duration = Duration::from_millis(1);
 
 pub fn main() {
     let event_loop = EventLoop::new();
-    let window = WindowBuilder::new().build(&event_loop).unwrap();
+    let window = WindowBuilder::new()
+        .with_fullscreen(Some(Fullscreen::Borderless(None)))
+        .build(&event_loop)
+        .unwrap();
 
     let mut context = Context::new(fonts());
     let font = context
