@@ -93,16 +93,19 @@ impl Wgpu {
 pub struct Graphics {
     wgpu: Wgpu,
     text_pipeline: TextPipeline,
+    line_pipeline: LinePipeline,
 }
 
 impl Graphics {
     pub fn new(window: Window) -> Self {
         let wgpu = Wgpu::new(window);
         let text_pipeline = TextPipeline::new(&wgpu.device, wgpu.config.format);
+        let line_pipeline = LinePipeline::new(&wgpu.device, wgpu.config.format);
 
         Self {
             wgpu,
             text_pipeline,
+            line_pipeline,
         }
     }
 
@@ -141,6 +144,135 @@ impl Graphics {
     }
 
     pub fn render(&mut self) {
+        fn bresenham_x(radius: u32) -> impl Iterator<Item = (i32, i32)> {
+            let r = radius as i32;
+
+            let mut x = 0;
+            let mut y = r;
+            let mut e = -r;
+
+            std::iter::from_fn(move || {
+                if x > y {
+                    None
+                } else {
+                    let top_left = (-y, x);
+
+                    e += 2 * x + 1;
+                    x += 1;
+
+                    if e >= 0 {
+                        e -= 2 * y - 1;
+                        y -= 1;
+                    }
+
+                    Some(top_left)
+                }
+            })
+        }
+        fn bresenham_y(radius: u32) -> impl Iterator<Item = (i32, i32)> {
+            let r = radius as i32;
+
+            let mut x = r;
+            let mut y = 0;
+            let mut e = -r;
+
+            std::iter::from_fn(move || {
+                if y > x {
+                    None
+                } else {
+                    let top_left = (-y, x);
+
+                    e += 2 * y + 1;
+                    y += 1;
+
+                    if e >= 0 {
+                        e -= 2 * x - 1;
+                        x -= 1;
+                    }
+
+                    Some(top_left)
+                }
+            })
+        }
+
+        let r = 200i32;
+        let t = 1000;
+        let bre = bresenham_y(r as u32).collect::<Vec<_>>();
+        self.line_pipeline.polyline(
+            bre.iter()
+                .copied()
+                .take(t)
+                .chain(
+                    bre.iter()
+                        .copied()
+                        .rev()
+                        .map(|(top, left)| (-left, -top))
+                        .take(t),
+                )
+                .chain(bre.iter().copied().map(|(top, left)| (-left, top)).take(t))
+                .chain(
+                    bre.iter()
+                        .rev()
+                        .copied()
+                        .map(|(top, left)| (top, -left))
+                        .take(t),
+                )
+                .chain(bre.iter().copied().map(|(top, left)| (-top, -left)).take(t))
+                .chain(
+                    bre.iter()
+                        .rev()
+                        .copied()
+                        .map(|(top, left)| (left, top))
+                        .take(t),
+                )
+                .chain(bre.iter().copied().map(|(top, left)| (left, -top)).take(t))
+                .chain(
+                    bre.iter()
+                        .rev()
+                        .copied()
+                        .map(|(top, left)| (-top, left))
+                        .take(t),
+                )
+                .map(|(top, left)| ([left + 2500, top + 1500], Rgba::RED)),
+        );
+        self.line_pipeline.polyline(
+            bre.iter()
+                .copied()
+                .take(t)
+                .chain(
+                    bre.iter()
+                        .copied()
+                        .rev()
+                        .map(|(top, left)| (-left, -top))
+                        .take(t),
+                )
+                .chain(bre.iter().copied().map(|(top, left)| (-left, top)).take(t))
+                .chain(
+                    bre.iter()
+                        .rev()
+                        .copied()
+                        .map(|(top, left)| (top, -left))
+                        .take(t),
+                )
+                .chain(bre.iter().copied().map(|(top, left)| (-top, -left)).take(t))
+                .chain(
+                    bre.iter()
+                        .rev()
+                        .copied()
+                        .map(|(top, left)| (left, top))
+                        .take(t),
+                )
+                .chain(bre.iter().copied().map(|(top, left)| (left, -top)).take(t))
+                .chain(
+                    bre.iter()
+                        .rev()
+                        .copied()
+                        .map(|(top, left)| (-top, left))
+                        .take(t),
+                )
+                .map(|(top, left)| ([left + 2500, top + 2500], Rgba::RED)),
+        );
+
         let output = self.wgpu.surface.get_current_texture().unwrap();
         let view = output.texture.create_view(&Default::default());
         let mut encoder = self
@@ -158,7 +290,7 @@ impl Graphics {
                     resolve_target: None,
                     ops: Operations {
                         load: LoadOp::Clear(Color {
-                            r: 1.0,
+                            r: 0.0,
                             g: 0.0,
                             b: 0.0,
                             a: 1.0,
@@ -169,6 +301,8 @@ impl Graphics {
                 depth_stencil_attachment: None,
             });
             self.text_pipeline
+                .render(&self.wgpu.queue, &mut render_pass);
+            self.line_pipeline
                 .render(&self.wgpu.queue, &mut render_pass);
         }
 
@@ -183,7 +317,7 @@ impl Graphics {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-pub struct Vertex {
+pub struct TextVertex {
     /// - 0: a background rectangle (use `color`),
     /// - 1: a mask glyph (use `texture` in the mask texture with `color`),
     /// - 2: a color glyph (use `texture` in the color texture),
@@ -196,10 +330,10 @@ pub struct Vertex {
     color: [u32; 4],
 }
 
-unsafe impl bytemuck::Zeroable for Vertex {}
-unsafe impl bytemuck::Pod for Vertex {}
+unsafe impl bytemuck::Zeroable for TextVertex {}
+unsafe impl bytemuck::Pod for TextVertex {}
 
-impl Vertex {
+impl TextVertex {
     pub const BACKGROUND_RECTANGLE_TYPE: u32 = 0;
     pub const MASK_GLYPH_TYPE: u32 = 1;
     pub const COLOR_GLYPH_TYPE: u32 = 2;
@@ -208,7 +342,7 @@ impl Vertex {
 
     pub fn vertex_buffer_layout() -> VertexBufferLayout<'static> {
         VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as BufferAddress,
+            array_stride: std::mem::size_of::<TextVertex>() as BufferAddress,
             step_mode: VertexStepMode::Vertex,
             attributes: &Self::ATTRIBUTES,
         }
@@ -242,10 +376,10 @@ impl Vertex {
         let y2 = y + height;
 
         [
-            Vertex::new(ty, [left, top, depth], [x, y], color),
-            Vertex::new(ty, [right, top, depth], [x2, y], color),
-            Vertex::new(ty, [left, bottom, depth], [x, y2], color),
-            Vertex::new(ty, [right, bottom, depth], [x2, y2], color),
+            TextVertex::new(ty, [left, top, depth], [x, y], color),
+            TextVertex::new(ty, [right, top, depth], [x2, y], color),
+            TextVertex::new(ty, [left, bottom, depth], [x, y2], color),
+            TextVertex::new(ty, [right, bottom, depth], [x2, y2], color),
         ]
     }
 }
@@ -258,7 +392,7 @@ pub struct TextPipeline {
     color_atlas: Atlas<(FontKey, GlyphId, FontSize)>,
     mask_texture: Texture,
     color_texture: Texture,
-    vertices: Vec<Vertex>,
+    vertices: Vec<TextVertex>,
     indices: Vec<u32>,
     vertex_buffer: Buffer,
     index_buffer: Buffer,
@@ -303,7 +437,7 @@ impl TextPipeline {
         ));
 
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("[TextPipeline] texture bind group layout"),
+            label: Some("[TextPipeline] Texture bind group layout"),
             entries: &[
                 // Mask texture
                 BindGroupLayoutEntry {
@@ -337,7 +471,7 @@ impl TextPipeline {
             ],
         });
         let bind_group = device.create_bind_group(&BindGroupDescriptor {
-            label: Some("Texture bind group"),
+            label: Some("[TextPipeline] Texture bind group"),
             layout: &bind_group_layout,
             entries: &[
                 // Mask texture
@@ -375,17 +509,17 @@ impl TextPipeline {
 
         let shader_module = device.create_shader_module(include_wgsl!("text.wgsl"));
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
-            label: Some("[TextPipeline] pipeline layout"),
+            label: Some("[TextPipeline] Pipeline layout"),
             bind_group_layouts: &[&bind_group_layout],
             push_constant_ranges: &[],
         });
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
-            label: Some("[TextPipeline] pipeline"),
+            label: Some("[TextPipeline] Pipeline"),
             layout: Some(&pipeline_layout),
             vertex: VertexState {
                 module: &shader_module,
                 entry_point: "vertex",
-                buffers: &[Vertex::vertex_buffer_layout()],
+                buffers: &[TextVertex::vertex_buffer_layout()],
             },
             fragment: Some(FragmentState {
                 module: &shader_module,
@@ -454,8 +588,8 @@ impl TextPipeline {
             // Add background
             //
 
-            self.insert_quad(Vertex::quad(
-                Vertex::BACKGROUND_RECTANGLE_TYPE,
+            self.insert_quad(TextVertex::quad(
+                TextVertex::BACKGROUND_RECTANGLE_TYPE,
                 [top, left],
                 [glyph.advance as u32, line_height],
                 depth,
@@ -478,13 +612,13 @@ impl TextPipeline {
 
             let (ty, ([x, y], is_new), texture, channels) = match image.content {
                 Content::Mask => (
-                    Vertex::MASK_GLYPH_TYPE,
+                    TextVertex::MASK_GLYPH_TYPE,
                     self.mask_atlas.insert(key, [width, height]).unwrap(),
                     &self.mask_texture,
                     1,
                 ),
                 Content::Color => (
-                    Vertex::COLOR_GLYPH_TYPE,
+                    TextVertex::COLOR_GLYPH_TYPE,
                     self.color_atlas.insert(key, [4 * width, height]).unwrap(),
                     &self.color_texture,
                     4,
@@ -514,7 +648,7 @@ impl TextPipeline {
                 );
             }
 
-            self.insert_quad(Vertex::quad(
+            self.insert_quad(TextVertex::quad(
                 ty,
                 [top, left],
                 [width, height],
@@ -549,7 +683,7 @@ impl TextPipeline {
         self.indices.clear();
     }
 
-    fn insert_quad(&mut self, [top_left, top_right, bottom_left, bottom_right]: [Vertex; 4]) {
+    fn insert_quad(&mut self, [top_left, top_right, bottom_left, bottom_right]: [TextVertex; 4]) {
         let i = self.vertices.len() as u32;
 
         self.vertices
@@ -568,5 +702,134 @@ impl TextPipeline {
             bottom_left,
             bottom_right,
         ]);
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                              Geom...                                           //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct LineVertex {
+    /// Screen coordinates.
+    position: [i32; 2],
+    /// Rgba color.
+    color: [u32; 4],
+}
+
+unsafe impl bytemuck::Zeroable for LineVertex {}
+unsafe impl bytemuck::Pod for LineVertex {}
+
+impl LineVertex {
+    pub const ATTRIBUTES: [VertexAttribute; 2] = vertex_attr_array![0 => Sint32x2, 1 => Uint32x4];
+
+    pub fn vertex_buffer_layout() -> VertexBufferLayout<'static> {
+        VertexBufferLayout {
+            array_stride: std::mem::size_of::<LineVertex>() as BufferAddress,
+            step_mode: VertexStepMode::Vertex,
+            attributes: &Self::ATTRIBUTES,
+        }
+    }
+
+    pub fn new(position: [i32; 2], color: Rgba) -> Self {
+        Self {
+            position,
+            color: [
+                color.r as u32,
+                color.g as u32,
+                color.b as u32,
+                color.a as u32,
+            ],
+        }
+    }
+}
+
+pub struct LinePipeline {
+    pipeline: RenderPipeline,
+    vertices: Vec<LineVertex>,
+    vertex_buffer: Buffer,
+}
+
+impl LinePipeline {
+    pub fn new(device: &Device, format: TextureFormat) -> Self {
+        let limits = device.limits();
+
+        let shader_module = device.create_shader_module(include_wgsl!("lines.wgsl"));
+        let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: Some("[LinePipeline] Pipeline layout"),
+            bind_group_layouts: &[],
+            push_constant_ranges: &[],
+        });
+        let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+            label: Some("[LinePipeline] Pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: VertexState {
+                module: &shader_module,
+                entry_point: "vertex",
+                buffers: &[LineVertex::vertex_buffer_layout()],
+            },
+            fragment: Some(FragmentState {
+                module: &shader_module,
+                entry_point: "fragment",
+                targets: &[Some(ColorTargetState {
+                    format,
+                    blend: Some(BlendState::ALPHA_BLENDING),
+                    write_mask: ColorWrites::ALL,
+                })],
+            }),
+            primitive: PrimitiveState {
+                topology: PrimitiveTopology::LineList,
+                strip_index_format: None,
+                front_face: Default::default(),
+                cull_mode: None,
+                unclipped_depth: false,
+                polygon_mode: Default::default(),
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: Default::default(),
+            multiview: None,
+        });
+
+        let vertex_buffer = device.create_buffer(&BufferDescriptor {
+            label: Some("[LinePipeline] Vertex buffer"),
+            size: limits.max_buffer_size,
+            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        Self {
+            pipeline,
+            vertex_buffer,
+            vertices: Vec::with_capacity(1_024),
+        }
+    }
+
+    pub fn polyline<T: IntoIterator<Item = ([i32; 2], Rgba)>>(&mut self, points: T) {
+        let polyline = || {
+            let mut points = points.into_iter();
+            let mut prev = points.next()?;
+
+            for curr in points {
+                self.vertices.push(LineVertex::new(prev.0, prev.1));
+                self.vertices.push(LineVertex::new(curr.0, curr.1));
+                prev = curr;
+            }
+
+            Option::<()>::None
+        };
+
+        polyline();
+    }
+
+    pub fn render<'pass>(&'pass mut self, queue: &Queue, render_pass: &mut RenderPass<'pass>) {
+        queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
+
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.draw(0..self.vertices.len() as u32, 0..1);
+
+        self.vertices.clear();
     }
 }

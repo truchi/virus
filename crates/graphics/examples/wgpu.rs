@@ -65,7 +65,7 @@ pub fn main() {
                 Styles {
                     font,
                     foreground: Rgba::new(255, 255, 0, 255),
-                    background: Rgba::new(0, 255, 0, 255),
+                    background: Rgba::new(0, 0, 0, 0),
                     underline: false,
                     strike: false,
                 },
@@ -108,10 +108,6 @@ pub fn main() {
             state.window().request_redraw();
         }
         Event::RedrawRequested(window_id) if window_id == state.window().id() => {
-            if start.elapsed().as_secs() > 3 {
-                std::process::exit(0);
-            }
-
             let now = Instant::now();
 
             if now - last_redraw > FRAME {
