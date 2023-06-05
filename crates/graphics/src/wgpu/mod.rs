@@ -147,134 +147,44 @@ impl Graphics {
     }
 
     pub fn render(&mut self) {
-        fn bresenham_x(radius: u32) -> impl Iterator<Item = (i32, i32)> {
-            let r = radius as i32;
-
-            let mut x = 0;
-            let mut y = r;
-            let mut e = -r;
-
-            std::iter::from_fn(move || {
-                if x > y {
-                    None
-                } else {
-                    let top_left = (-y, x);
-
-                    e += 2 * x + 1;
-                    x += 1;
-
-                    if e >= 0 {
-                        e -= 2 * y - 1;
-                        y -= 1;
-                    }
-
-                    Some(top_left)
-                }
-            })
+        for r in 100..200i32 {
+            let algo = bresenham;
+            let map = |(top, left)| ([left + 2500, top + 1500], Rgba::RED);
+            self.line_pipeline
+                .polyline(algo(r as u32).map(|(t, l)| (t, l)).map(map));
+            self.line_pipeline
+                .polyline(algo(r as u32).map(|(t, l)| (t, -l)).map(map));
+            self.line_pipeline
+                .polyline(algo(r as u32).map(|(t, l)| (-t, l)).map(map));
+            self.line_pipeline
+                .polyline(algo(r as u32).map(|(t, l)| (-t, -l)).map(map));
+            self.line_pipeline
+                .polyline(algo(r as u32).map(|(t, l)| (l, t)).map(map));
+            self.line_pipeline
+                .polyline(algo(r as u32).map(|(t, l)| (l, -t)).map(map));
+            self.line_pipeline
+                .polyline(algo(r as u32).map(|(t, l)| (-l, t)).map(map));
+            self.line_pipeline
+                .polyline(algo(r as u32).map(|(t, l)| (-l, -t)).map(map));
+            let algo = andres;
+            let map = |(top, left)| ([left + 3500, top + 1500], Rgba::RED);
+            self.line_pipeline
+                .polyline(algo(r as u32).map(|(t, l)| (t, l)).map(map));
+            self.line_pipeline
+                .polyline(algo(r as u32).map(|(t, l)| (t, -l)).map(map));
+            self.line_pipeline
+                .polyline(algo(r as u32).map(|(t, l)| (-t, l)).map(map));
+            self.line_pipeline
+                .polyline(algo(r as u32).map(|(t, l)| (-t, -l)).map(map));
+            self.line_pipeline
+                .polyline(algo(r as u32).map(|(t, l)| (l, t)).map(map));
+            self.line_pipeline
+                .polyline(algo(r as u32).map(|(t, l)| (l, -t)).map(map));
+            self.line_pipeline
+                .polyline(algo(r as u32).map(|(t, l)| (-l, t)).map(map));
+            self.line_pipeline
+                .polyline(algo(r as u32).map(|(t, l)| (-l, -t)).map(map));
         }
-        fn bresenham_y(radius: u32) -> impl Iterator<Item = (i32, i32)> {
-            let r = radius as i32;
-
-            let mut x = r;
-            let mut y = 0;
-            let mut e = -r;
-
-            std::iter::from_fn(move || {
-                if y > x {
-                    None
-                } else {
-                    let top_left = (-y, x);
-
-                    e += 2 * y + 1;
-                    y += 1;
-
-                    if e >= 0 {
-                        e -= 2 * x - 1;
-                        x -= 1;
-                    }
-
-                    Some(top_left)
-                }
-            })
-        }
-
-        let r = 200i32;
-        let t = 1000;
-        let bre = bresenham_y(r as u32).collect::<Vec<_>>();
-        self.line_pipeline.polyline(
-            bre.iter()
-                .copied()
-                .take(t)
-                .chain(
-                    bre.iter()
-                        .copied()
-                        .rev()
-                        .map(|(top, left)| (-left, -top))
-                        .take(t),
-                )
-                .chain(bre.iter().copied().map(|(top, left)| (-left, top)).take(t))
-                .chain(
-                    bre.iter()
-                        .rev()
-                        .copied()
-                        .map(|(top, left)| (top, -left))
-                        .take(t),
-                )
-                .chain(bre.iter().copied().map(|(top, left)| (-top, -left)).take(t))
-                .chain(
-                    bre.iter()
-                        .rev()
-                        .copied()
-                        .map(|(top, left)| (left, top))
-                        .take(t),
-                )
-                .chain(bre.iter().copied().map(|(top, left)| (left, -top)).take(t))
-                .chain(
-                    bre.iter()
-                        .rev()
-                        .copied()
-                        .map(|(top, left)| (-top, left))
-                        .take(t),
-                )
-                .map(|(top, left)| ([left + 2500, top + 1500], Rgba::RED)),
-        );
-        self.line_pipeline.polyline(
-            bre.iter()
-                .copied()
-                .take(t)
-                .chain(
-                    bre.iter()
-                        .copied()
-                        .rev()
-                        .map(|(top, left)| (-left, -top))
-                        .take(t),
-                )
-                .chain(bre.iter().copied().map(|(top, left)| (-left, top)).take(t))
-                .chain(
-                    bre.iter()
-                        .rev()
-                        .copied()
-                        .map(|(top, left)| (top, -left))
-                        .take(t),
-                )
-                .chain(bre.iter().copied().map(|(top, left)| (-top, -left)).take(t))
-                .chain(
-                    bre.iter()
-                        .rev()
-                        .copied()
-                        .map(|(top, left)| (left, top))
-                        .take(t),
-                )
-                .chain(bre.iter().copied().map(|(top, left)| (left, -top)).take(t))
-                .chain(
-                    bre.iter()
-                        .rev()
-                        .copied()
-                        .map(|(top, left)| (-top, left))
-                        .take(t),
-                )
-                .map(|(top, left)| ([left + 2500, top + 2500], Rgba::RED)),
-        );
 
         let output = self.wgpu.surface.get_current_texture().unwrap();
         let view = output.texture.create_view(&Default::default());
@@ -697,6 +607,15 @@ impl TextPipeline {
     }
 
     pub fn render<'pass>(&'pass mut self, queue: &Queue, render_pass: &mut RenderPass<'pass>) {
+        self.insert_quad(TextVertex::quad(
+            TextVertex::BACKGROUND_RECTANGLE_TYPE,
+            [1500, 2500],
+            [2, 2], // Need 2,2 to see a pixel...
+            0,
+            Default::default(),
+            Rgba::RED,
+        ));
+
         queue.write_buffer(&self.size_uniform, 0, bytemuck::cast_slice(&self.sizes));
         queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
         queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&self.indices));
@@ -921,4 +840,62 @@ impl LinePipeline {
 
         self.vertices.clear();
     }
+}
+
+// TODO factorize
+fn bresenham(radius: u32) -> impl Iterator<Item = (i32, i32)> {
+    let r = radius as i32;
+
+    let mut x = r;
+    let mut y = 0;
+    let mut e = -r;
+
+    std::iter::from_fn(move || {
+        if y > x {
+            None
+        } else {
+            let top_left = (-y, x);
+
+            e += 2 * y + 1;
+            y += 1;
+
+            if e >= 0 {
+                e -= 2 * x - 1;
+                x -= 1;
+            }
+
+            Some(top_left)
+        }
+    })
+}
+
+// TODO fatorize
+fn andres(radius: u32) -> impl Iterator<Item = (i32, i32)> {
+    let r = radius as i32;
+
+    let mut x = r;
+    let mut y = 0;
+    let mut d = r - 1;
+
+    std::iter::from_fn(move || {
+        if x < y {
+            None
+        } else {
+            let top_left = (-y, x);
+
+            if d >= 2 * y {
+                d -= 2 * y + 1;
+                y += 1;
+            } else if d < 2 * (r - x) {
+                d += 2 * x - 1;
+                x -= 1;
+            } else {
+                d += 2 * (x - y + 1);
+                x -= 1;
+                y += 1;
+            }
+
+            Some(top_left)
+        }
+    })
 }
