@@ -7,6 +7,7 @@ use crate::{
     colors::Rgba,
     text::{Context, FontKey, FontSize, Line, LineHeight},
 };
+use std::ops::Range;
 use swash::{scale::image::Content, GlyphId};
 use wgpu::{
     include_wgsl,
@@ -573,6 +574,21 @@ impl TextPipeline {
         line: &Line,
         line_height: LineHeight,
     ) {
+        // Add backgrounds
+        for (Range { start, end }, background) in line.backgrounds() {
+            if background.a != 0 {
+                self.insert_quad(TextVertex::quad(
+                    TextVertex::BACKGROUND_RECTANGLE_TYPE,
+                    [top, left + start as i32],
+                    [(end - start) as u32, line_height],
+                    depth,
+                    Default::default(),
+                    background,
+                ));
+            }
+        }
+
+        // Add glyphs
         let mut scaler = line.scaler(context);
 
         while let Some((advance, glyph, image)) = scaler.next() {
@@ -582,27 +598,9 @@ impl TextPipeline {
                 continue;
             };
 
-            let left = left + advance as i32;
-
-            //
-            // Add background
-            //
-
-            self.insert_quad(TextVertex::quad(
-                TextVertex::BACKGROUND_RECTANGLE_TYPE,
-                [top, left],
-                [glyph.advance as u32, line_height],
-                depth,
-                Default::default(),
-                glyph.styles.background,
-            ));
-
-            //
-            // Add glyph
-            //
-
-            let key = (glyph.styles.font, glyph.id, line.size());
             let top = top + line.size() as i32;
+            let left = left + advance as i32;
+            let key = (glyph.styles.font, glyph.id, line.size());
 
             // Swash image has placement
             let top = top - image.placement.top;
@@ -671,14 +669,6 @@ impl TextPipeline {
 
         self.mask_atlas.next_frame();
         self.color_atlas.next_frame();
-        self.vertices.clear();
-        self.indices.clear();
-    }
-
-    // TODO remove?
-    pub fn clear(&mut self) {
-        // self.mask_texture.clear();
-        // self.color_texture.clear();
         self.vertices.clear();
         self.indices.clear();
     }

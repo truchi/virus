@@ -1,4 +1,5 @@
 use crate::text::*;
+use std::ops::Range;
 use swash::{
     scale::{image::Image, Render, ScaleContext, Source, StrikeWith},
     shape::{ShapeContext, Shaper},
@@ -41,6 +42,34 @@ impl Line {
     /// Returns the `FontSize` of this `Line`.
     pub fn size(&self) -> FontSize {
         self.size
+    }
+
+    /// Returns an iterator of contiguous backgrounds.
+    pub fn backgrounds(&self) -> impl '_ + Iterator<Item = (Range<f32>, Rgba)> {
+        // NOTE: we could also compute in `LineShaper::push()` and store in `Line`
+
+        let mut glyphs = self.glyphs().iter().copied();
+        let mut previous = glyphs.next();
+
+        std::iter::from_fn(move || {
+            let prev = previous?;
+            let mut end = prev.offset + prev.advance;
+
+            loop {
+                if let Some(next) = glyphs.next() {
+                    if prev.styles.background == next.styles.background {
+                        end = next.offset + next.advance;
+                        continue;
+                    } else {
+                        previous = Some(next);
+                    }
+                } else {
+                    previous = None;
+                }
+
+                return Some((prev.offset..end, prev.styles.background));
+            }
+        })
     }
 }
 
