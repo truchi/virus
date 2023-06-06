@@ -38,10 +38,10 @@ fn vertex(vertex: Vertex) -> Fragment {
         1.0,
     );
     fragment.color = vec4<f32>(
-      f32(vertex.color.r) / 255.0,
-      f32(vertex.color.g) / 255.0,
-      f32(vertex.color.b) / 255.0,
-      f32(vertex.color.a) / 255.0,
+        f32(vertex.color.r) / 255.0,
+        f32(vertex.color.g) / 255.0,
+        f32(vertex.color.b) / 255.0,
+        f32(vertex.color.a) / 255.0,
     );
 
     return fragment;

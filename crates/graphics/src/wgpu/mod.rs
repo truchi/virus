@@ -147,44 +147,10 @@ impl Graphics {
     }
 
     pub fn render(&mut self) {
-        for r in 100..200i32 {
-            let algo = bresenham;
-            let map = |(top, left)| ([left + 2500, top + 1500], Rgba::RED);
-            self.line_pipeline
-                .polyline(algo(r as u32).map(|(t, l)| (t, l)).map(map));
-            self.line_pipeline
-                .polyline(algo(r as u32).map(|(t, l)| (t, -l)).map(map));
-            self.line_pipeline
-                .polyline(algo(r as u32).map(|(t, l)| (-t, l)).map(map));
-            self.line_pipeline
-                .polyline(algo(r as u32).map(|(t, l)| (-t, -l)).map(map));
-            self.line_pipeline
-                .polyline(algo(r as u32).map(|(t, l)| (l, t)).map(map));
-            self.line_pipeline
-                .polyline(algo(r as u32).map(|(t, l)| (l, -t)).map(map));
-            self.line_pipeline
-                .polyline(algo(r as u32).map(|(t, l)| (-l, t)).map(map));
-            self.line_pipeline
-                .polyline(algo(r as u32).map(|(t, l)| (-l, -t)).map(map));
-            let algo = andres;
-            let map = |(top, left)| ([left + 3500, top + 1500], Rgba::RED);
-            self.line_pipeline
-                .polyline(algo(r as u32).map(|(t, l)| (t, l)).map(map));
-            self.line_pipeline
-                .polyline(algo(r as u32).map(|(t, l)| (t, -l)).map(map));
-            self.line_pipeline
-                .polyline(algo(r as u32).map(|(t, l)| (-t, l)).map(map));
-            self.line_pipeline
-                .polyline(algo(r as u32).map(|(t, l)| (-t, -l)).map(map));
-            self.line_pipeline
-                .polyline(algo(r as u32).map(|(t, l)| (l, t)).map(map));
-            self.line_pipeline
-                .polyline(algo(r as u32).map(|(t, l)| (l, -t)).map(map));
-            self.line_pipeline
-                .polyline(algo(r as u32).map(|(t, l)| (-l, t)).map(map));
-            self.line_pipeline
-                .polyline(algo(r as u32).map(|(t, l)| (-l, -t)).map(map));
-        }
+        self.line_pipeline
+            .rect([99, 999], [402, 402], 1, 0, Rgba::RED);
+        self.line_pipeline
+            .rect([100, 1000], [400, 400], 50, 100, Rgba::GREEN);
 
         let output = self.wgpu.surface.get_current_texture().unwrap();
         let view = output.texture.create_view(&Default::default());
@@ -261,10 +227,10 @@ impl TextVertex {
         }
     }
 
-    pub fn new(ty: u32, position: [i32; 3], texture: [u32; 2], color: Rgba) -> Self {
+    pub fn new(ty: u32, [x, y, z]: [i32; 3], texture: [u32; 2], color: Rgba) -> Self {
         Self {
             ty,
-            position,
+            position: [x, y, z],
             texture,
             color: [
                 color.r as u32,
@@ -681,9 +647,9 @@ impl LineVertex {
         }
     }
 
-    pub fn new(position: [i32; 2], color: Rgba) -> Self {
+    pub fn new([top, left]: [i32; 2], color: Rgba) -> Self {
         Self {
-            position,
+            position: [left, top],
             color: [
                 color.r as u32,
                 color.g as u32,
@@ -829,6 +795,82 @@ impl LinePipeline {
         }
     }
 
+    pub fn rect(
+        &mut self,
+        [top, left]: [i32; 2],
+        [width, height]: [u32; 2],
+        thickness: u32,
+        radius: u32,
+        color: Rgba,
+    ) {
+        debug_assert!(2 * (thickness + radius) <= width);
+        debug_assert!(2 * (thickness + radius) <= height);
+
+        let width = width as i32;
+        let height = height as i32;
+        let thickness = thickness as i32;
+        let uradius = radius;
+        let radius = radius as i32;
+
+        for i in 0..thickness {
+            let top = top + i;
+            let left = left + i;
+            let width = width - 2 * i;
+            let height = height - 2 * i;
+            let radius = radius - i;
+
+            let translate = |translate_top, translate_left| {
+                move |(t, l)| ([top + translate_top + t, left + translate_left + l], color)
+            };
+
+            //
+            // Corners
+            //
+
+            // Top right
+            let top_right = translate(radius, width - radius);
+            self.polyline(Andres(radius as u32).o1().map(top_right));
+            self.polyline(Andres(radius as u32).o2().map(top_right));
+
+            // Top left
+            let top_left = translate(radius, radius);
+            self.polyline(Andres(radius as u32).o3().map(top_left));
+            self.polyline(Andres(radius as u32).o4().map(top_left));
+
+            // Bottom left
+            let bottom_left = translate(height - radius, radius);
+            self.polyline(Andres(radius as u32).o5().map(bottom_left));
+            self.polyline(Andres(radius as u32).o6().map(bottom_left));
+
+            // Bottom right
+            let bottom_right = translate(height - radius, width - radius);
+            self.polyline(Andres(radius as u32).o7().map(bottom_right));
+            self.polyline(Andres(radius as u32).o8().map(bottom_right));
+
+            //
+            // Sides
+            //
+
+            let translate =
+                |translate_top, translate_left| [top + translate_top, left + translate_left];
+
+            self.vertices.extend_from_slice(&[
+                // Top
+                LineVertex::new(translate(0, radius), color),
+                LineVertex::new(translate(0, width - radius), color),
+                // Right
+                LineVertex::new(translate(radius, width), color),
+                LineVertex::new(translate(height - radius, width), color),
+                // Bottom
+                LineVertex::new(translate(height, radius), color),
+                LineVertex::new(translate(height, width - radius), color),
+                // Left
+                LineVertex::new(translate(radius, 0), color),
+                LineVertex::new(translate(height - radius, 0), color),
+            ]);
+        }
+    }
+
     pub fn render<'pass>(&'pass mut self, queue: &Queue, render_pass: &mut RenderPass<'pass>) {
         queue.write_buffer(&self.size_uniform, 0, bytemuck::cast_slice(&self.sizes));
         queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
@@ -842,60 +884,65 @@ impl LinePipeline {
     }
 }
 
-// TODO factorize
-fn bresenham(radius: u32) -> impl Iterator<Item = (i32, i32)> {
-    let r = radius as i32;
-
-    let mut x = r;
-    let mut y = 0;
-    let mut e = -r;
-
-    std::iter::from_fn(move || {
-        if y > x {
-            None
-        } else {
-            let top_left = (-y, x);
-
-            e += 2 * y + 1;
-            y += 1;
-
-            if e >= 0 {
-                e -= 2 * x - 1;
-                x -= 1;
-            }
-
-            Some(top_left)
-        }
-    })
-}
-
 // TODO fatorize
-fn andres(radius: u32) -> impl Iterator<Item = (i32, i32)> {
-    let r = radius as i32;
+pub struct Andres(/* radius */ pub u32);
 
-    let mut x = r;
-    let mut y = 0;
-    let mut d = r - 1;
+impl Andres {
+    pub fn o1(&self) -> impl Iterator<Item = (i32, i32)> {
+        let r = self.0 as i32;
 
-    std::iter::from_fn(move || {
-        if x < y {
-            None
-        } else {
-            let top_left = (-y, x);
+        let mut x = r;
+        let mut y = 0;
+        let mut d = r - 1;
 
-            if d >= 2 * y {
-                d -= 2 * y + 1;
-                y += 1;
-            } else if d < 2 * (r - x) {
-                d += 2 * x - 1;
-                x -= 1;
+        std::iter::from_fn(move || {
+            if x < y {
+                None
             } else {
-                d += 2 * (x - y + 1);
-                x -= 1;
-                y += 1;
-            }
+                let top_left = (-y, x);
 
-            Some(top_left)
-        }
-    })
+                if d >= 2 * y {
+                    d -= 2 * y + 1;
+                    y += 1;
+                } else if d < 2 * (r - x) {
+                    d += 2 * x - 1;
+                    x -= 1;
+                } else {
+                    d += 2 * (x - y + 1);
+                    x -= 1;
+                    y += 1;
+                }
+
+                Some(top_left)
+            }
+        })
+    }
+
+    pub fn o2(&self) -> impl Iterator<Item = (i32, i32)> {
+        self.o1().map(|(top, left)| (-left, -top))
+    }
+
+    pub fn o3(&self) -> impl Iterator<Item = (i32, i32)> {
+        self.o1().map(|(top, left)| (-left, top))
+    }
+
+    pub fn o4(&self) -> impl Iterator<Item = (i32, i32)> {
+        self.o1().map(|(top, left)| (top, -left))
+    }
+
+    pub fn o5(&self) -> impl Iterator<Item = (i32, i32)> {
+        self.o1().map(|(top, left)| (-top, -left))
+    }
+
+    pub fn o6(&self) -> impl Iterator<Item = (i32, i32)> {
+        self.o1().map(|(top, left)| (left, top))
+    }
+
+    pub fn o7(&self) -> impl Iterator<Item = (i32, i32)> {
+        self.o1().map(|(top, left)| (left, -top))
+    }
+
+    pub fn o8(&self) -> impl Iterator<Item = (i32, i32)> {
+        self.o1().map(|(top, left)| (-top, left))
+    }
 }
