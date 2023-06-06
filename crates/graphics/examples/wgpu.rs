@@ -61,19 +61,18 @@ pub fn main() {
     let lines = {
         let mut lines = vec![];
 
-        for (i, line) in include_str!("./wgpu.rs").lines().enumerate() {
+        for line in include_str!("./wgpu.rs").lines() {
             let mut shaper = Line::shaper(&mut context, font_size);
             shaper.push(
                 line,
                 Styles {
                     font,
-                    foreground: Rgba::new(255, 255, 0, 255),
-                    background: Rgba::new(0, 0, 255, 255),
+                    foreground: Rgba::new(255, 255, 255, 255),
+                    background: Rgba::new(0, 0, 0, 0),
                     underline: false,
                     strike: false,
                 },
             );
-
             lines.push(shaper.line());
         }
 
@@ -131,6 +130,7 @@ pub fn main() {
                     .rectangle([100, 100], [100, 100], 10, 10, Rgba::GREEN);
 
                 graphics.render();
+                dbg!(now.elapsed());
             }
         }
         _ => {}

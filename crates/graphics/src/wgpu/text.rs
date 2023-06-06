@@ -12,12 +12,20 @@ struct Vertex {
     /// - 1: a mask glyph (use `texture` in the mask texture with `color`),
     /// - 2: a color glyph (use `texture` in the color texture),
     ty: u32,
-    /// Screen coordinates.
+    /// World coordinates.
     position: [i32; 3],
+    /// World/Texture size.
+    size: [u32; 2],
     /// Texture coordinates.
-    texture: [u32; 2],
+    texture: [i32; 2],
+    /// Glyph position.
+    glyph: [u32; 2],
     /// Rgba color.
     color: [u32; 4],
+    /// Blur radius.
+    blur_radius: u32,
+    /// Blur color.
+    blur_color: [u32; 3],
 }
 
 unsafe impl bytemuck::Zeroable for Vertex {}
@@ -27,8 +35,16 @@ impl Vertex {
     const BACKGROUND_RECTANGLE_TYPE: u32 = 0;
     const MASK_GLYPH_TYPE: u32 = 1;
     const COLOR_GLYPH_TYPE: u32 = 2;
-    const ATTRIBUTES: [VertexAttribute; 4] =
-        vertex_attr_array![0 => Uint32, 1 => Sint32x3, 2 => Uint32x2, 3 => Uint32x4];
+    const ATTRIBUTES: [VertexAttribute; 8] = vertex_attr_array![
+        0 => Uint32,   // ty
+        1 => Sint32x3, // position
+        2 => Uint32x2, // size
+        3 => Sint32x2, // texture
+        4 => Uint32x2, // glyph
+        5 => Uint32x4, // color
+        6 => Uint32,   // blur_radius
+        7 => Uint32x3, // blur_color
+    ];
 
     fn vertex_buffer_layout() -> VertexBufferLayout<'static> {
         VertexBufferLayout {
@@ -38,38 +54,92 @@ impl Vertex {
         }
     }
 
-    fn new(ty: u32, [x, y, z]: [i32; 3], texture: [u32; 2], color: Rgba) -> Self {
+    fn new(
+        ty: u32,
+        position: [i32; 3],
+        size: [u32; 2],
+        texture: [i32; 2],
+        glyph: [u32; 2],
+        color: Rgba,
+        blur_radius: u32,
+    ) -> Self {
         Self {
             ty,
-            position: [x, y, z],
+            position,
+            size,
             texture,
+            glyph,
             color: [
                 color.r as u32,
                 color.g as u32,
                 color.b as u32,
                 color.a as u32,
             ],
+            blur_radius,
+            blur_color: [45, 70, 77],
         }
     }
 
     fn quad(
         ty: u32,
-        [top, left]: [i32; 2],
+        [top, left, depth]: [i32; 3],
         [width, height]: [u32; 2],
-        depth: i32,
-        [x, y]: [u32; 2],
+        [u, v]: [u32; 2],
         color: Rgba,
+        blur_radius: u32,
     ) -> [Self; 4] {
-        let right = left + width as i32;
-        let bottom = top + height as i32;
-        let x2 = x + width;
-        let y2 = y + height;
+        let size = [width, height];
+        let glyph = [u, v];
+
+        let top = top - blur_radius as i32;
+        let left = left - blur_radius as i32;
+        let width = (width + 2 * blur_radius) as i32;
+        let height = (height + 2 * blur_radius) as i32;
+        let u = u as i32 - blur_radius as i32;
+        let v = v as i32 - blur_radius as i32;
+
+        let right = left + width;
+        let bottom = top + height;
+        let u2 = u + width;
+        let v2 = v + height;
 
         [
-            Vertex::new(ty, [left, top, depth], [x, y], color),
-            Vertex::new(ty, [right, top, depth], [x2, y], color),
-            Vertex::new(ty, [left, bottom, depth], [x, y2], color),
-            Vertex::new(ty, [right, bottom, depth], [x2, y2], color),
+            Vertex::new(
+                ty,
+                [left, top, depth],
+                size,
+                [u, v],
+                glyph,
+                color,
+                blur_radius,
+            ),
+            Vertex::new(
+                ty,
+                [right, top, depth],
+                size,
+                [u2, v],
+                glyph,
+                color,
+                blur_radius,
+            ),
+            Vertex::new(
+                ty,
+                [left, bottom, depth],
+                size,
+                [u, v2],
+                glyph,
+                color,
+                blur_radius,
+            ),
+            Vertex::new(
+                ty,
+                [right, bottom, depth],
+                size,
+                [u2, v2],
+                glyph,
+                color,
+                blur_radius,
+            ),
         ]
     }
 }
@@ -98,7 +168,7 @@ pub struct TextPipeline {
 }
 
 impl TextPipeline {
-    pub const ALTAS_ROW_HEIGHT: u32 = 200;
+    pub const ALTAS_ROW_HEIGHT: u32 = 400;
 
     pub fn new(device: &Device, config: &SurfaceConfiguration) -> Self {
         let limits = device.limits();
@@ -172,7 +242,7 @@ impl TextPipeline {
                 // Size uniform
                 BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: ShaderStages::VERTEX,
+                    visibility: ShaderStages::VERTEX | ShaderStages::FRAGMENT,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -313,11 +383,11 @@ impl TextPipeline {
             if background.a != 0 {
                 self.insert_quad(Vertex::quad(
                     Vertex::BACKGROUND_RECTANGLE_TYPE,
-                    [top, left + start as i32],
+                    [top, left + start as i32, depth],
                     [(end - start) as u32, line_height],
-                    depth,
                     Default::default(),
                     background,
+                    Default::default(),
                 ));
             }
         }
@@ -385,11 +455,11 @@ impl TextPipeline {
 
             self.insert_quad(Vertex::quad(
                 ty,
-                [top, left],
+                [top, left, depth],
                 [width, height],
-                depth,
                 [x, y],
                 glyph.styles.foreground,
+                10,
             ));
         }
     }
