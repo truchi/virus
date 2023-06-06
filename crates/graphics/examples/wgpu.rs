@@ -52,7 +52,7 @@ pub fn main() {
         .unwrap()
         .key();
 
-    let mut state = Graphics::new(window);
+    let mut graphics = Graphics::new(window);
     let mut start = Instant::now();
     let mut last_redraw = Instant::now();
 
@@ -84,33 +84,29 @@ pub fn main() {
         Event::WindowEvent {
             ref event,
             window_id,
-        } if window_id == state.window().id() => {
-            if !state.input(event) {
-                match event {
-                    WindowEvent::Resized(physical_size) => {
-                        state.resize(*physical_size);
-                    }
-                    WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                        state.resize(**new_inner_size);
-                    }
-                    WindowEvent::CloseRequested
-                    | WindowEvent::KeyboardInput {
-                        input:
-                            KeyboardInput {
-                                state: ElementState::Pressed,
-                                virtual_keycode: Some(VirtualKeyCode::Escape),
-                                ..
-                            },
-                        ..
-                    } => *control_flow = ControlFlow::Exit,
-                    _ => {}
-                }
+        } if window_id == graphics.window().id() => match event {
+            WindowEvent::Resized(physical_size) => {
+                graphics.resize(*physical_size);
             }
-        }
+            WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                graphics.resize(**new_inner_size);
+            }
+            WindowEvent::CloseRequested
+            | WindowEvent::KeyboardInput {
+                input:
+                    KeyboardInput {
+                        state: ElementState::Pressed,
+                        virtual_keycode: Some(VirtualKeyCode::Escape),
+                        ..
+                    },
+                ..
+            } => *control_flow = ControlFlow::Exit,
+            _ => {}
+        },
         Event::MainEventsCleared => {
-            state.window().request_redraw();
+            graphics.window().request_redraw();
         }
-        Event::RedrawRequested(window_id) if window_id == state.window().id() => {
+        Event::RedrawRequested(window_id) if window_id == graphics.window().id() => {
             let now = Instant::now();
 
             if now - last_redraw > FRAME {
@@ -120,7 +116,7 @@ pub fn main() {
                 let scroll = 0;
 
                 for (i, line) in lines.iter().enumerate() {
-                    state.add_line(
+                    graphics.draw().glyphs(
                         &mut context,
                         i as i32 * line_height as i32 - scroll,
                         0,
@@ -130,8 +126,11 @@ pub fn main() {
                     );
                 }
 
-                state.update();
-                state.render();
+                graphics
+                    .draw()
+                    .rectangle([100, 100], [100, 100], 10, 10, Rgba::GREEN);
+
+                graphics.render();
             }
         }
         _ => {}
