@@ -115,7 +115,7 @@ pub fn main() {
                 let scroll = 0;
 
                 for (i, line) in lines.iter().enumerate() {
-                    graphics.draw().glyphs(
+                    graphics.draw(([1000, 1000], [1500, 1500])).glyphs(
                         &mut context,
                         i as i32 * line_height as i32 - scroll,
                         0,
@@ -125,9 +125,15 @@ pub fn main() {
                     );
                 }
 
-                graphics
-                    .draw()
-                    .rectangle([100, 100], [100, 100], 10, 10, Rgba::GREEN);
+                for i in 0..10i32 {
+                    graphics.draw(([1000, 1000], [1500, 1500])).rectangle(
+                        [i * 500, i * 500],
+                        [500, 500],
+                        2,
+                        10,
+                        Rgba::RED,
+                    );
+                }
 
                 graphics.render();
                 dbg!(now.elapsed());

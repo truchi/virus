@@ -31,7 +31,10 @@ use winit::{dpi::PhysicalSize, window::Window};
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// A drawing API for [`Graphics`].
-pub struct Draw<'a>(&'a mut Graphics);
+pub struct Draw<'a> {
+    graphics: &'a mut Graphics,
+    region: ([i32; 2], [u32; 2]),
+}
 
 impl<'a> Draw<'a> {
     /// Draws glyphs.
@@ -44,9 +47,16 @@ impl<'a> Draw<'a> {
         line: &Line,
         line_height: LineHeight,
     ) {
-        self.0
-            .text_pipeline
-            .insert(&self.0.queue, context, top, left, depth, line, line_height);
+        self.graphics.text_pipeline.insert(
+            &self.graphics.queue,
+            context,
+            self.region,
+            top,
+            left,
+            depth,
+            line,
+            line_height,
+        );
     }
 
     /// Draws a rectangle.
@@ -58,9 +68,13 @@ impl<'a> Draw<'a> {
         radius: u32,
         color: Rgba,
     ) {
-        self.0
-            .line_pipeline
-            .rectangle([top, left], [width, height], thickness, radius, color);
+        self.graphics.line_pipeline.rectangle(
+            [top, left],
+            [width, height],
+            thickness,
+            radius,
+            color,
+        );
     }
 }
 
@@ -139,8 +153,11 @@ impl Graphics {
     }
 
     /// Returns the drawing API.
-    pub fn draw(&mut self) -> Draw {
-        Draw(self)
+    pub fn draw(&mut self, region: ([i32; 2], [u32; 2])) -> Draw {
+        Draw {
+            graphics: self,
+            region,
+        }
     }
 
     /// Renders to the screen.
