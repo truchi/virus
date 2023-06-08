@@ -54,16 +54,16 @@ impl Vertex {
 
     fn new(
         ty: u32,
-        (region_position, region_size): ([i32; 2], [u32; 2]),
-        (position, depth): ([i32; 2], u32),
+        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
+        ([top, left], depth): ([i32; 2], u32),
         uv: [u32; 2],
         color: Rgba,
     ) -> Self {
         Self {
             ty,
-            region_position,
-            region_size,
-            position,
+            region_position: [region_top, region_left],
+            region_size: [region_width, region_height],
+            position: [top, left],
             depth,
             uv,
             color: [
@@ -77,12 +77,13 @@ impl Vertex {
 
     fn quad(
         ty: u32,
-        region: ([i32; 2], [u32; 2]),
+        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
         ([top, left], depth): ([i32; 2], u32),
         [width, height]: [u32; 2],
         [u, v]: [u32; 2],
         color: Rgba,
     ) -> [Self; 4] {
+        let region = ([region_top, region_left], [region_width, region_height]);
         let right = left + width as i32;
         let bottom = top + height as i32;
         let u2 = u + width;
@@ -322,13 +323,13 @@ impl TextPipeline {
         &mut self,
         queue: &Queue,
         context: &mut Context,
-        region: ([i32; 2], [u32; 2]),
-        top: i32,
-        left: i32,
-        depth: u32,
+        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
+        ([top, left], depth): ([i32; 2], u32),
         line: &Line,
         line_height: LineHeight,
     ) {
+        let region = ([region_top, region_left], [region_width, region_height]);
+
         //
         // Add backgrounds
         //
@@ -343,7 +344,7 @@ impl TextPipeline {
                     region,
                     ([top, left], depth),
                     [width, line_height],
-                    Default::default(),
+                    [0, 0],
                     background,
                 ));
             }
@@ -372,7 +373,7 @@ impl TextPipeline {
             let width = image.placement.width;
             let height = image.placement.height;
 
-            let (ty, ([x, y], is_new), texture, channels) = match image.content {
+            let (ty, ([u, v], is_new), texture, channels) = match image.content {
                 Content::Mask => (
                     Vertex::MASK_GLYPH,
                     self.mask_atlas.insert(key, [width, height]).unwrap(),
@@ -393,7 +394,7 @@ impl TextPipeline {
                     ImageCopyTexture {
                         texture,
                         mip_level: 0,
-                        origin: Origin3d { x, y, z: 0 },
+                        origin: Origin3d { x: u, y: v, z: 0 },
                         aspect: TextureAspect::All,
                     },
                     &image.data,
@@ -415,7 +416,7 @@ impl TextPipeline {
                 region,
                 ([top, left], depth),
                 [width, height],
-                [x, y],
+                [u, v],
                 glyph.styles.foreground,
             ));
         }

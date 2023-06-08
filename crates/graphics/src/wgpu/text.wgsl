@@ -1,9 +1,9 @@
 struct Sizes {
     // Surface `(width, height)` size.
-    surface: vec2<u32>,
+    surface: vec2u,
 
     // Texture `(width, height)` size.
-    texture: vec2<u32>,
+    texture: vec2u,
 }
 
 struct Vertex {
@@ -14,31 +14,31 @@ struct Vertex {
     @location(0) ty: u32,
 
     // Region world `(top, left)` coordinates.
-    @location(1) region_position: vec2<i32>,
+    @location(1) region_position: vec2i,
 
     // Region `(width, height)` size.
-    @location(2) region_size: vec2<u32>,
+    @location(2) region_size: vec2u,
 
     // Vertex `(top, left)` coordinates in region.
-    @location(3) position: vec2<i32>,
+    @location(3) position: vec2i,
 
     // Depth (far to near).
     @location(4) depth: u32,
 
     // Texture `(x, y)` coordinates.
-    @location(5) uv: vec2<u32>,
+    @location(5) uv: vec2u,
 
     // sRGBA color.
-    @location(6) color: vec4<u32>,
+    @location(6) color: vec4u,
 }
 
 struct Fragment {
-    @builtin(position) position: vec4<f32>,
+    @builtin(position) position: vec4f,
     @location(0) ty: u32,
-    @location(1) uv: vec2<f32>,
-    @location(2) color: vec4<f32>,
-    @location(3) min: vec2<f32>,
-    @location(4) max: vec2<f32>,
+    @location(1) uv: vec2f,
+    @location(2) color: vec4f,
+    @location(3) min: vec2f,
+    @location(4) max: vec2f,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -49,18 +49,18 @@ struct Fragment {
 
 @vertex
 fn vertex(vertex: Vertex) -> Fragment {
-    let surface = vec2<f32>(sizes.surface);
-    let texture = vec2<f32>(sizes.texture);
-    let region_position = vec2<f32>(vertex.region_position.yx);
-    let region_size = vec2<f32>(vertex.region_size);
-    let position = vec2<f32>(vertex.position.yx);
+    let surface = vec2f(sizes.surface);
+    let texture = vec2f(sizes.texture);
+    let region_position = vec2f(vertex.region_position.yx);
+    let region_size = vec2f(vertex.region_size);
+    let position = vec2f(vertex.position.yx);
     let depth = f32(vertex.depth);
-    let uv = vec2<f32>(vertex.uv);
-    let color = vec4<f32>(vertex.color);
+    let uv = vec2f(vertex.uv);
+    let color = vec4f(vertex.color);
 
     var fragment: Fragment;
     fragment.ty = vertex.ty;
-    fragment.position = vec4<f32>(
+    fragment.position = vec4f(
         (position.x + region_position.x) / surface.x - 1.0,
         1.0 - (position.y + region_position.y) /  surface.y,
         depth,
@@ -83,7 +83,7 @@ fn vertex(vertex: Vertex) -> Fragment {
 @group(0) @binding(3) var texture_sampler: sampler;
 
 @fragment
-fn fragment(fragment: Fragment) -> @location(0) vec4<f32> {
+fn fragment(fragment: Fragment) -> @location(0) vec4f {
     // Clip region
     let inside = fragment.min <= fragment.position.xy & fragment.position.xy < fragment.max;
     if !(inside.x && inside.y) {
@@ -98,7 +98,7 @@ fn fragment(fragment: Fragment) -> @location(0) vec4<f32> {
         // Mask glyph
         case 1u {
             let mask = textureSampleLevel(mask_texture, texture_sampler, fragment.uv, 0.0).r;
-            return vec4<f32>(
+            return vec4f(
                 fragment.color.r,
                 fragment.color.g,
                 fragment.color.b,
@@ -110,7 +110,7 @@ fn fragment(fragment: Fragment) -> @location(0) vec4<f32> {
             return textureSampleLevel(color_texture, texture_sampler, fragment.uv, 0.0);
         }
         default {
-            return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            return vec4f(0.0, 0.0, 0.0, 0.0);
         }
     }
 }
