@@ -12,11 +12,13 @@ struct Vertex {
     /// - 1: a mask glyph (use `texture` in the mask texture with `color`),
     /// - 2: a color glyph (use `texture` in the color texture),
     ty: u32,
-    /// World coordinates.
-    position: [i32; 3],
-    /// Texture coordinates.
-    texture: [u32; 2],
-    /// Rgba color.
+    /// World `[top, left]` coordinates.
+    position: [i32; 2],
+    /// Depth (far to near).
+    depth: u32,
+    /// Texture `[x, y]` coordinates.
+    uv: [u32; 2],
+    /// sRGBA color.
     color: [u32; 4],
 }
 
@@ -24,14 +26,16 @@ unsafe impl bytemuck::Zeroable for Vertex {}
 unsafe impl bytemuck::Pod for Vertex {}
 
 impl Vertex {
-    const BACKGROUND_RECTANGLE_TYPE: u32 = 0;
-    const MASK_GLYPH_TYPE: u32 = 1;
-    const COLOR_GLYPH_TYPE: u32 = 2;
-    const ATTRIBUTES: [VertexAttribute; 4] = vertex_attr_array![
+    const BACKGROUND_RECTANGLE: u32 = 0;
+    const MASK_GLYPH: u32 = 1;
+    const COLOR_GLYPH: u32 = 2;
+
+    const ATTRIBUTES: [VertexAttribute; 5] = vertex_attr_array![
         0 => Uint32,   // ty
-        1 => Sint32x3, // position
-        2 => Uint32x2, // texture
-        3 => Uint32x4, // color
+        1 => Sint32x2, // position
+        2 => Uint32,   // depth
+        3 => Uint32x2, // uv
+        4 => Uint32x4, // color
     ];
 
     fn vertex_buffer_layout() -> VertexBufferLayout<'static> {
@@ -42,11 +46,12 @@ impl Vertex {
         }
     }
 
-    fn new(ty: u32, position: [i32; 3], texture: [u32; 2], color: Rgba) -> Self {
+    fn new(ty: u32, (position, depth): ([i32; 2], u32), uv: [u32; 2], color: Rgba) -> Self {
         Self {
             ty,
             position,
-            texture,
+            depth,
+            uv,
             color: [
                 color.r as u32,
                 color.g as u32,
@@ -58,7 +63,7 @@ impl Vertex {
 
     fn quad(
         ty: u32,
-        [top, left, depth]: [i32; 3],
+        ([top, left], depth): ([i32; 2], u32),
         [width, height]: [u32; 2],
         [u, v]: [u32; 2],
         color: Rgba,
@@ -69,10 +74,10 @@ impl Vertex {
         let v2 = v + height;
 
         [
-            Vertex::new(ty, [left, top, depth], [u, v], color),
-            Vertex::new(ty, [right, top, depth], [u2, v], color),
-            Vertex::new(ty, [left, bottom, depth], [u, v2], color),
-            Vertex::new(ty, [right, bottom, depth], [u2, v2], color),
+            Vertex::new(ty, ([top, left], depth), [u, v], color),
+            Vertex::new(ty, ([top, right], depth), [u2, v], color),
+            Vertex::new(ty, ([bottom, left], depth), [u, v2], color),
+            Vertex::new(ty, ([bottom, right], depth), [u2, v2], color),
         ]
     }
 }
@@ -304,7 +309,7 @@ impl TextPipeline {
         context: &mut Context,
         top: i32,
         left: i32,
-        depth: i32,
+        depth: u32,
         line: &Line,
         line_height: LineHeight,
     ) {
@@ -318,8 +323,8 @@ impl TextPipeline {
                 let width = (end - start) as u32;
 
                 self.insert_quad(Vertex::quad(
-                    Vertex::BACKGROUND_RECTANGLE_TYPE,
-                    [top, left, depth],
+                    Vertex::BACKGROUND_RECTANGLE,
+                    ([top, left], depth),
                     [width, line_height],
                     Default::default(),
                     background,
@@ -352,13 +357,13 @@ impl TextPipeline {
 
             let (ty, ([x, y], is_new), texture, channels) = match image.content {
                 Content::Mask => (
-                    Vertex::MASK_GLYPH_TYPE,
+                    Vertex::MASK_GLYPH,
                     self.mask_atlas.insert(key, [width, height]).unwrap(),
                     &self.mask_texture,
                     1,
                 ),
                 Content::Color => (
-                    Vertex::COLOR_GLYPH_TYPE,
+                    Vertex::COLOR_GLYPH,
                     self.color_atlas.insert(key, [4 * width, height]).unwrap(),
                     &self.color_texture,
                     4,
@@ -390,7 +395,7 @@ impl TextPipeline {
 
             self.insert_quad(Vertex::quad(
                 ty,
-                [top, left, depth],
+                ([top, left], depth),
                 [width, height],
                 [x, y],
                 glyph.styles.foreground,

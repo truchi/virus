@@ -40,7 +40,7 @@ impl<'a> Draw<'a> {
         context: &mut Context,
         top: i32,
         left: i32,
-        depth: i32,
+        depth: u32,
         line: &Line,
         line_height: LineHeight,
     ) {
