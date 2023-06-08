@@ -14,18 +14,10 @@ struct Vertex {
     ty: u32,
     /// World coordinates.
     position: [i32; 3],
-    /// World/Texture size.
-    size: [u32; 2],
     /// Texture coordinates.
-    texture: [i32; 2],
-    /// Glyph position.
-    glyph: [u32; 2],
+    texture: [u32; 2],
     /// Rgba color.
     color: [u32; 4],
-    /// Blur radius.
-    blur_radius: u32,
-    /// Blur color.
-    blur_color: [u32; 3],
 }
 
 unsafe impl bytemuck::Zeroable for Vertex {}
@@ -35,15 +27,11 @@ impl Vertex {
     const BACKGROUND_RECTANGLE_TYPE: u32 = 0;
     const MASK_GLYPH_TYPE: u32 = 1;
     const COLOR_GLYPH_TYPE: u32 = 2;
-    const ATTRIBUTES: [VertexAttribute; 8] = vertex_attr_array![
+    const ATTRIBUTES: [VertexAttribute; 4] = vertex_attr_array![
         0 => Uint32,   // ty
         1 => Sint32x3, // position
-        2 => Uint32x2, // size
-        3 => Sint32x2, // texture
-        4 => Uint32x2, // glyph
-        5 => Uint32x4, // color
-        6 => Uint32,   // blur_radius
-        7 => Uint32x3, // blur_color
+        2 => Uint32x2, // texture
+        3 => Uint32x4, // color
     ];
 
     fn vertex_buffer_layout() -> VertexBufferLayout<'static> {
@@ -54,29 +42,17 @@ impl Vertex {
         }
     }
 
-    fn new(
-        ty: u32,
-        position: [i32; 3],
-        size: [u32; 2],
-        texture: [i32; 2],
-        glyph: [u32; 2],
-        color: Rgba,
-        blur_radius: u32,
-    ) -> Self {
+    fn new(ty: u32, position: [i32; 3], texture: [u32; 2], color: Rgba) -> Self {
         Self {
             ty,
             position,
-            size,
             texture,
-            glyph,
             color: [
                 color.r as u32,
                 color.g as u32,
                 color.b as u32,
                 color.a as u32,
             ],
-            blur_radius,
-            blur_color: [45, 70, 77],
         }
     }
 
@@ -86,60 +62,17 @@ impl Vertex {
         [width, height]: [u32; 2],
         [u, v]: [u32; 2],
         color: Rgba,
-        blur_radius: u32,
     ) -> [Self; 4] {
-        let size = [width, height];
-        let glyph = [u, v];
-
-        let top = top - blur_radius as i32;
-        let left = left - blur_radius as i32;
-        let width = (width + 2 * blur_radius) as i32;
-        let height = (height + 2 * blur_radius) as i32;
-        let u = u as i32 - blur_radius as i32;
-        let v = v as i32 - blur_radius as i32;
-
-        let right = left + width;
-        let bottom = top + height;
+        let right = left + width as i32;
+        let bottom = top + height as i32;
         let u2 = u + width;
         let v2 = v + height;
 
         [
-            Vertex::new(
-                ty,
-                [left, top, depth],
-                size,
-                [u, v],
-                glyph,
-                color,
-                blur_radius,
-            ),
-            Vertex::new(
-                ty,
-                [right, top, depth],
-                size,
-                [u2, v],
-                glyph,
-                color,
-                blur_radius,
-            ),
-            Vertex::new(
-                ty,
-                [left, bottom, depth],
-                size,
-                [u, v2],
-                glyph,
-                color,
-                blur_radius,
-            ),
-            Vertex::new(
-                ty,
-                [right, bottom, depth],
-                size,
-                [u2, v2],
-                glyph,
-                color,
-                blur_radius,
-            ),
+            Vertex::new(ty, [left, top, depth], [u, v], color),
+            Vertex::new(ty, [right, top, depth], [u2, v], color),
+            Vertex::new(ty, [left, bottom, depth], [u, v2], color),
+            Vertex::new(ty, [right, bottom, depth], [u2, v2], color),
         ]
     }
 }
@@ -242,7 +175,7 @@ impl TextPipeline {
                 // Size uniform
                 BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: ShaderStages::VERTEX | ShaderStages::FRAGMENT,
+                    visibility: ShaderStages::VERTEX,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -381,13 +314,15 @@ impl TextPipeline {
 
         for (Range { start, end }, background) in line.backgrounds() {
             if background.a != 0 {
+                let left = left + start as i32;
+                let width = (end - start) as u32;
+
                 self.insert_quad(Vertex::quad(
                     Vertex::BACKGROUND_RECTANGLE_TYPE,
-                    [top, left + start as i32, depth],
-                    [(end - start) as u32, line_height],
+                    [top, left, depth],
+                    [width, line_height],
                     Default::default(),
                     background,
-                    Default::default(),
                 ));
             }
         }
@@ -459,7 +394,6 @@ impl TextPipeline {
                 [width, height],
                 [x, y],
                 glyph.styles.foreground,
-                10,
             ));
         }
     }

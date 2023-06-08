@@ -67,8 +67,8 @@ pub fn main() {
                 line,
                 Styles {
                     font,
-                    foreground: Rgba::new(255, 255, 255, 255),
-                    background: Rgba::new(0, 0, 0, 0),
+                    foreground: Rgba::new(255, 0, 255, 255),
+                    background: Rgba::new(0, 50, 0, 255),
                     underline: false,
                     strike: false,
                 },
