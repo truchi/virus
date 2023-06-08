@@ -330,6 +330,20 @@ impl TextPipeline {
     ) {
         let region = ([region_top, region_left], [region_width, region_height]);
 
+        // Discard when outside region. This suppposes that:
+        // - glyphs are not bigger that line height (~ font size < line height)
+        // - glyphs outside do not affect what's inside (~ no blur)
+        // - no further transforms are applied in the shader
+        // Of course the GPU would have done that for us. Don't fear to remove if necessary.
+        {
+            let above = top + (line_height as i32) < 0;
+            let below = top >= region_height as i32;
+
+            if above || below {
+                return;
+            }
+        }
+
         //
         // Add backgrounds
         //
