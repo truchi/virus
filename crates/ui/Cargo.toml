@@ -11,6 +11,5 @@ virus-graphics.workspace = true
 
 ropey.workspace = true
 swash.workspace = true
-pixels.workspace = true
 winit.workspace = true
 tween.workspace = true

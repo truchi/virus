@@ -237,8 +237,7 @@ impl<K: Eq + Hash> Atlas<K> {
             .0;
 
         // Remove items from this bucket
-        self.items
-            .retain(|key, item| item.bucket as usize != bucket);
+        self.items.retain(|_, item| item.bucket as usize != bucket);
         self.buckets[bucket] = Default::default();
 
         Some(bucket)
