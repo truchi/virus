@@ -37,6 +37,16 @@ pub struct Draw<'a> {
 }
 
 impl<'a> Draw<'a> {
+    /// Returns the width of the drawing region.
+    pub fn width(&self) -> u32 {
+        self.region.1[0]
+    }
+
+    /// Returns the height of the drawing region.
+    pub fn height(&self) -> u32 {
+        self.region.1[1]
+    }
+
     /// Draws glyphs.
     pub fn glyphs(
         &mut self,
@@ -80,8 +90,8 @@ impl<'a> Draw<'a> {
 
 /// WebGpu graphics.
 pub struct Graphics {
-    window: Window,
-    surface: Surface,
+    window: Window,   // Window and Surface MUST live as long as one another
+    surface: Surface, // That's why they are both here, to make sure its safe
     config: SurfaceConfiguration,
     device: Device,
     queue: Queue,

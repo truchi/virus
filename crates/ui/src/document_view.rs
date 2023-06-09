@@ -64,6 +64,7 @@ use virus_graphics::{
     colors::Rgba,
     pixels_mut::Surface,
     text::{Context, FontSize, Line, LineHeight},
+    wgpu::Draw,
 };
 
 pub struct DocumentView {
@@ -162,29 +163,26 @@ impl DocumentView {
 
     pub fn render(
         &mut self,
-        surface: &mut Surface,
+        mut draw: Draw,
         context: &mut Context,
         document: &Document,
         scroll_top: u32,
     ) {
         let start = (scroll_top as f32 / self.line_height as f32).floor() as usize;
-        let len = (surface.height() as f32 / self.line_height as f32).ceil() as usize;
+        let len = (draw.height() as f32 / self.line_height as f32).ceil() as usize;
 
         self.prepare(context, document, start..start + len + 1);
 
         for (index, line) in &self.lines {
-            surface.draw_line(
-                context,
-                *index as i32 * self.line_height as i32 - scroll_top as i32,
-                0,
-                &line,
-                self.line_height as u32,
-            );
+            let top = *index as i32 * self.line_height as i32 - scroll_top as i32;
+            draw.glyphs(context, [top, 0], &line, self.line_height as u32);
         }
 
-        self.render_selection(surface, document, scroll_top);
+        // TODO
+        // self.render_selection(surface, document, scroll_top);
     }
 
+    // TODO
     pub fn render_selection(
         &mut self,
         surface: &mut Surface,

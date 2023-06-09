@@ -1,15 +1,12 @@
-use std::time::Duration;
-
 use crate::{
     document_view::DocumentView,
     tween::{Tween, Tweened},
 };
-use pixels::{Pixels, SurfaceTexture};
+use std::time::Duration;
 use virus_editor::{document::Document, theme::Theme};
 use virus_graphics::{
-    colors::Rgb,
-    pixels_mut::PixelsMut,
     text::{Context, Font, Fonts},
+    wgpu::Graphics,
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
@@ -21,20 +18,15 @@ const SCROLL_DURATION: Duration = Duration::from_millis(500);
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct Ui {
-    width: u32,
-    height: u32,
-    pixels: Pixels,
+    graphics: Graphics,
     context: Context,
     document_view: DocumentView,
     scroll_top: Tweened<u32>,
 }
 
 impl Ui {
-    pub fn new(window: &Window) -> Self {
-        let PhysicalSize { width, height } = window.inner_size();
-
-        let pixels =
-            Pixels::new(width, height, SurfaceTexture::new(width, height, &window)).unwrap();
+    pub fn new(window: Window) -> Self {
+        let graphics = Graphics::new(window);
         let context = Context::new(fonts());
         let document_view = DocumentView::new(
             HIGHLIGHT_QUERY.into(),
@@ -44,13 +36,15 @@ impl Ui {
         );
 
         Self {
-            width,
-            height,
-            pixels,
+            graphics,
             context,
             document_view,
             scroll_top: Tweened::new(0),
         }
+    }
+
+    pub fn window(&self) -> &Window {
+        self.graphics.window()
     }
 
     pub fn is_animating(&self) -> bool {
@@ -58,17 +52,20 @@ impl Ui {
     }
 
     pub fn scroll_up(&mut self) {
+        let size = self.window().inner_size();
+
         self.scroll_top.to(
-            self.scroll_top.end().saturating_sub(self.height / 2),
+            self.scroll_top.end().saturating_sub(size.height / 2),
             SCROLL_DURATION,
             Tween::ExpoOut,
         );
     }
 
     pub fn scroll_down(&mut self) {
+        let size = self.window().inner_size();
         let line_height = self.document_view.line_height();
         let rope_lines = self.document_view.rope().len_lines() as u32 - 1;
-        let screen_height_in_lines = self.height / line_height;
+        let screen_height_in_lines = size.height / line_height;
 
         if rope_lines > screen_height_in_lines {
             let end = self.scroll_top.end() + screen_height_in_lines / 2 * line_height;
@@ -79,10 +76,7 @@ impl Ui {
     }
 
     pub fn resize(&mut self, size: PhysicalSize<u32>) {
-        self.width = size.width;
-        self.height = size.height;
-        self.pixels.resize_surface(self.width, self.height).unwrap();
-        self.pixels.resize_buffer(self.width, self.height).unwrap();
+        self.graphics.resize(size);
     }
 
     pub fn update(&mut self, delta: Duration) {
@@ -90,17 +84,16 @@ impl Ui {
     }
 
     pub fn render(&mut self, document: &Document) {
-        let mut pixels_mut = PixelsMut::new(self.width, self.height, self.pixels.frame_mut());
-        pixels_mut.clear(Rgb::BLACK);
+        let size = self.window().inner_size();
 
         self.document_view.render(
-            &mut pixels_mut.surface(0, 0, self.width, self.height),
+            self.graphics.draw(([0, 0], [size.width, size.height])),
             &mut self.context,
             document,
             self.scroll_top.current(),
         );
 
-        self.pixels.render().unwrap();
+        self.graphics.render();
     }
 }
 

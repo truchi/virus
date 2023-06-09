@@ -14,7 +14,6 @@ use winit::{
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct Virus {
-    window: Window,
     events: Events,
     document: Document,
     ui: Ui,
@@ -24,12 +23,11 @@ pub struct Virus {
 impl Virus {
     fn new(window: Window) -> Self {
         let events = Events::new();
-        let ui = Ui::new(&window);
+        let ui = Ui::new(window);
         let mut document = Document::open(std::env::args().skip(1).next().unwrap()).unwrap();
         document.parse();
 
         Self {
-            window,
             events,
             document,
             ui,
@@ -51,7 +49,7 @@ impl Virus {
         });
 
         event_loop.run(move |event, _, flow| {
-            let event = match virus.events.update(&event, &virus.window) {
+            let event = match virus.events.update(&event, virus.ui.window()) {
                 Some(event) => event,
                 None => return,
             };
