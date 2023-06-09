@@ -117,7 +117,7 @@ pub fn main() {
                 for (i, line) in lines.iter().enumerate() {
                     graphics.draw(([1000, 1000], [1500, 1500])).glyphs(
                         &mut context,
-                        ([i as i32 * line_height as i32 - scroll, 0], 0),
+                        [i as i32 * line_height as i32 - scroll, 0],
                         line,
                         line_height,
                     );

@@ -41,7 +41,7 @@ impl<'a> Draw<'a> {
     pub fn glyphs(
         &mut self,
         context: &mut Context,
-        ([top, left], depth): ([i32; 2], u32),
+        [top, left]: [i32; 2],
         line: &Line,
         line_height: LineHeight,
     ) {
@@ -49,7 +49,7 @@ impl<'a> Draw<'a> {
             &self.graphics.queue,
             context,
             self.region,
-            ([top, left], depth),
+            [top, left],
             line,
             line_height,
         );

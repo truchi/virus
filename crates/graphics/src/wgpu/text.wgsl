@@ -22,14 +22,11 @@ struct Vertex {
     // Vertex `(top, left)` coordinates in region.
     @location(3) position: vec2i,
 
-    // Depth (far to near).
-    @location(4) depth: u32,
-
     // Texture `(x, y)` coordinates.
-    @location(5) uv: vec2u,
+    @location(4) uv: vec2u,
 
     // sRGBA color.
-    @location(6) color: vec4u,
+    @location(5) color: vec4u,
 }
 
 struct Fragment {
@@ -54,7 +51,6 @@ fn vertex(vertex: Vertex) -> Fragment {
     let region_position = vec2f(vertex.region_position.yx);
     let region_size = vec2f(vertex.region_size);
     let position = vec2f(vertex.position.yx);
-    let depth = f32(vertex.depth);
     let uv = vec2f(vertex.uv);
     let color = vec4f(vertex.color);
 
@@ -63,7 +59,7 @@ fn vertex(vertex: Vertex) -> Fragment {
     fragment.position = vec4f(
         (position.x + region_position.x) / surface.x - 1.0,
         1.0 - (position.y + region_position.y) /  surface.y,
-        depth,
+        0.0,
         1.0,
     );
     fragment.uv = uv / texture;

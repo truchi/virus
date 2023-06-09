@@ -18,8 +18,6 @@ struct Vertex {
     region_size: [u32; 2],
     /// Vertex `[top, left]` coordinates in region.
     position: [i32; 2],
-    /// Depth (far to near).
-    depth: u32,
     /// Texture `[x, y]` coordinates.
     uv: [u32; 2],
     /// sRGBA color.
@@ -34,14 +32,13 @@ impl Vertex {
     const MASK_GLYPH: u32 = 1;
     const COLOR_GLYPH: u32 = 2;
 
-    const ATTRIBUTES: [VertexAttribute; 7] = vertex_attr_array![
+    const ATTRIBUTES: [VertexAttribute; 6] = vertex_attr_array![
         0 => Uint32,   // ty
         1 => Sint32x2, // region position
         2 => Uint32x2, // region size
         3 => Sint32x2, // position
-        4 => Uint32,   // depth
-        5 => Uint32x2, // uv
-        6 => Uint32x4, // color
+        4 => Uint32x2, // uv
+        5 => Uint32x4, // color
     ];
 
     fn vertex_buffer_layout() -> VertexBufferLayout<'static> {
@@ -55,7 +52,7 @@ impl Vertex {
     fn new(
         ty: u32,
         ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
-        ([top, left], depth): ([i32; 2], u32),
+        [top, left]: [i32; 2],
         uv: [u32; 2],
         color: Rgba,
     ) -> Self {
@@ -64,7 +61,6 @@ impl Vertex {
             region_position: [region_top, region_left],
             region_size: [region_width, region_height],
             position: [top, left],
-            depth,
             uv,
             color: [
                 color.r as u32,
@@ -78,7 +74,7 @@ impl Vertex {
     fn quad(
         ty: u32,
         ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
-        ([top, left], depth): ([i32; 2], u32),
+        [top, left]: [i32; 2],
         [width, height]: [u32; 2],
         [u, v]: [u32; 2],
         color: Rgba,
@@ -90,10 +86,10 @@ impl Vertex {
         let v2 = v + height;
 
         [
-            Vertex::new(ty, region, ([top, left], depth), [u, v], color),
-            Vertex::new(ty, region, ([top, right], depth), [u2, v], color),
-            Vertex::new(ty, region, ([bottom, left], depth), [u, v2], color),
-            Vertex::new(ty, region, ([bottom, right], depth), [u2, v2], color),
+            Vertex::new(ty, region, [top, left], [u, v], color),
+            Vertex::new(ty, region, [top, right], [u2, v], color),
+            Vertex::new(ty, region, [bottom, left], [u, v2], color),
+            Vertex::new(ty, region, [bottom, right], [u2, v2], color),
         ]
     }
 }
@@ -324,7 +320,7 @@ impl TextPipeline {
         queue: &Queue,
         context: &mut Context,
         ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
-        ([top, left], depth): ([i32; 2], u32),
+        [top, left]: [i32; 2],
         line: &Line,
         line_height: LineHeight,
     ) {
@@ -356,7 +352,7 @@ impl TextPipeline {
                 self.insert_quad(Vertex::quad(
                     Vertex::BACKGROUND_RECTANGLE,
                     region,
-                    ([top, left], depth),
+                    [top, left],
                     [width, line_height],
                     [0, 0],
                     background,
@@ -428,7 +424,7 @@ impl TextPipeline {
             self.insert_quad(Vertex::quad(
                 ty,
                 region,
-                ([top, left], depth),
+                [top, left],
                 [width, height],
                 [u, v],
                 glyph.styles.foreground,
