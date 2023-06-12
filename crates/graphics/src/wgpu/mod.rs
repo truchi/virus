@@ -129,7 +129,7 @@ impl Graphics {
         let config = surface
             .get_default_config(&adapter, size.width, size.height)
             .unwrap();
-        assert!(config.format == TextureFormat::Rgba8UnormSrgb);
+        assert!(config.format == TextureFormat::Bgra8UnormSrgb);
         surface.configure(&device, &config);
 
         // Pipelines

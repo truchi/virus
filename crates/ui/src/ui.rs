@@ -112,83 +112,92 @@ fn fonts() -> Fonts {
 
     // const UBUNTU: &str = "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf";
 
-    const FIRA_LIGHT: &str = "/home/romain/.local/share/fonts/FiraCodeNerdFont/Fira Code Light Nerd Font Complete Mono.ttf";
-    const FIRA_REGULAR: &str = "/home/romain/.local/share/fonts/FiraCodeNerdFont/Fira Code Regular Nerd Font Complete Mono.ttf";
-    const FIRA_MEDIUM: &str = "/home/romain/.local/share/fonts/FiraCodeNerdFont/Fira Code Medium Nerd Font Complete Mono.ttf";
-    const FIRA_BOLD: &str = "/home/romain/.local/share/fonts/FiraCodeNerdFont/Fira Code Bold Nerd Font Complete Mono.ttf";
+    const FIRA_LIGHT: &str =
+        "/home/romain/.local/share/fonts/FiraCode/Fira Code Light Nerd Font Complete.ttf";
+    const FIRA_REGULAR: &str =
+        "/home/romain/.local/share/fonts/FiraCode/Fira Code Regular Nerd Font Complete.ttf";
+    const FIRA_MEDIUM: &str =
+        "/home/romain/.local/share/fonts/FiraCode/Fira Code Medium Nerd Font Complete.ttf";
+    const FIRA_BOLD: &str =
+        "/home/romain/.local/share/fonts/FiraCode/Fira Code Bold Nerd Font Complete.ttf";
 
-    const RECURSIVE_REGULAR: &str = "/home/romain/.local/share/fonts/Recursive/Recursive_Code/RecMonoDuotone/RecMonoDuotone-Regular-1.084.ttf";
-    const RECURSIVE_BOLD: &str = "/home/romain/.local/share/fonts/Recursive/Recursive_Code/RecMonoDuotone/RecMonoDuotone-Bold-1.084.ttf";
-    const RECURSIVE_ITALIC: &str = "/home/romain/.local/share/fonts/Recursive/Recursive_Code/RecMonoDuotone/RecMonoDuotone-Italic-1.084.ttf";
-    const RECURSIVE_BOLD_ITALIC: &str = "/home/romain/.local/share/fonts/Recursive/Recursive_Code/RecMonoDuotone/RecMonoDuotone-BoldItalic-1.084.ttf";
+    const RECURSIVE_REGULAR: &str = "/home/romain/.local/share/fonts/Recursive/Recursive_Code/RecMonoDuotone/RecMonoDuotone-Regular-1.085.ttf";
+    const RECURSIVE_BOLD: &str = "/home/romain/.local/share/fonts/Recursive/Recursive_Code/RecMonoDuotone/RecMonoDuotone-Bold-1.085.ttf";
+    const RECURSIVE_ITALIC: &str = "/home/romain/.local/share/fonts/Recursive/Recursive_Code/RecMonoDuotone/RecMonoDuotone-Italic-1.085.ttf";
+    const RECURSIVE_BOLD_ITALIC: &str = "/home/romain/.local/share/fonts/Recursive/Recursive_Code/RecMonoDuotone/RecMonoDuotone-BoldItalic-1.085.ttf";
 
     const JETBRAINS_THIN: &str =
-        "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Thin.ttf";
-    const JETBRAINS_EXTRA_LIGHT : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-ExtraLight.ttf";
+        "/home/romain/.local/share/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-Thin.ttf";
+    const JETBRAINS_EXTRA_LIGHT: &str =
+        "/home/romain/.local/share/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-ExtraLight.ttf";
     const JETBRAINS_LIGHT: &str =
-        "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Light.ttf";
+        "/home/romain/.local/share/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-Light.ttf";
     const JETBRAINS_REGULAR: &str =
-        "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Regular.ttf";
+        "/home/romain/.local/share/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-Regular.ttf";
     const JETBRAINS_MEDIUM: &str =
-        "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Medium.ttf";
+        "/home/romain/.local/share/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-Medium.ttf";
     const JETBRAINS_BOLD: &str =
-        "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Bold.ttf";
+        "/home/romain/.local/share/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-Bold.ttf";
     const JETBRAINS_SEMI_BOLD: &str =
-        "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-SemiBold.ttf";
+        "/home/romain/.local/share/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-SemiBold.ttf";
     const JETBRAINS_EXTRA_BOLD: &str =
-        "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-ExtraBold.ttf";
-    const JETBRAINS_THIN_ITALIC : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-ThinItalic.ttf";
-    const JETBRAINS_EXTRA_LIGHT_ITALIC : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-ExtraLightItalic.ttf";
-    const JETBRAINS_LIGHT_ITALIC : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-LightItalic.ttf";
+        "/home/romain/.local/share/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-ExtraBold.ttf";
+    const JETBRAINS_THIN_ITALIC: &str =
+        "/home/romain/.local/share/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-ThinItalic.ttf";
+    const JETBRAINS_EXTRA_LIGHT_ITALIC : &str = "/home/romain/.local/share/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-ExtraLightItalic.ttf";
+    const JETBRAINS_LIGHT_ITALIC: &str =
+        "/home/romain/.local/share/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-LightItalic.ttf";
     const JETBRAINS_ITALIC: &str =
-        "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Italic.ttf";
-    const JETBRAINS_MEDIUM_ITALIC : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-MediumItalic.ttf";
-    const JETBRAINS_BOLD_ITALIC : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-BoldItalic.ttf";
-    const JETBRAINS_SEMI_BOLD_ITALIC : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-SemiBoldItalic.ttf";
-    const JETBRAINS_EXTRA_BOLD_ITALIC : &str = "/home/romain/.local/share/fonts/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-ExtraBoldItalic.ttf";
+        "/home/romain/.local/share/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-Italic.ttf";
+    const JETBRAINS_MEDIUM_ITALIC: &str =
+        "/home/romain/.local/share/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-MediumItalic.ttf";
+    const JETBRAINS_BOLD_ITALIC: &str =
+        "/home/romain/.local/share/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-BoldItalic.ttf";
+    const JETBRAINS_SEMI_BOLD_ITALIC: &str =
+        "/home/romain/.local/share/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-SemiBoldItalic.ttf";
+    const JETBRAINS_EXTRA_BOLD_ITALIC: &str =
+        "/home/romain/.local/share/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-ExtraBoldItalic.ttf";
 
-    const VICTOR_THIN: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-Thin.ttf";
+    const VICTOR_THIN: &str = "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-Thin.ttf";
     const VICTOR_EXTRA_LIGHT: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-ExtraLight.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-ExtraLight.ttf";
     const VICTOR_LIGHT: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-Light.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-Light.ttf";
     const VICTOR_REGULAR: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-Regular.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-Regular.ttf";
     const VICTOR_MEDIUM: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-Medium.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-Medium.ttf";
     const VICTOR_SEMI_BOLD: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-SemiBold.ttf";
-    const VICTOR_BOLD: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-Bold.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-SemiBold.ttf";
+    const VICTOR_BOLD: &str = "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-Bold.ttf";
     const VICTOR_THIN_ITALIC: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-ThinItalic.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-ThinItalic.ttf";
     const VICTOR_EXTRA_LIGHT_ITALIC: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-ExtraLightItalic.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-ExtraLightItalic.ttf";
     const VICTOR_LIGHT_ITALIC: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-LightItalic.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-LightItalic.ttf";
     const VICTOR_ITALIC: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-Italic.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-Italic.ttf";
     const VICTOR_MEDIUM_ITALIC: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-MediumItalic.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-MediumItalic.ttf";
     const VICTOR_SEMI_BOLD_ITALIC: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-SemiBoldItalic.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-SemiBoldItalic.ttf";
     const VICTOR_BOLD_ITALIC: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-BoldItalic.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-BoldItalic.ttf";
     const VICTOR_THIN_OBLIQUE: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-ThinOblique.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-ThinOblique.ttf";
     const VICTOR_EXTRA_LIGHT_OBLIQUE: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-ExtraLightOblique.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-ExtraLightOblique.ttf";
     const VICTOR_LIGHT_OBLIQUE: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-LightOblique.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-LightOblique.ttf";
     const VICTOR_OBLIQUE: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-Oblique.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-Oblique.ttf";
     const VICTOR_MEDIUM_OBLIQUE: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-MediumOblique.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-MediumOblique.ttf";
     const VICTOR_SEMI_BOLD_OBLIQUE: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-SemiBoldOblique.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-SemiBoldOblique.ttf";
     const VICTOR_BOLD_OBLIQUE: &str =
-        "/home/romain/.local/share/fonts/VictorMonoAll/TTF/VictorMono-BoldOblique.ttf";
+        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-BoldOblique.ttf";
 
     let mut fonts = Fonts::new(Font::from_file(EMOJI).unwrap());
 
