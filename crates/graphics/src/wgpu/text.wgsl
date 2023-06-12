@@ -64,8 +64,8 @@ fn vertex(vertex: Vertex) -> Fragment {
     );
     fragment.uv = uv / texture;
     fragment.color = color / 255.0;
-    fragment.min = region_position / 2.0;
-    fragment.max = fragment.min + region_size / 2.0;
+    fragment.min = region_position;
+    fragment.max = fragment.min + region_size;
 
     return fragment;
 }
@@ -83,7 +83,7 @@ fn fragment(fragment: Fragment) -> @location(0) vec4f {
     // Clip region
     let inside = fragment.min <= fragment.position.xy & fragment.position.xy < fragment.max;
     if !(inside.x && inside.y) {
-        discard;
+        //discard;
     }
 
     switch fragment.ty {

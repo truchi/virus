@@ -8,7 +8,10 @@ use virus_graphics::{
     text::{Context, Font, Fonts},
     wgpu::Graphics,
 };
-use winit::{dpi::PhysicalSize, window::Window};
+use winit::{
+    dpi::{LogicalSize, PhysicalSize},
+    window::Window,
+};
 
 const HIGHLIGHT_QUERY: &str = include_str!("../../editor/treesitter/rust/highlights.scm");
 const SCROLL_DURATION: Duration = Duration::from_millis(500);
@@ -47,12 +50,16 @@ impl Ui {
         self.graphics.window()
     }
 
+    pub fn size(&self) -> LogicalSize<u32> {
+        self.graphics.size()
+    }
+
     pub fn is_animating(&self) -> bool {
         self.scroll_top.is_animating()
     }
 
     pub fn scroll_up(&mut self) {
-        let size = self.window().inner_size();
+        let size = self.size();
 
         self.scroll_top.to(
             self.scroll_top.end().saturating_sub(size.height / 2),
@@ -62,7 +69,7 @@ impl Ui {
     }
 
     pub fn scroll_down(&mut self) {
-        let size = self.window().inner_size();
+        let size = self.size();
         let line_height = self.document_view.line_height();
         let rope_lines = self.document_view.rope().len_lines() as u32 - 1;
         let screen_height_in_lines = size.height / line_height;
@@ -75,8 +82,8 @@ impl Ui {
         }
     }
 
-    pub fn resize(&mut self, size: PhysicalSize<u32>) {
-        self.graphics.resize(size);
+    pub fn resize(&mut self) {
+        self.graphics.resize();
     }
 
     pub fn update(&mut self, delta: Duration) {
@@ -84,7 +91,7 @@ impl Ui {
     }
 
     pub fn render(&mut self, document: &Document) {
-        let size = self.window().inner_size();
+        let size = self.size();
 
         self.document_view.render(
             self.graphics.draw(([0, 0], [size.width, size.height])),

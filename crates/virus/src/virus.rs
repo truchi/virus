@@ -1,3 +1,5 @@
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
 use crate::events::{Event, Events};
 use std::time::Instant;
 use virus_editor::document::Document;
@@ -134,7 +136,7 @@ impl Virus {
     fn on_released(&mut self, key: VirtualKeyCode, flow: &mut ControlFlow) {}
 
     fn on_resized(&mut self, size: PhysicalSize<u32>, flow: &mut ControlFlow) {
-        self.ui.resize(size);
+        self.ui.resize();
     }
 
     fn on_moved(&mut self, position: PhysicalPosition<i32>, flow: &mut ControlFlow) {}
