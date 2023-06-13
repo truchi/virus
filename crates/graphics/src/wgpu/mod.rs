@@ -24,10 +24,7 @@ use wgpu::{
     TextureUsages, TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexState,
     VertexStepMode,
 };
-use winit::{
-    dpi::{LogicalSize, PhysicalSize},
-    window::Window,
-};
+use winit::{dpi::PhysicalSize, window::Window};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Draw                                              //
@@ -125,7 +122,7 @@ impl Graphics {
             pollster::block_on(adapter.request_device(&Default::default(), None)).unwrap();
 
         // Configure surface
-        let size = window.inner_size().to_logical(window.scale_factor());
+        let size = window.inner_size();
         let config = surface
             .get_default_config(&adapter, size.width, size.height)
             .unwrap();
@@ -152,16 +149,9 @@ impl Graphics {
         &self.window
     }
 
-    /// Returns the `Window`'s logical size.
-    pub fn size(&self) -> LogicalSize<u32> {
-        self.window
-            .inner_size()
-            .to_logical(self.window.scale_factor())
-    }
-
     /// Resizes the surface to the window's logical size.
     pub fn resize(&mut self) {
-        let size = self.size();
+        let size = self.window.inner_size();
         self.config.width = size.width;
         self.config.height = size.height;
         self.surface.configure(&self.device, &self.config);

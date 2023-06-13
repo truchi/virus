@@ -311,7 +311,7 @@ impl TextPipeline {
         }
     }
 
-    pub fn resize(&mut self, size: LogicalSize<u32>) {
+    pub fn resize(&mut self, size: PhysicalSize<u32>) {
         self.sizes[0] = [size.width, size.height];
     }
 
@@ -336,7 +336,7 @@ impl TextPipeline {
             let below = top >= region_height as i32;
 
             if above || below {
-                //    return;
+                // return;
             }
         }
 

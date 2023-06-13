@@ -160,7 +160,7 @@ impl LinePipeline {
         }
     }
 
-    pub fn resize(&mut self, size: LogicalSize<u32>) {
+    pub fn resize(&mut self, size: PhysicalSize<u32>) {
         self.sizes[0] = [size.width, size.height];
     }
 

@@ -32,6 +32,8 @@ pub enum Event {
 //                                                Events                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+const DEBUG: bool = false;
+
 #[derive(Debug)]
 pub struct Events {
     modifiers: ModifiersState,
@@ -53,18 +55,19 @@ impl Events {
         winit_event: &WinitEvent<T>,
         window: &Window,
     ) -> Option<Event> {
-        match winit_event {
-            WinitEvent::NewEvents(_) => {
-                println!("=======================================================================");
+        if DEBUG {
+            match winit_event {
+                WinitEvent::NewEvents(_) => {
+                    println!(
+                        "======================================================================="
+                    );
+                }
+                _ => {}
             }
-            _ => {}
         }
 
         let event = match winit_event {
-            WinitEvent::NewEvents(_) => {
-                dbg!(std::time::Instant::now());
-                None
-            }
+            WinitEvent::NewEvents(_) => None,
             WinitEvent::WindowEvent { window_id, event } => {
                 if window.id() == *window_id {
                     match event {
@@ -141,17 +144,21 @@ impl Events {
             WinitEvent::LoopDestroyed => Some(Event::Quit),
         };
 
-        if let Some(event) = event {
-            println!("\x1B[0;32m{event:#?}\x1B[0m");
-        } else {
-            println!("\x1B[0;31m{winit_event:#?}\x1B[0m");
-        }
-
-        match winit_event {
-            WinitEvent::RedrawEventsCleared => {
-                println!("=======================================================================");
+        if DEBUG {
+            if let Some(event) = event {
+                println!("\x1B[0;32m{event:#?}\x1B[0m");
+            } else {
+                println!("\x1B[0;31m{winit_event:#?}\x1B[0m");
             }
-            _ => {}
+
+            match winit_event {
+                WinitEvent::RedrawEventsCleared => {
+                    println!(
+                        "======================================================================="
+                    );
+                }
+                _ => {}
+            }
         }
 
         event

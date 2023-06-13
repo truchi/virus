@@ -58,7 +58,7 @@ fn vertex(vertex: Vertex) -> Fragment {
     fragment.ty = vertex.ty;
     fragment.position = vec4f(
         (position.x + region_position.x) / surface.x - 1.0,
-        1.0 - (position.y + region_position.y) /  surface.y,
+        1.0 - (position.y + region_position.y) / surface.y,
         0.0,
         1.0,
     );
@@ -83,7 +83,7 @@ fn fragment(fragment: Fragment) -> @location(0) vec4f {
     // Clip region
     let inside = fragment.min <= fragment.position.xy & fragment.position.xy < fragment.max;
     if !(inside.x && inside.y) {
-        //discard;
+        discard;
     }
 
     switch fragment.ty {
