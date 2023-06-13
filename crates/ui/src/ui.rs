@@ -5,7 +5,7 @@ use crate::{
 use std::time::Duration;
 use virus_editor::{document::Document, theme::Theme};
 use virus_graphics::{
-    text::{Context, Font, Fonts},
+    text::{Context, Font, FontStyle, FontWeight, Fonts},
     wgpu::Graphics,
 };
 use winit::window::Window;
@@ -84,12 +84,10 @@ impl Ui {
     }
 
     pub fn render(&mut self, document: &Document) {
-        let size = self.window().inner_size();
-        let height = self.screen_height_in_lines() * self.document_view.line_height();
+        let region = self.region();
 
         self.document_view.render(
-            self.graphics
-                .draw(([(size.height - height) as i32 / 2, 0], [size.width, height])),
+            self.graphics.draw(region),
             &mut self.context,
             document,
             self.scroll_top.current(),
@@ -103,6 +101,35 @@ impl Ui {
 impl Ui {
     fn screen_height_in_lines(&self) -> u32 {
         self.window().inner_size().height / self.document_view.line_height()
+    }
+
+    fn region(&mut self) -> ([i32; 2], [u32; 2]) {
+        const COLUMNS: u32 = 100;
+
+        let size = self.window().inner_size();
+        let width = {
+            let font = self
+                .context
+                .fonts()
+                .get((
+                    self.document_view.family(),
+                    FontWeight::Regular,
+                    FontStyle::Normal,
+                ))
+                .unwrap()
+                .key();
+            let advance = self
+                .context
+                .advance(font, self.document_view.font_size())
+                .unwrap();
+
+            size.width.min(COLUMNS * advance.round() as u32)
+        };
+        let height = self.screen_height_in_lines() * self.document_view.line_height();
+        let top = (size.height - height) / 2;
+        let left = (size.width - width) / 2;
+
+        ([top as i32, left as i32], [width, height])
     }
 }
 

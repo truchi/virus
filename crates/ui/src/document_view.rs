@@ -96,6 +96,14 @@ impl DocumentView {
         }
     }
 
+    pub fn family(&self) -> FontFamilyKey {
+        self.family
+    }
+
+    pub fn font_size(&self) -> FontSize {
+        self.font_size
+    }
+
     pub fn line_height(&self) -> LineHeight {
         self.line_height
     }
