@@ -30,7 +30,8 @@ impl Ui {
         let context = Context::new(fonts());
         let document_view = DocumentView::new(
             HIGHLIGHT_QUERY.into(),
-            Theme::dracula(context.fonts()),
+            context.fonts().get("Victor").unwrap().key(),
+            Theme::dracula(),
             20,
             25,
         );

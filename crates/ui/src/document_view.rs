@@ -61,12 +61,13 @@ use virus_editor::{
     theme::Theme,
 };
 use virus_graphics::{
-    text::{Context, FontSize, Line, LineHeight},
+    text::{Context, FontFamilyKey, FontSize, Line, LineHeight},
     wgpu::Draw,
 };
 
 pub struct DocumentView {
     query: String,
+    family: FontFamilyKey,
     theme: Theme,
     font_size: FontSize,
     line_height: LineHeight,
@@ -76,9 +77,16 @@ pub struct DocumentView {
 }
 
 impl DocumentView {
-    pub fn new(query: String, theme: Theme, font_size: FontSize, line_height: LineHeight) -> Self {
+    pub fn new(
+        query: String,
+        family: FontFamilyKey,
+        theme: Theme,
+        font_size: FontSize,
+        line_height: LineHeight,
+    ) -> Self {
         Self {
             query,
+            family,
             theme,
             font_size,
             line_height,
@@ -150,6 +158,7 @@ impl DocumentView {
                         .get_byte_slice(start.index..end.index)
                         .unwrap(),
                 ),
+                self.family,
                 self.theme[key],
             );
         }

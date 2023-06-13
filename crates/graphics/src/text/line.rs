@@ -17,7 +17,7 @@ pub struct Line {
     /// Glyphs.
     glyphs: Vec<Glyph>,
     /// Font size.
-    size: FontSize,
+    size: FontSize, // TODO remove?
 }
 
 impl Line {
@@ -109,11 +109,11 @@ impl<'a> LineShaper<'a> {
     /// Feeds `str` to the `LineShaper` with font `styles`.
     ///
     /// Not able to produce ligature across calls to this function.
-    pub fn push(&mut self, str: &str, styles: Styles) {
+    pub fn push(&mut self, str: &str, family: FontFamilyKey, styles: Styles) {
         let font = self
             .fonts
-            .get(styles.font)
-            .expect("Font not found")
+            .get((family, styles.weight, styles.style))
+            .unwrap()
             .as_ref();
         let emoji = self.fonts.emoji().as_ref();
         let font_key = font.key;
@@ -194,13 +194,17 @@ impl<'a> LineShaper<'a> {
         }
     }
 
-    fn flush(line: &mut Line, advance: &mut Advance, shaper: Shaper, key: FontKey, styles: Styles) {
-        let mut styles = styles;
-        styles.font = key;
-
+    fn flush(
+        line: &mut Line,
+        advance: &mut Advance,
+        shaper: Shaper,
+        font: FontKey,
+        styles: Styles,
+    ) {
         shaper.shape_with(|cluster| {
             for glyph in cluster.glyphs {
                 line.glyphs.push(Glyph {
+                    font,
                     id: glyph.id,
                     offset: *advance,
                     advance: glyph.advance,
@@ -256,19 +260,20 @@ impl<'a> LineScaler<'a> {
     pub fn next<'b>(&'b mut self) -> Option<(Advance, Glyph, Option<&'b Image>)> {
         let advance = self.advance;
         let glyph = self.glyphs.next()?;
-        let key = glyph.styles.font;
-        let font = self.fonts.get(key).expect("font").as_ref();
-        let image = self.cache.get_or_insert((key, glyph.id, self.size), || {
-            self.render.render(
-                &mut self
-                    .scale
-                    .builder(font)
-                    .size(self.size as f32)
-                    .hint(Self::HINT)
-                    .build(),
-                glyph.id,
-            )
-        });
+        let font = self.fonts.get(glyph.font).expect("font").as_ref();
+        let image = self
+            .cache
+            .get_or_insert((glyph.font, glyph.id, self.size), || {
+                self.render.render(
+                    &mut self
+                        .scale
+                        .builder(font)
+                        .size(self.size as f32)
+                        .hint(Self::HINT)
+                        .build(),
+                    glyph.id,
+                )
+            });
 
         self.advance += glyph.advance;
         Some((advance, *glyph, image.as_ref()))

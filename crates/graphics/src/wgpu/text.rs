@@ -375,7 +375,7 @@ impl TextPipeline {
 
             let top = top + line.size() as i32;
             let left = left + advance as i32;
-            let key = (glyph.styles.font, glyph.id, line.size());
+            let key = (glyph.font, glyph.id, line.size());
 
             // Swash image has placement
             let top = top - image.placement.top;

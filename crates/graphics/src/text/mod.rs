@@ -51,6 +51,8 @@ pub type Advance = f32;
 /// A shaped glyph.
 #[derive(Copy, Clone, Debug)]
 pub struct Glyph {
+    /// Font key.
+    pub font: FontKey,
     /// Glyph id.
     pub id: GlyphId,
     /// Glyph advance offset.
@@ -70,7 +72,8 @@ pub struct Glyph {
 /// Glyph styles.
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Styles {
-    pub font: FontKey,
+    pub weight: FontWeight,
+    pub style: FontStyle,
     pub foreground: Rgba,
     pub background: Rgba,
     pub underline: bool,
