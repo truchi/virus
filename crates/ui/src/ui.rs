@@ -52,20 +52,19 @@ impl Ui {
     }
 
     pub fn scroll_up(&mut self) {
-        let size = self.window().inner_size();
+        let scroll = self.screen_height_in_lines() / 2 * self.document_view.line_height();
 
         self.scroll_top.to(
-            self.scroll_top.end().saturating_sub(size.height / 2),
+            self.scroll_top.end().saturating_sub(scroll),
             SCROLL_DURATION,
             Tween::ExpoOut,
         );
     }
 
     pub fn scroll_down(&mut self) {
-        let size = self.window().inner_size();
         let line_height = self.document_view.line_height();
         let rope_lines = self.document_view.rope().len_lines() as u32 - 1;
-        let screen_height_in_lines = size.height / line_height;
+        let screen_height_in_lines = self.screen_height_in_lines();
 
         if rope_lines > screen_height_in_lines {
             let end = self.scroll_top.end() + screen_height_in_lines / 2 * line_height;
@@ -85,15 +84,24 @@ impl Ui {
 
     pub fn render(&mut self, document: &Document) {
         let size = self.window().inner_size();
+        let height = self.screen_height_in_lines() * self.document_view.line_height();
 
         self.document_view.render(
-            self.graphics.draw(([0, 0], [size.width, size.height])),
+            self.graphics
+                .draw(([(size.height - height) as i32 / 2, 0], [size.width, height])),
             &mut self.context,
             document,
             self.scroll_top.current(),
         );
 
         self.graphics.render();
+    }
+}
+
+/// Private.
+impl Ui {
+    fn screen_height_in_lines(&self) -> u32 {
+        self.window().inner_size().height / self.document_view.line_height()
     }
 }
 
