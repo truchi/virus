@@ -1,7 +1,7 @@
 use crate::text::*;
 use std::ops::Range;
 use swash::{
-    scale::{image::Image, Render, ScaleContext, Source, StrikeWith},
+    scale::{image::Image, Render, ScaleContext},
     shape::{ShapeContext, Shaper},
     text::cluster::{CharCluster, Parser, Status, Token},
     FontRef,
@@ -17,7 +17,7 @@ pub struct Line {
     /// Glyphs.
     glyphs: Vec<Glyph>,
     /// Font size.
-    size: FontSize, // TODO remove?
+    size: FontSize,
 }
 
 impl Line {
@@ -228,19 +228,10 @@ pub struct LineScaler<'a> {
     scale: &'a mut ScaleContext,
     glyphs: std::slice::Iter<'a, Glyph>,
     size: FontSize,
-    advance: Advance,
     render: Render<'static>,
 }
 
 impl<'a> LineScaler<'a> {
-    const HINT: bool = true;
-    const SOURCES: &[Source] = &[
-        Source::ColorOutline(0),
-        Source::ColorBitmap(StrikeWith::BestFit),
-        Source::Outline,
-        Source::Bitmap(StrikeWith::BestFit),
-    ];
-
     /// Creates a new `LineScaler` of `line` with `context`.
     pub fn new(context: &'a mut Context, line: &'a Line) -> Self {
         let (fonts, cache, _, scale) = context.as_muts();
@@ -251,14 +242,12 @@ impl<'a> LineScaler<'a> {
             scale,
             glyphs: line.glyphs.iter(),
             size: line.size,
-            advance: 0.,
-            render: Render::new(Self::SOURCES),
+            render: Render::new(SOURCES),
         }
     }
 
     /// Returns the next glyph, along with its advance and image.
-    pub fn next<'b>(&'b mut self) -> Option<(Advance, Glyph, Option<&'b Image>)> {
-        let advance = self.advance;
+    pub fn next<'b>(&'b mut self) -> Option<(Glyph, Option<&'b Image>)> {
         let glyph = self.glyphs.next()?;
         let font = self.fonts.get(glyph.font).expect("font").as_ref();
         let image = self
@@ -269,13 +258,12 @@ impl<'a> LineScaler<'a> {
                         .scale
                         .builder(font)
                         .size(self.size as f32)
-                        .hint(Self::HINT)
+                        .hint(HINT)
                         .build(),
                     glyph.id,
                 )
             });
 
-        self.advance += glyph.advance;
-        Some((advance, *glyph, image.as_ref()))
+        Some((*glyph, image.as_ref()))
     }
 }

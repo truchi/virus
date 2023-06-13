@@ -366,7 +366,7 @@ impl TextPipeline {
 
         let mut scaler = line.scaler(context);
 
-        while let Some((advance, glyph, image)) = scaler.next() {
+        while let Some((glyph, image)) = scaler.next() {
             let image = if let Some(image) = image {
                 image
             } else {
@@ -374,7 +374,7 @@ impl TextPipeline {
             };
 
             let top = top + line.size() as i32;
-            let left = left + advance as i32;
+            let left = left + glyph.offset.round() as i32;
             let key = (glyph.font, glyph.id, line.size());
 
             // Swash image has placement

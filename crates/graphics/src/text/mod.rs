@@ -16,12 +16,20 @@ pub use line::*;
 
 use crate::colors::Rgba;
 use swash::{
+    scale::{Source, StrikeWith},
     text::{cluster::SourceRange, Script},
     GlyphId,
 };
 
 const SCRIPT: Script = Script::Unknown;
 const FEATURES: &'static [(&'static str, u16)] = &[("dlig", 1), ("calt", 1)];
+const HINT: bool = true;
+const SOURCES: &[Source] = &[
+    Source::ColorOutline(0),
+    Source::ColorBitmap(StrikeWith::BestFit),
+    Source::Outline,
+    Source::Bitmap(StrikeWith::BestFit),
+];
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             FontSize                                           //
