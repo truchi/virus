@@ -3,10 +3,7 @@ use std::ops::Range;
 use swash::{
     scale::{image::Image, Render, ScaleContext, Source, StrikeWith},
     shape::{ShapeContext, Shaper},
-    text::{
-        cluster::{CharCluster, Parser, Status, Token},
-        Script,
-    },
+    text::cluster::{CharCluster, Parser, Status, Token},
     FontRef,
 };
 
@@ -93,9 +90,6 @@ pub struct LineShaper<'a> {
 }
 
 impl<'a> LineShaper<'a> {
-    const SCRIPT: Script = Script::Unknown;
-    const FEATURES: &'static [(&'static str, u16)] = &[("dlig", 1), ("calt", 1)];
-
     /// Creates a new `LineShaper` at `size` with `context`.
     pub fn new(context: &'a mut Context, size: FontSize) -> Self {
         let (fonts, _, shape, _) = context.as_muts();
@@ -129,10 +123,7 @@ impl<'a> LineShaper<'a> {
         let mut font_or_emoji = FontOrEmoji::Font;
         let mut cluster = CharCluster::default();
         let mut shaper = Self::build(self.shape, font, self.line.size);
-        let mut parser = Parser::new(
-            Self::SCRIPT,
-            str.char_indices().map(Self::token(self.bytes)),
-        );
+        let mut parser = Parser::new(SCRIPT, str.char_indices().map(Self::token(self.bytes)));
 
         while parser.next(&mut cluster) {
             shaper = match (Self::select(font, emoji, &mut cluster), font_or_emoji) {
@@ -177,9 +168,9 @@ impl<'a> LineShaper<'a> {
     fn build<'b>(shape: &'b mut ShapeContext, font: FontRef<'b>, size: FontSize) -> Shaper<'b> {
         shape
             .builder(font)
-            .script(Self::SCRIPT)
+            .script(SCRIPT)
             .size(size as f32)
-            .features(Self::FEATURES)
+            .features(FEATURES)
             .build()
     }
 

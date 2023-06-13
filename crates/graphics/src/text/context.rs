@@ -1,10 +1,9 @@
 use crate::text::*;
 use lru::LruCache;
-use std::num::NonZeroUsize;
+use std::{collections::HashMap, num::NonZeroUsize};
 use swash::{
     scale::{image::Image, ScaleContext},
     shape::ShapeContext,
-    GlyphId,
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -28,6 +27,8 @@ pub struct Context {
     shape: ShapeContext,
     /// Scale context.
     scale: ScaleContext,
+    /// Advance cache.
+    advances: HashMap<(FontKey, FontSize), Option<Advance>>,
 }
 
 impl Context {
@@ -41,6 +42,7 @@ impl Context {
             glyphs: Glyphs::new(NonZeroUsize::new(Self::GLYPHS_CAPACITY).unwrap()),
             shape: Default::default(),
             scale: Default::default(),
+            advances: Default::default(),
         }
     }
 
@@ -69,5 +71,38 @@ impl Context {
             &mut self.shape,
             &mut self.scale,
         )
+    }
+
+    /// Returns the advance of the character `'a'` for `font` at `size`,
+    /// or `None` if `font` does not exists or advance is `0.0`.
+    pub fn advance(&mut self, font: FontKey, size: FontSize) -> Option<Advance> {
+        const STR: &str = "a";
+
+        if let Some(advance) = self.advances.get(&(font, size)) {
+            return *advance;
+        }
+
+        let font = self.fonts.get(font)?;
+
+        let mut advance = 0.0;
+        let mut shaper = self
+            .shape
+            .builder(font.as_ref())
+            .script(SCRIPT)
+            .size(size as f32)
+            .features(FEATURES)
+            .build();
+
+        shaper.add_str(STR);
+        shaper.shape_with(|cluster| {
+            for glyph in cluster.glyphs {
+                advance += glyph.advance;
+            }
+        });
+
+        let advance = if advance == 0.0 { None } else { Some(advance) };
+        self.advances.insert((font.key(), size), advance);
+
+        advance
     }
 }
