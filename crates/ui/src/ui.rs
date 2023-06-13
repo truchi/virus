@@ -31,8 +31,8 @@ impl Ui {
         let document_view = DocumentView::new(
             HIGHLIGHT_QUERY.into(),
             Theme::dracula(context.fonts()),
-            40,
-            50,
+            20,
+            25,
         );
 
         Self {

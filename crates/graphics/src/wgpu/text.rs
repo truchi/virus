@@ -336,7 +336,7 @@ impl TextPipeline {
             let below = top >= region_height as i32;
 
             if above || below {
-                // return;
+                return;
             }
         }
 

@@ -57,8 +57,8 @@ fn vertex(vertex: Vertex) -> Fragment {
     var fragment: Fragment;
     fragment.ty = vertex.ty;
     fragment.position = vec4f(
-        (position.x + region_position.x) / surface.x - 1.0,
-        1.0 - (position.y + region_position.y) / surface.y,
+        0.0 + 2.0 * (position.x + region_position.x) / surface.x - 1.0,
+        0.0 - 2.0 * (position.y + region_position.y) / surface.y + 1.0,
         0.0,
         1.0,
     );
