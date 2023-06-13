@@ -172,8 +172,8 @@ impl<'rope> Highlights<'rope> {
 
         highlights.inspect(|highlight| {
             // In the requested line range
-            debug_assert!((self.start.line..self.end.line).contains(&highlight.start.line));
-            debug_assert!((self.start.line..self.end.line).contains(&highlight.end.line));
+            debug_assert!((self.start.line..=self.end.line).contains(&highlight.start.line));
+            debug_assert!((self.start.line..=self.end.line).contains(&highlight.end.line));
             // One-line
             debug_assert!(highlight.start.line == highlight.end.line);
             // Not empty
