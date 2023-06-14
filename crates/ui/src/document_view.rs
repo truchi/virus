@@ -61,9 +61,16 @@ use virus_editor::{
     theme::Theme,
 };
 use virus_graphics::{
-    text::{Context, FontFamilyKey, FontSize, Line, LineHeight},
+    colors::Rgba,
+    text::{
+        Advance, Context, FontFamilyKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
+    },
     wgpu::Draw,
 };
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                                View                                            //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct DocumentView {
     query: String,
@@ -112,93 +119,18 @@ impl DocumentView {
         &self.rope
     }
 
-    pub fn prepare(
-        &mut self,
-        context: &mut Context,
-        document: &Document,
-        Range { start, end }: Range<usize>,
-    ) {
-        // No need to prepare if same rope and similar range
-        if (self.rope.is_instance(document.rope()) || self.rope == *document.rope())
-            && self.range.contains(&start)
-            && self.range.contains(&(end - 1))
-        {
-            return;
-        }
-
-        // Apply margins
-        let margin = (end - start) / 2;
-        let start = start.saturating_sub(margin);
-        let end = (end + margin).max(self.rope.len_lines());
-
-        self.lines.clear();
-        self.range = start..end;
-        self.rope = document.rope().clone();
-
-        let highlights = Highlights::new(
-            document.rope(),
-            document.tree().unwrap().root_node(),
-            start..end,
-            &document.query(&self.query).unwrap(),
-        );
-
-        let mut prev_line = None;
-        let mut shaper = Line::shaper(context, self.font_size);
-
-        for Highlight { start, end, key } in highlights.highlights() {
-            debug_assert!(start.line == end.line);
-            let line = start.line;
-
-            if prev_line != Some(line) {
-                if let Some(line) = prev_line {
-                    self.lines.push((line, shaper.line()));
-                }
-
-                prev_line = Some(line);
-                shaper = Line::shaper(context, self.font_size);
-            }
-
-            shaper.push(
-                // We cow to make sure ligatures are not split between rope chunks
-                &Cow::from(
-                    document
-                        .rope()
-                        .get_byte_slice(start.index..end.index)
-                        .unwrap(),
-                ),
-                self.family,
-                self.theme[key],
-            );
-        }
-
-        if let Some(line) = prev_line {
-            self.lines.push((line, shaper.line()));
-        }
-    }
-
     pub fn render(
         &mut self,
-        mut draw: Draw,
+        draw: &mut Draw,
         context: &mut Context,
         document: &Document,
         scroll_top: u32,
     ) {
-        let start = (scroll_top as f32 / self.line_height as f32).floor() as usize;
-        let len = (draw.height() as f32 / self.line_height as f32).ceil() as usize;
-
-        self.prepare(context, document, start..start + len + 1);
-
-        for (index, line) in &self.lines {
-            let top = *index as i32 * self.line_height as i32 - scroll_top as i32;
-            draw.glyphs(context, [top, 0], &line, self.line_height as u32);
-        }
-
-        // TODO
-        // self.render_selection(surface, document, scroll_top);
+        Renderer::new(self, context, draw, document, scroll_top).render();
     }
 
     // TODO
-    // pub fn render_selection(
+    // fn render_selection(
     //     &mut self,
     //     surface: &mut Surface,
     //     document: &Document,
@@ -343,4 +275,167 @@ impl DocumentView {
     //     let radius = quarter.min(width / 2);
     //     surface.stroke_corner(BottomRight, bottom2, right2, width, half, radius, color);
     // }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                              Renderer                                          //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+struct Renderer<'a, 'b, 'c, 'd, 'e> {
+    view: &'a mut DocumentView,
+    context: &'b mut Context,
+    draw: &'c mut Draw<'d>,
+    document: &'e Document,
+    scroll_top: u32,
+    start: usize,
+    end: usize,
+    rope_lines: usize,
+    advance: Advance,
+    line_numbers_width: Advance,
+}
+
+impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
+    fn new(
+        view: &'a mut DocumentView,
+        context: &'b mut Context,
+        draw: &'c mut Draw<'d>,
+        document: &'e Document,
+        scroll_top: u32,
+    ) -> Self {
+        let start = (scroll_top as f32 / view.line_height as f32).floor() as usize;
+        let end = start + (draw.height() as f32 / view.line_height as f32).ceil() as usize;
+        let rope_lines = document.rope().len_lines() - 1;
+        let advance = {
+            let font = context
+                .fonts()
+                .get((view.family, FontWeight::Regular, FontStyle::Normal))
+                .unwrap();
+            context.advance(font.key(), view.font_size).unwrap()
+        };
+        let line_numbers_width = advance * (rope_lines.ilog10() + 2) as Advance;
+
+        Self {
+            view,
+            context,
+            draw,
+            document,
+            scroll_top,
+            start,
+            end,
+            rope_lines,
+            advance,
+            line_numbers_width,
+        }
+    }
+
+    fn render(&mut self) {
+        self.highlights();
+        self.render_line_numbers();
+        self.render_document((self.line_numbers_width + self.advance).ceil() as i32);
+    }
+
+    fn highlights(&mut self) {
+        // No need to prepare highlights if same rope and similar range
+        if (self.view.rope.is_instance(self.document.rope())
+            || self.view.rope == *self.document.rope())
+            && self.view.range.contains(&self.start)
+            && self.view.range.contains(&(self.end - 1))
+        {
+            return;
+        }
+
+        // Apply margins: half that line range above and below
+        let margin = (self.end - self.start) / 2;
+        let start = self.start.saturating_sub(margin);
+        let end = (self.end + margin).max(self.rope_lines + 1);
+
+        self.view.lines.clear();
+        self.view.range = start..end;
+        self.view.rope = self.document.rope().clone();
+
+        // Compute lines
+        let highlights = Highlights::new(
+            self.document.rope(),
+            self.document.tree().unwrap().root_node(),
+            start..end,
+            &self.document.query(&self.view.query).unwrap(),
+        );
+
+        let mut shaper = Line::shaper(self.context, self.view.font_size);
+        let mut prev_line = None;
+
+        for Highlight { start, end, key } in highlights.highlights() {
+            debug_assert!(start.line == end.line);
+            let line = start.line;
+
+            // New line
+            if prev_line != Some(line) {
+                if let Some(line) = prev_line {
+                    self.view.lines.push((line, shaper.line()));
+                }
+
+                shaper = Line::shaper(self.context, self.view.font_size);
+                prev_line = Some(line);
+            }
+
+            shaper.push(
+                // We cow to make sure ligatures are not split between rope chunks
+                &Cow::from(
+                    self.document
+                        .rope()
+                        .get_byte_slice(start.index..end.index)
+                        .unwrap(),
+                ),
+                self.view.family,
+                self.view.theme[key],
+            );
+        }
+
+        // Last line
+        if let Some(line) = prev_line {
+            self.view.lines.push((line, shaper.line()));
+        }
+    }
+
+    fn render_line_numbers(&mut self) {
+        let (family, foreground) = (self.view.family, self.view.theme.comment.foreground);
+        let styles = Styles {
+            weight: FontWeight::Regular,
+            style: FontStyle::Normal,
+            foreground: foreground.solid().transparent(127),
+            background: Rgba::TRANSPARENT,
+            underline: false,
+            strike: false,
+        };
+
+        for number in self.start..self.end.min(self.rope_lines) {
+            let line = {
+                let mut shaper = Line::shaper(self.context, self.view.font_size);
+                shaper.push(&(number + 1).to_string(), family, styles);
+                shaper.line()
+            };
+
+            let top = number as i32 * self.view.line_height as i32 - self.scroll_top as i32;
+            let left = (self.line_numbers_width - line.width()).round() as i32;
+
+            self.draw.glyphs(
+                self.context,
+                [top, left],
+                &line,
+                self.view.line_height as u32,
+            );
+        }
+    }
+
+    fn render_document(&mut self, left: i32) {
+        for (index, line) in &self.view.lines {
+            let top = *index as i32 * self.view.line_height as i32 - self.scroll_top as i32;
+            self.draw.glyphs(
+                self.context,
+                [top, left],
+                &line,
+                self.view.line_height as u32,
+            );
+        }
+    }
 }

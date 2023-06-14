@@ -41,6 +41,14 @@ impl Line {
         self.size
     }
 
+    /// Returns the width of this `Line`.
+    pub fn width(&self) -> Advance {
+        self.glyphs
+            .last()
+            .map(|glyph| glyph.offset + glyph.advance)
+            .unwrap_or_default()
+    }
+
     /// Returns an iterator of contiguous backgrounds.
     pub fn backgrounds(&self) -> impl '_ + Iterator<Item = (Range<f32>, Rgba)> {
         // NOTE: we could also compute in `LineShaper::push()` and store in `Line`
@@ -246,7 +254,7 @@ impl<'a> LineScaler<'a> {
         }
     }
 
-    /// Returns the next glyph, along with its advance and image.
+    /// Returns the next glyph and its image.
     pub fn next<'b>(&'b mut self) -> Option<(Glyph, Option<&'b Image>)> {
         let glyph = self.glyphs.next()?;
         let font = self.fonts.get(glyph.font).expect("font").as_ref();

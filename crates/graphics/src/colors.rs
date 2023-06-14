@@ -51,6 +51,7 @@ impl Rgba {
     pub const BLACK: Self = Rgb::BLACK.transparent(255);
     pub const WHITE: Self = Rgb::WHITE.transparent(255);
     pub const GREY: Self = Rgb::GREY.transparent(255);
+    pub const TRANSPARENT: Self = Rgb::BLACK.transparent(0);
 
     pub const fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self { r, g, b, a }

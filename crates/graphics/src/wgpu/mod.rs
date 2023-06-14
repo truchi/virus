@@ -37,6 +37,16 @@ pub struct Draw<'a> {
 }
 
 impl<'a> Draw<'a> {
+    /// Returns the top coordinate of the drawing region.
+    pub fn top(&self) -> i32 {
+        self.region.0[0]
+    }
+
+    /// Returns the left coordinate of the drawing region.
+    pub fn left(&self) -> i32 {
+        self.region.0[1]
+    }
+
     /// Returns the width of the drawing region.
     pub fn width(&self) -> u32 {
         self.region.1[0]
