@@ -12,7 +12,7 @@ struct Vertex {
     /// - 1: a mask glyph (use `uv` in the mask texture with `color`),
     /// - 2: a color glyph (use `uv` in the color texture),
     ty: u32,
-    /// Region world `[top, left]` coordinates.
+    /// Region `[top, left]` world coordinates.
     region_position: [i32; 2],
     /// Region `[width, height]` size.
     region_size: [u32; 2],

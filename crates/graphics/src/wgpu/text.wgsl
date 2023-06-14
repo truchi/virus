@@ -13,7 +13,7 @@ struct Vertex {
     // - 2: a color glyph (use `uv` in the color texture),
     @location(0) ty: u32,
 
-    // Region world `(top, left)` coordinates.
+    // Region `(top, left)` world coordinates.
     @location(1) region_position: vec2i,
 
     // Region `(width, height)` size.

@@ -4,11 +4,17 @@ struct Sizes {
 }
 
 struct Vertex {
-    // Screen `(top, left)` coordinates.
-    @location(0) position: vec2i,
+    // Region `(top, left)` world coordinates.
+    @location(0) region_position: vec2i,
+
+    // Region `(width, height)` size.
+    @location(1) region_size: vec2u,
+
+    // Vertex `(top, left)` coordinates in region.
+    @location(2) position: vec2i,
 
     // sRGBA color.
-    @location(1) color: vec4u,
+    @location(3) color: vec4u,
 }
 
 struct Fragment {
@@ -25,13 +31,15 @@ struct Fragment {
 @vertex
 fn vertex(vertex: Vertex) -> Fragment {
     let surface = vec2f(sizes.surface);
+    let region_position = vec2f(vertex.region_position.yx);
+    let region_size = vec2f(vertex.region_size);
     let position = vec2f(vertex.position.yx);
     let color = vec4f(vertex.color);
 
     var fragment: Fragment;
     fragment.position = vec4f(
-        0.0 + 2.0 * position.x / surface.x - 1.0,
-        0.0 - 2.0 * position.y / surface.y + 1.0,
+        0.0 + 2.0 * (position.x + region_position.x) / surface.x - 1.0,
+        0.0 - 2.0 * (position.y + region_position.y) / surface.y + 1.0,
         0.0,
         1.0,
     );
@@ -45,6 +53,6 @@ fn vertex(vertex: Vertex) -> Fragment {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 @fragment
-fn fragment(fragment: Fragment) -> @location(0) vec4<f32> {
+fn fragment(fragment: Fragment) -> @location(0) vec4f {
     return fragment.color;
 }

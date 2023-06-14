@@ -7,7 +7,11 @@ use super::*;
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct Vertex {
-    /// Screen coordinates.
+    /// Region `[top, left]` world coordinates.
+    region_position: [i32; 2],
+    /// Region `[width, height]` size.
+    region_size: [u32; 2],
+    /// Vertex `[top, left]` coordinates in region.
     position: [i32; 2],
     /// sRGBA color.
     color: [u32; 4],
@@ -17,7 +21,12 @@ unsafe impl bytemuck::Zeroable for Vertex {}
 unsafe impl bytemuck::Pod for Vertex {}
 
 impl Vertex {
-    const ATTRIBUTES: [VertexAttribute; 2] = vertex_attr_array![0 => Sint32x2, 1 => Uint32x4];
+    const ATTRIBUTES: [VertexAttribute; 4] = vertex_attr_array![
+        0 => Sint32x2, // region position
+        1 => Uint32x2, // region size
+        2 => Sint32x2, // position
+        3 => Uint32x4, // color
+    ];
 
     fn vertex_buffer_layout() -> VertexBufferLayout<'static> {
         VertexBufferLayout {
@@ -27,8 +36,14 @@ impl Vertex {
         }
     }
 
-    fn new([top, left]: [i32; 2], color: Rgba) -> Self {
+    fn new(
+        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
+        [top, left]: [i32; 2],
+        color: Rgba,
+    ) -> Self {
         Self {
+            region_position: [region_top, region_left],
+            region_size: [region_width, region_height],
             position: [top, left],
             color: [
                 color.r as u32,
@@ -164,7 +179,13 @@ impl LinePipeline {
         self.sizes[0] = [size.width, size.height];
     }
 
-    pub fn polyline<T: IntoIterator<Item = ([i32; 2], Rgba)>>(&mut self, points: T) {
+    pub fn polyline<T: IntoIterator<Item = ([i32; 2], Rgba)>>(
+        &mut self,
+        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
+        points: T,
+    ) {
+        let region = ([region_top, region_left], [region_width, region_height]);
+
         let mut points = points.into_iter();
         let mut prev = if let Some(prev) = points.next() {
             prev
@@ -174,14 +195,15 @@ impl LinePipeline {
         };
 
         for curr in points {
-            self.vertices.push(Vertex::new(prev.0, prev.1));
-            self.vertices.push(Vertex::new(curr.0, curr.1));
+            self.vertices.push(Vertex::new(region, prev.0, prev.1));
+            self.vertices.push(Vertex::new(region, curr.0, curr.1));
             prev = curr;
         }
     }
 
     pub fn rectangle(
         &mut self,
+        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
         [top, left]: [i32; 2],
         [width, height]: [u32; 2],
         thickness: u32,
@@ -191,6 +213,7 @@ impl LinePipeline {
         debug_assert!(2 * (thickness + radius) <= width);
         debug_assert!(2 * (thickness + radius) <= height);
 
+        let region = ([region_top, region_left], [region_width, region_height]);
         let width = width as i32;
         let height = height as i32;
         let thickness = thickness as i32;
@@ -214,23 +237,23 @@ impl LinePipeline {
 
             // Top right
             let top_right = translate(radius, width - radius);
-            self.polyline(andres.o1().map(top_right));
-            self.polyline(andres.o2().map(top_right));
+            self.polyline(region, andres.o1().map(top_right));
+            self.polyline(region, andres.o2().map(top_right));
 
             // Top left
             let top_left = translate(radius, radius);
-            self.polyline(andres.o3().map(top_left));
-            self.polyline(andres.o4().map(top_left));
+            self.polyline(region, andres.o3().map(top_left));
+            self.polyline(region, andres.o4().map(top_left));
 
             // Bottom left
             let bottom_left = translate(height - radius, radius);
-            self.polyline(andres.o5().map(bottom_left));
-            self.polyline(andres.o6().map(bottom_left));
+            self.polyline(region, andres.o5().map(bottom_left));
+            self.polyline(region, andres.o6().map(bottom_left));
 
             // Bottom right
             let bottom_right = translate(height - radius, width - radius);
-            self.polyline(andres.o7().map(bottom_right));
-            self.polyline(andres.o8().map(bottom_right));
+            self.polyline(region, andres.o7().map(bottom_right));
+            self.polyline(region, andres.o8().map(bottom_right));
 
             //
             // Sides
@@ -241,17 +264,17 @@ impl LinePipeline {
 
             self.vertices.extend_from_slice(&[
                 // Top
-                Vertex::new(translate(0, radius), color),
-                Vertex::new(translate(0, width - radius), color),
+                Vertex::new(region, translate(0, radius), color),
+                Vertex::new(region, translate(0, width - radius), color),
                 // Right
-                Vertex::new(translate(radius, width), color),
-                Vertex::new(translate(height - radius, width), color),
+                Vertex::new(region, translate(radius, width), color),
+                Vertex::new(region, translate(height - radius, width), color),
                 // Bottom
-                Vertex::new(translate(height, radius), color),
-                Vertex::new(translate(height, width - radius), color),
+                Vertex::new(region, translate(height, radius), color),
+                Vertex::new(region, translate(height, width - radius), color),
                 // Left
-                Vertex::new(translate(radius, 0), color),
-                Vertex::new(translate(height - radius, 0), color),
+                Vertex::new(region, translate(radius, 0), color),
+                Vertex::new(region, translate(height - radius, 0), color),
             ]);
         }
     }

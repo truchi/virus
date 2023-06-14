@@ -85,6 +85,7 @@ impl<'a> Draw<'a> {
         color: Rgba,
     ) {
         self.graphics.line_pipeline.rectangle(
+            self.region,
             [top, left],
             [width, height],
             thickness,
