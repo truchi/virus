@@ -9,7 +9,7 @@ use super::*;
 struct Vertex {
     /// Screen coordinates.
     position: [i32; 2],
-    /// Rgba color.
+    /// sRGBA color.
     color: [u32; 4],
 }
 
@@ -29,7 +29,7 @@ impl Vertex {
 
     fn new([top, left]: [i32; 2], color: Rgba) -> Self {
         Self {
-            position: [left, top],
+            position: [top, left],
             color: [
                 color.r as u32,
                 color.g as u32,
