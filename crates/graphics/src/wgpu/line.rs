@@ -279,6 +279,82 @@ impl LinePipeline {
         }
     }
 
+    pub fn top_right(
+        &mut self,
+        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
+        [center_top, center_left]: [i32; 2],
+        thickness: u32,
+        radius: u32,
+        color: Rgba,
+    ) {
+        self.corner(
+            ([region_top, region_left], [region_width, region_height]),
+            [center_top, center_left],
+            thickness,
+            radius,
+            color,
+            Andres::o1,
+            Andres::o2,
+        );
+    }
+
+    pub fn top_left(
+        &mut self,
+        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
+        [center_top, center_left]: [i32; 2],
+        thickness: u32,
+        radius: u32,
+        color: Rgba,
+    ) {
+        self.corner(
+            ([region_top, region_left], [region_width, region_height]),
+            [center_top, center_left],
+            thickness,
+            radius,
+            color,
+            Andres::o3,
+            Andres::o4,
+        );
+    }
+
+    pub fn bottom_left(
+        &mut self,
+        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
+        [center_top, center_left]: [i32; 2],
+        thickness: u32,
+        radius: u32,
+        color: Rgba,
+    ) {
+        self.corner(
+            ([region_top, region_left], [region_width, region_height]),
+            [center_top, center_left],
+            thickness,
+            radius,
+            color,
+            Andres::o5,
+            Andres::o6,
+        );
+    }
+
+    pub fn bottom_right(
+        &mut self,
+        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
+        [center_top, center_left]: [i32; 2],
+        thickness: u32,
+        radius: u32,
+        color: Rgba,
+    ) {
+        self.corner(
+            ([region_top, region_left], [region_width, region_height]),
+            [center_top, center_left],
+            thickness,
+            radius,
+            color,
+            Andres::o7,
+            Andres::o8,
+        );
+    }
+
     pub fn render<'pass>(&'pass mut self, queue: &Queue, render_pass: &mut RenderPass<'pass>) {
         queue.write_buffer(&self.size_uniform, 0, bytemuck::cast_slice(&self.sizes));
         queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
@@ -291,6 +367,43 @@ impl LinePipeline {
         self.vertices.clear();
     }
 }
+
+/// Private.
+impl LinePipeline {
+    fn corner<O1, O2>(
+        &mut self,
+        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
+        [center_top, center_left]: [i32; 2],
+        thickness: u32,
+        radius: u32,
+        color: Rgba,
+        o1: fn(&Andres) -> O1,
+        o2: fn(&Andres) -> O2,
+    ) where
+        O1: Iterator<Item = (i32, i32)>,
+        O2: Iterator<Item = (i32, i32)>,
+    {
+        let region = ([region_top, region_left], [region_width, region_height]);
+        let thickness = thickness as i32;
+        let radius = radius as i32;
+
+        for i in 0..thickness {
+            let center_top = center_top + i;
+            let center_left = center_left + i;
+            let radius = radius - i;
+
+            let andres = Andres(radius as u32);
+            let translate = |(t, l)| ([center_top + t, center_left + l], color);
+
+            self.polyline(region, o1(&andres).map(translate));
+            self.polyline(region, o2(&andres).map(translate));
+        }
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                              Andres                                            //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 // TODO fatorize
 struct Andres(/* radius */ u32);

@@ -75,6 +75,11 @@ impl<'a> Draw<'a> {
         );
     }
 
+    /// Draws a polyline.
+    pub fn polyline<T: IntoIterator<Item = ([i32; 2], Rgba)>>(&mut self, points: T) {
+        self.graphics.line_pipeline.polyline(self.region, points);
+    }
+
     /// Draws a rectangle.
     pub fn rectangle(
         &mut self,
@@ -92,6 +97,74 @@ impl<'a> Draw<'a> {
             radius,
             color,
         );
+    }
+
+    /// Draws a top-right rounded corner.
+    pub fn top_right(
+        &mut self,
+        [center_top, center_left]: [i32; 2],
+        thickness: u32,
+        radius: u32,
+        color: Rgba,
+    ) {
+        self.graphics.line_pipeline.top_right(
+            self.region,
+            [center_top, center_left],
+            thickness,
+            radius,
+            color,
+        )
+    }
+
+    /// Draws a top-left rounded corner.
+    pub fn top_left(
+        &mut self,
+        [center_top, center_left]: [i32; 2],
+        thickness: u32,
+        radius: u32,
+        color: Rgba,
+    ) {
+        self.graphics.line_pipeline.top_left(
+            self.region,
+            [center_top, center_left],
+            thickness,
+            radius,
+            color,
+        )
+    }
+
+    /// Draws a bottom-left rounded corner.
+    pub fn bottom_left(
+        &mut self,
+        [center_top, center_left]: [i32; 2],
+        thickness: u32,
+        radius: u32,
+        color: Rgba,
+    ) {
+        self.graphics.line_pipeline.bottom_left(
+            self.region,
+            [center_top, center_left],
+            thickness,
+            radius,
+            color,
+        )
+    }
+
+    /// Draws a bottom-right rounded corner.
+    pub fn bottom_right(
+        &mut self,
+        [center_top, center_left]: [i32; 2],
+        thickness: u32,
+        radius: u32,
+        color: Rgba,
+    ) {
+        self.graphics.line_pipeline.bottom_right(
+            self.region,
+            [center_top, center_left],
+            thickness,
+            radius,
+            color,
+        )
     }
 }
 
