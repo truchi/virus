@@ -52,7 +52,7 @@ fn vertex(vertex: Vertex) -> Fragment {
     let region_size = vec2f(vertex.region_size);
     let position = vec2f(vertex.position.yx);
     let uv = vec2f(vertex.uv);
-    let color = vec4f(vertex.color);
+    let color = vec4f(vertex.color) / 255.0;
 
     var fragment: Fragment;
     fragment.ty = vertex.ty;
@@ -63,7 +63,7 @@ fn vertex(vertex: Vertex) -> Fragment {
         1.0,
     );
     fragment.uv = uv / texture;
-    fragment.color = color / 255.0;
+    fragment.color = pow(color, vec4f(2.2, 2.2, 2.2, 1.0));
     fragment.min = region_position;
     fragment.max = fragment.min + region_size;
 

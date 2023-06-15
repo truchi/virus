@@ -34,7 +34,7 @@ fn vertex(vertex: Vertex) -> Fragment {
     let region_position = vec2f(vertex.region_position.yx);
     let region_size = vec2f(vertex.region_size);
     let position = vec2f(vertex.position.yx);
-    let color = vec4f(vertex.color);
+    let color = vec4f(vertex.color) / 255.0;
 
     var fragment: Fragment;
     fragment.position = vec4f(
@@ -43,7 +43,7 @@ fn vertex(vertex: Vertex) -> Fragment {
         0.0,
         1.0,
     );
-    fragment.color = color / 255.0;
+    fragment.color = pow(color, vec4f(2.2, 2.2, 2.2, 1.0));
 
     return fragment;
 }
