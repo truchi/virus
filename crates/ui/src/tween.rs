@@ -117,6 +117,18 @@ impl<T: Tweenable> Tweened<T> {
         }
     }
 
+    /// Creates a new animating `Tweened` from `start` to `end` for `duration` with `tween`.
+    pub fn with_animation(start: T, end: T, duration: Duration, tween: Tween) -> Self {
+        Self {
+            start,
+            end,
+            current: start,
+            time: None,
+            duration,
+            tween,
+        }
+    }
+
     /// Returns the start value.
     pub fn start(&self) -> T {
         self.start

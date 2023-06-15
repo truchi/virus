@@ -22,6 +22,7 @@ pub struct Ui {
     context: Context,
     document_view: DocumentView,
     scroll_top: Tweened<u32>,
+    scrollbar_alpha: Tweened<u8>,
 }
 
 impl Ui {
@@ -41,6 +42,7 @@ impl Ui {
             context,
             document_view,
             scroll_top: Tweened::new(0),
+            scrollbar_alpha: Tweened::new(0),
         }
     }
 
@@ -49,7 +51,7 @@ impl Ui {
     }
 
     pub fn is_animating(&self) -> bool {
-        self.scroll_top.is_animating()
+        self.scroll_top.is_animating() || self.scrollbar_alpha.is_animating()
     }
 
     pub fn scroll_up(&mut self) {
@@ -60,6 +62,7 @@ impl Ui {
             SCROLL_DURATION,
             Tween::ExpoOut,
         );
+        self.scrollbar_alpha = Tweened::with_animation(255, 0, SCROLL_DURATION, Tween::ExpoOut);
     }
 
     pub fn scroll_down(&mut self) {
@@ -72,6 +75,7 @@ impl Ui {
             let end = end.min((rope_lines - screen_height_in_lines) * line_height);
 
             self.scroll_top.to(end, SCROLL_DURATION, Tween::ExpoOut);
+            self.scrollbar_alpha = Tweened::with_animation(255, 0, SCROLL_DURATION, Tween::ExpoOut);
         }
     }
 
@@ -81,6 +85,7 @@ impl Ui {
 
     pub fn update(&mut self, delta: Duration) {
         self.scroll_top.step(delta);
+        self.scrollbar_alpha.step(delta);
     }
 
     pub fn render(&mut self, document: &Document) {
@@ -91,6 +96,7 @@ impl Ui {
             &mut self.context,
             document,
             self.scroll_top.current(),
+            self.scrollbar_alpha.current(),
         );
 
         self.graphics.render();

@@ -126,8 +126,9 @@ impl DocumentView {
         context: &mut Context,
         document: &Document,
         scroll_top: u32,
+        scrollbar_alpha: u8,
     ) {
-        Renderer::new(self, context, draw, document, scroll_top).render();
+        Renderer::new(self, context, draw, document, scroll_top, scrollbar_alpha).render();
     }
 }
 
@@ -141,6 +142,7 @@ struct Renderer<'a, 'b, 'c, 'd, 'e> {
     draw: &'c mut Draw<'d>,
     document: &'e Document,
     scroll_top: u32,
+    scrollbar_alpha: u8,
     start: usize,
     end: usize,
     rope_lines: usize,
@@ -159,7 +161,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
         (1, Rgb::WHITE.transparent(255 / 32)),
         (2, Rgb::WHITE.transparent(255 / 64)),
     ];
-    const SCROLLBAR: Rgba = Rgb::WHITE.transparent(255 / 2);
+    const SCROLLBAR: Rgb = Rgb::WHITE;
 
     fn new(
         view: &'a mut DocumentView,
@@ -167,6 +169,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
         draw: &'c mut Draw<'d>,
         document: &'e Document,
         scroll_top: u32,
+        scrollbar_alpha: u8,
     ) -> Self {
         let start = (scroll_top as f32 / view.line_height as f32).floor() as usize;
         let end = start + (draw.height() as f32 / view.line_height as f32).ceil() as usize;
@@ -186,6 +189,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             draw,
             document,
             scroll_top,
+            scrollbar_alpha,
             start,
             end,
             rope_lines,
@@ -446,7 +450,9 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
         let left = (self.advance / 2.0).round() as i32;
         let width = (self.advance / 4.0).round() as u32;
 
-        self.draw
-            .rectangle(([top, left], [width, height]), Self::SCROLLBAR);
+        self.draw.rectangle(
+            ([top, left], [width, height]),
+            Self::SCROLLBAR.transparent(self.scrollbar_alpha),
+        );
     }
 }
