@@ -315,7 +315,23 @@ impl TextPipeline {
         self.sizes[0] = [size.width, size.height];
     }
 
-    pub fn insert(
+    pub fn rectangle(
+        &mut self,
+        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
+        ([top, left], [width, height]): ([i32; 2], [u32; 2]),
+        color: Rgba,
+    ) {
+        self.insert_quad(Vertex::quad(
+            Vertex::BACKGROUND_RECTANGLE,
+            ([region_top, region_left], [region_width, region_height]),
+            [top, left],
+            [width, height],
+            [0, 0],
+            color,
+        ));
+    }
+
+    pub fn glyphs(
         &mut self,
         queue: &Queue,
         context: &mut Context,

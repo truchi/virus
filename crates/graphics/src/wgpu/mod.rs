@@ -65,7 +65,7 @@ impl<'a> Draw<'a> {
         line: &Line,
         line_height: LineHeight,
     ) {
-        self.graphics.text_pipeline.insert(
+        self.graphics.text_pipeline.glyphs(
             &self.graphics.queue,
             context,
             self.region,
@@ -73,6 +73,13 @@ impl<'a> Draw<'a> {
             line,
             line_height,
         );
+    }
+
+    /// Draws a rectange.
+    pub fn rectangle(&mut self, ([top, left], [width, height]): ([i32; 2], [u32; 2]), color: Rgba) {
+        self.graphics
+            .text_pipeline
+            .rectangle(self.region, ([top, left], [width, height]), color)
     }
 
     /// Draws a polyline.
