@@ -1,58 +1,3 @@
-//! DocumentView.
-//!
-//! # Selections
-//!
-//! Square when touching borders (final `\n` is selected), round otherwise.
-//!
-//! ```text
-//!
-//! ┌──────────────────────────────────────────────────────────────┐
-//! │Lorem ipsum dolor sit amet, qui minim labore.                 │
-//! │                                                              │
-//! │Lorem ipsum dolor sit amet, qui minim labore.                 │
-//! │                                                              │
-//! │Lorem ipsum dolor sit amet, qui minim labore.                 │
-//! ├──────────────────────────────────────────────────────────────┤
-//! │Lorem ipsum dolor sit amet, qui minim labore.                 │ // Full line (\n), square
-//! ├──────────────────────────────────────────────────────────────┤
-//! │Lorem ipsum dolor sit amet, qui minim labore.                 │
-//! │                                                              │
-//! │Lorem ipsum dolor sit amet, qui minim labore.                 │
-//! │                            ╭─────────────────╮               │
-//! │Lorem ipsum dolor sit amet, │officia excepteur│ labore.       │ // Single line, round
-//! │                            ╰─────────────────╯               │
-//! │culpa sint ad nisi Lorem pariatur mollit ex esse amet.        │
-//! │                                       ╭──────────────────────┤
-//! │Nisi anim cupidatat excepteur officia. │Reprehenderit         │ // Two lines, disjoined
-//! ├────────────────────────╮              ╰──────────────────────┤
-//! │amet voluptate voluptate│ dolor minim nulla est proident.     │
-//! ├────────────────────────╯                                     │
-//! │Lorem ipsum dolor sit amet, qui minim labore adipisicing.     │
-//! │                                  ╭───────────────────────────┤
-//! │Sit irure elit esse ea nulla sunt │ex occaecat reprehenderit  │ // Two lines, joined
-//! ├──────────────────────────────────╯            ╭──────────────┤
-//! │Lorem duis laboris cupidatat officia voluptate.│              │
-//! ├───────────────────────────────────────────────╯              │
-//! │Lorem ipsum dolor sit amet, qui minim labore adipisicing.     │
-//! │                                                       ╭──────┤
-//! │Culpa proident adipisicing id nulla nisi laboris ex in │Lorem │ // Three lines
-//! ├───────────────────────────────────────────────────────╯      │
-//! │Aliqua reprehenderit commodo ex non excepteur duis sunt velit.│
-//! │                                        ╭─────────────────────┤
-//! │Voluptate laboris sint cupidatat ullamco│ ut ea consectetur.  │
-//! ├────────────────────────────────────────╯                     │
-//! │Lorem ipsum dolor sit amet, qui minim labore adipisicing.     │
-//! │                                                              │
-//! │Lorem ipsum dolor sit amet, qui minim labore adipisicing.     │
-//! │                                                       ╭──────┤
-//! │Culpa proident adipisicing id nulla nisi laboris ex in │Lorem │ // Three lines
-//! ├───────────────────────────────────────────────────────╯      │
-//! │Aliqua reprehenderit commodo ex non excepteur duis sunt velit.│
-//! │                                                              │
-//! │Voluptate laboris sint cupidatat ullamco ut ea consectetur.   │ // (\n)
-//! └──────────────────────────────────────────────────────────────┘
-//! ```
-
 use ropey::Rope;
 use std::{borrow::Cow, ops::Range};
 use virus_common::Cursor;
@@ -122,8 +67,8 @@ impl DocumentView {
 
     pub fn render(
         &mut self,
-        draw: &mut Draw,
         context: &mut Context,
+        draw: &mut Draw,
         document: &Document,
         scroll_top: u32,
         scrollbar_alpha: u8,

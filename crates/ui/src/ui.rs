@@ -92,8 +92,8 @@ impl Ui {
         let region = self.region();
 
         self.document_view.render(
-            &mut self.graphics.draw(region),
             &mut self.context,
+            &mut self.graphics.draw(region),
             document,
             self.scroll_top.current(),
             self.scrollbar_alpha.current(),
