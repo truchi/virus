@@ -263,7 +263,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             strike: false,
         };
 
-        for number in self.start..self.end.min(self.rope_lines) {
+        for number in self.start..=self.end.min(self.rope_lines.saturating_sub(1)) {
             let line = {
                 let mut shaper = Line::shaper(self.context, self.view.font_size);
                 shaper.push(&(number + 1).to_string(), family, styles);

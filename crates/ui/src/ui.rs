@@ -84,10 +84,10 @@ impl Ui {
     }
 
     pub fn render(&mut self, document: &Document) {
-        let size = self.window().inner_size();
+        let region = self.region();
 
         self.document_view.render(
-            &mut self.graphics.draw(([0, 0], [size.width, size.height])),
+            &mut self.graphics.draw(region),
             &mut self.context,
             document,
             self.scroll_top.current(),
@@ -101,6 +101,14 @@ impl Ui {
 impl Ui {
     fn screen_height_in_lines(&self) -> u32 {
         self.window().inner_size().height / self.document_view.line_height()
+    }
+
+    fn region(&self) -> ([i32; 2], [u32; 2]) {
+        let size = self.window().inner_size();
+        let height = self.screen_height_in_lines() * self.document_view.line_height();
+        let top = (size.height - height) as i32 / 2;
+
+        ([top, 0], [size.width, height])
     }
 }
 
