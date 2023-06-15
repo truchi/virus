@@ -149,6 +149,18 @@ struct Renderer<'a, 'b, 'c, 'd, 'e> {
 }
 
 impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
+    const CARETS: [(i32, Rgba); 3] = [
+        (0, Rgb::WHITE.transparent(255)),
+        (1, Rgb::WHITE.transparent(255 / 8)),
+        (2, Rgb::WHITE.transparent(255 / 32)),
+    ];
+    const OUTLINES: [(i32, Rgba); 3] = [
+        (0, Rgb::WHITE.transparent(255 / 16)),
+        (1, Rgb::WHITE.transparent(255 / 32)),
+        (2, Rgb::WHITE.transparent(255 / 64)),
+    ];
+    const SCROLLBAR: Rgba = Rgb::WHITE.transparent(255 / 2);
+
     fn new(
         view: &'a mut DocumentView,
         context: &'b mut Context,
@@ -187,6 +199,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
         self.render_line_numbers();
         self.render_document();
         self.render_selection(self.document.selection());
+        self.render_scrollbar();
     }
 
     fn highlights(&mut self) {
@@ -297,12 +310,6 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
     }
 
     fn render_selection(&mut self, selection: Range<Cursor>) {
-        const CARETS: [(i32, Rgba); 3] = [
-            (0, Rgb::WHITE.transparent(255)),
-            (1, Rgb::WHITE.transparent(255 / 8)),
-            (2, Rgb::WHITE.transparent(255 / 32)),
-        ];
-
         let width = self.draw.width() as i32;
         let height = self.view.line_height as i32;
 
@@ -338,7 +345,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
 
             self.render_outline(Some(top), Some(bottom), 0, width);
 
-            for (i, color) in CARETS {
+            for (i, color) in Self::CARETS {
                 self.draw
                     .polyline([([top, start - i], color), ([bottom, start - i], color)]);
                 self.draw
@@ -352,7 +359,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             self.render_outline(Some(top), Some(bottom), 0, start);
             self.render_outline(Some(top), Some(bottom), end, width);
 
-            for (i, color) in CARETS {
+            for (i, color) in Self::CARETS {
                 self.draw.polyline([
                     ([top + i, start + i], color),
                     ([top + i, end - i], color),
@@ -370,7 +377,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             self.render_outline(Some(top), None, 0, start);
             self.render_outline(None, Some(bottom), end, width);
 
-            for (i, color) in CARETS {
+            for (i, color) in Self::CARETS {
                 self.draw.polyline([
                     ([top + i, width], color),
                     ([top + i, start + i], color),
@@ -392,7 +399,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             self.render_outline(Some(top1), None, 0, start);
             self.render_outline(None, Some(bottom2), end, width);
 
-            for (i, color) in CARETS {
+            for (i, color) in Self::CARETS {
                 self.draw.polyline([
                     ([top2 + i, 0], color),
                     ([top2 + i, start + i], color),
@@ -410,13 +417,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
     }
 
     fn render_outline(&mut self, top: Option<i32>, bottom: Option<i32>, left: i32, right: i32) {
-        const OUTLINES: [(i32, Rgba); 3] = [
-            (0, Rgb::WHITE.transparent(255 / 16)),
-            (1, Rgb::WHITE.transparent(255 / 32)),
-            (2, Rgb::WHITE.transparent(255 / 64)),
-        ];
-
-        for (i, color) in OUTLINES {
+        for (i, color) in Self::OUTLINES {
             if let Some(top) = top {
                 self.draw
                     .polyline([([top + i, left], color), ([top + i, right], color)]);
@@ -427,5 +428,25 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
                     .polyline([([bottom - i, left], color), ([bottom - i, right], color)]);
             }
         }
+    }
+
+    fn render_scrollbar(&mut self) {
+        let region_height_in_lines = self.draw.height() / self.view.line_height();
+
+        if self.rope_lines <= region_height_in_lines as usize {
+            return;
+        }
+
+        let scroll_top_in_lines = self.scroll_top as f32 / self.view.line_height() as f32;
+        let top = scroll_top_in_lines / self.rope_lines as f32;
+        let height = region_height_in_lines as f32 / self.rope_lines as f32;
+
+        let top = (top * self.draw.height() as f32).round() as i32;
+        let height = (height * self.draw.height() as f32).round() as u32;
+        let left = (self.advance / 2.0).round() as i32;
+        let width = (self.advance / 4.0).round() as u32;
+
+        self.draw
+            .rectangle(([top, left], [width, height]), Self::SCROLLBAR);
     }
 }
