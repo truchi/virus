@@ -404,7 +404,11 @@ impl TextPipeline {
                 continue;
             };
 
-            let key = (glyph.font, glyph.id, line.size());
+            let key = (glyph.font, glyph.id, glyph.size);
+
+            // Swash image has placement (vertical up from baseline)
+            let top = top + line.size() as i32 - image.placement.top;
+            let left = left + glyph.offset.round() as i32 + image.placement.left;
             let width = image.placement.width;
             let height = image.placement.height;
 
@@ -448,30 +452,12 @@ impl TextPipeline {
                 );
             }
 
-            // Scale emoji glyphs
-            let scaled = if let Some(advance) = glyph.emoji {
-                let scale = glyph.advance / advance;
-
-                swash::zeno::Placement {
-                    top: (scale * image.placement.top as f32).round() as i32,
-                    left: (scale * image.placement.left as f32).round() as i32,
-                    width: (scale * image.placement.width as f32).round() as u32,
-                    height: (scale * image.placement.height as f32).round() as u32,
-                }
-            } else {
-                image.placement
-            };
-
-            // Swash image has placement (vertical up from baseline)
-            let top = top + line.size() as i32 - scaled.top;
-            let left = left + glyph.offset.round() as i32 + scaled.left;
-
             self.insert_quad(Vertex::quad(
                 ty,
                 region,
                 [top, left],
-                [scaled.width, scaled.height],
-                ([u, v], [image.placement.width, image.placement.height]),
+                [width, height],
+                ([u, v], [width, height]),
                 glyph.styles.foreground,
             ));
         }

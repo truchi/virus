@@ -61,14 +61,14 @@ pub type Advance = f32;
 pub struct Glyph {
     /// Font key.
     pub font: FontKey,
+    /// Font size.
+    pub size: FontSize,
     /// Glyph id.
     pub id: GlyphId,
     /// Glyph advance offset.
     pub offset: Advance,
-    /// Glyph advance (forced to twice the family's advance when emoji).
+    /// Glyph advance.
     pub advance: Advance,
-    /// Glyph original advance when emoji.
-    pub emoji: Option<Advance>,
     /// Range in the underlying string.
     pub range: SourceRange,
     /// Glyph styles.

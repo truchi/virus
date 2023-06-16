@@ -106,7 +106,7 @@ pub struct LineShaper<'a> {
     line: Line,
     bytes: u32,
     advance: Advance,
-    mono: Advance,
+    emoji_size: FontSize,
 }
 
 impl<'a> LineShaper<'a> {
@@ -122,6 +122,7 @@ impl<'a> LineShaper<'a> {
                 size,
             )
             .unwrap();
+        let emoji_size = context.fonts().emoji().size_for_advance(2.0 * mono).round() as u8;
         let (fonts, _, shape, _) = context.as_muts();
 
         Self {
@@ -134,7 +135,7 @@ impl<'a> LineShaper<'a> {
             },
             bytes: 0,
             advance: 0.,
-            mono,
+            emoji_size,
         }
     }
 
@@ -150,8 +151,11 @@ impl<'a> LineShaper<'a> {
         let emoji = self.fonts.emoji().as_ref();
         let font_key = font.key;
         let emoji_key = emoji.key;
+        let font_size = self.line.size;
+        let emoji_size = self.emoji_size;
 
         let mut key = font_key;
+        let mut size = font_size;
         let mut font_or_emoji = FontOrEmoji::Font;
         let mut cluster = CharCluster::default();
         let mut shaper = Self::build(self.shape, font, self.line.size);
@@ -162,30 +166,14 @@ impl<'a> LineShaper<'a> {
                 (FontOrEmoji::Font, FontOrEmoji::Font) => shaper,
                 (FontOrEmoji::Emoji, FontOrEmoji::Emoji) => shaper,
                 (FontOrEmoji::Font, FontOrEmoji::Emoji) => {
-                    Self::flush(
-                        &mut self.line,
-                        &mut self.advance,
-                        self.mono,
-                        shaper,
-                        key,
-                        true,
-                        styles,
-                    );
-                    (key, font_or_emoji) = (font_key, FontOrEmoji::Font);
+                    Self::flush(&mut self.line, &mut self.advance, shaper, key, size, styles);
+                    (key, size, font_or_emoji) = (font_key, font_size, FontOrEmoji::Font);
                     Self::build(self.shape, font, self.line.size)
                 }
                 (FontOrEmoji::Emoji, FontOrEmoji::Font) => {
-                    Self::flush(
-                        &mut self.line,
-                        &mut self.advance,
-                        self.mono,
-                        shaper,
-                        key,
-                        false,
-                        styles,
-                    );
-                    (key, font_or_emoji) = (emoji_key, FontOrEmoji::Emoji);
-                    Self::build(self.shape, emoji, self.line.size)
+                    Self::flush(&mut self.line, &mut self.advance, shaper, key, size, styles);
+                    (key, size, font_or_emoji) = (emoji_key, emoji_size, FontOrEmoji::Emoji);
+                    Self::build(self.shape, emoji, self.emoji_size)
                 }
             };
 
@@ -195,22 +183,17 @@ impl<'a> LineShaper<'a> {
             self.bytes += range.end - range.start;
         }
 
-        Self::flush(
-            &mut self.line,
-            &mut self.advance,
-            self.mono,
-            shaper,
-            key,
-            key == emoji_key,
-            styles,
-        );
+        Self::flush(&mut self.line, &mut self.advance, shaper, key, size, styles);
     }
 
     /// Returns the shaped `Line`.
     pub fn line(self) -> Line {
         self.line
     }
+}
 
+/// Private.
+impl<'a> LineShaper<'a> {
     fn token(offset: u32) -> impl Clone + Fn((usize, char)) -> Token {
         move |(i, ch)| Token {
             ch,
@@ -253,30 +236,23 @@ impl<'a> LineShaper<'a> {
     fn flush(
         line: &mut Line,
         offset: &mut Advance,
-        mono: Advance,
         shaper: Shaper,
         font: FontKey,
-        is_emoji: bool,
+        size: FontSize,
         styles: Styles,
     ) {
         shaper.shape_with(|cluster| {
             for glyph in cluster.glyphs {
-                let (advance, emoji) = if is_emoji {
-                    (2.0 * mono, Some(glyph.advance))
-                } else {
-                    (glyph.advance, None)
-                };
-
                 line.glyphs.push(Glyph {
                     font,
+                    size,
                     id: glyph.id,
                     offset: *offset,
-                    advance,
-                    emoji,
+                    advance: glyph.advance,
                     range: cluster.source,
                     styles,
                 });
-                *offset += advance;
+                *offset += glyph.advance;
             }
         });
     }
@@ -317,7 +293,7 @@ impl<'a> LineScaler<'a> {
         let font = self.fonts.get(glyph.font).expect("font").as_ref();
         let image = self
             .cache
-            .get_or_insert((glyph.font, glyph.id, self.size), || {
+            .get_or_insert((glyph.font, glyph.id, glyph.size), || {
                 self.render.render(
                     &mut self
                         .scale
