@@ -178,7 +178,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             &self.document.query(&self.view.query).unwrap(),
         );
 
-        let mut shaper = Line::shaper(self.context, self.view.font_size);
+        let mut shaper = Line::shaper(self.context, self.view.family, self.view.font_size);
         let mut prev_line = None;
 
         for Highlight { start, end, key } in highlights.highlights() {
@@ -191,7 +191,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
                     self.view.lines.push((line, shaper.line()));
                 }
 
-                shaper = Line::shaper(self.context, self.view.font_size);
+                shaper = Line::shaper(self.context, self.view.family, self.view.font_size);
                 prev_line = Some(line);
             }
 
@@ -203,7 +203,6 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
                         .get_byte_slice(start.index..end.index)
                         .unwrap(),
                 ),
-                self.view.family,
                 self.view.theme[key],
             );
         }
@@ -227,8 +226,8 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
 
         for number in self.start..=self.end.min(self.rope_lines.saturating_sub(1)) {
             let line = {
-                let mut shaper = Line::shaper(self.context, self.view.font_size);
-                shaper.push(&(number + 1).to_string(), family, styles);
+                let mut shaper = Line::shaper(self.context, family, self.view.font_size);
+                shaper.push(&(number + 1).to_string(), styles);
                 shaper.line()
             };
 

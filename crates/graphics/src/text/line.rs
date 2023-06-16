@@ -16,14 +16,20 @@ use swash::{
 pub struct Line {
     /// Glyphs.
     glyphs: Vec<Glyph>,
+    /// Font family.
+    family: FontFamilyKey,
     /// Font size.
     size: FontSize,
 }
 
 impl Line {
     /// Returns a `LineShaper` at `size` with `context`.
-    pub fn shaper<'a>(context: &'a mut Context, size: FontSize) -> LineShaper<'a> {
-        LineShaper::new(context, size)
+    pub fn shaper<'a>(
+        context: &'a mut Context,
+        family: FontFamilyKey,
+        size: FontSize,
+    ) -> LineShaper<'a> {
+        LineShaper::new(context, family, size)
     }
 
     /// Returns a `LineScaler` of this `line` with `context`.
@@ -34,6 +40,11 @@ impl Line {
     /// Returns the glyphs of this `Line`.
     pub fn glyphs(&self) -> &[Glyph] {
         &self.glyphs
+    }
+
+    /// Returns the `FontFamilyKey` of this `Line`.
+    pub fn family(&self) -> FontFamilyKey {
+        self.family
     }
 
     /// Returns the `FontSize` of this `Line`.
@@ -99,7 +110,7 @@ pub struct LineShaper<'a> {
 
 impl<'a> LineShaper<'a> {
     /// Creates a new `LineShaper` at `size` with `context`.
-    pub fn new(context: &'a mut Context, size: FontSize) -> Self {
+    pub fn new(context: &'a mut Context, family: FontFamilyKey, size: FontSize) -> Self {
         let (fonts, _, shape, _) = context.as_muts();
 
         Self {
@@ -107,6 +118,7 @@ impl<'a> LineShaper<'a> {
             shape,
             line: Line {
                 glyphs: Vec::new(),
+                family,
                 size,
             },
             bytes: 0,
@@ -117,10 +129,10 @@ impl<'a> LineShaper<'a> {
     /// Feeds `str` to the `LineShaper` with font `styles`.
     ///
     /// Not able to produce ligature across calls to this function.
-    pub fn push(&mut self, str: &str, family: FontFamilyKey, styles: Styles) {
+    pub fn push(&mut self, str: &str, styles: Styles) {
         let font = self
             .fonts
-            .get((family, styles.weight, styles.style))
+            .get((self.line.family, styles.weight, styles.style))
             .unwrap()
             .as_ref();
         let emoji = self.fonts.emoji().as_ref();
