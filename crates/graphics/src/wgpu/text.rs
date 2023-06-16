@@ -76,14 +76,14 @@ impl Vertex {
         ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
         [top, left]: [i32; 2],
         [width, height]: [u32; 2],
-        [u, v]: [u32; 2],
+        ([u, v], [texture_width, texture_height]): ([u32; 2], [u32; 2]),
         color: Rgba,
     ) -> [Self; 4] {
         let region = ([region_top, region_left], [region_width, region_height]);
         let right = left + width as i32;
         let bottom = top + height as i32;
-        let u2 = u + width;
-        let v2 = v + height;
+        let u2 = u + texture_width;
+        let v2 = v + texture_height;
 
         [
             Vertex::new(ty, region, [top, left], [u, v], color),
@@ -326,7 +326,7 @@ impl TextPipeline {
             ([region_top, region_left], [region_width, region_height]),
             [top, left],
             [width, height],
-            [0, 0],
+            ([0, 0], [0, 0]),
             color,
         ));
     }
@@ -370,7 +370,7 @@ impl TextPipeline {
                     region,
                     [top, left],
                     [width, line_height],
-                    [0, 0],
+                    ([0, 0], [0, 0]),
                     background,
                 ));
             }
@@ -389,16 +389,11 @@ impl TextPipeline {
                 continue;
             };
 
-            let top = top + line.size() as i32;
-            let left = left + glyph.offset.round() as i32;
             let key = (glyph.font, glyph.id, line.size());
-
-            // Swash image has placement
-            let top = top - image.placement.top;
-            let left = left + image.placement.left;
             let width = image.placement.width;
             let height = image.placement.height;
 
+            // Allocate glyph in atlas
             let (ty, ([u, v], is_new), texture, channels) = match image.content {
                 Content::Mask => (
                     Vertex::MASK_GLYPH,
@@ -415,6 +410,7 @@ impl TextPipeline {
                 Content::SubpixelMask => unreachable!(),
             };
 
+            // Insert glyph in atlas
             if is_new {
                 queue.write_texture(
                     ImageCopyTexture {
@@ -437,12 +433,30 @@ impl TextPipeline {
                 );
             }
 
+            // Scale emoji glyphs
+            let scaled = if let Some(advance) = glyph.emoji {
+                let scale = glyph.advance / advance;
+
+                swash::zeno::Placement {
+                    top: (scale * image.placement.top as f32).round() as i32,
+                    left: (scale * image.placement.left as f32).round() as i32,
+                    width: (scale * image.placement.width as f32).round() as u32,
+                    height: (scale * image.placement.height as f32).round() as u32,
+                }
+            } else {
+                image.placement
+            };
+
+            // Swash image has placement (vertical up from baseline)
+            let top = top + line.size() as i32 - scaled.top;
+            let left = left + glyph.offset.round() as i32 + scaled.left;
+
             self.insert_quad(Vertex::quad(
                 ty,
                 region,
                 [top, left],
-                [width, height],
-                [u, v],
+                [scaled.width, scaled.height],
+                ([u, v], [image.placement.width, image.placement.height]),
                 glyph.styles.foreground,
             ));
         }
