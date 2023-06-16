@@ -1,6 +1,8 @@
 use std::{collections::HashMap, path::Path};
 use swash::{CacheKey, FontDataRef, FontRef};
 
+use super::Advance;
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             FontWeight                                         //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -147,6 +149,16 @@ impl Font {
         self.key
     }
 
+    /// Returns the font size giving `advance`.
+    pub fn size_for_advance(&self, advance: Advance) -> f32 {
+        let metrics = self.as_ref().metrics(&[]);
+
+        advance * metrics.units_per_em as f32 / metrics.average_width as f32
+    }
+}
+
+/// Debug.
+impl Font {
     /// Prints various infos from the [`Font`] file.
     pub fn inspect(&self) {
         let font = self.as_ref();
@@ -329,7 +341,10 @@ impl Fonts {
     pub fn emoji(&self) -> &Font {
         &self.emoji
     }
+}
 
+/// Private.
+impl Fonts {
     /// Returns the next [`FontFamilyKey`] available for this `self.families`.
     fn family_key(&self) -> FontFamilyKey {
         let key = FontFamilyKey(self.families.len() as u64);
