@@ -12,17 +12,17 @@ use std::ops::Range;
 use swash::{scale::image::Content, GlyphId};
 use text::TextPipeline;
 use wgpu::{
-    include_wgsl, vertex_attr_array, BindGroup, BindGroupDescriptor, BindGroupEntry,
+    include_wgsl, vertex_attr_array, AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry,
     BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, BlendState,
     Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, Color,
-    ColorTargetState, ColorWrites, CommandEncoderDescriptor, Device, Extent3d, FragmentState,
-    ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, LoadOp, Operations, Origin3d,
-    PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, Queue, RenderPass,
+    ColorTargetState, ColorWrites, CommandEncoderDescriptor, Device, Extent3d, FilterMode,
+    FragmentState, ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, LoadOp, Operations,
+    Origin3d, PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, Queue, RenderPass,
     RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
-    RequestAdapterOptions, SamplerBindingType, ShaderStages, Surface, SurfaceConfiguration,
-    Texture, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType,
-    TextureUsages, TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexState,
-    VertexStepMode,
+    RequestAdapterOptions, SamplerBindingType, SamplerDescriptor, ShaderStages, Surface,
+    SurfaceConfiguration, Texture, TextureAspect, TextureDescriptor, TextureDimension,
+    TextureFormat, TextureSampleType, TextureUsages, TextureViewDimension, VertexAttribute,
+    VertexBufferLayout, VertexState, VertexStepMode,
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
