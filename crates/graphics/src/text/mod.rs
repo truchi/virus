@@ -65,8 +65,10 @@ pub struct Glyph {
     pub id: GlyphId,
     /// Glyph advance offset.
     pub offset: Advance,
-    /// Glyph advance.
+    /// Glyph advance (forced to twice the family's advance when emoji).
     pub advance: Advance,
+    /// Glyph original advance when emoji.
+    pub emoji: Option<Advance>,
     /// Range in the underlying string.
     pub range: SourceRange,
     /// Glyph styles.

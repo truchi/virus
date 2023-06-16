@@ -106,11 +106,22 @@ pub struct LineShaper<'a> {
     line: Line,
     bytes: u32,
     advance: Advance,
+    mono: Advance,
 }
 
 impl<'a> LineShaper<'a> {
     /// Creates a new `LineShaper` at `size` with `context`.
     pub fn new(context: &'a mut Context, family: FontFamilyKey, size: FontSize) -> Self {
+        let mono = context
+            .advance(
+                context
+                    .fonts()
+                    .get((family, FontWeight::Regular, FontStyle::Normal))
+                    .unwrap()
+                    .key(),
+                size,
+            )
+            .unwrap();
         let (fonts, _, shape, _) = context.as_muts();
 
         Self {
@@ -123,6 +134,7 @@ impl<'a> LineShaper<'a> {
             },
             bytes: 0,
             advance: 0.,
+            mono,
         }
     }
 
@@ -150,12 +162,28 @@ impl<'a> LineShaper<'a> {
                 (FontOrEmoji::Font, FontOrEmoji::Font) => shaper,
                 (FontOrEmoji::Emoji, FontOrEmoji::Emoji) => shaper,
                 (FontOrEmoji::Font, FontOrEmoji::Emoji) => {
-                    Self::flush(&mut self.line, &mut self.advance, shaper, key, styles);
+                    Self::flush(
+                        &mut self.line,
+                        &mut self.advance,
+                        self.mono,
+                        shaper,
+                        key,
+                        true,
+                        styles,
+                    );
                     (key, font_or_emoji) = (font_key, FontOrEmoji::Font);
                     Self::build(self.shape, font, self.line.size)
                 }
                 (FontOrEmoji::Emoji, FontOrEmoji::Font) => {
-                    Self::flush(&mut self.line, &mut self.advance, shaper, key, styles);
+                    Self::flush(
+                        &mut self.line,
+                        &mut self.advance,
+                        self.mono,
+                        shaper,
+                        key,
+                        false,
+                        styles,
+                    );
                     (key, font_or_emoji) = (emoji_key, FontOrEmoji::Emoji);
                     Self::build(self.shape, emoji, self.line.size)
                 }
@@ -167,7 +195,15 @@ impl<'a> LineShaper<'a> {
             self.bytes += range.end - range.start;
         }
 
-        Self::flush(&mut self.line, &mut self.advance, shaper, key, styles);
+        Self::flush(
+            &mut self.line,
+            &mut self.advance,
+            self.mono,
+            shaper,
+            key,
+            key == emoji_key,
+            styles,
+        );
     }
 
     /// Returns the shaped `Line`.
@@ -216,22 +252,31 @@ impl<'a> LineShaper<'a> {
 
     fn flush(
         line: &mut Line,
-        advance: &mut Advance,
+        offset: &mut Advance,
+        mono: Advance,
         shaper: Shaper,
         font: FontKey,
+        is_emoji: bool,
         styles: Styles,
     ) {
         shaper.shape_with(|cluster| {
             for glyph in cluster.glyphs {
+                let (advance, emoji) = if is_emoji {
+                    (2.0 * mono, Some(glyph.advance))
+                } else {
+                    (glyph.advance, None)
+                };
+
                 line.glyphs.push(Glyph {
                     font,
                     id: glyph.id,
-                    offset: *advance,
-                    advance: glyph.advance,
+                    offset: *offset,
+                    advance,
+                    emoji,
                     range: cluster.source,
                     styles,
                 });
-                *advance += glyph.advance;
+                *offset += advance;
             }
         });
     }
