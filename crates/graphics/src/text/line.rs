@@ -4,7 +4,6 @@ use swash::{
     scale::{image::Image, Render, ScaleContext},
     shape::{ShapeContext, Shaper},
     text::cluster::{CharCluster, Parser, Status, Token},
-    FontRef,
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -16,35 +15,26 @@ use swash::{
 pub struct Line {
     /// Glyphs.
     glyphs: Vec<Glyph>,
-    /// Font family.
-    family: FontFamilyKey,
     /// Font size.
     size: FontSize,
+    /// Advance.
+    advance: Advance,
 }
 
 impl Line {
-    /// Returns a `LineShaper` at `size` with `context`.
-    pub fn shaper<'a>(
-        context: &'a mut Context,
-        family: FontFamilyKey,
-        size: FontSize,
-    ) -> LineShaper<'a> {
-        LineShaper::new(context, family, size)
+    /// Returns a `LineShaper` for `size`.
+    pub fn shaper<'a>(context: &'a mut Context, size: FontSize) -> LineShaper<'a> {
+        LineShaper::new(context, size)
     }
 
-    /// Returns a `LineScaler` of this `line` with `context`.
+    /// Returns a `LineScaler` of this `Line`.
     pub fn scaler<'a>(&'a self, context: &'a mut Context) -> LineScaler<'a> {
         LineScaler::new(context, self)
     }
 
-    /// Returns the glyphs of this `Line`.
+    /// Returns the `Glyph`s of this `Line`.
     pub fn glyphs(&self) -> &[Glyph] {
         &self.glyphs
-    }
-
-    /// Returns the `FontFamilyKey` of this `Line`.
-    pub fn family(&self) -> FontFamilyKey {
-        self.family
     }
 
     /// Returns the `FontSize` of this `Line`.
@@ -52,12 +42,9 @@ impl Line {
         self.size
     }
 
-    /// Returns the width of this `Line`.
-    pub fn width(&self) -> Advance {
-        self.glyphs
-            .last()
-            .map(|glyph| glyph.offset + glyph.advance)
-            .unwrap_or_default()
+    /// Returns the `Advance` of this `Line`.
+    pub fn advance(&self) -> Advance {
+        self.advance
     }
 
     /// Returns an iterator of contiguous backgrounds.
@@ -105,24 +92,11 @@ pub struct LineShaper<'a> {
     shape: &'a mut ShapeContext,
     line: Line,
     bytes: u32,
-    advance: Advance,
-    emoji_size: FontSize,
 }
 
 impl<'a> LineShaper<'a> {
     /// Creates a new `LineShaper` at `size` with `context`.
-    pub fn new(context: &'a mut Context, family: FontFamilyKey, size: FontSize) -> Self {
-        let mono = context
-            .advance(
-                context
-                    .fonts()
-                    .get((family, FontWeight::Regular, FontStyle::Normal))
-                    .unwrap()
-                    .key(),
-                size,
-            )
-            .unwrap();
-        let emoji_size = context.fonts().emoji().size_for_advance(2.0 * mono).round() as u8;
+    pub fn new(context: &'a mut Context, size: FontSize) -> Self {
         let (fonts, _, shape, _) = context.as_muts();
 
         Self {
@@ -130,60 +104,63 @@ impl<'a> LineShaper<'a> {
             shape,
             line: Line {
                 glyphs: Vec::new(),
-                family,
                 size,
+                advance: 0.,
             },
             bytes: 0,
-            advance: 0.,
-            emoji_size,
         }
     }
 
     /// Feeds `str` to the `LineShaper` with font `styles`.
     ///
     /// Not able to produce ligature across calls to this function.
-    pub fn push(&mut self, str: &str, styles: Styles) {
+    pub fn push(&mut self, str: &str, family: FontFamilyKey, styles: Styles) {
         let font = self
             .fonts
-            .get((self.line.family, styles.weight, styles.style))
-            .unwrap()
-            .as_ref();
-        let emoji = self.fonts.emoji().as_ref();
-        let font_key = font.key;
-        let emoji_key = emoji.key;
+            .get((family, styles.weight, styles.style))
+            .unwrap();
+        let emoji = self.fonts.emoji();
+        let font_key = font.key();
+        let emoji_key = emoji.key();
         let font_size = self.line.size;
-        let emoji_size = self.emoji_size;
+        let emoji_size = self
+            .fonts
+            .emoji()
+            .size_for_advance(2.0 * font.advance_for_size(font_size));
 
-        let mut key = font_key;
-        let mut size = font_size;
+        let line = &mut self.line;
         let mut font_or_emoji = FontOrEmoji::Font;
         let mut cluster = CharCluster::default();
-        let mut shaper = Self::build(self.shape, font, self.line.size);
+        let mut shaper = Self::build(self.shape, font, font_size);
         let mut parser = Parser::new(SCRIPT, str.char_indices().map(Self::token(self.bytes)));
 
         while parser.next(&mut cluster) {
-            shaper = match (Self::select(font, emoji, &mut cluster), font_or_emoji) {
-                (FontOrEmoji::Font, FontOrEmoji::Font) => shaper,
-                (FontOrEmoji::Emoji, FontOrEmoji::Emoji) => shaper,
+            match (Self::select(font, emoji, &mut cluster), font_or_emoji) {
+                (FontOrEmoji::Font, FontOrEmoji::Font) => {}
+                (FontOrEmoji::Emoji, FontOrEmoji::Emoji) => {}
                 (FontOrEmoji::Font, FontOrEmoji::Emoji) => {
-                    Self::flush(&mut self.line, &mut self.advance, shaper, key, size, styles);
-                    (key, size, font_or_emoji) = (font_key, font_size, FontOrEmoji::Font);
-                    Self::build(self.shape, font, self.line.size)
+                    Self::flush(line, shaper, emoji_key, emoji_size, styles);
+                    font_or_emoji = FontOrEmoji::Font;
+                    shaper = Self::build(self.shape, font, font_size);
                 }
                 (FontOrEmoji::Emoji, FontOrEmoji::Font) => {
-                    Self::flush(&mut self.line, &mut self.advance, shaper, key, size, styles);
-                    (key, size, font_or_emoji) = (emoji_key, emoji_size, FontOrEmoji::Emoji);
-                    Self::build(self.shape, emoji, self.emoji_size)
+                    Self::flush(line, shaper, font_key, font_size, styles);
+                    font_or_emoji = FontOrEmoji::Emoji;
+                    shaper = Self::build(self.shape, emoji, emoji_size);
                 }
             };
 
             shaper.add_cluster(&cluster);
-
-            let range = cluster.range();
-            self.bytes += range.end - range.start;
+            self.bytes += {
+                let range = cluster.range();
+                range.end - range.start
+            };
         }
 
-        Self::flush(&mut self.line, &mut self.advance, shaper, key, size, styles);
+        match font_or_emoji {
+            FontOrEmoji::Font => Self::flush(line, shaper, font_key, font_size, styles),
+            FontOrEmoji::Emoji => Self::flush(line, shaper, emoji_key, emoji_size, styles),
+        }
     }
 
     /// Returns the shaped `Line`.
@@ -204,7 +181,7 @@ impl<'a> LineShaper<'a> {
         }
     }
 
-    fn build<'b>(shape: &'b mut ShapeContext, font: FontRef<'b>, size: FontSize) -> Shaper<'b> {
+    fn build<'b>(shape: &'b mut ShapeContext, font: &'b Font, size: FontSize) -> Shaper<'b> {
         shape
             .builder(font)
             .script(SCRIPT)
@@ -213,18 +190,18 @@ impl<'a> LineShaper<'a> {
             .build()
     }
 
-    fn select(font: FontRef, emoji: FontRef, cluster: &mut CharCluster) -> FontOrEmoji {
-        match cluster.map(|ch| font.charmap().map(ch)) {
+    fn select(font: &Font, emoji: &Font, cluster: &mut CharCluster) -> FontOrEmoji {
+        match cluster.map(|ch| font.as_ref().charmap().map(ch)) {
             Status::Discard => {
                 // Make sure to map cluster with correct font
-                cluster.map(|ch| emoji.charmap().map(ch));
+                cluster.map(|ch| emoji.as_ref().charmap().map(ch));
                 FontOrEmoji::Emoji
             }
             Status::Complete => FontOrEmoji::Font,
-            Status::Keep => match cluster.map(|ch| emoji.charmap().map(ch)) {
+            Status::Keep => match cluster.map(|ch| emoji.as_ref().charmap().map(ch)) {
                 Status::Discard => {
                     // Make sure to map cluster with correct font
-                    cluster.map(|ch| font.charmap().map(ch));
+                    cluster.map(|ch| font.as_ref().charmap().map(ch));
                     FontOrEmoji::Font
                 }
                 Status::Complete => FontOrEmoji::Emoji,
@@ -233,26 +210,19 @@ impl<'a> LineShaper<'a> {
         }
     }
 
-    fn flush(
-        line: &mut Line,
-        offset: &mut Advance,
-        shaper: Shaper,
-        font: FontKey,
-        size: FontSize,
-        styles: Styles,
-    ) {
+    fn flush(line: &mut Line, shaper: Shaper, font: FontKey, size: FontSize, styles: Styles) {
         shaper.shape_with(|cluster| {
             for glyph in cluster.glyphs {
                 line.glyphs.push(Glyph {
                     font,
                     size,
                     id: glyph.id,
-                    offset: *offset,
+                    offset: line.advance,
                     advance: glyph.advance,
                     range: cluster.source,
                     styles,
                 });
-                *offset += glyph.advance;
+                line.advance += glyph.advance;
             }
         });
     }
@@ -293,7 +263,7 @@ impl<'a> LineScaler<'a> {
         let font = self.fonts.get(glyph.font).expect("font").as_ref();
         let image = self
             .cache
-            .get_or_insert((glyph.font, glyph.id, glyph.size), || {
+            .get_or_insert((glyph.font, glyph.size, glyph.id), || {
                 self.render.render(
                     &mut self
                         .scale

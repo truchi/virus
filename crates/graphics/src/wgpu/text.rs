@@ -74,16 +74,15 @@ impl Vertex {
     fn quad(
         ty: u32,
         ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
-        [top, left]: [i32; 2],
-        [width, height]: [u32; 2],
-        ([u, v], [texture_width, texture_height]): ([u32; 2], [u32; 2]),
+        ([top, left], [width, height]): ([i32; 2], [u32; 2]),
+        [u, v]: [u32; 2],
         color: Rgba,
     ) -> [Self; 4] {
         let region = ([region_top, region_left], [region_width, region_height]);
         let right = left + width as i32;
         let bottom = top + height as i32;
-        let u2 = u + texture_width;
-        let v2 = v + texture_height;
+        let u2 = u + width;
+        let v2 = v + height;
 
         [
             Vertex::new(ty, region, [top, left], [u, v], color),
@@ -109,8 +108,8 @@ pub struct TextPipeline {
     size_uniform: Buffer,
     vertex_buffer: Buffer,
     index_buffer: Buffer,
-    mask_atlas: Atlas<(FontKey, GlyphId, FontSize)>,
-    color_atlas: Atlas<(FontKey, GlyphId, FontSize)>,
+    mask_atlas: Atlas<GlyphKey>,
+    color_atlas: Atlas<GlyphKey>,
     mask_texture: Texture,
     color_texture: Texture,
     bind_group: BindGroup,
@@ -257,22 +256,7 @@ impl TextPipeline {
                 // Sampler
                 BindGroupEntry {
                     binding: 3,
-                    resource: BindingResource::Sampler(&device.create_sampler(
-                        &SamplerDescriptor {
-                            label: Some("[TextPipeline] Sampler descriptor"),
-                            address_mode_u: AddressMode::ClampToEdge,
-                            address_mode_v: AddressMode::ClampToEdge,
-                            address_mode_w: AddressMode::ClampToEdge,
-                            mag_filter: FilterMode::Linear,
-                            min_filter: FilterMode::Linear,
-                            mipmap_filter: FilterMode::Linear,
-                            lod_min_clamp: 0.0,
-                            lod_max_clamp: 0.0,
-                            compare: None,
-                            anisotropy_clamp: 1,
-                            border_color: None,
-                        },
-                    )),
+                    resource: BindingResource::Sampler(&device.create_sampler(&Default::default())),
                 },
             ],
         });
@@ -339,9 +323,8 @@ impl TextPipeline {
         self.insert_quad(Vertex::quad(
             Vertex::BACKGROUND_RECTANGLE,
             ([region_top, region_left], [region_width, region_height]),
-            [top, left],
-            [width, height],
-            ([0, 0], [0, 0]),
+            ([top, left], [width, height]),
+            [0, 0],
             color,
         ));
     }
@@ -383,9 +366,8 @@ impl TextPipeline {
                 self.insert_quad(Vertex::quad(
                     Vertex::BACKGROUND_RECTANGLE,
                     region,
-                    [top, left],
-                    [width, line_height],
-                    ([0, 0], [0, 0]),
+                    ([top, left], [width, line_height]),
+                    [0, 0],
                     background,
                 ));
             }
@@ -404,7 +386,7 @@ impl TextPipeline {
                 continue;
             };
 
-            let key = (glyph.font, glyph.id, glyph.size);
+            let key = glyph.key();
 
             // Swash image has placement (vertical up from baseline)
             let top = top + line.size() as i32 - image.placement.top;
@@ -455,9 +437,8 @@ impl TextPipeline {
             self.insert_quad(Vertex::quad(
                 ty,
                 region,
-                [top, left],
-                [width, height],
-                ([u, v], [width, height]),
+                ([top, left], [width, height]),
+                [u, v],
                 glyph.styles.foreground,
             ));
         }
@@ -479,7 +460,10 @@ impl TextPipeline {
         self.mask_atlas.next_frame();
         self.color_atlas.next_frame();
     }
+}
 
+/// Private.
+impl TextPipeline {
     fn insert_quad(&mut self, [top_left, top_right, bottom_left, bottom_right]: [Vertex; 4]) {
         let i = self.vertices.len() as u32;
 

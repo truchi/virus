@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::Path};
 use swash::{CacheKey, FontDataRef, FontRef};
 
-use super::Advance;
+use super::{Advance, FontSize};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             FontWeight                                         //
@@ -131,7 +131,6 @@ impl Font {
         let key = font.key;
 
         debug_assert!(font.offset == 0);
-
         Some(Self { data, key })
     }
 
@@ -149,11 +148,24 @@ impl Font {
         self.key
     }
 
-    /// Returns the font size giving `advance`.
-    pub fn size_for_advance(&self, advance: Advance) -> f32 {
+    /// Returns the advance giving `size`.
+    pub fn advance_for_size(&self, size: FontSize) -> Advance {
         let metrics = self.as_ref().metrics(&[]);
 
-        advance * metrics.units_per_em as f32 / metrics.average_width as f32
+        size as f32 * metrics.average_width as f32 / metrics.units_per_em as f32
+    }
+
+    /// Returns the size giving `advance`.
+    pub fn size_for_advance(&self, advance: Advance) -> FontSize {
+        let metrics = self.as_ref().metrics(&[]);
+
+        (advance * metrics.units_per_em as f32 / metrics.average_width as f32).round() as FontSize
+    }
+}
+
+impl<'a> From<&'a Font> for FontRef<'a> {
+    fn from(font: &'a Font) -> Self {
+        font.as_ref()
     }
 }
 

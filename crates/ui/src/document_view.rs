@@ -119,13 +119,11 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
         let start = (scroll_top as f32 / view.line_height as f32).floor() as usize;
         let end = start + (draw.height() as f32 / view.line_height as f32).ceil() as usize;
         let rope_lines = document.rope().len_lines() - 1;
-        let advance = {
-            let font = context
-                .fonts()
-                .get((view.family, FontWeight::Regular, FontStyle::Normal))
-                .unwrap();
-            context.advance(font.key(), view.font_size).unwrap()
-        };
+        let advance = context
+            .fonts()
+            .get((view.family, FontWeight::Regular, FontStyle::Normal))
+            .unwrap()
+            .advance_for_size(view.font_size);
         let line_numbers_width = advance * (rope_lines.ilog10() + 3) as Advance;
 
         Self {
@@ -178,7 +176,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             &self.document.query(&self.view.query).unwrap(),
         );
 
-        let mut shaper = Line::shaper(self.context, self.view.family, self.view.font_size);
+        let mut shaper = Line::shaper(self.context, self.view.font_size);
         let mut prev_line = None;
 
         for Highlight { start, end, key } in highlights.highlights() {
@@ -191,7 +189,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
                     self.view.lines.push((line, shaper.line()));
                 }
 
-                shaper = Line::shaper(self.context, self.view.family, self.view.font_size);
+                shaper = Line::shaper(self.context, self.view.font_size);
                 prev_line = Some(line);
             }
 
@@ -203,6 +201,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
                         .get_byte_slice(start.index..end.index)
                         .unwrap(),
                 ),
+                self.view.family,
                 self.view.theme[key],
             );
         }
@@ -226,13 +225,13 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
 
         for number in self.start..=self.end.min(self.rope_lines.saturating_sub(1)) {
             let line = {
-                let mut shaper = Line::shaper(self.context, family, self.view.font_size);
-                shaper.push(&(number + 1).to_string(), styles);
+                let mut shaper = Line::shaper(self.context, self.view.font_size);
+                shaper.push(&(number + 1).to_string(), family, styles);
                 shaper.line()
             };
 
             let top = number as i32 * self.view.line_height as i32 - self.scroll_top as i32;
-            let left = (self.line_numbers_width - self.advance - line.width()).round() as i32;
+            let left = (self.line_numbers_width - self.advance - line.advance()).round() as i32;
 
             self.draw.glyphs(
                 self.context,
@@ -275,7 +274,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
                         .find_map(|glyph| {
                             (glyph.range.end as usize > cursor.column).then_some(glyph.offset)
                         })
-                        .unwrap_or_else(|| line.width())
+                        .unwrap_or_else(|| line.advance())
                         .round() as i32
                 } else {
                     0

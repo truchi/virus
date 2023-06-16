@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use futures::{stream::FuturesUnordered, StreamExt};
 use reqwest::*;
 
-const OUTPUT: &str = "/home/romain/perso/virus/crates/graphics/noto_animated_emoji";
+const OUTPUT: &str = "/home/romain/Desktop/noto_animated_emoji";
 const SIZE: u32 = 64;
 const QUALITY: u32 = 1;
 
