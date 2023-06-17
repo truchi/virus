@@ -108,8 +108,8 @@ pub struct TextPipeline {
     size_uniform: Buffer,
     vertex_buffer: Buffer,
     index_buffer: Buffer,
-    mask_atlas: Atlas<GlyphKey>,
-    color_atlas: Atlas<GlyphKey>,
+    mask_atlas: Atlas<GlyphKey, Placement>,
+    color_atlas: Atlas<GlyphKey, Placement>,
     mask_texture: Texture,
     color_texture: Texture,
     bind_group: BindGroup,
@@ -379,60 +379,20 @@ impl TextPipeline {
 
         let mut scaler = line.scaler(context);
 
-        while let Some((glyph, image)) = scaler.next() {
-            let image = if let Some(image) = image {
-                image
+        for glyph in line.glyphs() {
+            let (ty, [u, v], placement) = if let Some((ty, [u, v], placement)) =
+                self.insert_glyph(queue, &mut scaler, glyph)
+            {
+                (ty, [u, v], placement)
             } else {
                 continue;
             };
 
-            let key = glyph.key();
-
             // Swash image has placement (vertical up from baseline)
-            let top = top + line.size() as i32 - image.placement.top;
-            let left = left + glyph.offset.round() as i32 + image.placement.left;
-            let width = image.placement.width;
-            let height = image.placement.height;
-
-            // Allocate glyph in atlas
-            let (ty, ([u, v], is_new), texture, channels) = match image.content {
-                Content::Mask => (
-                    Vertex::MASK_GLYPH,
-                    self.mask_atlas.insert(key, [width, height]).unwrap(),
-                    &self.mask_texture,
-                    1,
-                ),
-                Content::Color => (
-                    Vertex::COLOR_GLYPH,
-                    self.color_atlas.insert(key, [4 * width, height]).unwrap(),
-                    &self.color_texture,
-                    4,
-                ),
-                Content::SubpixelMask => unreachable!(),
-            };
-
-            // Insert glyph in atlas
-            if is_new {
-                queue.write_texture(
-                    ImageCopyTexture {
-                        texture,
-                        mip_level: 0,
-                        origin: Origin3d { x: u, y: v, z: 0 },
-                        aspect: TextureAspect::All,
-                    },
-                    &image.data,
-                    ImageDataLayout {
-                        offset: 0,
-                        bytes_per_row: Some(width * channels),
-                        rows_per_image: Some(height),
-                    },
-                    Extent3d {
-                        width,
-                        height,
-                        depth_or_array_layers: 1,
-                    },
-                );
-            }
+            let top = top + line.size() as i32 - placement.top;
+            let left = left + glyph.offset.round() as i32 + placement.left;
+            let width = placement.width;
+            let height = placement.height;
 
             self.insert_quad(Vertex::quad(
                 ty,
@@ -464,6 +424,73 @@ impl TextPipeline {
 
 /// Private.
 impl TextPipeline {
+    fn insert_glyph(
+        &mut self,
+        queue: &Queue,
+        scaler: &mut LineScaler,
+        glyph: &Glyph,
+    ) -> Option<(u32, [u32; 2], Placement)> {
+        let key = glyph.key();
+
+        // Check atlases for glyph
+        if let Some((ty, ([u, v], placement))) = {
+            let in_mask = || self.mask_atlas.get(&key).map(|v| (Vertex::MASK_GLYPH, v));
+            let in_color = || self.color_atlas.get(&key).map(|v| (Vertex::COLOR_GLYPH, v));
+            in_mask().or_else(in_color)
+        } {
+            return Some((ty, [u, v], *placement));
+        }
+
+        // Render glyph
+        let image = scaler.render(&glyph)?;
+        let placement = image.placement;
+        let [width, height] = [placement.width, placement.height];
+
+        // Allocate glyph in atlas
+        let (ty, atlas, texture, channels) = match image.content {
+            Content::Mask => (
+                Vertex::MASK_GLYPH,
+                &mut self.mask_atlas,
+                &self.mask_texture,
+                1,
+            ),
+            Content::Color => (
+                Vertex::COLOR_GLYPH,
+                &mut self.color_atlas,
+                &self.color_texture,
+                4,
+            ),
+            Content::SubpixelMask => unreachable!(),
+        };
+        let ([u, v], _) = {
+            atlas.insert(key, placement, [width, height]).unwrap();
+            atlas.get(&key).unwrap()
+        };
+
+        // Insert glyph in atlas
+        queue.write_texture(
+            ImageCopyTexture {
+                texture,
+                mip_level: 0,
+                origin: Origin3d { x: u, y: v, z: 0 },
+                aspect: TextureAspect::All,
+            },
+            &image.data,
+            ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(width * channels),
+                rows_per_image: Some(height),
+            },
+            Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        Some((ty, [u, v], placement))
+    }
+
     fn insert_quad(&mut self, [top_left, top_right, bottom_left, bottom_right]: [Vertex; 4]) {
         let i = self.vertices.len() as u32;
 

@@ -4,12 +4,12 @@ mod text;
 
 use crate::{
     colors::Rgba,
-    text::{Context, GlyphKey, Line, LineHeight},
+    text::{Context, Glyph, GlyphKey, Line, LineHeight, LineScaler},
 };
 use atlas::Atlas;
 use line::LinePipeline;
 use std::ops::Range;
-use swash::scale::image::Content;
+use swash::{scale::image::Content, zeno::Placement};
 use text::TextPipeline;
 use wgpu::{
     include_wgsl, vertex_attr_array, BindGroup, BindGroupDescriptor, BindGroupEntry,

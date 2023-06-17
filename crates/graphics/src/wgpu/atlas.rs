@@ -7,13 +7,15 @@ use std::hash::Hash;
 
 /// An [`Atlas`] item.
 #[derive(Copy, Clone, Debug)]
-struct Item {
+struct Item<V> {
     /// The bucket index.
     bucket: u32,
     /// The X coordinate in the atlas.
     x: u32,
     /// The Y coordinate in the atlas.
     y: u32,
+    /// The value.
+    value: V,
 }
 
 /// An [`Atlas`] bucket.
@@ -42,7 +44,7 @@ struct Bucket {
 /// De-allocation happens automatically.
 /// The row that has oldest data is reclaimed when space is needed.
 #[derive(Debug)]
-pub struct Atlas<K: Eq + Hash> {
+pub struct Atlas<K: Eq + Hash, V> {
     /// The bucket height of the atlas.
     row: u32,
     /// The width of the atlas.
@@ -50,14 +52,14 @@ pub struct Atlas<K: Eq + Hash> {
     /// The height of the atlas.
     height: u32,
     /// The items in the atlas.
-    items: HashMap<K, Item>,
+    items: HashMap<K, Item<V>>,
     /// The buckets of the atlas.
     buckets: Vec<Bucket>,
     /// The current frame.
     frame: u32,
 }
 
-impl<K: Eq + Hash> Atlas<K> {
+impl<K: Eq + Hash, V> Atlas<K, V> {
     /// Creates a new empty atlas with `width` and `height` and `row` height.
     ///
     /// Last row may be shorter than `row`.
@@ -73,26 +75,13 @@ impl<K: Eq + Hash> Atlas<K> {
         }
     }
 
-    /// Returns the row height of the atlas.
-    pub fn row(&self) -> u32 {
-        self.row
-    }
-
-    /// Returns the width of the atlas.
-    pub fn width(&self) -> u32 {
-        self.width
-    }
-
-    /// Returns the height of the atlas.
-    pub fn height(&self) -> u32 {
-        self.height
-    }
-
-    /// Returns the position in the altas of the item for `key`.
+    /// Returns the position and value of the item for `key`.
     ///
     /// If this item is to be used in the current frame, you ***MUST*** call [`Atlas::insert()`].
-    pub fn get(&self, key: &K) -> Option<[u32; 2]> {
-        self.items.get(key).map(|item| [item.x, item.y])
+    pub fn get(&self, key: &K) -> Option<([u32; 2], &V)> {
+        self.items
+            .get(key)
+            .map(|item| ([item.x, item.y], &item.value))
     }
 
     /// Marks the beginning of a new frame.
@@ -109,17 +98,27 @@ impl<K: Eq + Hash> Atlas<K> {
         }
     }
 
-    /// Inserts an item for `key` with `[width, height]`
-    /// and returns its position in the atlas and a `is_new` flag, or `None` if allocation fails.
+    /// Inserts an item for `key` with `value` and `[width, height]`.
     ///
-    /// Re-uses the position if `key` is already present.
+    /// Returns:
+    /// - `Ok(Some(value))`: `key` already exists, `value` was not updated but returned,
+    /// - `Ok(None)`: item is inserted,
+    /// - `Err((key, value))`: allocation failed.
+    ///
+    /// You ***MUST*** call this function for items to be used in the current frame,
+    /// otherwise it might get de-allocated.
     /// De-allocates oldest items automatically, when needed.
     ///
     /// If allocation fails, call [`Atlas::clear()`] before the next frame, or try a larger atlas.
-    pub fn insert(&mut self, mut key: K, [width, height]: [u32; 2]) -> Option<([u32; 2], bool)> {
+    pub fn insert(
+        &mut self,
+        key: K,
+        value: V,
+        [width, height]: [u32; 2],
+    ) -> Result<Option<V>, (K, V)> {
         // Check dimensions
         if width > self.width || height > self.row {
-            return None;
+            return Err((key, value));
         }
 
         // Lookup cache
@@ -127,16 +126,22 @@ impl<K: Eq + Hash> Atlas<K> {
             // Update bucket's frame
             self.buckets[item.bucket as usize].frame = self.frame;
 
-            return Some(([item.x, item.y], false));
+            return Ok(Some(value));
         }
 
         // Insert or deallocate oldest bucket and retry (or fail)
+        let mut key = key;
+        let mut value = value;
         loop {
-            match self.try_insert(key, [width, height]) {
-                Ok(item) => return Some(([item.x, item.y], true)),
-                Err(k) => {
-                    self.try_deallocate()?;
+            match self.try_insert(key, value, [width, height]) {
+                Ok(()) => return Ok(None),
+                Err((k, v)) => {
                     key = k;
+                    value = v;
+
+                    if self.try_deallocate().is_none() {
+                        return Err((key, value));
+                    }
                 }
             }
         }
@@ -151,9 +156,9 @@ impl<K: Eq + Hash> Atlas<K> {
 }
 
 /// Private.
-impl<K: Eq + Hash> Atlas<K> {
+impl<K: Eq + Hash, V> Atlas<K, V> {
     /// Tries to insert an item in the atlas.
-    fn try_insert(&mut self, key: K, [width, height]: [u32; 2]) -> Result<Item, K> {
+    fn try_insert(&mut self, key: K, value: V, [width, height]: [u32; 2]) -> Result<(), (K, V)> {
         debug_assert!(width <= self.width);
         debug_assert!(height <= self.row);
 
@@ -167,37 +172,41 @@ impl<K: Eq + Hash> Atlas<K> {
             if (width <= self.width - bucket.shelf_x)
                 && (height <= bucket_height - bucket.shelf_height)
             {
-                let item = Item {
-                    bucket: b as u32,
-                    x: bucket.shelf_x,
-                    y: bucket_y + bucket.shelf_height,
-                };
-
-                self.items.insert(key, item);
+                self.items.insert(
+                    key,
+                    Item {
+                        bucket: b as u32,
+                        x: bucket.shelf_x,
+                        y: bucket_y + bucket.shelf_height,
+                        value,
+                    },
+                );
                 bucket.frame = self.frame;
                 bucket.shelf_width = bucket.shelf_width.max(width);
                 bucket.shelf_height += height;
 
-                return Ok(item);
+                return Ok(());
             }
 
             // Fits in new shelf
             if (width <= self.width - bucket.shelf_x - bucket.shelf_width)
                 && (height <= bucket_height)
             {
-                let item = Item {
-                    bucket: b as u32,
-                    x: bucket.shelf_x + bucket.shelf_width,
-                    y: bucket_y,
-                };
-
-                self.items.insert(key, item);
+                self.items.insert(
+                    key,
+                    Item {
+                        bucket: b as u32,
+                        x: bucket.shelf_x + bucket.shelf_width,
+                        y: bucket_y,
+                        value,
+                    },
+                );
                 bucket.frame = self.frame;
                 bucket.shelf_x += bucket.shelf_width;
                 bucket.shelf_width = width;
                 bucket.shelf_height = height;
 
-                return Ok(item);
+                return Ok(());
             }
 
             bucket_y += bucket_height;
@@ -205,13 +214,15 @@ impl<K: Eq + Hash> Atlas<K> {
 
         // Fits in new bucket
         if height <= self.height - bucket_y {
-            let item = Item {
-                bucket: self.buckets.len() as u32,
-                x: 0,
-                y: bucket_y,
-            };
-
-            self.items.insert(key, item);
+            self.items.insert(
+                key,
+                Item {
+                    bucket: self.buckets.len() as u32,
+                    x: 0,
+                    y: bucket_y,
+                    value,
+                },
+            );
             self.buckets.push(Bucket {
                 frame: self.frame,
                 shelf_x: 0,
@@ -219,10 +230,10 @@ impl<K: Eq + Hash> Atlas<K> {
                 shelf_height: height,
             });
 
-            return Ok(item);
+            return Ok(());
         }
 
-        Err(key)
+        Err((key, value))
     }
 
     /// Tries to de-allocate the oldest bucket in the atlas.

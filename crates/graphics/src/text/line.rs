@@ -235,9 +235,7 @@ impl<'a> LineShaper<'a> {
 /// A [`Line`] scaler.
 pub struct LineScaler<'a> {
     fonts: &'a Fonts,
-    cache: &'a mut Glyphs,
     scale: &'a mut ScaleContext,
-    glyphs: std::slice::Iter<'a, Glyph>,
     size: FontSize,
     render: Render<'static>,
 }
@@ -245,36 +243,26 @@ pub struct LineScaler<'a> {
 impl<'a> LineScaler<'a> {
     /// Creates a new `LineScaler` of `line` with `context`.
     pub fn new(context: &'a mut Context, line: &'a Line) -> Self {
-        let (fonts, cache, _, scale) = context.as_muts();
+        let (fonts, _, _, scale) = context.as_muts();
 
         Self {
             fonts,
-            cache,
             scale,
-            glyphs: line.glyphs.iter(),
             size: line.size,
             render: Render::new(SOURCES),
         }
     }
 
-    /// Returns the next glyph and its image.
-    pub fn next<'b>(&'b mut self) -> Option<(Glyph, Option<&'b Image>)> {
-        let glyph = self.glyphs.next()?;
-        let font = self.fonts.get(glyph.font).expect("font").as_ref();
-        let image = self
-            .cache
-            .get_or_insert((glyph.font, glyph.size, glyph.id), || {
-                self.render.render(
-                    &mut self
-                        .scale
-                        .builder(font)
-                        .size(self.size as f32)
-                        .hint(HINT)
-                        .build(),
-                    glyph.id,
-                )
-            });
-
-        Some((*glyph, image.as_ref()))
+    /// Renders `glyph`.
+    pub fn render(&mut self, glyph: &Glyph) -> Option<Image> {
+        self.render.render(
+            &mut self
+                .scale
+                .builder(self.fonts.get(glyph.font).expect("font").as_ref())
+                .size(self.size as f32)
+                .hint(HINT)
+                .build(),
+            glyph.id,
+        )
     }
 }
