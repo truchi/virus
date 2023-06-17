@@ -1,24 +1,5 @@
-use crate::text::*;
-use lru::LruCache;
-use std::num::NonZeroUsize;
-use swash::{
-    scale::{image::Image, ScaleContext},
-    shape::ShapeContext,
-};
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                            GlyphKey                                            //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-/// [`Glyphs`] key.
-pub type GlyphKey = (FontKey, FontSize, GlyphId);
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                             Glyphs                                             //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-/// Glyph cache.
-pub type Glyphs = LruCache<GlyphKey, Option<Image>>;
+use super::Fonts;
+use swash::{scale::ScaleContext, shape::ShapeContext};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Context                                            //
@@ -28,8 +9,6 @@ pub type Glyphs = LruCache<GlyphKey, Option<Image>>;
 pub struct Context {
     /// Font cache.
     fonts: Fonts,
-    /// Glyph cache.
-    glyphs: Glyphs,
     /// Shape context.
     shape: ShapeContext,
     /// Scale context.
@@ -37,14 +16,10 @@ pub struct Context {
 }
 
 impl Context {
-    /// Capacity of the glyph cache.
-    const GLYPHS_CAPACITY: usize = 1_024;
-
     /// Creates a new `Context` with `fonts`.
     pub fn new(fonts: Fonts) -> Self {
         Self {
             fonts,
-            glyphs: Glyphs::new(NonZeroUsize::new(Self::GLYPHS_CAPACITY).unwrap()),
             shape: Default::default(),
             scale: Default::default(),
         }
@@ -55,25 +30,8 @@ impl Context {
         &self.fonts
     }
 
-    /// Returns the glyph cache.
-    pub fn glyphs(&self) -> &Glyphs {
-        &self.glyphs
-    }
-
     /// Returns a tuple of mutable references.
-    pub fn as_muts(
-        &mut self,
-    ) -> (
-        &mut Fonts,
-        &mut Glyphs,
-        &mut ShapeContext,
-        &mut ScaleContext,
-    ) {
-        (
-            &mut self.fonts,
-            &mut self.glyphs,
-            &mut self.shape,
-            &mut self.scale,
-        )
+    pub fn as_muts(&mut self) -> (&mut Fonts, &mut ShapeContext, &mut ScaleContext) {
+        (&mut self.fonts, &mut self.shape, &mut self.scale)
     }
 }

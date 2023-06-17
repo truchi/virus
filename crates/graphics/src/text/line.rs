@@ -97,7 +97,7 @@ pub struct LineShaper<'a> {
 impl<'a> LineShaper<'a> {
     /// Creates a new `LineShaper` at `size` with `context`.
     pub fn new(context: &'a mut Context, size: FontSize) -> Self {
-        let (fonts, _, shape, _) = context.as_muts();
+        let (fonts, shape, _) = context.as_muts();
 
         Self {
             fonts,
@@ -243,7 +243,7 @@ pub struct LineScaler<'a> {
 impl<'a> LineScaler<'a> {
     /// Creates a new `LineScaler` of `line` with `context`.
     pub fn new(context: &'a mut Context, line: &'a Line) -> Self {
-        let (fonts, _, _, scale) = context.as_muts();
+        let (fonts, _, scale) = context.as_muts();
 
         Self {
             fonts,
