@@ -12,9 +12,11 @@ wgpu.workspace = true
 winit.workspace = true
 pollster.workspace = true
 bytemuck.workspace = true
+image.workspace = true
 
 [dev-dependencies]
 # examples/download_noto_animated_emoji.rs
 tokio = { version = "1.28", features = ["full"] }
 reqwest = "0.11.18"
 futures = "0.3.28"
+rayon = "1.7.0"

@@ -1,51 +1,132 @@
-//! And use (https://github.com/ImageOptim/gifski).
-
-use std::collections::HashSet;
 use futures::{stream::FuturesUnordered, StreamExt};
+use image::{
+    codecs::{
+        gif::GifDecoder,
+        png::{self, PngEncoder},
+    },
+    imageops::FilterType,
+    AnimationDecoder, ColorType, DynamicImage, Frame, ImageEncoder,
+};
+use rayon::prelude::*;
 use reqwest::*;
+use std::{collections::HashSet, io::Write, time::Instant};
 
+const ENDPOINT: &str = "https://fonts.gstatic.com/s/e/notoemoji/latest";
+const SIZE: u32 = 512;
+const RESIZE: u32 = 64;
 const OUTPUT: &str = "/home/romain/Desktop/noto_animated_emoji";
-const SIZE: u32 = 64;
-const QUALITY: u32 = 1;
+const COMPRESSION: png::CompressionType = png::CompressionType::Best;
+const PNG_FILTER: png::FilterType = png::FilterType::Adaptive;
+const RESIZE_FILTER: FilterType = FilterType::CatmullRom;
+const CHUNK: usize = 30;
 
+#[derive(Default)]
+struct Main {
+    client: Client,
+    gifs: Vec<(String, Vec<Frame>)>,
+}
+
+impl Main {
+    async fn download(&mut self, emojis: &[&str]) {
+        let mut stream = emojis
+            .iter()
+            .map(|emoji| {
+                let client = self.client.clone();
+                async move { (emoji.to_string(), download(&client, &emoji).await) }
+            })
+            .collect::<FuturesUnordered<_>>();
+
+        while let Some((emoji, gif)) = stream.next().await {
+            self.gifs.push((emoji, decode_gif(&gif).collect()));
+        }
+    }
+
+    fn write(self) {
+        self.gifs
+            .into_par_iter()
+            .flat_map(|(emoji, frames)| {
+                std::fs::create_dir_all(format!("{OUTPUT}/{emoji}")).unwrap();
+                frames
+                    .into_par_iter()
+                    .enumerate()
+                    .map(move |(i, frame)| (emoji.clone(), i, frame))
+            })
+            .map(|(emoji, i, frame)| {
+                let delay = frame.delay();
+                let (numer, denom) = delay.numer_denom_ms();
+                let name = format!("frame:{i}-numer:{numer}-denom:{denom}");
+                let frame = resize_frame(frame, RESIZE, RESIZE_FILTER);
+                let png = encode_png(&frame);
+
+                std::fs::write(format!("{OUTPUT}/{emoji}/{name}.png"), &png).unwrap();
+            })
+            .count();
+    }
+}
+
+// (https://github.com/ImageOptim/gifski)?
 #[tokio::main]
 async fn main() {
     std::fs::create_dir_all(OUTPUT).unwrap();
-    std::fs::create_dir_all(format!("{OUTPUT}/")).unwrap();
-    std::fs::create_dir_all(format!("{OUTPUT}/{SIZE}-q{QUALITY}/")).unwrap();
 
-    let emojis = HashSet::<&str>::from_iter(EMOJIS.iter().map(|emoji| *emoji));
-    assert!(emojis.len() == EMOJIS.len());
+    let emojis = HashSet::<&str>::from_iter(EMOJIS.into_iter().filter_map(|emoji| {
+        const SKIN_PREFIX: &str = "_1f3f";
+        const HAIR_PREFIX: &str = "_1f9b";
+        const NON_RED_HEARTS: &[&str] = &[
+            "u1f9e1", "u1f49b", "u1f49a", "u1fa75", "u1f499", "u1f49c", "u1f90e", "u1f5a4",
+            "u1fa76", "u1f90d", "u1fa77",
+        ];
 
-    let client = Client::new();
-    emojis
-        .iter()
-        .map(|emoji| {
-            let client = client.clone();
-            async move {
-                // println!("\x1B[0;34mDownloading {emoji}\x1B[0m");
-                let downloaded = download(&client, &emoji).await;
+        if NON_RED_HEARTS.contains(emoji)
+            || emoji.contains(HAIR_PREFIX)
+            || emoji.contains(SKIN_PREFIX)
+        {
+            None
+        } else {
+            Some(*emoji)
+        }
+    }))
+    .into_iter()
+    .collect::<Vec<_>>();
 
-                // println!("\x1B[0;32mSave {emoji}\x1B[0m");
-                std::fs::write(format!("{OUTPUT}/{emoji}.gif"), &downloaded).unwrap();
-            }
-        })
-        .collect::<FuturesUnordered<_>>()
-        .count()
-        .await;
+    let chunks = (emojis.len() as f32 / CHUNK as f32).ceil() as u32;
+    println!(
+        "{} emojis, chunk size: {CHUNK}, chunks: {}",
+        emojis.len(),
+        chunks
+    );
 
-    for emoji in emojis {
-        println!("gifski -q --extra -W {SIZE} -H {SIZE} -Q {QUALITY} -o {OUTPUT}/{SIZE}-q{QUALITY}/{emoji}.gif {OUTPUT}/{emoji}.gif");
+    let start = Instant::now();
+
+    for (i, emojis) in emojis.chunks(CHUNK).enumerate() {
+        let i = i as u32 + 1;
+        let mut main = Main::default();
+
+        print!("{}/{chunks}: downloading & decoding", i);
+        std::io::stdout().flush().unwrap();
+
+        let now = Instant::now();
+        main.download(emojis).await;
+
+        print!(" ({:?}), writing", now.elapsed());
+        std::io::stdout().flush().unwrap();
+
+        let now = Instant::now();
+        main.write();
+
+        println!(
+            " ({:?}), {:?} left",
+            now.elapsed(),
+            (start.elapsed() / i) * (chunks - i),
+        );
     }
 
-    eprintln!("\x1B[0;35mchmod +x gifski.sh && ./gifski.sh\x1B[0m");
+    println!("Took {:?}", start.elapsed());
 }
 
 async fn download(client: &Client, emoji: &str) -> Vec<u8> {
     client
-        .get(format!(
-            "https://fonts.gstatic.com/s/e/notoemoji/latest/{emoji}/512.gif"
-        ))
+        .get(format!("{ENDPOINT}/{emoji}/{SIZE}.gif"))
         .send()
         .await
         .unwrap()
@@ -53,6 +134,47 @@ async fn download(client: &Client, emoji: &str) -> Vec<u8> {
         .await
         .unwrap()
         .into()
+}
+
+fn decode_gif(bytes: &[u8]) -> impl '_ + Iterator<Item = Frame> {
+    GifDecoder::new(bytes).unwrap().into_frames().map(|frame| {
+        let frame = frame.unwrap();
+        debug_assert!(frame.top() == 0);
+        debug_assert!(frame.left() == 0);
+        debug_assert!(frame.buffer().width() == SIZE);
+        debug_assert!(frame.buffer().height() == SIZE);
+
+        frame
+    })
+}
+
+fn resize_frame(frame: Frame, size: u32, filter: FilterType) -> Frame {
+    let (top, left, delay, buffer) = (
+        frame.top(),
+        frame.left(),
+        frame.delay(),
+        frame.into_buffer(),
+    );
+
+    Frame::from_parts(
+        DynamicImage::from(buffer)
+            .resize(size, size, filter)
+            .into_rgba8(),
+        left,
+        top,
+        delay,
+    )
+}
+
+fn encode_png(frame: &Frame) -> Vec<u8> {
+    let buffer = frame.buffer();
+
+    let mut png = Vec::new();
+    PngEncoder::new_with_quality(&mut png, COMPRESSION, PNG_FILTER)
+        .write_image(buffer, buffer.width(), buffer.height(), ColorType::Rgba8)
+        .unwrap();
+
+    png
 }
 
 // https://googlefonts.github.io/noto-emoji-animation/

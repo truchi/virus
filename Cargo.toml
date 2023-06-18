@@ -24,6 +24,7 @@ tween = "2.0.1"
 wgpu = "0.16"
 pollster = "0.3"
 bytemuck = "1.13"
+image = "0.24"
 
 [profile.dev]
 # Remove debug stuff in the binary
