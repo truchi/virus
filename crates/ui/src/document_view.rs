@@ -272,6 +272,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
                     line.glyphs()
                         .iter()
                         .find_map(|glyph| {
+                            // TODO: consecutive glyphs may have same range!
                             (glyph.range.end as usize > cursor.column).then_some(glyph.offset)
                         })
                         .unwrap_or_else(|| line.advance())

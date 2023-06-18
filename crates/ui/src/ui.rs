@@ -119,6 +119,7 @@ impl Ui {
 }
 
 fn fonts() -> Fonts {
+    use virus_graphics::text::AnimatedFont;
     use virus_graphics::text::FontStyle::*;
     use virus_graphics::text::FontWeight::*;
 
@@ -213,7 +214,10 @@ fn fonts() -> Fonts {
     const VICTOR_BOLD_OBLIQUE: &str =
         "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-BoldOblique.ttf";
 
-    let mut fonts = Fonts::new(Font::from_file(EMOJI).unwrap());
+    let mut fonts = Fonts::new(
+        Font::from_file(EMOJI).unwrap(),
+        AnimatedFont::new("/home/romain/Desktop/noto_animated_emoji".into()).unwrap(),
+    );
 
     // let ubuntu = fonts.set(Font::from_file(UBUNTU).unwrap());
 

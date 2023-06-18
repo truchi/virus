@@ -151,10 +151,7 @@ impl<'a> LineShaper<'a> {
             };
 
             shaper.add_cluster(&cluster);
-            self.bytes += {
-                let range = cluster.range();
-                range.end - range.start
-            };
+            self.bytes += cluster.range().to_range().len() as u32;
         }
 
         match font_or_emoji {
@@ -190,6 +187,7 @@ impl<'a> LineShaper<'a> {
             .build()
     }
 
+    // TODO cache charmaps
     fn select(font: &Font, emoji: &Font, cluster: &mut CharCluster) -> FontOrEmoji {
         match cluster.map(|ch| font.as_ref().charmap().map(ch)) {
             Status::Discard => {

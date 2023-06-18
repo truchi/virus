@@ -6,10 +6,12 @@
 //!
 //! It would be nice to crop what we shape/scale of a line on the horizontal axis.
 
+mod animated;
 mod context;
 mod font;
 mod line;
 
+pub use animated::*;
 pub use context::*;
 pub use font::*;
 pub use line::*;

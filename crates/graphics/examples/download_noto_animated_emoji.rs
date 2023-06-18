@@ -53,8 +53,8 @@ impl Main {
             })
             .map(|(emoji, i, frame)| {
                 let delay = frame.delay();
-                let (numer, denom) = delay.numer_denom_ms();
-                let name = format!("frame:{i}-numer:{numer}-denom:{denom}");
+                let (delay, _) = delay.numer_denom_ms();
+                let name = format!("frame:{i}-delay:{delay}");
                 let frame = resize_frame(frame, RESIZE, RESIZE_FILTER);
                 let png = encode_png(&frame);
 
@@ -139,10 +139,11 @@ async fn download(client: &Client, emoji: &str) -> Vec<u8> {
 fn decode_gif(bytes: &[u8]) -> impl '_ + Iterator<Item = Frame> {
     GifDecoder::new(bytes).unwrap().into_frames().map(|frame| {
         let frame = frame.unwrap();
-        debug_assert!(frame.top() == 0);
-        debug_assert!(frame.left() == 0);
-        debug_assert!(frame.buffer().width() == SIZE);
-        debug_assert!(frame.buffer().height() == SIZE);
+        assert!(frame.top() == 0);
+        assert!(frame.left() == 0);
+        assert!(frame.buffer().width() == SIZE);
+        assert!(frame.buffer().height() == SIZE);
+        assert!(frame.delay().numer_denom_ms().1 == 1);
 
         frame
     })
