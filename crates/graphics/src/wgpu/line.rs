@@ -30,7 +30,7 @@ impl Vertex {
 
     fn vertex_buffer_layout() -> VertexBufferLayout<'static> {
         VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as BufferAddress,
+            array_stride: size_of::<Vertex>() as BufferAddress,
             step_mode: VertexStepMode::Vertex,
             attributes: &Self::ATTRIBUTES,
         }
@@ -81,7 +81,7 @@ impl LinePipeline {
 
         let size_uniform = device.create_buffer(&BufferDescriptor {
             label: Some("[LinePipeline] Size uniform"),
-            size: std::mem::size_of::<Sizes>() as BufferAddress,
+            size: size_of::<Sizes>() as BufferAddress,
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });

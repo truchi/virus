@@ -8,21 +8,21 @@ use crate::{
 };
 use atlas::Atlas;
 use line::LinePipeline;
-use std::{ops::Range, time::Duration};
+use std::{mem::size_of, ops::Range, time::Duration};
 use swash::{scale::image::Content, zeno::Placement};
 use text::TextPipeline;
 use wgpu::{
     include_wgsl, vertex_attr_array, BindGroup, BindGroupDescriptor, BindGroupEntry,
-    BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, BlendState,
-    Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, Color,
+    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
+    BlendState, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, Color,
     ColorTargetState, ColorWrites, CommandEncoderDescriptor, Device, Extent3d, FragmentState,
     ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, LoadOp, Operations, Origin3d,
     PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, Queue, RenderPass,
     RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
     RequestAdapterOptions, SamplerBindingType, ShaderStages, Surface, SurfaceConfiguration,
     Texture, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType,
-    TextureUsages, TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexState,
-    VertexStepMode,
+    TextureUsages, TextureView, TextureViewDimension, VertexAttribute, VertexBufferLayout,
+    VertexState, VertexStepMode,
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
@@ -161,7 +161,7 @@ impl Graphics {
         self.config.width = size.width;
         self.config.height = size.height;
         self.surface.configure(&self.device, &self.config);
-        self.text_pipeline.resize(size);
+        self.text_pipeline.resize(&self.device, &self.config);
         self.line_pipeline.resize(size);
     }
 
@@ -179,31 +179,83 @@ impl Graphics {
     /// Renders to the screen.
     pub fn render(&mut self) {
         let output = self.surface.get_current_texture().unwrap();
-        let view = output.texture.create_view(&Default::default());
         let mut encoder = self
             .device
             .create_command_encoder(&CommandEncoderDescriptor {
                 label: Some("Encoder"),
             });
 
+        self.text_pipeline.pre_render(&self.queue);
+
         {
+            let view = self.text_pipeline.rectangle_texture_view();
             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("Render pass"),
+                label: Some("Render pass (rectangles)"),
                 color_attachments: &[Some(RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
                     ops: Operations {
-                        load: LoadOp::Clear(Color::BLACK),
+                        load: LoadOp::Clear(Color::TRANSPARENT),
                         store: true,
                     },
                 })],
                 depth_stencil_attachment: None,
             });
-            self.text_pipeline.render(&self.queue, &mut render_pass);
+            self.text_pipeline.render_rectangles(&mut render_pass);
+        }
+        {
+            let view = self.text_pipeline.blur_texture_view();
+            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("Render pass (blur)"),
+                color_attachments: &[Some(RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::TRANSPARENT),
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            });
+            self.text_pipeline.render_blurs(&mut render_pass);
+        }
+        {
+            let view = self.text_pipeline.glyph_texture_view();
+            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("Render pass (glyph)"),
+                color_attachments: &[Some(RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::TRANSPARENT),
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            });
+            self.text_pipeline.render_glyphs(&mut render_pass);
+        }
+        {
+            let view = output.texture.create_view(&Default::default());
+            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("Render pass (compose)"),
+                color_attachments: &[Some(RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::TRANSPARENT),
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            });
+            self.text_pipeline.compose(&mut render_pass);
             self.line_pipeline.render(&self.queue, &mut render_pass);
         }
 
         self.queue.submit([encoder.finish()]);
         output.present();
+
+        self.text_pipeline.post_render();
     }
 }

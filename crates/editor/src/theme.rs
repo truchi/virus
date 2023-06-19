@@ -171,13 +171,21 @@ impl Theme {
                     b,
                     a: u8::MAX,
                 },
-                background: Default::default(),
+                background: if r > 200 {
+                    Rgba::new(0, 50, 0, 255)
+                } else {
+                    Default::default()
+                },
                 underline: Default::default(),
                 strike: Default::default(),
-                blur: Some(Blur {
-                    radius: 3,
-                    color: Rgba::BLUE,
-                }),
+                blur: if r == 255 {
+                    Some(Blur {
+                        radius: 3,
+                        color: Rgba::BLUE,
+                    })
+                } else {
+                    None
+                },
             }
         }
 
