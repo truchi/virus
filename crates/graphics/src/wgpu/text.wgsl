@@ -11,6 +11,7 @@ struct Vertex {
     // - 0: a background rectangle (use `color`),
     // - 1: a mask glyph (use `uv` in the mask texture with `color`),
     // - 2: a color glyph (use `uv` in the color texture),
+    // - 3: an animated glyph (use `uv` in the animated texture),
     @location(0) ty: u32,
 
     // Region `(top, left)` world coordinates.
@@ -76,7 +77,8 @@ fn vertex(vertex: Vertex) -> Fragment {
 
 @group(0) @binding(1) var mask_texture: texture_2d<f32>;
 @group(0) @binding(2) var color_texture: texture_2d<f32>;
-@group(0) @binding(3) var texture_sampler: sampler;
+@group(0) @binding(3) var animated_texture: texture_2d<f32>;
+@group(0) @binding(4) var texture_sampler: sampler;
 
 @fragment
 fn fragment(fragment: Fragment) -> @location(0) vec4f {
@@ -94,16 +96,15 @@ fn fragment(fragment: Fragment) -> @location(0) vec4f {
         // Mask glyph
         case 1u {
             let mask = textureSampleLevel(mask_texture, texture_sampler, fragment.uv, 0.0).r;
-            return vec4f(
-                fragment.color.r,
-                fragment.color.g,
-                fragment.color.b,
-                fragment.color.a * mask,
-            );
+            return vec4f(fragment.color.rgb, fragment.color.a * mask);
         }
         // Color glyph
         case 2u {
             return textureSampleLevel(color_texture, texture_sampler, fragment.uv, 0.0);
+        }
+        // Animated glyph
+        case 3u {
+            return textureSampleLevel(animated_texture, texture_sampler, fragment.uv, 0.0);
         }
         default {
             return vec4f(0.0, 0.0, 0.0, 0.0);

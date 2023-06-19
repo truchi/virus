@@ -73,8 +73,8 @@ async fn main() {
         const SKIN_PREFIX: &str = "_1f3f";
         const HAIR_PREFIX: &str = "_1f9b";
         const NON_RED_HEARTS: &[&str] = &[
-            "u1f9e1", "u1f49b", "u1f49a", "u1fa75", "u1f499", "u1f49c", "u1f90e", "u1f5a4",
-            "u1fa76", "u1f90d", "u1fa77",
+            "1f9e1", "1f49b", "1f49a", "1fa75", "1f499", "1f49c", "1f90e", "1f5a4",
+            "1fa76", "1f90d", "1fa77",
         ];
 
         if NON_RED_HEARTS.contains(emoji)

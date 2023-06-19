@@ -1,5 +1,5 @@
 use ropey::Rope;
-use std::{borrow::Cow, ops::Range};
+use std::{borrow::Cow, ops::Range, time::Duration};
 use virus_common::Cursor;
 use virus_editor::{
     document::Document,
@@ -72,8 +72,18 @@ impl DocumentView {
         document: &Document,
         scroll_top: u32,
         scrollbar_alpha: u8,
+        time: Duration,
     ) {
-        Renderer::new(self, context, draw, document, scroll_top, scrollbar_alpha).render();
+        Renderer::new(
+            self,
+            context,
+            draw,
+            document,
+            scroll_top,
+            scrollbar_alpha,
+            time,
+        )
+        .render();
     }
 }
 
@@ -88,6 +98,7 @@ struct Renderer<'a, 'b, 'c, 'd, 'e> {
     document: &'e Document,
     scroll_top: u32,
     scrollbar_alpha: u8,
+    time: Duration,
     start: usize,
     end: usize,
     rope_lines: usize,
@@ -115,6 +126,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
         document: &'e Document,
         scroll_top: u32,
         scrollbar_alpha: u8,
+        time: Duration,
     ) -> Self {
         let start = (scroll_top as f32 / view.line_height as f32).floor() as usize;
         let end = start + (draw.height() as f32 / view.line_height as f32).ceil() as usize;
@@ -133,6 +145,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             document,
             scroll_top,
             scrollbar_alpha,
+            time,
             start,
             end,
             rope_lines,
@@ -238,6 +251,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
                 [top, left],
                 &line,
                 self.view.line_height as u32,
+                self.time,
             );
         }
     }
@@ -252,6 +266,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
                 [top, left],
                 &line,
                 self.view.line_height as u32,
+                self.time,
             );
         }
     }

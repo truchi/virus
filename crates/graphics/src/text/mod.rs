@@ -74,6 +74,8 @@ pub struct Glyph {
     pub size: FontSize,
     /// Glyph id.
     pub id: GlyphId,
+    /// Animated glyph id.
+    pub animated_id: Option<AnimatedGlyphId>,
     /// Glyph advance offset.
     pub offset: Advance,
     /// Glyph advance.
@@ -88,6 +90,11 @@ impl Glyph {
     /// Returns the [`GlyphKey`].
     pub fn key(&self) -> GlyphKey {
         (self.font, self.size, self.id)
+    }
+
+    /// Returns `true` if this glyph can be animated.
+    pub fn is_animated(&self) -> bool {
+        self.animated_id.is_some()
     }
 }
 

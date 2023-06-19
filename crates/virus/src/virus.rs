@@ -151,11 +151,11 @@ impl Virus {
         self.ui.update(delta);
         self.ui.render(&self.document);
 
-        if self.ui.is_animating() {
-            flow.set_wait_timeout(std::time::Duration::from_millis(10_000));
-        } else {
-            flow.set_wait();
-        }
+        // if self.ui.is_animating() {
+        //     flow.set_wait_timeout(std::time::Duration::from_millis(10_000));
+        // } else {
+        //     flow.set_wait();
+        // }
     }
 
     fn on_close(&mut self, flow: &mut ControlFlow) {}

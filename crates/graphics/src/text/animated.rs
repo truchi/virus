@@ -1,3 +1,4 @@
+use super::FontSize;
 use image::imageops::FilterType;
 use std::{collections::HashMap, fmt::Debug, path::PathBuf, time::Duration};
 use swash::{
@@ -9,10 +10,22 @@ use swash::{
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                            FrameIndex                                          //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub type FrameIndex = u8;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                          AnimatedGlyphId                                       //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub type AnimatedGlyphId = u16;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                          AnimatedGlyphKey                                      //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub type AnimatedGlyphKey = (FontSize, AnimatedGlyphId, FrameIndex);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           AnimatedGlyph                                        //
@@ -39,7 +52,7 @@ impl AnimatedGlyph {
         self.frames.len()
     }
 
-    pub fn frame(&self, time: Duration) -> usize {
+    pub fn frame(&self, time: Duration) -> FrameIndex {
         let time = time.as_millis() % self.duration.as_millis();
 
         self.frames
@@ -52,6 +65,8 @@ impl AnimatedGlyph {
             .find(|(_, duration)| time < *duration)
             .unwrap()
             .0
+            .try_into()
+            .unwrap()
     }
 
     pub fn render(&self, size: u32) -> std::io::Result<Vec<Image>> {

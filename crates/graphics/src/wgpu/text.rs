@@ -11,6 +11,7 @@ struct Vertex {
     /// - 0: a background rectangle (use `color`),
     /// - 1: a mask glyph (use `uv` in the mask texture with `color`),
     /// - 2: a color glyph (use `uv` in the color texture),
+    /// - 3: an animated glyph (use `uv` in the animated texture),
     ty: u32,
     /// Region `[top, left]` world coordinates.
     region_position: [i32; 2],
@@ -31,6 +32,7 @@ impl Vertex {
     const BACKGROUND_RECTANGLE: u32 = 0;
     const MASK_GLYPH: u32 = 1;
     const COLOR_GLYPH: u32 = 2;
+    const ANIMATED_GLYPH: u32 = 3;
 
     const ATTRIBUTES: [VertexAttribute; 6] = vertex_attr_array![
         0 => Uint32,   // ty
@@ -110,8 +112,10 @@ pub struct TextPipeline {
     index_buffer: Buffer,
     mask_atlas: Atlas<GlyphKey, Placement>,
     color_atlas: Atlas<GlyphKey, Placement>,
+    animated_atlas: Atlas<AnimatedGlyphKey, Placement>,
     mask_texture: Texture,
     color_texture: Texture,
+    animated_texture: Texture,
     bind_group: BindGroup,
     pipeline: RenderPipeline,
 }
@@ -155,8 +159,10 @@ impl TextPipeline {
 
         let mut mask_atlas = Atlas::new(Self::ALTAS_ROW_HEIGHT, width, height);
         let mut color_atlas = Atlas::new(Self::ALTAS_ROW_HEIGHT, width, height);
+        let mut animated_atlas = Atlas::new(Self::ALTAS_ROW_HEIGHT, width, height);
         mask_atlas.next_frame();
         color_atlas.next_frame();
+        animated_atlas.next_frame();
 
         let texture_descriptor = |label, format| TextureDescriptor {
             label: Some(label),
@@ -178,6 +184,10 @@ impl TextPipeline {
         ));
         let color_texture = device.create_texture(&texture_descriptor(
             "[TextPipeline] Color glyphs texture",
+            TextureFormat::Rgba8Unorm,
+        ));
+        let animated_texture = device.create_texture(&texture_descriptor(
+            "[TextPipeline] Animated glyphs texture",
             TextureFormat::Rgba8Unorm,
         ));
 
@@ -221,9 +231,20 @@ impl TextPipeline {
                     },
                     count: None,
                 },
-                // Sampler
+                // Animated texture
                 BindGroupLayoutEntry {
                     binding: 3,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: TextureViewDimension::D2,
+                        sample_type: TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                // Sampler
+                BindGroupLayoutEntry {
+                    binding: 4,
                     visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Sampler(SamplerBindingType::Filtering),
                     count: None,
@@ -253,9 +274,16 @@ impl TextPipeline {
                         &color_texture.create_view(&Default::default()),
                     ),
                 },
-                // Sampler
+                // Animated texture
                 BindGroupEntry {
                     binding: 3,
+                    resource: BindingResource::TextureView(
+                        &animated_texture.create_view(&Default::default()),
+                    ),
+                },
+                // Sampler
+                BindGroupEntry {
+                    binding: 4,
                     resource: BindingResource::Sampler(&device.create_sampler(&Default::default())),
                 },
             ],
@@ -303,8 +331,10 @@ impl TextPipeline {
             index_buffer,
             mask_atlas,
             color_atlas,
+            animated_atlas,
             mask_texture,
             color_texture,
+            animated_texture,
             bind_group,
             pipeline,
         }
@@ -337,6 +367,7 @@ impl TextPipeline {
         [top, left]: [i32; 2],
         line: &Line,
         line_height: LineHeight,
+        time: Duration,
     ) {
         let region = ([region_top, region_left], [region_width, region_height]);
 
@@ -380,19 +411,37 @@ impl TextPipeline {
         let mut scaler = line.scaler(context);
 
         for glyph in line.glyphs() {
-            let (ty, [u, v], placement) = if let Some((ty, [u, v], placement)) =
-                self.insert_glyph(queue, &mut scaler, glyph)
-            {
-                (ty, [u, v], placement)
-            } else {
-                continue;
-            };
+            let (ty, ([top, left], [width, height]), [u, v]) = if glyph.is_animated() {
+                if let Some((ty, [u, v], placement)) =
+                    self.insert_animated_glyph(queue, &mut scaler, glyph, time)
+                {
+                    debug_assert!(placement.top == 0 && placement.left == 0);
 
-            // Swash image has placement (vertical up from baseline)
-            let top = top + line.size() as i32 - placement.top;
-            let left = left + glyph.offset.round() as i32 + placement.left;
-            let width = placement.width;
-            let height = placement.height;
+                    // Centering vertically by hand
+                    let top =
+                        top + ((line_height as f32 - placement.width as f32) / 2.0).round() as i32;
+                    let left = left + glyph.offset.round() as i32;
+                    let width = placement.width;
+                    let height = placement.height;
+
+                    (ty, ([top, left], [width, height]), [u, v])
+                } else {
+                    continue;
+                }
+            } else {
+                if let Some((ty, [u, v], placement)) = self.insert_glyph(queue, &mut scaler, glyph)
+                {
+                    // Swash image has placement (vertical up from baseline)
+                    let top = top + line.size() as i32 - placement.top;
+                    let left = left + glyph.offset.round() as i32 + placement.left;
+                    let width = placement.width;
+                    let height = placement.height;
+
+                    (ty, ([top, left], [width, height]), [u, v])
+                } else {
+                    continue;
+                }
+            };
 
             self.insert_quad(Vertex::quad(
                 ty,
@@ -419,6 +468,7 @@ impl TextPipeline {
         self.indices.clear();
         self.mask_atlas.next_frame();
         self.color_atlas.next_frame();
+        self.animated_atlas.next_frame();
     }
 }
 
@@ -478,7 +528,7 @@ impl TextPipeline {
             &image.data,
             ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(width * channels),
+                bytes_per_row: Some(channels * width),
                 rows_per_image: Some(height),
             },
             Extent3d {
@@ -489,6 +539,64 @@ impl TextPipeline {
         );
 
         Some((ty, [u, v], placement))
+    }
+
+    fn insert_animated_glyph(
+        &mut self,
+        queue: &Queue,
+        scaler: &mut LineScaler,
+        glyph: &Glyph,
+        time: Duration,
+    ) -> Option<(u32, [u32; 2], Placement)> {
+        let id = glyph.animated_id?;
+        let key = (glyph.size, id, scaler.frame(glyph, time)?);
+
+        // Check atlas for frame
+        if let Some(([u, v], placement)) = self.animated_atlas.get(&key) {
+            return Some((Vertex::ANIMATED_GLYPH, [u, v], *placement));
+        }
+
+        // Render frames
+        let frames = scaler.render_animated(&glyph)?;
+        debug_assert!(FrameIndex::try_from(frames.len()).is_ok());
+
+        for (index, frame) in frames.iter().enumerate() {
+            let placement = frame.placement;
+            let [width, height] = [placement.width, placement.height];
+
+            // Allocate frame in atlas
+            let ([u, v], _) = {
+                let key = (glyph.size, id, index as FrameIndex);
+                self.animated_atlas
+                    .insert(key, placement, [width, height])
+                    .unwrap();
+                self.animated_atlas.get(&key).unwrap()
+            };
+
+            // Insert frame in atlas
+            queue.write_texture(
+                ImageCopyTexture {
+                    texture: &self.animated_texture,
+                    mip_level: 0,
+                    origin: Origin3d { x: u, y: v, z: 0 },
+                    aspect: TextureAspect::All,
+                },
+                &frame.data,
+                ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(4 * width),
+                    rows_per_image: Some(height),
+                },
+                Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+            );
+        }
+
+        let ([u, v], placement) = self.animated_atlas.get(&key).unwrap();
+        Some((Vertex::ANIMATED_GLYPH, [u, v], *placement))
     }
 
     fn insert_quad(&mut self, [top_left, top_right, bottom_left, bottom_right]: [Vertex; 4]) {

@@ -23,6 +23,7 @@ pub struct Ui {
     document_view: DocumentView,
     scroll_top: Tweened<u32>,
     scrollbar_alpha: Tweened<u8>,
+    time: Duration,
 }
 
 impl Ui {
@@ -43,6 +44,7 @@ impl Ui {
             document_view,
             scroll_top: Tweened::new(0),
             scrollbar_alpha: Tweened::new(0),
+            time: Duration::ZERO,
         }
     }
 
@@ -86,6 +88,7 @@ impl Ui {
     pub fn update(&mut self, delta: Duration) {
         self.scroll_top.step(delta);
         self.scrollbar_alpha.step(delta);
+        self.time += delta;
     }
 
     pub fn render(&mut self, document: &Document) {
@@ -97,6 +100,7 @@ impl Ui {
             document,
             self.scroll_top.current(),
             self.scrollbar_alpha.current(),
+            self.time,
         );
 
         self.graphics.render();

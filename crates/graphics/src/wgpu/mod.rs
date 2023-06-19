@@ -4,11 +4,11 @@ mod text;
 
 use crate::{
     colors::Rgba,
-    text::{Context, Glyph, GlyphKey, Line, LineHeight, LineScaler},
+    text::{AnimatedGlyphKey, Context, FrameIndex, Glyph, GlyphKey, Line, LineHeight, LineScaler},
 };
 use atlas::Atlas;
 use line::LinePipeline;
-use std::ops::Range;
+use std::{ops::Range, time::Duration};
 use swash::{scale::image::Content, zeno::Placement};
 use text::TextPipeline;
 use wgpu::{
@@ -64,6 +64,7 @@ impl<'a> Draw<'a> {
         [top, left]: [i32; 2],
         line: &Line,
         line_height: LineHeight,
+        time: Duration,
     ) {
         self.graphics.text_pipeline.glyphs(
             &self.graphics.queue,
@@ -72,6 +73,7 @@ impl<'a> Draw<'a> {
             [top, left],
             line,
             line_height,
+            time,
         );
     }
 
