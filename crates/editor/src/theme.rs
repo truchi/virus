@@ -156,6 +156,7 @@ impl Theme {
     /// Stupid shit for tests!
     pub fn dracula() -> Self {
         use virus_graphics::text::{
+            Blur,
             FontStyle::{self, *},
             FontWeight::{self, *},
         };
@@ -173,6 +174,10 @@ impl Theme {
                 background: Default::default(),
                 underline: Default::default(),
                 strike: Default::default(),
+                blur: Some(Blur {
+                    radius: 3,
+                    color: Rgba::BLUE,
+                }),
             }
         }
 
