@@ -106,6 +106,7 @@ struct Pass {
     vertices: Vec<Vertex>,
     indices: Vec<u32>,
     output: Texture,
+    pipeline: Option<RenderPipeline>,
 }
 
 impl Pass {
@@ -114,6 +115,7 @@ impl Pass {
             vertices: Vec::with_capacity(1024),
             indices: Vec::with_capacity(1024),
             output,
+            pipeline: None,
         }
     }
 
@@ -183,7 +185,6 @@ pub struct TextPipeline {
     blur: Pass,
     glyph: Pass,
     pass_bind_group: BindGroup,
-    pass_pipeline: RenderPipeline,
     compose_bind_group_layout: BindGroupLayout,
     compose_bind_group: BindGroup,
     compose_pipeline: RenderPipeline,
@@ -267,9 +268,9 @@ impl TextPipeline {
         //
 
         let [rectangle, blur, glyph] = Self::output_texture_descriptors(config);
-        let rectangle = Pass::new(device.create_texture(&rectangle));
-        let blur = Pass::new(device.create_texture(&blur));
-        let glyph = Pass::new(device.create_texture(&glyph));
+        let mut rectangle = Pass::new(device.create_texture(&rectangle));
+        let mut blur = Pass::new(device.create_texture(&blur));
+        let mut glyph = Pass::new(device.create_texture(&glyph));
 
         //
         // Bind groups
@@ -381,57 +382,70 @@ impl TextPipeline {
         // Pipelines
         //
 
-        let pass_pipeline = {
-            let shader_module = device.create_shader_module(include_wgsl!("text.wgsl"));
-            let pass_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+        {
+            let layout = &device.create_pipeline_layout(&PipelineLayoutDescriptor {
                 label: Some("[TextPipeline] Pass pipeline layout"),
                 bind_group_layouts: &[&pass_bind_group_layout],
                 push_constant_ranges: &[],
             });
-
-            device.create_render_pipeline(&RenderPipelineDescriptor {
-                label: Some("[TextPipeline] Pass pipeline"),
-                layout: Some(&pass_pipeline_layout),
+            let module = &device.create_shader_module(include_wgsl!("text.wgsl"));
+            let buffers = &[Vertex::vertex_buffer_layout()];
+            let targets = &[Some(ColorTargetState {
+                format: config.format,
+                blend: Some(BlendState::ALPHA_BLENDING),
+                write_mask: ColorWrites::ALL,
+            })];
+            let descriptor = |label, fragment| RenderPipelineDescriptor {
+                label: Some(label),
+                layout: Some(layout),
                 vertex: VertexState {
-                    module: &shader_module,
+                    module,
                     entry_point: "vertex",
-                    buffers: &[Vertex::vertex_buffer_layout()],
+                    buffers,
                 },
                 fragment: Some(FragmentState {
-                    module: &shader_module,
-                    entry_point: "fragment",
-                    targets: &[Some(ColorTargetState {
-                        format: config.format,
-                        blend: Some(BlendState::ALPHA_BLENDING),
-                        write_mask: ColorWrites::ALL,
-                    })],
+                    module,
+                    entry_point: fragment,
+                    targets,
                 }),
                 primitive: Default::default(),
                 depth_stencil: None,
                 multisample: Default::default(),
                 multiview: None,
-            })
+            };
+
+            rectangle.pipeline = Some(device.create_render_pipeline(&descriptor(
+                "[TextPipeline] Rectangle pass pipeline",
+                "rectangle_fragment",
+            )));
+            blur.pipeline = Some(device.create_render_pipeline(&descriptor(
+                "[TextPipeline] Blur pass pipeline",
+                "blur_fragment",
+            )));
+            glyph.pipeline = Some(device.create_render_pipeline(&descriptor(
+                "[TextPipeline] Glyph pass pipeline",
+                "glyph_fragment",
+            )));
         };
 
         let compose_pipeline = {
-            let shader_module = device.create_shader_module(include_wgsl!("compose.wgsl"));
-            let compose_pipeline_layout =
-                device.create_pipeline_layout(&PipelineLayoutDescriptor {
-                    label: Some("[TextPipeline] Compose pipeline layout"),
-                    bind_group_layouts: &[&compose_bind_group_layout],
-                    push_constant_ranges: &[],
-                });
+            let module = &device.create_shader_module(include_wgsl!("compose.wgsl"));
+            let layout = &device.create_pipeline_layout(&PipelineLayoutDescriptor {
+                label: Some("[TextPipeline] Compose pipeline layout"),
+                bind_group_layouts: &[&compose_bind_group_layout],
+                push_constant_ranges: &[],
+            });
 
             device.create_render_pipeline(&RenderPipelineDescriptor {
                 label: Some("[TextPipeline] Compose pipeline"),
-                layout: Some(&compose_pipeline_layout),
+                layout: Some(layout),
                 vertex: VertexState {
-                    module: &shader_module,
+                    module,
                     entry_point: "vertex",
                     buffers: &[],
                 },
                 fragment: Some(FragmentState {
-                    module: &shader_module,
+                    module,
                     entry_point: "fragment",
                     targets: &[Some(ColorTargetState {
                         format: config.format,
@@ -464,7 +478,6 @@ impl TextPipeline {
             blur,
             glyph,
             pass_bind_group,
-            pass_pipeline,
             compose_bind_group_layout,
             compose_bind_group,
             compose_pipeline,
@@ -651,7 +664,7 @@ impl TextPipeline {
         let indices = ..self.rectangle.indices();
 
         if !self.rectangle.is_empty() {
-            render_pass.set_pipeline(&self.pass_pipeline);
+            render_pass.set_pipeline(self.rectangle.pipeline.as_ref().unwrap());
             render_pass.set_bind_group(0, &self.pass_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(vertices));
             render_pass.set_index_buffer(self.index_buffer.slice(indices), IndexFormat::Uint32);
@@ -664,7 +677,7 @@ impl TextPipeline {
         let indices = self.rectangle.indices()..self.rectangle.indices() + self.blur.indices();
 
         if !self.blur.is_empty() {
-            render_pass.set_pipeline(&self.pass_pipeline);
+            render_pass.set_pipeline(self.blur.pipeline.as_ref().unwrap());
             render_pass.set_bind_group(0, &self.pass_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(vertices));
             render_pass.set_index_buffer(self.index_buffer.slice(indices), IndexFormat::Uint32);
@@ -677,7 +690,7 @@ impl TextPipeline {
         let indices = self.rectangle.indices() + self.blur.indices()..;
 
         if !self.glyph.is_empty() {
-            render_pass.set_pipeline(&self.pass_pipeline);
+            render_pass.set_pipeline(self.glyph.pipeline.as_ref().unwrap());
             render_pass.set_bind_group(0, &self.pass_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(vertices));
             render_pass.set_index_buffer(self.index_buffer.slice(indices), IndexFormat::Uint32);

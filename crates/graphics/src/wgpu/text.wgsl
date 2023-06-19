@@ -81,7 +81,19 @@ fn vertex(vertex: Vertex) -> Fragment {
 @group(0) @binding(4) var texture_sampler: sampler;
 
 @fragment
-fn fragment(fragment: Fragment) -> @location(0) vec4f {
+fn rectangle_fragment(fragment: Fragment) -> @location(0) vec4f {
+    // Clip region
+    let inside = fragment.min <= fragment.position.xy & fragment.position.xy < fragment.max;
+    if !(inside.x && inside.y) {
+        discard;
+    }
+
+    // Background rectangle
+    return fragment.color;
+}
+
+@fragment
+fn blur_fragment(fragment: Fragment) -> @location(0) vec4f {
     // Clip region
     let inside = fragment.min <= fragment.position.xy & fragment.position.xy < fragment.max;
     if !(inside.x && inside.y) {
@@ -89,10 +101,34 @@ fn fragment(fragment: Fragment) -> @location(0) vec4f {
     }
 
     switch fragment.ty {
-        // Background rectangle
-        case 0u {
-            return fragment.color;
+        // Mask glyph
+        case 1u {
+            let mask = textureSampleLevel(mask_texture, texture_sampler, fragment.uv, 0.0).r;
+            return vec4f(fragment.color.rgb, fragment.color.a * mask);
         }
+        // Color glyph
+        case 2u {
+            return textureSampleLevel(color_texture, texture_sampler, fragment.uv, 0.0);
+        }
+        // Animated glyph
+        case 3u {
+            return textureSampleLevel(animated_texture, texture_sampler, fragment.uv, 0.0);
+        }
+        default {
+            return vec4f(0.0, 0.0, 0.0, 0.0);
+        }
+    }
+}
+
+@fragment
+fn glyph_fragment(fragment: Fragment) -> @location(0) vec4f {
+    // Clip region
+    let inside = fragment.min <= fragment.position.xy & fragment.position.xy < fragment.max;
+    if !(inside.x && inside.y) {
+        discard;
+    }
+
+    switch fragment.ty {
         // Mask glyph
         case 1u {
             let mask = textureSampleLevel(mask_texture, texture_sampler, fragment.uv, 0.0).r;
