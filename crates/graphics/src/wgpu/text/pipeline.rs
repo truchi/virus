@@ -1,104 +1,5 @@
 use super::*;
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                              Vertex                                            //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-struct Vertex {
-    /// Vertex type:
-    /// - 0: a background rectangle (use `color`),
-    /// - 1: a mask glyph (use `uv` in the mask texture with `color`),
-    /// - 2: a color glyph (use `uv` in the color texture),
-    /// - 3: an animated glyph (use `uv` in the animated texture),
-    ty: u32,
-    /// Region `[top, left]` world coordinates.
-    region_position: [i32; 2],
-    /// Region `[width, height]` size.
-    region_size: [u32; 2],
-    /// Vertex `[top, left]` coordinates in region.
-    position: [i32; 2],
-    /// Texture `[x, y]` coordinates.
-    uv: [u32; 2],
-    /// sRGBA color.
-    color: [u32; 4],
-}
-
-unsafe impl bytemuck::Zeroable for Vertex {}
-unsafe impl bytemuck::Pod for Vertex {}
-
-impl Vertex {
-    const BACKGROUND_RECTANGLE: u32 = 0;
-    const MASK_GLYPH: u32 = 1;
-    const COLOR_GLYPH: u32 = 2;
-    const ANIMATED_GLYPH: u32 = 3;
-
-    const ATTRIBUTES: [VertexAttribute; 6] = vertex_attr_array![
-        0 => Uint32,   // ty
-        1 => Sint32x2, // region position
-        2 => Uint32x2, // region size
-        3 => Sint32x2, // position
-        4 => Uint32x2, // uv
-        5 => Uint32x4, // color
-    ];
-
-    fn vertex_buffer_layout() -> VertexBufferLayout<'static> {
-        VertexBufferLayout {
-            array_stride: size_of::<Vertex>() as BufferAddress,
-            step_mode: VertexStepMode::Vertex,
-            attributes: &Self::ATTRIBUTES,
-        }
-    }
-
-    fn new(
-        ty: u32,
-        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
-        [top, left]: [i32; 2],
-        uv: [u32; 2],
-        color: Rgba,
-    ) -> Self {
-        Self {
-            ty,
-            region_position: [region_top, region_left],
-            region_size: [region_width, region_height],
-            position: [top, left],
-            uv,
-            color: [
-                color.r as u32,
-                color.g as u32,
-                color.b as u32,
-                color.a as u32,
-            ],
-        }
-    }
-
-    fn quad(
-        ty: u32,
-        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
-        ([top, left], [width, height]): ([i32; 2], [u32; 2]),
-        [u, v]: [u32; 2],
-        color: Rgba,
-    ) -> [Self; 4] {
-        let region = ([region_top, region_left], [region_width, region_height]);
-        let right = left + width as i32;
-        let bottom = top + height as i32;
-        let u2 = u + width;
-        let v2 = v + height;
-
-        [
-            Vertex::new(ty, region, [top, left], [u, v], color),
-            Vertex::new(ty, region, [top, right], [u2, v], color),
-            Vertex::new(ty, region, [bottom, left], [u, v2], color),
-            Vertex::new(ty, region, [bottom, right], [u2, v2], color),
-        ]
-    }
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                              Pipeline                                          //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
 type Sizes = [[u32; 2]; 2];
 
 #[derive(Debug)]
@@ -167,6 +68,10 @@ impl Pass {
         self.indices.clear();
     }
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                           TextPipeline                                         //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// Text pipeline.
 #[derive(Debug)]
@@ -330,25 +235,24 @@ impl TextPipeline {
         // Pipelines
         //
 
+        let targets = [Some(ColorTargetState {
+            format: config.format,
+            blend: Some(BlendState::ALPHA_BLENDING),
+            write_mask: ColorWrites::ALL,
+        })];
         {
             let layout = device.create_pipeline_layout(&pipeline_layout! {
                 label: "[TextPipeline] Pass pipeline layout",
                 bind_group_layouts: [pass_bind_group_layout],
             });
-            let module = device.create_shader_module(include_wgsl!("text.wgsl"));
-            let buffers = [Vertex::vertex_buffer_layout()];
-            let targets = [Some(ColorTargetState {
-                format: config.format,
-                blend: Some(BlendState::ALPHA_BLENDING),
-                write_mask: ColorWrites::ALL,
-            })];
+            let module = device.create_shader_module(include_wgsl!("shaders/text.wgsl"));
 
             rectangle.pipeline = Some(device.create_render_pipeline(&render_pipeline! {
                 label: "[TextPipeline] Rectangle pass pipeline",
                 layout: layout,
                 module: module,
                 vertex: "vertex",
-                buffers: buffers,
+                buffers: [Vertex::vertex_buffer_layout()],
                 fragment: "rectangle_fragment",
                 targets: targets,
                 topology: TriangleList,
@@ -358,7 +262,7 @@ impl TextPipeline {
                 layout: layout,
                 module: module,
                 vertex: "vertex",
-                buffers: buffers,
+                buffers: [Vertex::vertex_buffer_layout()],
                 fragment: "blur_fragment",
                 targets: targets,
                 topology: TriangleList,
@@ -368,7 +272,7 @@ impl TextPipeline {
                 layout: layout,
                 module: module,
                 vertex: "vertex",
-                buffers: buffers,
+                buffers: [Vertex::vertex_buffer_layout()],
                 fragment: "glyph_fragment",
                 targets: targets,
                 topology: TriangleList,
@@ -376,7 +280,7 @@ impl TextPipeline {
         };
 
         let compose_pipeline = {
-            let module = &device.create_shader_module(include_wgsl!("compose.wgsl"));
+            let module = &device.create_shader_module(include_wgsl!("shaders/compose.wgsl"));
             let layout = &device.create_pipeline_layout(&pipeline_layout! {
                 label: "[TextPipeline] Compose pipeline layout",
                 bind_group_layouts: [compose_bind_group_layout],
@@ -389,11 +293,7 @@ impl TextPipeline {
                 vertex: "vertex",
                 buffers: [],
                 fragment: "fragment",
-                targets: [Some(ColorTargetState {
-                    format: config.format,
-                    blend: Some(BlendState::ALPHA_BLENDING),
-                    write_mask: ColorWrites::ALL,
-                })],
+                targets: targets,
                 topology: TriangleList,
             })
         };

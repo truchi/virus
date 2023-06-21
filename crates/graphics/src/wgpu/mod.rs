@@ -1,8 +1,16 @@
+mod text {
+    mod pipeline;
+    mod vertices;
+
+    use super::*;
+    use vertices::*;
+
+    pub use pipeline::TextPipeline;
+}
 mod atlas;
 mod blur;
 mod line;
 mod macros;
-mod text;
 
 use crate::{
     colors::Rgba,
@@ -29,70 +37,6 @@ use wgpu::{
     VertexAttribute, VertexBufferLayout, VertexState, VertexStepMode,
 };
 use winit::{dpi::PhysicalSize, window::Window};
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                              Draw                                              //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-/// A drawing API for [`Graphics`].
-pub struct Draw<'a> {
-    graphics: &'a mut Graphics,
-    region: ([i32; 2], [u32; 2]),
-}
-
-impl<'a> Draw<'a> {
-    /// Returns the top coordinate of the drawing region.
-    pub fn top(&self) -> i32 {
-        self.region.0[0]
-    }
-
-    /// Returns the left coordinate of the drawing region.
-    pub fn left(&self) -> i32 {
-        self.region.0[1]
-    }
-
-    /// Returns the width of the drawing region.
-    pub fn width(&self) -> u32 {
-        self.region.1[0]
-    }
-
-    /// Returns the height of the drawing region.
-    pub fn height(&self) -> u32 {
-        self.region.1[1]
-    }
-
-    /// Draws glyphs.
-    pub fn glyphs(
-        &mut self,
-        context: &mut Context,
-        [top, left]: [i32; 2],
-        line: &Line,
-        line_height: LineHeight,
-        time: Duration,
-    ) {
-        self.graphics.text_pipeline.glyphs(
-            &self.graphics.queue,
-            context,
-            self.region,
-            [top, left],
-            line,
-            line_height,
-            time,
-        );
-    }
-
-    /// Draws a rectange.
-    pub fn rectangle(&mut self, ([top, left], [width, height]): ([i32; 2], [u32; 2]), color: Rgba) {
-        self.graphics
-            .text_pipeline
-            .rectangle(self.region, ([top, left], [width, height]), color)
-    }
-
-    /// Draws a polyline.
-    pub fn polyline<T: IntoIterator<Item = ([i32; 2], Rgba)>>(&mut self, points: T) {
-        self.graphics.line_pipeline.polyline(self.region, points);
-    }
-}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            Graphics                                            //
@@ -310,5 +254,69 @@ impl Graphics {
         output.present();
 
         self.text_pipeline.post_render();
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                              Draw                                              //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+/// A drawing API for [`Graphics`].
+pub struct Draw<'a> {
+    graphics: &'a mut Graphics,
+    region: ([i32; 2], [u32; 2]),
+}
+
+impl<'a> Draw<'a> {
+    /// Returns the top coordinate of the drawing region.
+    pub fn top(&self) -> i32 {
+        self.region.0[0]
+    }
+
+    /// Returns the left coordinate of the drawing region.
+    pub fn left(&self) -> i32 {
+        self.region.0[1]
+    }
+
+    /// Returns the width of the drawing region.
+    pub fn width(&self) -> u32 {
+        self.region.1[0]
+    }
+
+    /// Returns the height of the drawing region.
+    pub fn height(&self) -> u32 {
+        self.region.1[1]
+    }
+
+    /// Draws glyphs.
+    pub fn glyphs(
+        &mut self,
+        context: &mut Context,
+        [top, left]: [i32; 2],
+        line: &Line,
+        line_height: LineHeight,
+        time: Duration,
+    ) {
+        self.graphics.text_pipeline.glyphs(
+            &self.graphics.queue,
+            context,
+            self.region,
+            [top, left],
+            line,
+            line_height,
+            time,
+        );
+    }
+
+    /// Draws a rectange.
+    pub fn rectangle(&mut self, ([top, left], [width, height]): ([i32; 2], [u32; 2]), color: Rgba) {
+        self.graphics
+            .text_pipeline
+            .rectangle(self.region, ([top, left], [width, height]), color)
+    }
+
+    /// Draws a polyline.
+    pub fn polyline<T: IntoIterator<Item = ([i32; 2], Rgba)>>(&mut self, points: T) {
+        self.graphics.line_pipeline.polyline(self.region, points);
     }
 }
