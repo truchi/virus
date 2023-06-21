@@ -1,7 +1,6 @@
 struct Fragment {
     @builtin(position) position: vec4f,
-    @location(0) texture: u32,
-    @location(1) uv: vec2f,
+    @location(0) uv: vec2f,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -11,7 +10,6 @@ struct Fragment {
 @vertex
 fn vertex(
     @builtin(vertex_index) vertex: u32,
-    @builtin(instance_index) instance: u32,
 ) -> Fragment {
     var fragment: Fragment;
     switch vertex {
@@ -32,7 +30,6 @@ fn vertex(
         case 5u { fragment.uv = vec2f(1.0, 1.0); } // Bottom right
         default {}
     }
-    fragment.texture = instance;
 
     return fragment;
 }
@@ -41,32 +38,38 @@ fn vertex(
 //                                              Fragment                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-@group(0) @binding(0) var rectangle_texture: texture_2d<f32>;
-@group(0) @binding(1) var blur_texture: texture_2d<f32>;
-@group(0) @binding(2) var glyph_texture: texture_2d<f32>;
-@group(0) @binding(3) var texture_sampler: sampler;
+@group(0) @binding(0) var<uniform> direction: u32;
+@group(0) @binding(1) var texture: texture_2d<f32>;
+@group(0) @binding(2) var texture_sampler: sampler;
 
 @fragment
 fn fragment(fragment: Fragment) -> @location(0) vec4f {
-    switch fragment.texture {
-        // Rectangle texture
-        case 0u {
-            return textureSampleLevel(rectangle_texture, texture_sampler, fragment.uv, 0.0);
-        }
-        // Blur texture
-        case 1u {
-            let color = textureSampleLevel(blur_texture, texture_sampler, fragment.uv, 0.0);
-            //return color;
-            let alpha = color.a;
-            let blur = vec4f(1.0, 0.0, 0.0, 1.0);
-            return vec4f(blur.rgb, blur.a * alpha);
-        }
-        // Glyph texture
-        case 2u {
-            return textureSampleLevel(glyph_texture, texture_sampler, fragment.uv, 0.0);
-        }
-        default {
-            return vec4f(0.0, 0.0, 0.0, 0.0);
-        }
+    let dimensions = textureDimensions(texture);
+    let w = 1.0 / f32(dimensions.x);
+    let h = 1.0 / f32(dimensions.y);
+    
+    var dir = vec2f(0.0, 0.0);
+    if direction == 0u {
+        dir = vec2f(w, 0.0);
+    } else {
+        dir = vec2f(0.0, h);
     }
+    
+    let radius = 10;
+    //let weight = 1.0 + 2.0 * f32(radius);
+    let weight = 1.0 + 2.0 * f32(radius) + f32(radius) * f32(radius);
+    let original = textureSample(texture, texture_sampler, fragment.uv);
+    //var color = original;
+    var color = original * f32(radius + 1);
+    
+    for (var i: i32 = 1; i <= radius; i++) {
+        //let factor = 1.0;
+        let factor = f32(radius + 1 - i);
+        let offset = f32(i) * dir;
+        color += textureSample(texture, texture_sampler, fragment.uv - offset) * factor;
+        color += textureSample(texture, texture_sampler, fragment.uv + offset) * factor;
+    }
+    
+    color = color / weight;
+    return vec4f(1.0, 0.0, 0.0, color.a);
 }

@@ -1,4 +1,5 @@
 mod atlas;
+mod blur;
 mod line;
 mod text;
 
@@ -7,6 +8,7 @@ use crate::{
     text::{AnimatedGlyphKey, Context, FrameIndex, Glyph, GlyphKey, Line, LineHeight, LineScaler},
 };
 use atlas::Atlas;
+use blur::BlurPipeline;
 use line::LinePipeline;
 use std::{mem::size_of, ops::Range, time::Duration};
 use swash::{scale::image::Content, zeno::Placement};
@@ -103,6 +105,8 @@ pub struct Graphics {
     queue: Queue,
     text_pipeline: TextPipeline,
     line_pipeline: LinePipeline,
+    pong_blur_texture: Texture,
+    blur_pipeline: BlurPipeline,
 }
 
 impl Graphics {
@@ -135,9 +139,32 @@ impl Graphics {
         assert!(config.format == TextureFormat::Bgra8UnormSrgb);
         surface.configure(&device, &config);
 
+        // Textures
+        let pong_blur_texture = device.create_texture(&TextureDescriptor {
+            label: Some("[Graphics] Blur texture"),
+            size: Extent3d {
+                width: size.width,
+                height: size.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: config.format,
+            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
+
+            view_formats: &[],
+        });
+
         // Pipelines
         let text_pipeline = TextPipeline::new(&device, &config);
         let line_pipeline = LinePipeline::new(&device, &config);
+        let blur_pipeline = BlurPipeline::new(
+            &device,
+            &config,
+            &text_pipeline.blur_texture_view(),
+            &pong_blur_texture.create_view(&Default::default()),
+        );
 
         Self {
             window,
@@ -147,6 +174,8 @@ impl Graphics {
             queue,
             text_pipeline,
             line_pipeline,
+            pong_blur_texture,
+            blur_pipeline,
         }
     }
 
@@ -163,6 +192,28 @@ impl Graphics {
         self.surface.configure(&self.device, &self.config);
         self.text_pipeline.resize(&self.device, &self.config);
         self.line_pipeline.resize(size);
+
+        self.pong_blur_texture.destroy();
+        self.pong_blur_texture = self.device.create_texture(&TextureDescriptor {
+            label: Some("[Graphics] Blur texture"),
+            size: Extent3d {
+                width: size.width,
+                height: size.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: self.config.format,
+            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
+
+            view_formats: &[],
+        });
+        self.blur_pipeline.rebind(
+            &self.device,
+            &self.text_pipeline.blur_texture_view(),
+            &self.pong_blur_texture.create_view(&Default::default()),
+        );
     }
 
     /// Returns the drawing API.
@@ -201,7 +252,7 @@ impl Graphics {
                 })],
                 depth_stencil_attachment: None,
             });
-            self.text_pipeline.render_rectangles(&mut render_pass);
+            // self.text_pipeline.render_rectangles(&mut render_pass);
         }
         {
             let view = self.text_pipeline.blur_texture_view();
@@ -233,8 +284,44 @@ impl Graphics {
                 })],
                 depth_stencil_attachment: None,
             });
-            self.text_pipeline.render_glyphs(&mut render_pass);
+            // self.text_pipeline.render_glyphs(&mut render_pass);
         }
+
+        // BLUR
+        {
+            let ping = self.text_pipeline.blur_texture_view();
+            let pong = self.pong_blur_texture.create_view(&Default::default());
+
+            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("Render pass (blur ping)"),
+                color_attachments: &[Some(RenderPassColorAttachment {
+                    view: &pong,
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::TRANSPARENT),
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            });
+            self.blur_pipeline.ping(&self.queue, &mut render_pass);
+            drop(render_pass);
+
+            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("Render pass (blur pong)"),
+                color_attachments: &[Some(RenderPassColorAttachment {
+                    view: &ping,
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::TRANSPARENT),
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            });
+            self.blur_pipeline.pong(&self.queue, &mut render_pass);
+        }
+
         {
             let view = output.texture.create_view(&Default::default());
             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
@@ -243,7 +330,7 @@ impl Graphics {
                     view: &view,
                     resolve_target: None,
                     ops: Operations {
-                        load: LoadOp::Clear(Color::TRANSPARENT),
+                        load: LoadOp::Clear(Color::WHITE),
                         store: true,
                     },
                 })],
@@ -259,3 +346,9 @@ impl Graphics {
         self.text_pipeline.post_render();
     }
 }
+
+// Surface
+// "Background" texture
+// "Middleground" texture aka "Ping" (the one we want to blur)
+// "Foreground" texture
+// "Pong"

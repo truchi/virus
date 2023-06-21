@@ -165,27 +165,22 @@ impl Theme {
             Styles {
                 weight,
                 style,
-                foreground: Rgba {
-                    r,
-                    g,
-                    b,
-                    a: u8::MAX,
-                },
-                background: if r > 200 {
-                    Rgba::new(0, 50, 0, 255)
-                } else {
-                    Default::default()
-                },
                 underline: Default::default(),
                 strike: Default::default(),
-                blur: if r == 255 {
-                    Some(Blur {
-                        radius: 3,
-                        color: Rgba::BLUE,
-                    })
-                } else {
-                    None
-                },
+                // foreground: Rgba {
+                //     r,
+                //     g,
+                //     b,
+                //     a: u8::MAX,
+                // },
+                // background: Default::default(),
+                // blur: None,
+                foreground: Rgba::BLACK,
+                background: Rgba::BLACK,
+                blur: Some(Blur {
+                    radius: 3,
+                    color: Rgba::RED,
+                }),
             }
         }
 

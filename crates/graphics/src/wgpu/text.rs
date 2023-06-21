@@ -620,17 +620,17 @@ impl TextPipeline {
                 glyph.styles.foreground,
             ));
 
-            if let Some(_blur) = glyph
+            if let Some(blur) = glyph
                 .styles
                 .blur
-                .map(|blur| blur.radius > 0 && blur.color.a != 0)
+                .filter(|blur| blur.radius > 0 && blur.color.a != 0)
             {
                 self.blur.insert_quad(Vertex::quad(
                     ty,
                     region,
                     ([top, left], [width, height]),
                     [u, v],
-                    glyph.styles.foreground,
+                    blur.color,
                 ));
             }
         }
