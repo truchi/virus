@@ -263,6 +263,35 @@ macro_rules! render_pipeline {
 pub(crate) use render_pipeline;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                       RenderPassDescriptor                                     //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+macro_rules! render_pass {
+    (
+        label: $label:expr,
+        view: $view:expr,
+        load: $load:ident$(($color:ident))?,
+        store: $store:expr
+        $(,)?
+    ) => {
+        RenderPassDescriptor {
+            label: Some($label),
+            color_attachments: &[Some(RenderPassColorAttachment {
+                view: &$view,
+                resolve_target: None,
+                ops: Operations {
+                    load: LoadOp::$load$((Color::$color))?,
+                    store: $store,
+                },
+            })],
+            depth_stencil_attachment: None,
+        }
+    };
+}
+
+pub(crate) use render_pass;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Tests                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
@@ -282,6 +311,7 @@ mod tests {
             module: ShaderModule,
             buffer_layout: VertexBufferLayout,
             target: ColorTargetState,
+            view: TextureView,
         ) {
             // Buffer
             let _ = buffer! {
@@ -385,6 +415,20 @@ mod tests {
                 fragment: "fragment",
                 targets: [Some(target)],
                 topology: TriangleList,
+            };
+
+            // Render pass
+            let _ = render_pass! {
+                label: "Render pipeline",
+                view: view,
+                load: Load,
+                store: true,
+            };
+            let _ = render_pass! {
+                label: "Render pipeline",
+                view: view,
+                load: Clear(BLACK),
+                store: true,
             };
         }
     }

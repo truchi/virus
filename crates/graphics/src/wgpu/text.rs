@@ -202,23 +202,20 @@ impl TextPipeline {
         // Buffers
         //
 
-        let size_uniform = device.create_buffer(&BufferDescriptor {
-            label: Some("[TextPipeline] Size uniform"),
-            size: size_of::<Sizes>() as BufferAddress,
-            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-            mapped_at_creation: false,
+        let size_uniform = device.create_buffer(&buffer! {
+            label: "[TextPipeline] Size uniform",
+            size: size_of::<Sizes>(),
+            usage: UNIFORM | COPY_DST,
         });
-        let vertex_buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("[TextPipeline] Vertex buffer"),
+        let vertex_buffer = device.create_buffer(&buffer! {
+            label: "[TextPipeline] Vertex buffer",
             size: max_buffer_size,
-            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
-            mapped_at_creation: false,
+            usage: VERTEX | COPY_DST,
         });
-        let index_buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("[TextPipeline] Index buffer"),
+        let index_buffer = device.create_buffer(&buffer! {
+            label: "[TextPipeline] Index buffer",
             size: max_buffer_size,
-            usage: BufferUsages::INDEX | BufferUsages::COPY_DST,
-            mapped_at_creation: false,
+            usage: INDEX | COPY_DST,
         });
 
         //
@@ -244,132 +241,83 @@ impl TextPipeline {
         color_atlas.next_frame();
         animated_atlas.next_frame();
 
-        let mask_texture = device.create_texture(&Self::texture_descriptor(
-            "[TextPipeline] Mask glyphs texture",
-            [max_texture_dimension, max_texture_dimension],
-            TextureFormat::R8Unorm,
-            TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
-        ));
-        let color_texture = device.create_texture(&Self::texture_descriptor(
-            "[TextPipeline] Color glyphs texture",
-            [max_texture_dimension, max_texture_dimension],
-            TextureFormat::Rgba8Unorm,
-            TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
-        ));
-        let animated_texture = device.create_texture(&Self::texture_descriptor(
-            "[TextPipeline] Animated glyphs texture",
-            [max_texture_dimension, max_texture_dimension],
-            TextureFormat::Rgba8Unorm,
-            TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
-        ));
+        let mask_texture = device.create_texture(&texture! {
+            label: "[TextPipeline] Mask glyphs texture",
+            size: [max_texture_dimension, max_texture_dimension],
+            format: TextureFormat::R8Unorm,
+            usage: TEXTURE_BINDING | COPY_DST,
+        });
+        let color_texture = device.create_texture(&texture! {
+            label: "[TextPipeline] Color glyphs texture",
+            size: [max_texture_dimension, max_texture_dimension],
+            format: TextureFormat::Rgba8Unorm,
+            usage: TEXTURE_BINDING | COPY_DST,
+        });
+        let animated_texture = device.create_texture(&texture! {
+            label: "[TextPipeline] Animated glyphs texture",
+            size: [max_texture_dimension, max_texture_dimension],
+            format: TextureFormat::Rgba8Unorm,
+            usage: TEXTURE_BINDING | COPY_DST,
+        });
 
         //
         // Passes
         //
 
-        let [rectangle, blur, glyph] = Self::output_texture_descriptors(config);
-        let mut rectangle = Pass::new(device.create_texture(&rectangle));
-        let mut blur = Pass::new(device.create_texture(&blur));
-        let mut glyph = Pass::new(device.create_texture(&glyph));
+        let [rectangle, blur, glyph] = Self::pass_textures(device, config);
+        let mut rectangle = Pass::new(rectangle);
+        let mut blur = Pass::new(blur);
+        let mut glyph = Pass::new(glyph);
 
         //
         // Bind groups
         //
 
-        let uniform_entry = |binding| BindGroupLayoutEntry {
-            binding,
-            visibility: ShaderStages::VERTEX,
-            ty: BindingType::Buffer {
-                ty: BufferBindingType::Uniform,
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            },
-            count: None,
-        };
-        let texture_entry = |binding| BindGroupLayoutEntry {
-            binding,
-            visibility: ShaderStages::FRAGMENT,
-            ty: BindingType::Texture {
-                multisampled: false,
-                view_dimension: TextureViewDimension::D2,
-                sample_type: TextureSampleType::Float { filterable: true },
-            },
-            count: None,
-        };
-        let sampler_entry = |binding| BindGroupLayoutEntry {
-            binding,
-            visibility: ShaderStages::FRAGMENT,
-            ty: BindingType::Sampler(SamplerBindingType::Filtering),
-            count: None,
-        };
-
-        let pass_bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("[TextPipeline] Pass bind group layout"),
-            entries: &[
+        let pass_bind_group_layout = device.create_bind_group_layout(&bind_group_layout! {
+            label: "[TextPipeline] Pass bind group layout",
+            entries: [
                 // Size uniform
-                uniform_entry(0),
+                { binding: 0, visibility: VERTEX, ty: Uniform },
                 // Mask texture
-                texture_entry(1),
+                { binding: 1, visibility: FRAGMENT, ty: Texture },
                 // Color texture
-                texture_entry(2),
+                { binding: 2, visibility: FRAGMENT, ty: Texture },
                 // Animated texture
-                texture_entry(3),
+                { binding: 3, visibility: FRAGMENT, ty: Texture },
                 // Sampler
-                sampler_entry(4),
+                { binding: 4, visibility: FRAGMENT, ty: Sampler(Filtering) },
             ],
         });
-        let pass_bind_group = device.create_bind_group(&BindGroupDescriptor {
-            label: Some("[TextPipeline] Pass bind group"),
-            layout: &pass_bind_group_layout,
-            entries: &[
+        let pass_bind_group = device.create_bind_group(&bind_group! {
+            label: "[TextPipeline] Pass bind group",
+            layout: pass_bind_group_layout,
+            entries: [
                 // Size uniform
-                BindGroupEntry {
-                    binding: 0,
-                    resource: size_uniform.as_entire_binding(),
-                },
+                { binding: 0, resource: Buffer(size_uniform) },
                 // Mask texture
-                BindGroupEntry {
-                    binding: 1,
-                    resource: BindingResource::TextureView(
-                        &mask_texture.create_view(&Default::default()),
-                    ),
-                },
+                { binding: 1, resource: Texture(mask_texture) },
                 // Color texture
-                BindGroupEntry {
-                    binding: 2,
-                    resource: BindingResource::TextureView(
-                        &color_texture.create_view(&Default::default()),
-                    ),
-                },
+                { binding: 2, resource: Texture(color_texture) },
                 // Animated texture
-                BindGroupEntry {
-                    binding: 3,
-                    resource: BindingResource::TextureView(
-                        &animated_texture.create_view(&Default::default()),
-                    ),
-                },
+                { binding: 3, resource: Texture(animated_texture) },
                 // Sampler
-                BindGroupEntry {
-                    binding: 4,
-                    resource: BindingResource::Sampler(&device.create_sampler(&Default::default())),
-                },
+                { binding: 4, resource: Sampler(device.create_sampler(&Default::default())) },
             ],
         });
 
-        let compose_bind_group_layout =
-            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("[TextPipeline] Compose bind group layout"),
-                entries: &[
-                    // Rectangle texture
-                    texture_entry(0),
-                    // Blur texture
-                    texture_entry(1),
-                    // Glyph texture
-                    texture_entry(2),
-                    // Sampler
-                    sampler_entry(3),
-                ],
-            });
+        let compose_bind_group_layout = device.create_bind_group_layout(&bind_group_layout! {
+            label: "[TextPipeline] Compose bind group layout",
+            entries: [
+                // Rectangle texture
+                { binding: 0, visibility: FRAGMENT, ty: Texture },
+                // Blur texture
+                { binding: 1, visibility: FRAGMENT, ty: Texture },
+                // Glyph texture
+                { binding: 2, visibility: FRAGMENT, ty: Texture },
+                // Sampler
+                { binding: 3, visibility: FRAGMENT, ty: Sampler(Filtering) },
+            ],
+        });
         let compose_bind_group = Self::compose_bind_group(
             device,
             &compose_bind_group_layout,
@@ -383,80 +331,70 @@ impl TextPipeline {
         //
 
         {
-            let layout = &device.create_pipeline_layout(&PipelineLayoutDescriptor {
-                label: Some("[TextPipeline] Pass pipeline layout"),
-                bind_group_layouts: &[&pass_bind_group_layout],
-                push_constant_ranges: &[],
+            let layout = device.create_pipeline_layout(&pipeline_layout! {
+                label: "[TextPipeline] Pass pipeline layout",
+                bind_group_layouts: [pass_bind_group_layout],
             });
-            let module = &device.create_shader_module(include_wgsl!("text.wgsl"));
-            let buffers = &[Vertex::vertex_buffer_layout()];
-            let targets = &[Some(ColorTargetState {
+            let module = device.create_shader_module(include_wgsl!("text.wgsl"));
+            let buffers = [Vertex::vertex_buffer_layout()];
+            let targets = [Some(ColorTargetState {
                 format: config.format,
                 blend: Some(BlendState::ALPHA_BLENDING),
                 write_mask: ColorWrites::ALL,
             })];
-            let descriptor = |label, fragment| RenderPipelineDescriptor {
-                label: Some(label),
-                layout: Some(layout),
-                vertex: VertexState {
-                    module,
-                    entry_point: "vertex",
-                    buffers,
-                },
-                fragment: Some(FragmentState {
-                    module,
-                    entry_point: fragment,
-                    targets,
-                }),
-                primitive: Default::default(),
-                depth_stencil: None,
-                multisample: Default::default(),
-                multiview: None,
-            };
 
-            rectangle.pipeline = Some(device.create_render_pipeline(&descriptor(
-                "[TextPipeline] Rectangle pass pipeline",
-                "rectangle_fragment",
-            )));
-            blur.pipeline = Some(device.create_render_pipeline(&descriptor(
-                "[TextPipeline] Blur pass pipeline",
-                "blur_fragment",
-            )));
-            glyph.pipeline = Some(device.create_render_pipeline(&descriptor(
-                "[TextPipeline] Glyph pass pipeline",
-                "glyph_fragment",
-            )));
+            rectangle.pipeline = Some(device.create_render_pipeline(&render_pipeline! {
+                label: "[TextPipeline] Rectangle pass pipeline",
+                layout: layout,
+                module: module,
+                vertex: "vertex",
+                buffers: buffers,
+                fragment: "rectangle_fragment",
+                targets: targets,
+                topology: TriangleList,
+            }));
+            blur.pipeline = Some(device.create_render_pipeline(&render_pipeline! {
+                label: "[TextPipeline] Blur pass pipeline",
+                layout: layout,
+                module: module,
+                vertex: "vertex",
+                buffers: buffers,
+                fragment: "blur_fragment",
+                targets: targets,
+                topology: TriangleList,
+            }));
+            glyph.pipeline = Some(device.create_render_pipeline(&render_pipeline! {
+                label: "[TextPipeline] Glyph pass pipeline",
+                layout: layout,
+                module: module,
+                vertex: "vertex",
+                buffers: buffers,
+                fragment: "glyph_fragment",
+                targets: targets,
+                topology: TriangleList,
+            }));
         };
 
         let compose_pipeline = {
             let module = &device.create_shader_module(include_wgsl!("compose.wgsl"));
-            let layout = &device.create_pipeline_layout(&PipelineLayoutDescriptor {
-                label: Some("[TextPipeline] Compose pipeline layout"),
-                bind_group_layouts: &[&compose_bind_group_layout],
-                push_constant_ranges: &[],
+            let layout = &device.create_pipeline_layout(&pipeline_layout! {
+                label: "[TextPipeline] Compose pipeline layout",
+                bind_group_layouts: [compose_bind_group_layout],
             });
 
-            device.create_render_pipeline(&RenderPipelineDescriptor {
-                label: Some("[TextPipeline] Compose pipeline"),
-                layout: Some(layout),
-                vertex: VertexState {
-                    module,
-                    entry_point: "vertex",
-                    buffers: &[],
-                },
-                fragment: Some(FragmentState {
-                    module,
-                    entry_point: "fragment",
-                    targets: &[Some(ColorTargetState {
-                        format: config.format,
-                        blend: Some(BlendState::ALPHA_BLENDING),
-                        write_mask: ColorWrites::ALL,
-                    })],
-                }),
-                primitive: Default::default(),
-                depth_stencil: None,
-                multisample: Default::default(),
-                multiview: None,
+            device.create_render_pipeline(&render_pipeline! {
+                label: "[TextPipeline] Compose pipeline",
+                layout: layout,
+                module: module,
+                vertex: "vertex",
+                buffers: [],
+                fragment: "fragment",
+                targets: [Some(ColorTargetState {
+                    format: config.format,
+                    blend: Some(BlendState::ALPHA_BLENDING),
+                    write_mask: ColorWrites::ALL,
+                })],
+                topology: TriangleList,
             })
         };
 
@@ -499,10 +437,10 @@ impl TextPipeline {
     pub fn resize(&mut self, device: &Device, config: &SurfaceConfiguration) {
         self.sizes[0] = [config.width, config.height];
 
-        let [rectangle, blur, glyph] = Self::output_texture_descriptors(config);
-        self.rectangle.resize(device.create_texture(&rectangle));
-        self.blur.resize(device.create_texture(&blur));
-        self.glyph.resize(device.create_texture(&glyph));
+        let [rectangle, blur, glyph] = Self::pass_textures(device, config);
+        self.rectangle.resize(rectangle);
+        self.blur.resize(blur);
+        self.glyph.resize(glyph);
 
         self.compose_bind_group = Self::compose_bind_group(
             device,
@@ -717,48 +655,26 @@ impl TextPipeline {
 
 /// Private.
 impl TextPipeline {
-    fn texture_descriptor(
-        label: &str,
-        [width, height]: [u32; 2],
-        format: TextureFormat,
-        usage: TextureUsages,
-    ) -> TextureDescriptor {
-        TextureDescriptor {
-            label: Some(label),
-            size: Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: TextureDimension::D2,
-            format,
-            usage,
-            view_formats: &[],
-        }
-    }
-
-    fn output_texture_descriptors(config: &SurfaceConfiguration) -> [TextureDescriptor; 3] {
+    fn pass_textures(device: &Device, config: &SurfaceConfiguration) -> [Texture; 3] {
         [
-            Self::texture_descriptor(
-                "[TextPipeline] Rectangle pass output texture",
-                [config.width, config.height],
-                config.format,
-                TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
-            ),
-            Self::texture_descriptor(
-                "[TextPipeline] Blur pass output texture",
-                [config.width, config.height],
-                config.format,
-                TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
-            ),
-            Self::texture_descriptor(
-                "[TextPipeline] Glyph pass output texture",
-                [config.width, config.height],
-                config.format,
-                TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
-            ),
+            device.create_texture(&texture! {
+                label: "[TextPipeline] Rectangle pass output texture",
+                size: [config.width, config.height],
+                format: config.format,
+                usage: TEXTURE_BINDING | RENDER_ATTACHMENT,
+            }),
+            device.create_texture(&texture! {
+                label: "[TextPipeline] Blur pass output texture",
+                size: [config.width, config.height],
+                format: config.format,
+                usage: TEXTURE_BINDING | RENDER_ATTACHMENT,
+            }),
+            device.create_texture(&texture! {
+                label: "[TextPipeline] Glyph pass output texture",
+                size: [config.width, config.height],
+                format: config.format,
+                usage: TEXTURE_BINDING | RENDER_ATTACHMENT,
+            }),
         ]
     }
 
@@ -769,36 +685,18 @@ impl TextPipeline {
         blur: &Pass,
         glyph: &Pass,
     ) -> BindGroup {
-        device.create_bind_group(&BindGroupDescriptor {
-            label: Some("[TextPipeline] Compose bind group"),
-            layout,
-            entries: &[
+        device.create_bind_group(&bind_group! {
+            label: "[TextPipeline] Compose bind group",
+            layout: layout,
+            entries: [
                 // Rectangle texture
-                BindGroupEntry {
-                    binding: 0,
-                    resource: BindingResource::TextureView(
-                        &rectangle.output.create_view(&Default::default()),
-                    ),
-                },
+                { binding: 0, resource: Texture(rectangle.output) },
                 // Blur texture
-                BindGroupEntry {
-                    binding: 1,
-                    resource: BindingResource::TextureView(
-                        &blur.output.create_view(&Default::default()),
-                    ),
-                },
+                { binding: 1, resource: Texture(blur.output) },
                 // Glyph texture
-                BindGroupEntry {
-                    binding: 2,
-                    resource: BindingResource::TextureView(
-                        &glyph.output.create_view(&Default::default()),
-                    ),
-                },
+                { binding: 2, resource: Texture(glyph.output) },
                 // Sampler
-                BindGroupEntry {
-                    binding: 3,
-                    resource: BindingResource::Sampler(&device.create_sampler(&Default::default())),
-                },
+                { binding: 3, resource: Sampler(device.create_sampler(&Default::default())) },
             ],
         })
     }

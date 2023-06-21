@@ -79,48 +79,34 @@ impl LinePipeline {
         // Buffers
         //
 
-        let size_uniform = device.create_buffer(&BufferDescriptor {
-            label: Some("[LinePipeline] Size uniform"),
-            size: size_of::<Sizes>() as BufferAddress,
-            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-            mapped_at_creation: false,
+        let size_uniform = device.create_buffer(&buffer! {
+            label: "[LinePipeline] Size uniform",
+            size: size_of::<Sizes>(),
+            usage: UNIFORM | COPY_DST,
         });
-        let vertex_buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("[LinePipeline] Vertex buffer"),
+        let vertex_buffer = device.create_buffer(&buffer! {
+            label: "[LinePipeline] Vertex buffer",
             size: limits.max_buffer_size,
-            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
-            mapped_at_creation: false,
+            usage: VERTEX | COPY_DST,
         });
 
         //
         // Bind group
         //
 
-        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("[LinePipeline] Texture bind group layout"),
-            entries: &[
+        let bind_group_layout = device.create_bind_group_layout(&bind_group_layout! {
+            label: "[LinePipeline] Texture bind group layout",
+            entries: [
                 // Size uniform
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::VERTEX,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
+                { binding: 0, visibility: VERTEX, ty: Uniform },
             ],
         });
-        let bind_group = device.create_bind_group(&BindGroupDescriptor {
-            label: Some("[LinePipeline] Texture bind group"),
-            layout: &bind_group_layout,
-            entries: &[
+        let bind_group = device.create_bind_group(&bind_group! {
+            label: "[LinePipeline] Texture bind group",
+            layout: bind_group_layout,
+            entries: [
                 // Size uniform
-                BindGroupEntry {
-                    binding: 0,
-                    resource: size_uniform.as_entire_binding(),
-                },
+                { binding: 0, resource: Buffer(size_uniform) },
             ],
         });
 
@@ -128,41 +114,24 @@ impl LinePipeline {
         // Pipeline
         //
 
-        let shader_module = device.create_shader_module(include_wgsl!("line.wgsl"));
-        let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
-            label: Some("[LinePipeline] Pipeline layout"),
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
+        let module = device.create_shader_module(include_wgsl!("line.wgsl"));
+        let pipeline_layout = device.create_pipeline_layout(&pipeline_layout! {
+            label: "[LinePipeline] Pipeline layout",
+            bind_group_layouts: [bind_group_layout],
         });
-        let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
-            label: Some("[LinePipeline] Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: VertexState {
-                module: &shader_module,
-                entry_point: "vertex",
-                buffers: &[Vertex::vertex_buffer_layout()],
-            },
-            fragment: Some(FragmentState {
-                module: &shader_module,
-                entry_point: "fragment",
-                targets: &[Some(ColorTargetState {
-                    format: config.format,
-                    blend: Some(BlendState::ALPHA_BLENDING),
-                    write_mask: ColorWrites::ALL,
-                })],
-            }),
-            primitive: PrimitiveState {
-                topology: PrimitiveTopology::LineList,
-                strip_index_format: None,
-                front_face: Default::default(),
-                cull_mode: None,
-                unclipped_depth: false,
-                polygon_mode: Default::default(),
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: Default::default(),
-            multiview: None,
+        let pipeline = device.create_render_pipeline(&render_pipeline! {
+            label: "[LinePipeline] Pipeline",
+            layout: pipeline_layout,
+            module: module,
+            vertex: "vertex",
+            buffers: [Vertex::vertex_buffer_layout()],
+            fragment: "fragment",
+            targets: [Some(ColorTargetState {
+                format: config.format,
+                blend: Some(BlendState::ALPHA_BLENDING),
+                write_mask: ColorWrites::ALL,
+            })],
+            topology: LineList,
         });
 
         Self {

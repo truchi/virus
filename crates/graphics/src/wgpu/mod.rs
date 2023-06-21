@@ -11,6 +11,7 @@ use crate::{
 use atlas::Atlas;
 use blur::BlurPipeline;
 use line::LinePipeline;
+use macros::*;
 use std::{mem::size_of, ops::Range, time::Duration};
 use swash::{scale::image::Content, zeno::Placement};
 use text::TextPipeline;
@@ -22,10 +23,10 @@ use wgpu::{
     ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, LoadOp, Operations, Origin3d,
     PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, Queue, RenderPass,
     RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
-    RequestAdapterOptions, SamplerBindingType, ShaderStages, Surface, SurfaceConfiguration,
-    Texture, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType,
-    TextureUsages, TextureView, TextureViewDimension, VertexAttribute, VertexBufferLayout,
-    VertexState, VertexStepMode,
+    RequestAdapterOptions, Sampler, SamplerBindingType, ShaderStages, Surface,
+    SurfaceConfiguration, Texture, TextureAspect, TextureDescriptor, TextureDimension,
+    TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDimension,
+    VertexAttribute, VertexBufferLayout, VertexState, VertexStepMode,
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
@@ -241,49 +242,31 @@ impl Graphics {
 
         {
             let view = self.text_pipeline.rectangle_texture_view();
-            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("Render pass (rectangles)"),
-                color_attachments: &[Some(RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: Operations {
-                        load: LoadOp::Clear(Color::TRANSPARENT),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
+            let mut render_pass = encoder.begin_render_pass(&render_pass! {
+                label: "Render pass (rectangles)",
+                view: view,
+                load: Clear(TRANSPARENT),
+                store: true,
             });
             // self.text_pipeline.render_rectangles(&mut render_pass);
         }
         {
             let view = self.text_pipeline.blur_texture_view();
-            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("Render pass (blur)"),
-                color_attachments: &[Some(RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: Operations {
-                        load: LoadOp::Clear(Color::TRANSPARENT),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
+            let mut render_pass = encoder.begin_render_pass(&render_pass! {
+                label: "Render pass (blur)",
+                view: view,
+                load: Clear(TRANSPARENT),
+                store: true,
             });
             self.text_pipeline.render_blurs(&mut render_pass);
         }
         {
             let view = self.text_pipeline.glyph_texture_view();
-            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("Render pass (glyph)"),
-                color_attachments: &[Some(RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: Operations {
-                        load: LoadOp::Clear(Color::TRANSPARENT),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
+            let mut render_pass = encoder.begin_render_pass(&render_pass! {
+                label: "Render pass (glyph)",
+                view: view,
+                load: Clear(TRANSPARENT),
+                store: true,
             });
             // self.text_pipeline.render_glyphs(&mut render_pass);
         }
@@ -293,49 +276,31 @@ impl Graphics {
             let ping = self.text_pipeline.blur_texture_view();
             let pong = self.pong_blur_texture.create_view(&Default::default());
 
-            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("Render pass (blur ping)"),
-                color_attachments: &[Some(RenderPassColorAttachment {
-                    view: &pong,
-                    resolve_target: None,
-                    ops: Operations {
-                        load: LoadOp::Clear(Color::TRANSPARENT),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
+            let mut render_pass = encoder.begin_render_pass(&render_pass! {
+                label: "Render pass (blur ping)",
+                view: pong,
+                load: Clear(TRANSPARENT),
+                store: true,
             });
             self.blur_pipeline.ping(&self.queue, &mut render_pass);
             drop(render_pass);
 
-            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("Render pass (blur pong)"),
-                color_attachments: &[Some(RenderPassColorAttachment {
-                    view: &ping,
-                    resolve_target: None,
-                    ops: Operations {
-                        load: LoadOp::Clear(Color::TRANSPARENT),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
+            let mut render_pass = encoder.begin_render_pass(&render_pass! {
+                label: "Render pass (blur pong)",
+                view: ping,
+                load: Clear(TRANSPARENT),
+                store: true,
             });
             self.blur_pipeline.pong(&self.queue, &mut render_pass);
         }
 
         {
             let view = output.texture.create_view(&Default::default());
-            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("Render pass (compose)"),
-                color_attachments: &[Some(RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: Operations {
-                        load: LoadOp::Clear(Color::WHITE),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
+            let mut render_pass = encoder.begin_render_pass(&render_pass! {
+                label: "Render pass (compose)",
+                view: view,
+                load: Clear(WHITE),
+                store: true,
             });
             self.text_pipeline.compose(&mut render_pass);
             self.line_pipeline.render(&self.queue, &mut render_pass);
@@ -347,9 +312,3 @@ impl Graphics {
         self.text_pipeline.post_render();
     }
 }
-
-// Surface
-// "Background" texture
-// "Middleground" texture aka "Ping" (the one we want to blur)
-// "Foreground" texture
-// "Pong"
