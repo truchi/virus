@@ -1,6 +1,7 @@
 mod atlas;
 mod blur;
 mod line;
+mod macros;
 mod text;
 
 use crate::{
