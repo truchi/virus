@@ -47,32 +47,70 @@ impl Line {
         self.advance
     }
 
-    /// Returns an iterator of contiguous backgrounds.
-    pub fn backgrounds(&self) -> impl '_ + Iterator<Item = (Range<f32>, Rgba)> {
-        // NOTE: we could also compute in `LineShaper::push()` and store in `Line`
+    /// Returns an iterator of contiguous `key(glyph)`.
+    pub fn segments<'a, T, F>(&'a self, key: F) -> impl 'a + Iterator<Item = (Range<Advance>, T)>
+    where
+        T: 'a + PartialEq,
+        F: 'a + FnMut(&Glyph) -> T,
+    {
+        LineSegments {
+            glyphs: self.glyphs.iter(),
+            current: None,
+            key,
+        }
+    }
+}
 
-        let mut glyphs = self.glyphs().iter().copied();
-        let mut previous = glyphs.next();
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                          LineSegments                                          //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-        std::iter::from_fn(move || {
-            let prev = previous?;
-            let mut end = prev.offset + prev.advance;
+#[derive(Clone, Debug)]
+struct LineSegments<'a, T, F> {
+    glyphs: std::slice::Iter<'a, Glyph>,
+    current: Option<(Range<Advance>, T)>,
+    key: F,
+}
 
-            loop {
-                if let Some(next) = glyphs.next() {
-                    if prev.styles.background == next.styles.background {
-                        end = next.offset + next.advance;
-                        continue;
-                    } else {
-                        previous = Some(next);
-                    }
-                } else {
-                    previous = None;
-                }
+// TODO tests
+impl<'a, T, F> Iterator for LineSegments<'a, T, F>
+where
+    T: PartialEq,
+    F: FnMut(&Glyph) -> T,
+{
+    type Item = (Range<Advance>, T);
 
-                return Some((prev.offset..end, prev.styles.background));
+    fn next(&mut self) -> Option<Self::Item> {
+        match (self.current.take(), self.glyphs.next()) {
+            // Line/Glyphs is empty
+            (None, None) => None,
+            // First glyph
+            (None, Some(glyph)) => {
+                self.current = Some((
+                    glyph.offset..glyph.offset + glyph.advance,
+                    (self.key)(glyph),
+                ));
+                self.next()
             }
-        })
+            // Last glyph
+            (Some((Range { start, end }, key)), None) => {
+                self.current = None; // To stop the iteration
+                Some((start..end, key))
+            }
+            // Same key
+            (Some((Range { start, end }, key)), Some(glyph)) if key == (self.key)(glyph) => {
+                self.current = Some((start..end + glyph.advance, key));
+                self.next()
+            }
+            // New key
+            (Some((Range { start, end }, key)), Some(glyph)) => {
+                self.current = Some((
+                    glyph.offset..glyph.offset + glyph.advance,
+                    (self.key)(glyph),
+                ));
+                Some((start..end, key))
+            }
+        }
     }
 }
 

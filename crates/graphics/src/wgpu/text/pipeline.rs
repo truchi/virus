@@ -334,20 +334,21 @@ impl TextPipeline {
         // Add backgrounds
         //
 
-        for (Range { start, end }, background) in line.backgrounds() {
-            if background.a != 0 {
-                let left = left + start as i32;
-                let width = (end - start) as u32;
+        for (Range { start, end }, background) in line
+            .segments(|glyph| glyph.styles.background)
+            .filter(|(_, background)| background.a != 0)
+        {
+            let left = left + start as i32;
+            let width = (end - start) as u32;
 
-                Self::push_quad(
-                    (&mut self.rectangle_vertices, &mut self.rectangle_indices),
-                    RectangleVertex::quad(
-                        ([region_top, region_left], [region_width, region_height]),
-                        ([top, left], [width, line_height]),
-                        background,
-                    ),
-                );
-            }
+            Self::push_quad(
+                (&mut self.rectangle_vertices, &mut self.rectangle_indices),
+                RectangleVertex::quad(
+                    ([region_top, region_left], [region_width, region_height]),
+                    ([top, left], [width, line_height]),
+                    background,
+                ),
+            );
         }
 
         //
