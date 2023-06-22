@@ -17,7 +17,6 @@ use crate::{
     text::{AnimatedGlyphKey, Context, FrameIndex, Glyph, GlyphKey, Line, LineHeight, LineScaler},
 };
 use atlas::Atlas;
-use blur::BlurPipeline;
 use line::LinePipeline;
 use macros::*;
 use std::{mem::size_of, ops::Range, time::Duration};
@@ -51,8 +50,6 @@ pub struct Graphics {
     queue: Queue,
     text_pipeline: TextPipeline,
     line_pipeline: LinePipeline,
-    pong_blur_texture: Texture,
-    blur_pipeline: BlurPipeline,
 }
 
 impl Graphics {
@@ -85,32 +82,9 @@ impl Graphics {
         assert!(config.format == TextureFormat::Bgra8UnormSrgb);
         surface.configure(&device, &config);
 
-        // Textures
-        let pong_blur_texture = device.create_texture(&TextureDescriptor {
-            label: Some("[Graphics] Blur texture"),
-            size: Extent3d {
-                width: size.width,
-                height: size.height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: TextureDimension::D2,
-            format: config.format,
-            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
-
-            view_formats: &[],
-        });
-
         // Pipelines
         let text_pipeline = TextPipeline::new(&device, &config);
         let line_pipeline = LinePipeline::new(&device, &config);
-        let blur_pipeline = BlurPipeline::new(
-            &device,
-            &config,
-            &text_pipeline.blur_texture_view(),
-            &pong_blur_texture.create_view(&Default::default()),
-        );
 
         Self {
             window,
@@ -120,8 +94,6 @@ impl Graphics {
             queue,
             text_pipeline,
             line_pipeline,
-            pong_blur_texture,
-            blur_pipeline,
         }
     }
 
@@ -136,30 +108,8 @@ impl Graphics {
         self.config.width = size.width;
         self.config.height = size.height;
         self.surface.configure(&self.device, &self.config);
-        self.text_pipeline.resize(&self.device, &self.config);
+        self.text_pipeline.resize(&self.config);
         self.line_pipeline.resize(size);
-
-        self.pong_blur_texture.destroy();
-        self.pong_blur_texture = self.device.create_texture(&TextureDescriptor {
-            label: Some("[Graphics] Blur texture"),
-            size: Extent3d {
-                width: size.width,
-                height: size.height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: TextureDimension::D2,
-            format: self.config.format,
-            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
-
-            view_formats: &[],
-        });
-        self.blur_pipeline.rebind(
-            &self.device,
-            &self.text_pipeline.blur_texture_view(),
-            &self.pong_blur_texture.create_view(&Default::default()),
-        );
     }
 
     /// Returns the drawing API.
@@ -184,71 +134,18 @@ impl Graphics {
 
         self.text_pipeline.pre_render(&self.queue);
 
-        {
-            let view = self.text_pipeline.rectangle_texture_view();
-            let mut render_pass = encoder.begin_render_pass(&render_pass! {
-                label: "Render pass (rectangles)",
-                view: view,
-                load: Clear(TRANSPARENT),
-                store: true,
-            });
-            // self.text_pipeline.render_rectangles(&mut render_pass);
-        }
-        {
-            let view = self.text_pipeline.blur_texture_view();
-            let mut render_pass = encoder.begin_render_pass(&render_pass! {
-                label: "Render pass (blur)",
-                view: view,
-                load: Clear(TRANSPARENT),
-                store: true,
-            });
-            self.text_pipeline.render_blurs(&mut render_pass);
-        }
-        {
-            let view = self.text_pipeline.glyph_texture_view();
-            let mut render_pass = encoder.begin_render_pass(&render_pass! {
-                label: "Render pass (glyph)",
-                view: view,
-                load: Clear(TRANSPARENT),
-                store: true,
-            });
-            // self.text_pipeline.render_glyphs(&mut render_pass);
-        }
-
-        // BLUR
-        {
-            let ping = self.text_pipeline.blur_texture_view();
-            let pong = self.pong_blur_texture.create_view(&Default::default());
-
-            let mut render_pass = encoder.begin_render_pass(&render_pass! {
-                label: "Render pass (blur ping)",
-                view: pong,
-                load: Clear(TRANSPARENT),
-                store: true,
-            });
-            self.blur_pipeline.ping(&self.queue, &mut render_pass);
-            drop(render_pass);
-
-            let mut render_pass = encoder.begin_render_pass(&render_pass! {
-                label: "Render pass (blur pong)",
-                view: ping,
-                load: Clear(TRANSPARENT),
-                store: true,
-            });
-            self.blur_pipeline.pong(&self.queue, &mut render_pass);
-        }
-
-        {
-            let view = output.texture.create_view(&Default::default());
-            let mut render_pass = encoder.begin_render_pass(&render_pass! {
-                label: "Render pass (compose)",
-                view: view,
-                load: Clear(WHITE),
-                store: true,
-            });
-            self.text_pipeline.compose(&mut render_pass);
-            self.line_pipeline.render(&self.queue, &mut render_pass);
-        }
+        let view = output.texture.create_view(&Default::default());
+        let mut render_pass = encoder.begin_render_pass(&render_pass! {
+            label: "Render pass",
+            view: view,
+            load: Clear(BLACK),
+            store: true,
+        });
+        self.text_pipeline.render_rectangles(&mut render_pass);
+        self.text_pipeline.render_shadows(&mut render_pass);
+        self.text_pipeline.render_glyphs(&mut render_pass);
+        self.line_pipeline.render(&self.queue, &mut render_pass);
+        drop(render_pass);
 
         self.queue.submit([encoder.finish()]);
         output.present();

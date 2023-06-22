@@ -86,7 +86,7 @@ impl LinePipeline {
         });
         let vertex_buffer = device.create_buffer(&buffer! {
             label: "[LinePipeline] Vertex buffer",
-            size: limits.max_buffer_size,
+            size: limits.max_buffer_size  / 2,
             usage: VERTEX | COPY_DST,
         });
 

@@ -1,124 +1,116 @@
 use super::*;
 
-type Sizes = [[u32; 2]; 2];
-
-#[derive(Debug)]
-struct Pass {
-    vertices: Vec<Vertex>,
-    indices: Vec<u32>,
-    output: Texture,
-    pipeline: Option<RenderPipeline>,
-}
-
-impl Pass {
-    fn new(output: Texture) -> Self {
-        Self {
-            vertices: Vec::with_capacity(1024),
-            indices: Vec::with_capacity(1024),
-            output,
-            pipeline: None,
-        }
-    }
-
-    fn vertices(&self) -> BufferAddress {
-        (self.vertices.len() * size_of::<Vertex>()) as BufferAddress
-    }
-
-    fn indices(&self) -> BufferAddress {
-        (self.indices.len() * size_of::<u32>()) as BufferAddress
-    }
-
-    fn is_empty(&self) -> bool {
-        debug_assert!(!(self.vertices.is_empty() ^ self.indices.is_empty()));
-        self.indices.is_empty()
-    }
-
-    fn len(&self) -> u32 {
-        self.indices.len() as u32
-    }
-
-    fn insert_quad(&mut self, [top_left, top_right, bottom_left, bottom_right]: [Vertex; 4]) {
-        let i = self.vertices.len() as u32;
-
-        self.vertices
-            .extend_from_slice(&[top_left, top_right, bottom_left, bottom_right]);
-
-        let top_left = i;
-        let top_right = i + 1;
-        let bottom_left = i + 2;
-        let bottom_right = i + 3;
-
-        self.indices.extend_from_slice(&[
-            top_left,
-            bottom_right,
-            top_right,
-            top_left,
-            bottom_left,
-            bottom_right,
-        ]);
-    }
-
-    fn resize(&mut self, output: Texture) {
-        self.output.destroy();
-        self.output = output;
-    }
-
-    fn clear(&mut self) {
-        self.vertices.clear();
-        self.indices.clear();
-    }
-}
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           TextPipeline                                         //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+type Size = [[f32; 2]; 2];
+type Index = u32;
+
 /// Text pipeline.
 #[derive(Debug)]
 pub struct TextPipeline {
-    sizes: Sizes,
+    size: Size,
     size_uniform: Buffer,
-    vertex_buffer: Buffer,
-    index_buffer: Buffer,
+
+    rectangle_vertices: Vec<RectangleVertex>,
+    rectangle_indices: Vec<Index>,
+    rectangle_vertex_buffer: Buffer,
+    rectangle_index_buffer: Buffer,
+    shadow_vertices: Vec<ShadowVertex>,
+    shadow_indices: Vec<Index>,
+    shadow_vertex_buffer: Buffer,
+    shadow_index_buffer: Buffer,
+    glyph_vertices: Vec<GlyphVertex>,
+    glyph_indices: Vec<Index>,
+    glyph_vertex_buffer: Buffer,
+    glyph_index_buffer: Buffer,
+
     mask_atlas: Atlas<GlyphKey, Placement>,
     color_atlas: Atlas<GlyphKey, Placement>,
     animated_atlas: Atlas<AnimatedGlyphKey, Placement>,
     mask_texture: Texture,
     color_texture: Texture,
     animated_texture: Texture,
-    rectangle: Pass,
-    blur: Pass,
-    glyph: Pass,
-    pass_bind_group: BindGroup,
-    compose_bind_group_layout: BindGroupLayout,
-    compose_bind_group: BindGroup,
-    compose_pipeline: RenderPipeline,
+
+    bind_group: BindGroup,
+    rectangle_pipeline: RenderPipeline,
+    shadow_pipeline: RenderPipeline,
+    glyph_pipeline: RenderPipeline,
 }
+
+// ping_direction_uniform: Buffer,
+// pong_direction_uniform: Buffer,
+
+// blur_vertices: Vec<BlurVertex>,
+// blur_indices: Vec<Indice>,
+// blur_vertex_buffer: Buffer,
+// blur_index_buffer: Buffer,
+
+// blur_atlas: Atlas<GlyphKey, Placement>,
+// blur_ping_texture: Texture,
+// blur_pong_texture: Texture,
+
+// pass_bind_group: BindGroup,
+// compose_bind_group_layout: BindGroupLayout,
+// compose_bind_group: BindGroup,
+// compose_pipeline: RenderPipeline,
 
 impl TextPipeline {
     pub const ALTAS_ROW_HEIGHT: u32 = 400;
 
     pub fn new(device: &Device, config: &SurfaceConfiguration) -> Self {
         let limits = device.limits();
-        let max_buffer_size = limits.max_buffer_size;
+        let max_buffer_size = limits.max_buffer_size / 4; // FIXME OOM (investigate)
         let max_texture_dimension = limits.max_texture_dimension_2d;
 
         //
         // Buffers
         //
 
+        let size = [
+            [config.width as f32, config.height as f32],
+            [max_texture_dimension as f32, max_texture_dimension as f32],
+        ];
         let size_uniform = device.create_buffer(&buffer! {
             label: "[TextPipeline] Size uniform",
-            size: size_of::<Sizes>(),
+            size: size_of::<Size>(),
             usage: UNIFORM | COPY_DST,
         });
-        let vertex_buffer = device.create_buffer(&buffer! {
-            label: "[TextPipeline] Vertex buffer",
+
+        let rectangle_vertices = Vec::with_capacity(1024);
+        let rectangle_indices = Vec::with_capacity(1024);
+        let rectangle_vertex_buffer = device.create_buffer(&buffer! {
+            label: "[TextPipeline] Rectangle vertex buffer",
             size: max_buffer_size,
             usage: VERTEX | COPY_DST,
         });
-        let index_buffer = device.create_buffer(&buffer! {
-            label: "[TextPipeline] Index buffer",
+        let rectangle_index_buffer = device.create_buffer(&buffer! {
+            label: "[TextPipeline] Rectangle index buffer",
+            size: max_buffer_size,
+            usage: INDEX | COPY_DST,
+        });
+        let shadow_vertices = Vec::with_capacity(1024);
+        let shadow_indices = Vec::with_capacity(1024);
+        let shadow_vertex_buffer = device.create_buffer(&buffer! {
+            label: "[TextPipeline] Shadow vertex buffer",
+            size: max_buffer_size,
+            usage: VERTEX | COPY_DST,
+        });
+        let shadow_index_buffer = device.create_buffer(&buffer! {
+            label: "[TextPipeline] Shadow index buffer",
+            size: max_buffer_size,
+            usage: INDEX | COPY_DST,
+        });
+        let glyph_vertices = Vec::with_capacity(1024);
+        let glyph_indices = Vec::with_capacity(1024);
+        let glyph_vertex_buffer = device.create_buffer(&buffer! {
+            label: "[TextPipeline] Glyph vertex buffer",
+            size: max_buffer_size,
+            usage: VERTEX | COPY_DST,
+        });
+        let glyph_index_buffer = device.create_buffer(&buffer! {
+            label: "[TextPipeline] Glyph index buffer",
             size: max_buffer_size,
             usage: INDEX | COPY_DST,
         });
@@ -142,6 +134,7 @@ impl TextPipeline {
             max_texture_dimension,
             max_texture_dimension,
         );
+
         mask_atlas.next_frame();
         color_atlas.next_frame();
         animated_atlas.next_frame();
@@ -166,20 +159,11 @@ impl TextPipeline {
         });
 
         //
-        // Passes
+        // Bind group
         //
 
-        let [rectangle, blur, glyph] = Self::pass_textures(device, config);
-        let mut rectangle = Pass::new(rectangle);
-        let mut blur = Pass::new(blur);
-        let mut glyph = Pass::new(glyph);
-
-        //
-        // Bind groups
-        //
-
-        let pass_bind_group_layout = device.create_bind_group_layout(&bind_group_layout! {
-            label: "[TextPipeline] Pass bind group layout",
+        let bind_group_layout = device.create_bind_group_layout(&bind_group_layout! {
+            label: "[TextPipeline] Bind group layout",
             entries: [
                 // Size uniform
                 { binding: 0, visibility: VERTEX, ty: Uniform },
@@ -193,9 +177,9 @@ impl TextPipeline {
                 { binding: 4, visibility: FRAGMENT, ty: Sampler(Filtering) },
             ],
         });
-        let pass_bind_group = device.create_bind_group(&bind_group! {
-            label: "[TextPipeline] Pass bind group",
-            layout: pass_bind_group_layout,
+        let bind_group = device.create_bind_group(&bind_group! {
+            label: "[TextPipeline] Bind group",
+            layout: bind_group_layout,
             entries: [
                 // Size uniform
                 { binding: 0, resource: Buffer(size_uniform) },
@@ -210,29 +194,8 @@ impl TextPipeline {
             ],
         });
 
-        let compose_bind_group_layout = device.create_bind_group_layout(&bind_group_layout! {
-            label: "[TextPipeline] Compose bind group layout",
-            entries: [
-                // Rectangle texture
-                { binding: 0, visibility: FRAGMENT, ty: Texture },
-                // Blur texture
-                { binding: 1, visibility: FRAGMENT, ty: Texture },
-                // Glyph texture
-                { binding: 2, visibility: FRAGMENT, ty: Texture },
-                // Sampler
-                { binding: 3, visibility: FRAGMENT, ty: Sampler(Filtering) },
-            ],
-        });
-        let compose_bind_group = Self::compose_bind_group(
-            device,
-            &compose_bind_group_layout,
-            &rectangle,
-            &blur,
-            &glyph,
-        );
-
         //
-        // Pipelines
+        // Pipeline
         //
 
         let targets = [Some(ColorTargetState {
@@ -240,115 +203,72 @@ impl TextPipeline {
             blend: Some(BlendState::ALPHA_BLENDING),
             write_mask: ColorWrites::ALL,
         })];
-        {
-            let layout = device.create_pipeline_layout(&pipeline_layout! {
-                label: "[TextPipeline] Pass pipeline layout",
-                bind_group_layouts: [pass_bind_group_layout],
-            });
-            let module = device.create_shader_module(include_wgsl!("shaders/text.wgsl"));
-
-            rectangle.pipeline = Some(device.create_render_pipeline(&render_pipeline! {
-                label: "[TextPipeline] Rectangle pass pipeline",
-                layout: layout,
-                module: module,
-                vertex: "vertex",
-                buffers: [Vertex::vertex_buffer_layout()],
-                fragment: "rectangle_fragment",
-                targets: targets,
-                topology: TriangleList,
-            }));
-            blur.pipeline = Some(device.create_render_pipeline(&render_pipeline! {
-                label: "[TextPipeline] Blur pass pipeline",
-                layout: layout,
-                module: module,
-                vertex: "vertex",
-                buffers: [Vertex::vertex_buffer_layout()],
-                fragment: "blur_fragment",
-                targets: targets,
-                topology: TriangleList,
-            }));
-            glyph.pipeline = Some(device.create_render_pipeline(&render_pipeline! {
-                label: "[TextPipeline] Glyph pass pipeline",
-                layout: layout,
-                module: module,
-                vertex: "vertex",
-                buffers: [Vertex::vertex_buffer_layout()],
-                fragment: "glyph_fragment",
-                targets: targets,
-                topology: TriangleList,
-            }));
-        };
-
-        let compose_pipeline = {
-            let module = &device.create_shader_module(include_wgsl!("shaders/compose.wgsl"));
-            let layout = &device.create_pipeline_layout(&pipeline_layout! {
-                label: "[TextPipeline] Compose pipeline layout",
-                bind_group_layouts: [compose_bind_group_layout],
-            });
-
-            device.create_render_pipeline(&render_pipeline! {
-                label: "[TextPipeline] Compose pipeline",
-                layout: layout,
-                module: module,
-                vertex: "vertex",
-                buffers: [],
-                fragment: "fragment",
-                targets: targets,
-                topology: TriangleList,
-            })
-        };
+        let layout = device.create_pipeline_layout(&pipeline_layout! {
+            label: "[TextPipeline] Pipeline layout",
+            bind_group_layouts: [bind_group_layout],
+        });
+        let module = device.create_shader_module(include_wgsl!("shaders/shader.wgsl"));
+        let rectangle_pipeline = device.create_render_pipeline(&render_pipeline! {
+            label: "[TextPipeline] Rectangle pipeline",
+            layout: layout,
+            module: module,
+            vertex: "rectangle_vertex",
+            buffers: [RectangleVertex::buffer_layout()],
+            fragment: "rectangle_fragment",
+            targets: targets,
+            topology: TriangleList,
+        });
+        let shadow_pipeline = device.create_render_pipeline(&render_pipeline! {
+            label: "[TextPipeline] Shadow pipeline",
+            layout: layout,
+            module: module,
+            vertex: "shadow_vertex",
+            buffers: [ShadowVertex::buffer_layout()],
+            fragment: "shadow_fragment",
+            targets: targets,
+            topology: TriangleList,
+        });
+        let glyph_pipeline = device.create_render_pipeline(&render_pipeline! {
+            label: "[TextPipeline] Glyph pipeline",
+            layout: layout,
+            module: module,
+            vertex: "glyph_vertex",
+            buffers: [GlyphVertex::buffer_layout()],
+            fragment: "glyph_fragment",
+            targets: targets,
+            topology: TriangleList,
+        });
 
         Self {
-            sizes: [
-                [config.width, config.height],
-                [max_texture_dimension, max_texture_dimension],
-            ],
+            size,
             size_uniform,
-            vertex_buffer,
-            index_buffer,
+            rectangle_vertices,
+            rectangle_indices,
+            rectangle_vertex_buffer,
+            rectangle_index_buffer,
+            shadow_vertices,
+            shadow_indices,
+            shadow_vertex_buffer,
+            shadow_index_buffer,
+            glyph_vertices,
+            glyph_indices,
+            glyph_vertex_buffer,
+            glyph_index_buffer,
             mask_atlas,
             color_atlas,
             animated_atlas,
             mask_texture,
             color_texture,
             animated_texture,
-            rectangle,
-            blur,
-            glyph,
-            pass_bind_group,
-            compose_bind_group_layout,
-            compose_bind_group,
-            compose_pipeline,
+            bind_group,
+            rectangle_pipeline,
+            shadow_pipeline,
+            glyph_pipeline,
         }
     }
 
-    pub fn rectangle_texture_view(&self) -> TextureView {
-        self.rectangle.output.create_view(&Default::default())
-    }
-
-    pub fn blur_texture_view(&self) -> TextureView {
-        self.blur.output.create_view(&Default::default())
-    }
-
-    pub fn glyph_texture_view(&self) -> TextureView {
-        self.glyph.output.create_view(&Default::default())
-    }
-
-    pub fn resize(&mut self, device: &Device, config: &SurfaceConfiguration) {
-        self.sizes[0] = [config.width, config.height];
-
-        let [rectangle, blur, glyph] = Self::pass_textures(device, config);
-        self.rectangle.resize(rectangle);
-        self.blur.resize(blur);
-        self.glyph.resize(glyph);
-
-        self.compose_bind_group = Self::compose_bind_group(
-            device,
-            &self.compose_bind_group_layout,
-            &self.rectangle,
-            &self.blur,
-            &self.glyph,
-        );
+    pub fn resize(&mut self, config: &SurfaceConfiguration) {
+        self.size[0] = [config.width as f32, config.height as f32];
     }
 
     pub fn rectangle(
@@ -357,13 +277,14 @@ impl TextPipeline {
         ([top, left], [width, height]): ([i32; 2], [u32; 2]),
         color: Rgba,
     ) {
-        self.rectangle.insert_quad(Vertex::quad(
-            Vertex::BACKGROUND_RECTANGLE,
-            ([region_top, region_left], [region_width, region_height]),
-            ([top, left], [width, height]),
-            [0, 0],
-            color,
-        ));
+        Self::push_quad(
+            (&mut self.rectangle_vertices, &mut self.rectangle_indices),
+            RectangleVertex::quad(
+                ([region_top, region_left], [region_width, region_height]),
+                ([top, left], [width, height]),
+                color,
+            ),
+        );
     }
 
     pub fn glyphs(
@@ -401,13 +322,14 @@ impl TextPipeline {
                 let left = left + start as i32;
                 let width = (end - start) as u32;
 
-                self.rectangle.insert_quad(Vertex::quad(
-                    Vertex::BACKGROUND_RECTANGLE,
-                    region,
-                    ([top, left], [width, line_height]),
-                    [0, 0],
-                    background,
-                ));
+                Self::push_quad(
+                    (&mut self.rectangle_vertices, &mut self.rectangle_indices),
+                    RectangleVertex::quad(
+                        ([region_top, region_left], [region_width, region_height]),
+                        ([top, left], [width, line_height]),
+                        background,
+                    ),
+                );
             }
         }
 
@@ -450,102 +372,95 @@ impl TextPipeline {
                 }
             };
 
-            self.glyph.insert_quad(Vertex::quad(
-                ty,
-                region,
-                ([top, left], [width, height]),
-                [u, v],
-                glyph.styles.foreground,
-            ));
-
-            if let Some(blur) = glyph
+            if let Some(_blur) = glyph
                 .styles
                 .blur
                 .filter(|blur| blur.radius > 0 && blur.color.a != 0)
             {
-                self.blur.insert_quad(Vertex::quad(
+                Self::push_quad(
+                    (&mut self.shadow_vertices, &mut self.shadow_indices),
+                    ShadowVertex::quad(ty, region, ([top, left], [width, height]), [u, v]),
+                );
+            }
+
+            Self::push_quad(
+                (&mut self.glyph_vertices, &mut self.glyph_indices),
+                GlyphVertex::quad(
                     ty,
                     region,
                     ([top, left], [width, height]),
                     [u, v],
-                    blur.color,
-                ));
-            }
+                    glyph.styles.foreground,
+                ),
+            );
         }
     }
 
     pub fn pre_render(&mut self, queue: &Queue) {
-        let vertices = self
-            .rectangle
-            .vertices
-            .iter()
-            .chain(&self.blur.vertices)
-            .chain(&self.glyph.vertices)
-            .copied()
-            .collect::<Vec<_>>();
-        let indices = self
-            .rectangle
-            .indices
-            .iter()
-            .chain(&self.blur.indices)
-            .chain(&self.glyph.indices)
-            .copied()
-            .collect::<Vec<_>>();
-
-        queue.write_buffer(&self.size_uniform, 0, bytemuck::cast_slice(&self.sizes));
-        queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
-        queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&indices));
+        queue.write_buffer(&self.size_uniform, 0, bytemuck::cast_slice(&self.size));
+        queue.write_buffer(
+            &self.rectangle_vertex_buffer,
+            0,
+            bytemuck::cast_slice(&self.rectangle_vertices),
+        );
+        queue.write_buffer(
+            &self.rectangle_index_buffer,
+            0,
+            bytemuck::cast_slice(&self.rectangle_indices),
+        );
+        queue.write_buffer(
+            &self.shadow_vertex_buffer,
+            0,
+            bytemuck::cast_slice(&self.shadow_vertices),
+        );
+        queue.write_buffer(
+            &self.shadow_index_buffer,
+            0,
+            bytemuck::cast_slice(&self.shadow_indices),
+        );
+        queue.write_buffer(
+            &self.glyph_vertex_buffer,
+            0,
+            bytemuck::cast_slice(&self.glyph_vertices),
+        );
+        queue.write_buffer(
+            &self.glyph_index_buffer,
+            0,
+            bytemuck::cast_slice(&self.glyph_indices),
+        );
     }
 
-    pub fn render_rectangles<'pass>(&'pass mut self, render_pass: &mut RenderPass<'pass>) {
-        let vertices = ..self.rectangle.vertices();
-        let indices = ..self.rectangle.indices();
-
-        if !self.rectangle.is_empty() {
-            render_pass.set_pipeline(self.rectangle.pipeline.as_ref().unwrap());
-            render_pass.set_bind_group(0, &self.pass_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(vertices));
-            render_pass.set_index_buffer(self.index_buffer.slice(indices), IndexFormat::Uint32);
-            render_pass.draw_indexed(0..self.rectangle.len(), 0, 0..1);
-        }
+    pub fn render_rectangles<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
+        render_pass.set_pipeline(&self.rectangle_pipeline);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_vertex_buffer(0, self.rectangle_vertex_buffer.slice(..));
+        render_pass.set_index_buffer(self.rectangle_index_buffer.slice(..), IndexFormat::Uint32);
+        render_pass.draw_indexed(0..self.rectangle_indices.len() as u32, 0, 0..1);
     }
 
-    pub fn render_blurs<'pass>(&'pass mut self, render_pass: &mut RenderPass<'pass>) {
-        let vertices = self.rectangle.vertices()..self.rectangle.vertices() + self.blur.vertices();
-        let indices = self.rectangle.indices()..self.rectangle.indices() + self.blur.indices();
-
-        if !self.blur.is_empty() {
-            render_pass.set_pipeline(self.blur.pipeline.as_ref().unwrap());
-            render_pass.set_bind_group(0, &self.pass_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(vertices));
-            render_pass.set_index_buffer(self.index_buffer.slice(indices), IndexFormat::Uint32);
-            render_pass.draw_indexed(0..self.blur.len(), 0, 0..1);
-        }
+    pub fn render_shadows<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
+        render_pass.set_pipeline(&self.shadow_pipeline);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_vertex_buffer(0, self.shadow_vertex_buffer.slice(..));
+        render_pass.set_index_buffer(self.shadow_index_buffer.slice(..), IndexFormat::Uint32);
+        render_pass.draw_indexed(0..self.shadow_indices.len() as u32, 0, 0..1);
     }
 
-    pub fn render_glyphs<'pass>(&'pass mut self, render_pass: &mut RenderPass<'pass>) {
-        let vertices = self.rectangle.vertices() + self.blur.vertices()..;
-        let indices = self.rectangle.indices() + self.blur.indices()..;
-
-        if !self.glyph.is_empty() {
-            render_pass.set_pipeline(self.glyph.pipeline.as_ref().unwrap());
-            render_pass.set_bind_group(0, &self.pass_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(vertices));
-            render_pass.set_index_buffer(self.index_buffer.slice(indices), IndexFormat::Uint32);
-            render_pass.draw_indexed(0..self.glyph.len(), 0, 0..1);
-        }
-    }
-
-    pub fn compose<'pass>(&'pass mut self, render_pass: &mut RenderPass<'pass>) {
-        render_pass.set_pipeline(&self.compose_pipeline);
-        render_pass.set_bind_group(0, &self.compose_bind_group, &[]);
-        render_pass.draw(0..6, 0..3);
+    pub fn render_glyphs<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
+        render_pass.set_pipeline(&self.glyph_pipeline);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_vertex_buffer(0, self.glyph_vertex_buffer.slice(..));
+        render_pass.set_index_buffer(self.glyph_index_buffer.slice(..), IndexFormat::Uint32);
+        render_pass.draw_indexed(0..self.glyph_indices.len() as u32, 0, 0..1);
     }
 
     pub fn post_render(&mut self) {
-        self.rectangle.clear();
-        self.blur.clear();
-        self.glyph.clear();
+        self.rectangle_vertices.clear();
+        self.rectangle_indices.clear();
+        self.shadow_vertices.clear();
+        self.shadow_indices.clear();
+        self.glyph_vertices.clear();
+        self.glyph_indices.clear();
 
         self.mask_atlas.next_frame();
         self.color_atlas.next_frame();
@@ -555,52 +470,6 @@ impl TextPipeline {
 
 /// Private.
 impl TextPipeline {
-    fn pass_textures(device: &Device, config: &SurfaceConfiguration) -> [Texture; 3] {
-        [
-            device.create_texture(&texture! {
-                label: "[TextPipeline] Rectangle pass output texture",
-                size: [config.width, config.height],
-                format: config.format,
-                usage: TEXTURE_BINDING | RENDER_ATTACHMENT,
-            }),
-            device.create_texture(&texture! {
-                label: "[TextPipeline] Blur pass output texture",
-                size: [config.width, config.height],
-                format: config.format,
-                usage: TEXTURE_BINDING | RENDER_ATTACHMENT,
-            }),
-            device.create_texture(&texture! {
-                label: "[TextPipeline] Glyph pass output texture",
-                size: [config.width, config.height],
-                format: config.format,
-                usage: TEXTURE_BINDING | RENDER_ATTACHMENT,
-            }),
-        ]
-    }
-
-    fn compose_bind_group(
-        device: &Device,
-        layout: &BindGroupLayout,
-        rectangle: &Pass,
-        blur: &Pass,
-        glyph: &Pass,
-    ) -> BindGroup {
-        device.create_bind_group(&bind_group! {
-            label: "[TextPipeline] Compose bind group",
-            layout: layout,
-            entries: [
-                // Rectangle texture
-                { binding: 0, resource: Texture(rectangle.output) },
-                // Blur texture
-                { binding: 1, resource: Texture(blur.output) },
-                // Glyph texture
-                { binding: 2, resource: Texture(glyph.output) },
-                // Sampler
-                { binding: 3, resource: Sampler(device.create_sampler(&Default::default())) },
-            ],
-        })
-    }
-
     fn insert_glyph(
         &mut self,
         queue: &Queue,
@@ -611,8 +480,8 @@ impl TextPipeline {
 
         // Check atlases for glyph
         if let Some((ty, ([u, v], placement))) = {
-            let in_mask = || self.mask_atlas.get(&key).map(|v| (Vertex::MASK_GLYPH, v));
-            let in_color = || self.color_atlas.get(&key).map(|v| (Vertex::COLOR_GLYPH, v));
+            let in_mask = || self.mask_atlas.get(&key).map(|v| (MASK_GLYPH, v));
+            let in_color = || self.color_atlas.get(&key).map(|v| (COLOR_GLYPH, v));
             in_mask().or_else(in_color)
         } {
             return Some((ty, [u, v], *placement));
@@ -625,18 +494,8 @@ impl TextPipeline {
 
         // Allocate glyph in atlas
         let (ty, atlas, texture, channels) = match image.content {
-            Content::Mask => (
-                Vertex::MASK_GLYPH,
-                &mut self.mask_atlas,
-                &self.mask_texture,
-                1,
-            ),
-            Content::Color => (
-                Vertex::COLOR_GLYPH,
-                &mut self.color_atlas,
-                &self.color_texture,
-                4,
-            ),
+            Content::Mask => (MASK_GLYPH, &mut self.mask_atlas, &self.mask_texture, 1),
+            Content::Color => (COLOR_GLYPH, &mut self.color_atlas, &self.color_texture, 4),
             Content::SubpixelMask => unreachable!(),
         };
         let ([u, v], _) = {
@@ -680,7 +539,7 @@ impl TextPipeline {
 
         // Check atlas for frame
         if let Some(([u, v], placement)) = self.animated_atlas.get(&key) {
-            return Some((Vertex::ANIMATED_GLYPH, [u, v], *placement));
+            return Some((ANIMATED_GLYPH, [u, v], *placement));
         }
 
         // Render frames
@@ -723,6 +582,29 @@ impl TextPipeline {
         }
 
         let ([u, v], placement) = self.animated_atlas.get(&key).unwrap();
-        Some((Vertex::ANIMATED_GLYPH, [u, v], *placement))
+        Some((ANIMATED_GLYPH, [u, v], *placement))
+    }
+
+    fn push_quad<T: Copy>(
+        (vertices, indices): (&mut Vec<T>, &mut Vec<Index>),
+        [top_left, top_right, bottom_left, bottom_right]: [T; 4],
+    ) {
+        let i = vertices.len() as u32;
+
+        vertices.extend_from_slice(&[top_left, top_right, bottom_left, bottom_right]);
+
+        let top_left = i;
+        let top_right = i + 1;
+        let bottom_left = i + 2;
+        let bottom_right = i + 3;
+
+        indices.extend_from_slice(&[
+            top_left,
+            bottom_right,
+            top_right,
+            top_left,
+            bottom_left,
+            bottom_right,
+        ]);
     }
 }

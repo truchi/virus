@@ -167,16 +167,13 @@ impl Theme {
                 style,
                 underline: Default::default(),
                 strike: Default::default(),
-                // foreground: Rgba {
-                //     r,
-                //     g,
-                //     b,
-                //     a: u8::MAX,
-                // },
-                // background: Default::default(),
-                // blur: None,
-                foreground: Rgba::BLACK,
-                background: Rgba::BLACK,
+                foreground: Rgba {
+                    r,
+                    g,
+                    b,
+                    a: u8::MAX,
+                },
+                background: Default::default(),
                 blur: Some(Blur {
                     radius: 3,
                     color: Rgba::RED,
