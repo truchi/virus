@@ -1,6 +1,6 @@
-struct Sizes {
+struct Constants {
     // Surface `(width, height)` size.
-    surface: vec2u,
+    surface: vec2f,
 }
 
 struct Vertex {
@@ -22,15 +22,14 @@ struct Fragment {
     @location(0) color: vec4f,
 }
 
+var<push_constant> CONSTANTS: Constants;
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                               Vertex                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-@group(0) @binding(0) var<uniform> sizes: Sizes;
-
 @vertex
 fn vertex(vertex: Vertex) -> Fragment {
-    let surface = vec2f(sizes.surface);
     let region_position = vec2f(vertex.region_position.yx);
     let region_size = vec2f(vertex.region_size);
     let position = vec2f(vertex.position.yx);
@@ -38,8 +37,8 @@ fn vertex(vertex: Vertex) -> Fragment {
 
     var fragment: Fragment;
     fragment.position = vec4f(
-        0.0 + 2.0 * (position.x + region_position.x) / surface.x - 1.0,
-        0.0 - 2.0 * (position.y + region_position.y) / surface.y + 1.0,
+        0.0 + 2.0 * (position.x + region_position.x) / CONSTANTS.surface.x - 1.0,
+        0.0 - 2.0 * (position.y + region_position.y) / CONSTANTS.surface.y + 1.0,
         0.0,
         1.0,
     );

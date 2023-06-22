@@ -1,4 +1,4 @@
-struct Size {
+struct Constants {
     // Surface `(width, height)` size.
     surface: vec2f,
 
@@ -6,11 +6,11 @@ struct Size {
     texture: vec2f,
 }
 
-@group(0) @binding(0) var<uniform> SIZE: Size;
-@group(0) @binding(1) var MASK: texture_2d<f32>;
-@group(0) @binding(2) var COLOR: texture_2d<f32>;
-@group(0) @binding(3) var ANIMATED: texture_2d<f32>;
-@group(0) @binding(4) var SAMPLER: sampler;
+var<push_constant> CONSTANTS: Constants;
+@group(0) @binding(0) var MASK: texture_2d<f32>;
+@group(0) @binding(1) var COLOR: texture_2d<f32>;
+@group(0) @binding(2) var ANIMATED: texture_2d<f32>;
+@group(0) @binding(3) var SAMPLER: sampler;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Rectangle                                         //
@@ -43,8 +43,8 @@ fn rectangle_vertex(vertex: RectangleVertex) -> RectangleFragment {
 
     var fragment: RectangleFragment;
     fragment.position = vec4f(
-        0.0 + 2.0 * (position.x + region_position.x) / SIZE.surface.x - 1.0,
-        0.0 - 2.0 * (position.y + region_position.y) / SIZE.surface.y + 1.0,
+        0.0 + 2.0 * (position.x + region_position.x) / CONSTANTS.surface.x - 1.0,
+        0.0 - 2.0 * (position.y + region_position.y) / CONSTANTS.surface.y + 1.0,
         0.0,
         1.0,
     );
@@ -101,13 +101,13 @@ fn shadow_vertex(vertex: ShadowVertex) -> ShadowFragment {
 
     var fragment: ShadowFragment;
     fragment.position = vec4f(
-        0.0 + 2.0 * (position.x + region_position.x) / SIZE.surface.x - 1.0,
-        0.0 - 2.0 * (position.y + region_position.y) / SIZE.surface.y + 1.0,
+        0.0 + 2.0 * (position.x + region_position.x) / CONSTANTS.surface.x - 1.0,
+        0.0 - 2.0 * (position.y + region_position.y) / CONSTANTS.surface.y + 1.0,
         0.0,
         1.0,
     );
     fragment.glyph_type = vertex.glyph_type;
-    fragment.uv = uv / SIZE.texture;
+    fragment.uv = uv / CONSTANTS.texture;
     fragment.min = region_position;
     fragment.max = region_position + region_size;
 
@@ -181,13 +181,13 @@ fn glyph_vertex(vertex: GlyphVertex) -> GlyphFragment {
 
     var fragment: GlyphFragment;
     fragment.position = vec4f(
-        0.0 + 2.0 * (position.x + region_position.x) / SIZE.surface.x - 1.0,
-        0.0 - 2.0 * (position.y + region_position.y) / SIZE.surface.y + 1.0,
+        0.0 + 2.0 * (position.x + region_position.x) / CONSTANTS.surface.x - 1.0,
+        0.0 - 2.0 * (position.y + region_position.y) / CONSTANTS.surface.y + 1.0,
         0.0,
         1.0,
     );
     fragment.glyph_type = vertex.glyph_type;
-    fragment.uv = uv / SIZE.texture;
+    fragment.uv = uv / CONSTANTS.texture;
     fragment.color = pow(color, vec4f(2.2, 2.2, 2.2, 1.0));
     fragment.min = region_position;
     fragment.max = region_position + region_size;

@@ -26,14 +26,14 @@ use wgpu::{
     include_wgsl, vertex_attr_array, BindGroup, BindGroupDescriptor, BindGroupEntry,
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
     BlendState, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, Color,
-    ColorTargetState, ColorWrites, CommandEncoderDescriptor, Device, Extent3d, FragmentState,
-    ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, LoadOp, Operations, Origin3d,
-    PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, Queue, RenderPass,
-    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
-    RequestAdapterOptions, Sampler, SamplerBindingType, ShaderStages, Surface,
-    SurfaceConfiguration, Texture, TextureAspect, TextureDescriptor, TextureDimension,
-    TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDimension,
-    VertexAttribute, VertexBufferLayout, VertexState, VertexStepMode,
+    ColorTargetState, ColorWrites, CommandEncoderDescriptor, Device, DeviceDescriptor, Extent3d,
+    Features, FragmentState, ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, Limits,
+    LoadOp, Operations, Origin3d, PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology,
+    PushConstantRange, Queue, RenderPass, RenderPassColorAttachment, RenderPassDescriptor,
+    RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions, Sampler, SamplerBindingType,
+    ShaderStages, Surface, SurfaceConfiguration, Texture, TextureAspect, TextureDescriptor,
+    TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureView,
+    TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexState, VertexStepMode,
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
@@ -73,8 +73,18 @@ impl Graphics {
             ..Default::default()
         }))
         .unwrap();
-        let (device, queue) =
-            pollster::block_on(adapter.request_device(&Default::default(), None)).unwrap();
+        let (device, queue) = pollster::block_on(adapter.request_device(
+            &DeviceDescriptor {
+                label: Some("Device descriptor"),
+                features: Features::PUSH_CONSTANTS,
+                limits: Limits {
+                    max_push_constant_size: 128,
+                    ..Default::default()
+                },
+            },
+            None,
+        ))
+        .unwrap();
 
         // Configure surface
         let size = window.inner_size();

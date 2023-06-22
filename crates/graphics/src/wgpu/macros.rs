@@ -1,3 +1,5 @@
+// TODO ShaderStages: $(|)+ and remove ::empty()
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                         BufferDescriptor                                       //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -214,6 +216,21 @@ macro_rules! pipeline_layout {
             push_constant_ranges: &[],
         }
     };
+    (
+        label: $label:expr,
+        bind_group_layouts: [$($bind_group_layout:expr),*],
+        push_constant_ranges: [$(($($stage:ident)|*, $range:expr)),*]
+        $(,)?
+    ) => {
+        PipelineLayoutDescriptor {
+            label: Some($label),
+            bind_group_layouts: &[$(&$bind_group_layout),*],
+            push_constant_ranges: &[$(PushConstantRange {
+                stages: $(ShaderStages::$stage|)* ShaderStages::empty(),
+                range: $range,
+            }),*],
+        }
+    };
 }
 
 pub(crate) use pipeline_layout;
@@ -403,6 +420,11 @@ mod tests {
             let _ = pipeline_layout! {
                 label: "Pipeline layout",
                 bind_group_layouts: [bind_group_layout],
+            };
+            let _ = pipeline_layout! {
+                label: "Pipeline layout",
+                bind_group_layouts: [bind_group_layout],
+                push_constant_ranges: [(VERTEX | FRAGMENT, 0..128)],
             };
 
             // Render pipeline

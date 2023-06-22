@@ -12,13 +12,11 @@ const SHADOW_VERTEX_SIZE: usize = size_of::<ShadowVertex>();
 const GLYPH_VERTEX_SIZE: usize = size_of::<GlyphVertex>();
 const INDEX_SIZE: usize = size_of::<Index>();
 
-type Size = [[f32; 2]; 2];
-
 /// Text pipeline.
 #[derive(Debug)]
 pub struct TextPipeline {
-    size: Size,
-    size_uniform: Buffer,
+    surface_size: [f32; 2],
+    texture_size: [f32; 2],
 
     rectangle_vertices: Vec<RectangleVertex>,
     rectangle_indices: Vec<Index>,
@@ -75,15 +73,8 @@ impl TextPipeline {
         // Buffers
         //
 
-        let size = [
-            [config.width as f32, config.height as f32],
-            [max_texture_dimension as f32, max_texture_dimension as f32],
-        ];
-        let size_uniform = device.create_buffer(&buffer! {
-            label: "[TextPipeline] Size uniform",
-            size: size_of::<Size>(),
-            usage: UNIFORM | COPY_DST,
-        });
+        let surface_size = [config.width as f32, config.height as f32];
+        let texture_size = [max_texture_dimension as f32, max_texture_dimension as f32];
 
         let rectangle_vertex_buffer_size = 4 * MAX_RECTANGLES * RECTANGLE_VERTEX_SIZE;
         let rectangle_index_buffer_size = 6 * MAX_RECTANGLES * INDEX_SIZE;
@@ -182,32 +173,28 @@ impl TextPipeline {
         let bind_group_layout = device.create_bind_group_layout(&bind_group_layout! {
             label: "[TextPipeline] Bind group layout",
             entries: [
-                // Size uniform
-                { binding: 0, visibility: VERTEX, ty: Uniform },
                 // Mask texture
-                { binding: 1, visibility: FRAGMENT, ty: Texture },
+                { binding: 0, visibility: FRAGMENT, ty: Texture },
                 // Color texture
-                { binding: 2, visibility: FRAGMENT, ty: Texture },
+                { binding: 1, visibility: FRAGMENT, ty: Texture },
                 // Animated texture
-                { binding: 3, visibility: FRAGMENT, ty: Texture },
+                { binding: 2, visibility: FRAGMENT, ty: Texture },
                 // Sampler
-                { binding: 4, visibility: FRAGMENT, ty: Sampler(Filtering) },
+                { binding: 3, visibility: FRAGMENT, ty: Sampler(Filtering) },
             ],
         });
         let bind_group = device.create_bind_group(&bind_group! {
             label: "[TextPipeline] Bind group",
             layout: bind_group_layout,
             entries: [
-                // Size uniform
-                { binding: 0, resource: Buffer(size_uniform) },
                 // Mask texture
-                { binding: 1, resource: Texture(mask_texture) },
+                { binding: 0, resource: Texture(mask_texture) },
                 // Color texture
-                { binding: 2, resource: Texture(color_texture) },
+                { binding: 1, resource: Texture(color_texture) },
                 // Animated texture
-                { binding: 3, resource: Texture(animated_texture) },
+                { binding: 2, resource: Texture(animated_texture) },
                 // Sampler
-                { binding: 4, resource: Sampler(device.create_sampler(&Default::default())) },
+                { binding: 3, resource: Sampler(device.create_sampler(&Default::default())) },
             ],
         });
 
@@ -223,6 +210,7 @@ impl TextPipeline {
         let layout = device.create_pipeline_layout(&pipeline_layout! {
             label: "[TextPipeline] Pipeline layout",
             bind_group_layouts: [bind_group_layout],
+            push_constant_ranges: [(VERTEX_FRAGMENT, 0..16)],
         });
         let module = device.create_shader_module(include_wgsl!("shaders/shader.wgsl"));
         let rectangle_pipeline = device.create_render_pipeline(&render_pipeline! {
@@ -257,8 +245,8 @@ impl TextPipeline {
         });
 
         Self {
-            size,
-            size_uniform,
+            surface_size,
+            texture_size,
             rectangle_vertices,
             rectangle_indices,
             rectangle_vertex_buffer,
@@ -285,7 +273,7 @@ impl TextPipeline {
     }
 
     pub fn resize(&mut self, config: &SurfaceConfiguration) {
-        self.size[0] = [config.width as f32, config.height as f32];
+        self.surface_size = [config.width as f32, config.height as f32];
     }
 
     pub fn rectangle(
@@ -415,7 +403,6 @@ impl TextPipeline {
     }
 
     pub fn pre_render(&mut self, queue: &Queue) {
-        queue.write_buffer(&self.size_uniform, 0, bytemuck::cast_slice(&self.size));
         queue.write_buffer(
             &self.rectangle_vertex_buffer,
             0,
@@ -451,6 +438,16 @@ impl TextPipeline {
     pub fn render_rectangles<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
         render_pass.set_pipeline(&self.rectangle_pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_push_constants(
+            ShaderStages::VERTEX_FRAGMENT,
+            0,
+            bytemuck::cast_slice(&[
+                self.surface_size[0],
+                self.surface_size[1],
+                self.texture_size[0],
+                self.texture_size[1],
+            ]),
+        );
         render_pass.set_vertex_buffer(0, self.rectangle_vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.rectangle_index_buffer.slice(..), IndexFormat::Uint32);
         render_pass.draw_indexed(0..self.rectangle_indices.len() as u32, 0, 0..1);
@@ -459,6 +456,16 @@ impl TextPipeline {
     pub fn render_shadows<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
         render_pass.set_pipeline(&self.shadow_pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_push_constants(
+            ShaderStages::VERTEX_FRAGMENT,
+            0,
+            bytemuck::cast_slice(&[
+                self.surface_size[0],
+                self.surface_size[1],
+                self.texture_size[0],
+                self.texture_size[1],
+            ]),
+        );
         render_pass.set_vertex_buffer(0, self.shadow_vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.shadow_index_buffer.slice(..), IndexFormat::Uint32);
         render_pass.draw_indexed(0..self.shadow_indices.len() as u32, 0, 0..1);
@@ -467,6 +474,16 @@ impl TextPipeline {
     pub fn render_glyphs<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
         render_pass.set_pipeline(&self.glyph_pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_push_constants(
+            ShaderStages::VERTEX_FRAGMENT,
+            0,
+            bytemuck::cast_slice(&[
+                self.surface_size[0],
+                self.surface_size[1],
+                self.texture_size[0],
+                self.texture_size[1],
+            ]),
+        );
         render_pass.set_vertex_buffer(0, self.glyph_vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.glyph_index_buffer.slice(..), IndexFormat::Uint32);
         render_pass.draw_indexed(0..self.glyph_indices.len() as u32, 0, 0..1);

@@ -59,13 +59,10 @@ impl Vertex {
 //                                              Pipeline                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-type Sizes = [[u32; 2]; 1];
-
 /// Line pipeline.
 pub struct LinePipeline {
-    sizes: Sizes,
+    surface_size: [f32; 2],
     vertices: Vec<Vertex>,
-    size_uniform: Buffer,
     vertex_buffer: Buffer,
     bind_group: BindGroup,
     pipeline: RenderPipeline,
@@ -76,14 +73,9 @@ impl LinePipeline {
         let limits = device.limits();
 
         //
-        // Buffers
+        // Buffer
         //
 
-        let size_uniform = device.create_buffer(&buffer! {
-            label: "[LinePipeline] Size uniform",
-            size: size_of::<Sizes>(),
-            usage: UNIFORM | COPY_DST,
-        });
         let vertex_buffer = device.create_buffer(&buffer! {
             label: "[LinePipeline] Vertex buffer",
             size: limits.max_buffer_size  / 2,
@@ -96,18 +88,12 @@ impl LinePipeline {
 
         let bind_group_layout = device.create_bind_group_layout(&bind_group_layout! {
             label: "[LinePipeline] Texture bind group layout",
-            entries: [
-                // Size uniform
-                { binding: 0, visibility: VERTEX, ty: Uniform },
-            ],
+            entries: [],
         });
         let bind_group = device.create_bind_group(&bind_group! {
             label: "[LinePipeline] Texture bind group",
             layout: bind_group_layout,
-            entries: [
-                // Size uniform
-                { binding: 0, resource: Buffer(size_uniform) },
-            ],
+            entries: [],
         });
 
         //
@@ -118,6 +104,7 @@ impl LinePipeline {
         let pipeline_layout = device.create_pipeline_layout(&pipeline_layout! {
             label: "[LinePipeline] Pipeline layout",
             bind_group_layouts: [bind_group_layout],
+            push_constant_ranges: [(VERTEX_FRAGMENT, 0..8)],
         });
         let pipeline = device.create_render_pipeline(&render_pipeline! {
             label: "[LinePipeline] Pipeline",
@@ -135,9 +122,8 @@ impl LinePipeline {
         });
 
         Self {
-            sizes: [[config.width, config.height]],
+            surface_size: [config.width as f32, config.height as f32],
             vertices: Vec::with_capacity(1_024),
-            size_uniform,
             vertex_buffer,
             bind_group,
             pipeline,
@@ -145,7 +131,7 @@ impl LinePipeline {
     }
 
     pub fn resize(&mut self, size: PhysicalSize<u32>) {
-        self.sizes[0] = [size.width, size.height];
+        self.surface_size = [size.width as f32, size.height as f32];
     }
 
     pub fn polyline<T: IntoIterator<Item = ([i32; 2], Rgba)>>(
@@ -171,11 +157,15 @@ impl LinePipeline {
     }
 
     pub fn render<'pass>(&'pass mut self, queue: &Queue, render_pass: &mut RenderPass<'pass>) {
-        queue.write_buffer(&self.size_uniform, 0, bytemuck::cast_slice(&self.sizes));
         queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
 
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_push_constants(
+            ShaderStages::VERTEX_FRAGMENT,
+            0,
+            bytemuck::cast_slice(&[self.surface_size[0], self.surface_size[1]]),
+        );
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.draw(0..self.vertices.len() as u32, 0..1);
 
