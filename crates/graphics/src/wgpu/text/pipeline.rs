@@ -49,14 +49,14 @@ pub struct TextPipeline {
 // ping_direction_uniform: Buffer,
 // pong_direction_uniform: Buffer,
 
-// blur_vertices: Vec<BlurVertex>,
-// blur_indices: Vec<Indice>,
-// blur_vertex_buffer: Buffer,
-// blur_index_buffer: Buffer,
+// shadow_vertices: Vec<ShadowVertex>,
+// shadow_indices: Vec<Indice>,
+// shadow_vertex_buffer: Buffer,
+// shadow_index_buffer: Buffer,
 
-// blur_atlas: Atlas<GlyphKey, Placement>,
-// blur_ping_texture: Texture,
-// blur_pong_texture: Texture,
+// shadow_atlas: Atlas<GlyphKey, Placement>,
+// shadow_ping_texture: Texture,
+// shadow_pong_texture: Texture,
 
 // pass_bind_group: BindGroup,
 // compose_bind_group_layout: BindGroupLayout,
@@ -318,7 +318,7 @@ impl TextPipeline {
 
         // Discard when outside region. This suppposes that:
         // - glyphs are not bigger that line height (~ font size < line height)
-        // - glyphs outside do not affect what's inside (~ no blur)
+        // - glyphs outside do not affect what's inside (~ no shadow FIXME)
         // - no further transforms are applied in the shader
         // Of course the GPU would have done that for us. Don't fear to remove if necessary.
         {
@@ -389,10 +389,10 @@ impl TextPipeline {
                 }
             };
 
-            if let Some(_blur) = glyph
+            if let Some(_shadow) = glyph
                 .styles
-                .blur
-                .filter(|blur| blur.radius > 0 && blur.color.a != 0)
+                .shadow
+                .filter(|shadow| shadow.radius > 0 && shadow.color.a != 0)
             {
                 Self::push_quad(
                     (&mut self.shadow_vertices, &mut self.shadow_indices),

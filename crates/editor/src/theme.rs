@@ -156,9 +156,9 @@ impl Theme {
     /// Stupid shit for tests!
     pub fn dracula() -> Self {
         use virus_graphics::text::{
-            Blur,
             FontStyle::{self, *},
             FontWeight::{self, *},
+            Shadow,
         };
 
         fn style(r: u8, g: u8, b: u8, weight: FontWeight, style: FontStyle) -> Styles {
@@ -178,7 +178,7 @@ impl Theme {
                 } else {
                     Default::default()
                 },
-                blur: Some(Blur {
+                shadow: Some(Shadow {
                     radius: 3,
                     color: Rgba::RED,
                 }),
