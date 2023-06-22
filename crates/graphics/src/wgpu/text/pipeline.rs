@@ -4,8 +4,15 @@ use super::*;
 //                                           TextPipeline                                         //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+const MAX_RECTANGLES: usize = 1_000;
+const MAX_SHADOWS: usize = 10_000;
+const MAX_GLYPHS: usize = 10_000;
+const RECTANGLE_VERTEX_SIZE: usize = size_of::<RectangleVertex>();
+const SHADOW_VERTEX_SIZE: usize = size_of::<ShadowVertex>();
+const GLYPH_VERTEX_SIZE: usize = size_of::<GlyphVertex>();
+const INDEX_SIZE: usize = size_of::<Index>();
+
 type Size = [[f32; 2]; 2];
-type Index = u32;
 
 /// Text pipeline.
 #[derive(Debug)]
@@ -61,7 +68,7 @@ impl TextPipeline {
 
     pub fn new(device: &Device, config: &SurfaceConfiguration) -> Self {
         let limits = device.limits();
-        let max_buffer_size = limits.max_buffer_size / 4; // FIXME OOM (investigate)
+        let max_buffer_size = limits.max_buffer_size as usize;
         let max_texture_dimension = limits.max_texture_dimension_2d;
 
         //
@@ -78,40 +85,53 @@ impl TextPipeline {
             usage: UNIFORM | COPY_DST,
         });
 
-        let rectangle_vertices = Vec::with_capacity(1024);
-        let rectangle_indices = Vec::with_capacity(1024);
+        let rectangle_vertex_buffer_size = 4 * MAX_RECTANGLES * RECTANGLE_VERTEX_SIZE;
+        let rectangle_index_buffer_size = 6 * MAX_RECTANGLES * INDEX_SIZE;
+        let shadow_vertex_buffer_size = 4 * MAX_SHADOWS * SHADOW_VERTEX_SIZE;
+        let shadow_index_buffer_size = 6 * MAX_SHADOWS * INDEX_SIZE;
+        let glyph_vertex_buffer_size = 4 * MAX_GLYPHS * GLYPH_VERTEX_SIZE;
+        let glyph_index_buffer_size = 6 * MAX_GLYPHS * INDEX_SIZE;
+        assert!(rectangle_vertex_buffer_size <= max_buffer_size);
+        assert!(rectangle_index_buffer_size <= max_buffer_size);
+        assert!(shadow_vertex_buffer_size <= max_buffer_size);
+        assert!(shadow_index_buffer_size <= max_buffer_size);
+        assert!(glyph_vertex_buffer_size <= max_buffer_size);
+        assert!(glyph_index_buffer_size <= max_buffer_size);
+
+        let rectangle_vertices = Vec::with_capacity(4 * MAX_RECTANGLES);
+        let rectangle_indices = Vec::with_capacity(6 * MAX_RECTANGLES);
         let rectangle_vertex_buffer = device.create_buffer(&buffer! {
             label: "[TextPipeline] Rectangle vertex buffer",
-            size: max_buffer_size,
+            size: rectangle_vertex_buffer_size,
             usage: VERTEX | COPY_DST,
         });
         let rectangle_index_buffer = device.create_buffer(&buffer! {
             label: "[TextPipeline] Rectangle index buffer",
-            size: max_buffer_size,
+            size: rectangle_index_buffer_size,
             usage: INDEX | COPY_DST,
         });
-        let shadow_vertices = Vec::with_capacity(1024);
-        let shadow_indices = Vec::with_capacity(1024);
+        let shadow_vertices = Vec::with_capacity(4 * MAX_SHADOWS);
+        let shadow_indices = Vec::with_capacity(6 * MAX_SHADOWS);
         let shadow_vertex_buffer = device.create_buffer(&buffer! {
             label: "[TextPipeline] Shadow vertex buffer",
-            size: max_buffer_size,
+            size: shadow_vertex_buffer_size,
             usage: VERTEX | COPY_DST,
         });
         let shadow_index_buffer = device.create_buffer(&buffer! {
             label: "[TextPipeline] Shadow index buffer",
-            size: max_buffer_size,
+            size: shadow_index_buffer_size,
             usage: INDEX | COPY_DST,
         });
-        let glyph_vertices = Vec::with_capacity(1024);
-        let glyph_indices = Vec::with_capacity(1024);
+        let glyph_vertices = Vec::with_capacity(4 * MAX_GLYPHS);
+        let glyph_indices = Vec::with_capacity(6 * MAX_GLYPHS);
         let glyph_vertex_buffer = device.create_buffer(&buffer! {
             label: "[TextPipeline] Glyph vertex buffer",
-            size: max_buffer_size,
+            size: glyph_vertex_buffer_size,
             usage: VERTEX | COPY_DST,
         });
         let glyph_index_buffer = device.create_buffer(&buffer! {
             label: "[TextPipeline] Glyph index buffer",
-            size: max_buffer_size,
+            size: glyph_index_buffer_size,
             usage: INDEX | COPY_DST,
         });
 
@@ -119,20 +139,17 @@ impl TextPipeline {
         // Atlases and textures
         //
 
-        let mut mask_atlas = Atlas::new(
-            Self::ALTAS_ROW_HEIGHT,
-            max_texture_dimension,
-            max_texture_dimension,
-        );
-        let mut color_atlas = Atlas::new(
-            Self::ALTAS_ROW_HEIGHT,
-            max_texture_dimension,
-            max_texture_dimension,
-        );
+        // FIXME do we use atlas/texture sizes properly?
+        let mask_dimension = max_texture_dimension;
+        let color_dimension = max_texture_dimension;
+        let animated_dimension = max_texture_dimension;
+
+        let mut mask_atlas = Atlas::new(Self::ALTAS_ROW_HEIGHT, mask_dimension, mask_dimension);
+        let mut color_atlas = Atlas::new(Self::ALTAS_ROW_HEIGHT, color_dimension, color_dimension);
         let mut animated_atlas = Atlas::new(
             Self::ALTAS_ROW_HEIGHT,
-            max_texture_dimension,
-            max_texture_dimension,
+            animated_dimension,
+            animated_dimension,
         );
 
         mask_atlas.next_frame();
@@ -141,19 +158,19 @@ impl TextPipeline {
 
         let mask_texture = device.create_texture(&texture! {
             label: "[TextPipeline] Mask glyphs texture",
-            size: [max_texture_dimension, max_texture_dimension],
+            size: [mask_dimension, mask_dimension],
             format: TextureFormat::R8Unorm,
             usage: TEXTURE_BINDING | COPY_DST,
         });
         let color_texture = device.create_texture(&texture! {
             label: "[TextPipeline] Color glyphs texture",
-            size: [max_texture_dimension, max_texture_dimension],
+            size: [color_dimension, color_dimension],
             format: TextureFormat::Rgba8Unorm,
             usage: TEXTURE_BINDING | COPY_DST,
         });
         let animated_texture = device.create_texture(&texture! {
             label: "[TextPipeline] Animated glyphs texture",
-            size: [max_texture_dimension, max_texture_dimension],
+            size: [animated_dimension, animated_dimension],
             format: TextureFormat::Rgba8Unorm,
             usage: TEXTURE_BINDING | COPY_DST,
         });

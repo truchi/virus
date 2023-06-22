@@ -173,7 +173,11 @@ impl Theme {
                     b,
                     a: u8::MAX,
                 },
-                background: Default::default(),
+                background: if r == 255 {
+                    Rgba::BLUE
+                } else {
+                    Default::default()
+                },
                 blur: Some(Blur {
                     radius: 3,
                     color: Rgba::RED,
