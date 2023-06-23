@@ -97,6 +97,23 @@ macro_rules! bind_group_layout_entry {
     (
         binding: $binding:expr,
         visibility: $($visibility:ident)|*,
+        ty: StorageTexture($format:expr)
+        $(,)?
+    ) => {
+        BindGroupLayoutEntry {
+            binding: $binding,
+            visibility: $(ShaderStages::$visibility|)* ShaderStages::empty(),
+            ty: BindingType::StorageTexture {
+                access: StorageTextureAccess::ReadWrite,
+                format: $format,
+                view_dimension: TextureViewDimension::D2,
+            },
+            count: None,
+        }
+    };
+    (
+        binding: $binding:expr,
+        visibility: $($visibility:ident)|*,
         ty: Sampler($sampler_binding_type:ident)
         $(,)?
     ) => {

@@ -236,3 +236,39 @@ impl GlyphVertex {
         ]
     }
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                           BlurVertex                                           //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+unsafe impl bytemuck::Zeroable for BlurVertex {}
+unsafe impl bytemuck::Pod for BlurVertex {}
+
+// TODO
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct BlurVertex {
+    position: [i32; 2],
+}
+
+impl BlurVertex {
+    const ATTRIBUTES: [VertexAttribute; 1] = vertex_attr_array![
+        0 => Sint32x2, // position
+    ];
+
+    pub fn buffer_layout() -> VertexBufferLayout<'static> {
+        VertexBufferLayout {
+            array_stride: size_of::<Self>() as BufferAddress,
+            step_mode: VertexStepMode::Vertex,
+            attributes: &Self::ATTRIBUTES,
+        }
+    }
+
+    pub fn new() -> Self {
+        todo!()
+    }
+
+    pub fn quad() -> [Self; 4] {
+        todo!()
+    }
+}

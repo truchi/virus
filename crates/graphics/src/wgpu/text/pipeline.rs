@@ -7,17 +7,25 @@ use super::*;
 const MAX_RECTANGLES: usize = 1_000;
 const MAX_SHADOWS: usize = 10_000;
 const MAX_GLYPHS: usize = 10_000;
+const MAX_BLURS: usize = 1_000;
 const RECTANGLE_VERTEX_SIZE: usize = size_of::<RectangleVertex>();
 const SHADOW_VERTEX_SIZE: usize = size_of::<ShadowVertex>();
 const GLYPH_VERTEX_SIZE: usize = size_of::<GlyphVertex>();
+const BLUR_VERTEX_SIZE: usize = size_of::<GlyphVertex>();
 const INDEX_SIZE: usize = size_of::<Index>();
 
 /// Text pipeline.
 #[derive(Debug)]
 pub struct TextPipeline {
+    //
+    // Constants
+    //
     surface_size: [f32; 2],
     texture_size: [f32; 2],
 
+    //
+    // Vertices and indices
+    //
     rectangle_vertices: Vec<RectangleVertex>,
     rectangle_indices: Vec<Index>,
     rectangle_vertex_buffer: Buffer,
@@ -30,36 +38,35 @@ pub struct TextPipeline {
     glyph_indices: Vec<Index>,
     glyph_vertex_buffer: Buffer,
     glyph_index_buffer: Buffer,
+    blur_vertices: Vec<BlurVertex>,
+    blur_indices: Vec<Index>,
+    blur_vertex_buffer: Buffer,
+    blur_index_buffer: Buffer,
 
+    //
+    // Atlases and textures
+    //
     mask_atlas: Atlas<GlyphKey, Placement>,
-    color_atlas: Atlas<GlyphKey, Placement>,
-    animated_atlas: Atlas<AnimatedGlyphKey, Placement>,
     mask_texture: Texture,
+    color_atlas: Atlas<GlyphKey, Placement>,
     color_texture: Texture,
+    animated_atlas: Atlas<AnimatedGlyphKey, Placement>,
     animated_texture: Texture,
+    blur_atlas: Atlas<usize, Placement>,
+    blur_ping_texture: Texture,
+    blur_pong_texture: Texture,
 
-    bind_group: BindGroup,
+    //
+    // Bind group and pipelines
+    //
+    bind_group_layout: BindGroupLayout,
+    ping_bind_group: BindGroup,
+    pong_bind_group: BindGroup,
     rectangle_pipeline: RenderPipeline,
     shadow_pipeline: RenderPipeline,
     glyph_pipeline: RenderPipeline,
+    blur_pipeline: RenderPipeline,
 }
-
-// ping_direction_uniform: Buffer,
-// pong_direction_uniform: Buffer,
-
-// shadow_vertices: Vec<ShadowVertex>,
-// shadow_indices: Vec<Indice>,
-// shadow_vertex_buffer: Buffer,
-// shadow_index_buffer: Buffer,
-
-// shadow_atlas: Atlas<GlyphKey, Placement>,
-// shadow_ping_texture: Texture,
-// shadow_pong_texture: Texture,
-
-// pass_bind_group: BindGroup,
-// compose_bind_group_layout: BindGroupLayout,
-// compose_bind_group: BindGroup,
-// compose_pipeline: RenderPipeline,
 
 impl TextPipeline {
     pub const ALTAS_ROW_HEIGHT: u32 = 400;
@@ -82,12 +89,16 @@ impl TextPipeline {
         let shadow_index_buffer_size = 6 * MAX_SHADOWS * INDEX_SIZE;
         let glyph_vertex_buffer_size = 4 * MAX_GLYPHS * GLYPH_VERTEX_SIZE;
         let glyph_index_buffer_size = 6 * MAX_GLYPHS * INDEX_SIZE;
+        let blur_vertex_buffer_size = 4 * MAX_BLURS * BLUR_VERTEX_SIZE;
+        let blur_index_buffer_size = 6 * MAX_BLURS * INDEX_SIZE;
         assert!(rectangle_vertex_buffer_size <= max_buffer_size);
         assert!(rectangle_index_buffer_size <= max_buffer_size);
         assert!(shadow_vertex_buffer_size <= max_buffer_size);
         assert!(shadow_index_buffer_size <= max_buffer_size);
         assert!(glyph_vertex_buffer_size <= max_buffer_size);
         assert!(glyph_index_buffer_size <= max_buffer_size);
+        assert!(blur_vertex_buffer_size <= max_buffer_size);
+        assert!(blur_index_buffer_size <= max_buffer_size);
 
         let rectangle_vertices = Vec::with_capacity(4 * MAX_RECTANGLES);
         let rectangle_indices = Vec::with_capacity(6 * MAX_RECTANGLES);
@@ -125,46 +136,76 @@ impl TextPipeline {
             size: glyph_index_buffer_size,
             usage: INDEX | COPY_DST,
         });
+        let blur_vertices = Vec::with_capacity(4 * MAX_BLURS);
+        let blur_indices = Vec::with_capacity(6 * MAX_BLURS);
+        let blur_vertex_buffer = device.create_buffer(&buffer! {
+            label: "[TextPipeline] Blur vertex buffer",
+            size: blur_vertex_buffer_size,
+            usage: VERTEX | COPY_DST,
+        });
+        let blur_index_buffer = device.create_buffer(&buffer! {
+            label: "[TextPipeline] Blur index buffer",
+            size: blur_index_buffer_size,
+            usage: INDEX | COPY_DST,
+        });
 
         //
         // Atlases and textures
         //
 
         // FIXME do we use atlas/texture sizes properly?
-        let mask_dimension = max_texture_dimension;
-        let color_dimension = max_texture_dimension;
-        let animated_dimension = max_texture_dimension;
 
-        let mut mask_atlas = Atlas::new(Self::ALTAS_ROW_HEIGHT, mask_dimension, mask_dimension);
-        let mut color_atlas = Atlas::new(Self::ALTAS_ROW_HEIGHT, color_dimension, color_dimension);
+        let mut mask_atlas = Atlas::new(
+            Self::ALTAS_ROW_HEIGHT,
+            max_texture_dimension,
+            max_texture_dimension,
+        );
+        let mask_texture = device.create_texture(&texture! {
+            label: "[TextPipeline] Mask glyphs texture",
+            size: [max_texture_dimension, max_texture_dimension],
+            format: TextureFormat::R8Unorm,
+            usage: TEXTURE_BINDING | COPY_DST,
+        });
+        let mut color_atlas = Atlas::new(
+            Self::ALTAS_ROW_HEIGHT,
+            max_texture_dimension,
+            max_texture_dimension,
+        );
+        let color_texture = device.create_texture(&texture! {
+            label: "[TextPipeline] Color glyphs texture",
+            size: [max_texture_dimension, max_texture_dimension],
+            format: TextureFormat::Rgba8Unorm,
+            usage: TEXTURE_BINDING | COPY_DST,
+        });
         let mut animated_atlas = Atlas::new(
             Self::ALTAS_ROW_HEIGHT,
-            animated_dimension,
-            animated_dimension,
+            max_texture_dimension,
+            max_texture_dimension,
         );
+        let animated_texture = device.create_texture(&texture! {
+            label: "[TextPipeline] Animated glyphs texture",
+            size: [max_texture_dimension, max_texture_dimension],
+            format: TextureFormat::Rgba8Unorm,
+            usage: TEXTURE_BINDING | COPY_DST,
+        });
+        let mut blur_atlas = Atlas::new(Self::ALTAS_ROW_HEIGHT, config.width, config.height);
+        let blur_ping_texture = device.create_texture(&texture! {
+            label: "[TextPipeline] Blur ping texture",
+            size: [config.width, config.height],
+            format: TextureFormat::R8Unorm,
+            usage: RENDER_ATTACHMENT | STORAGE_BINDING | COPY_DST,
+        });
+        let blur_pong_texture = device.create_texture(&texture! {
+            label: "[TextPipeline] Blur pong texture",
+            size: [config.width, config.height],
+            format: TextureFormat::R8Unorm,
+            usage: RENDER_ATTACHMENT | STORAGE_BINDING | COPY_DST,
+        });
 
         mask_atlas.next_frame();
         color_atlas.next_frame();
         animated_atlas.next_frame();
-
-        let mask_texture = device.create_texture(&texture! {
-            label: "[TextPipeline] Mask glyphs texture",
-            size: [mask_dimension, mask_dimension],
-            format: TextureFormat::R8Unorm,
-            usage: TEXTURE_BINDING | COPY_DST,
-        });
-        let color_texture = device.create_texture(&texture! {
-            label: "[TextPipeline] Color glyphs texture",
-            size: [color_dimension, color_dimension],
-            format: TextureFormat::Rgba8Unorm,
-            usage: TEXTURE_BINDING | COPY_DST,
-        });
-        let animated_texture = device.create_texture(&texture! {
-            label: "[TextPipeline] Animated glyphs texture",
-            size: [animated_dimension, animated_dimension],
-            format: TextureFormat::Rgba8Unorm,
-            usage: TEXTURE_BINDING | COPY_DST,
-        });
+        blur_atlas.next_frame();
 
         //
         // Bind group
@@ -179,12 +220,14 @@ impl TextPipeline {
                 { binding: 1, visibility: FRAGMENT, ty: Texture },
                 // Animated texture
                 { binding: 2, visibility: FRAGMENT, ty: Texture },
+                // Blur texture
+                { binding: 3, visibility: FRAGMENT, ty: StorageTexture(TextureFormat::R8Unorm) },
                 // Sampler
-                { binding: 3, visibility: FRAGMENT, ty: Sampler(Filtering) },
+                { binding: 4, visibility: FRAGMENT, ty: Sampler(Filtering) },
             ],
         });
-        let bind_group = device.create_bind_group(&bind_group! {
-            label: "[TextPipeline] Bind group",
+        let ping_bind_group = device.create_bind_group(&bind_group! {
+            label: "[TextPipeline] Ping bind group",
             layout: bind_group_layout,
             entries: [
                 // Mask texture
@@ -193,8 +236,26 @@ impl TextPipeline {
                 { binding: 1, resource: Texture(color_texture) },
                 // Animated texture
                 { binding: 2, resource: Texture(animated_texture) },
+                // Ping blur texture
+                { binding: 3, resource: Texture(blur_ping_texture) },
                 // Sampler
-                { binding: 3, resource: Sampler(device.create_sampler(&Default::default())) },
+                { binding: 4, resource: Sampler(device.create_sampler(&Default::default())) },
+            ],
+        });
+        let pong_bind_group = device.create_bind_group(&bind_group! {
+            label: "[TextPipeline] Pong bind group",
+            layout: bind_group_layout,
+            entries: [
+                // Mask texture
+                { binding: 0, resource: Texture(mask_texture) },
+                // Color texture
+                { binding: 1, resource: Texture(color_texture) },
+                // Animated texture
+                { binding: 2, resource: Texture(animated_texture) },
+                // Pong blur texture
+                { binding: 3, resource: Texture(blur_pong_texture) },
+                // Sampler
+                { binding: 4, resource: Sampler(device.create_sampler(&Default::default())) },
             ],
         });
 
@@ -202,11 +263,12 @@ impl TextPipeline {
         // Pipeline
         //
 
-        let targets = [Some(ColorTargetState {
+        let config_target = [Some(ColorTargetState {
             format: config.format,
             blend: Some(BlendState::ALPHA_BLENDING),
             write_mask: ColorWrites::ALL,
         })];
+        let r8_target = [Some(TextureFormat::R8Unorm.into())];
         let layout = device.create_pipeline_layout(&pipeline_layout! {
             label: "[TextPipeline] Pipeline layout",
             bind_group_layouts: [bind_group_layout],
@@ -220,7 +282,7 @@ impl TextPipeline {
             vertex: "rectangle_vertex",
             buffers: [RectangleVertex::buffer_layout()],
             fragment: "rectangle_fragment",
-            targets: targets,
+            targets: config_target,
             topology: TriangleList,
         });
         let shadow_pipeline = device.create_render_pipeline(&render_pipeline! {
@@ -230,7 +292,7 @@ impl TextPipeline {
             vertex: "shadow_vertex",
             buffers: [ShadowVertex::buffer_layout()],
             fragment: "shadow_fragment",
-            targets: targets,
+            targets: r8_target,
             topology: TriangleList,
         });
         let glyph_pipeline = device.create_render_pipeline(&render_pipeline! {
@@ -240,7 +302,17 @@ impl TextPipeline {
             vertex: "glyph_vertex",
             buffers: [GlyphVertex::buffer_layout()],
             fragment: "glyph_fragment",
-            targets: targets,
+            targets: config_target,
+            topology: TriangleList,
+        });
+        let blur_pipeline = device.create_render_pipeline(&render_pipeline! {
+            label: "[TextPipeline] Blur pipeline",
+            layout: layout,
+            module: module,
+            vertex: "blur_vertex",
+            buffers: [BlurVertex::buffer_layout()],
+            fragment: "blur_fragment",
+            targets: r8_target,
             topology: TriangleList,
         });
 
@@ -259,21 +331,84 @@ impl TextPipeline {
             glyph_indices,
             glyph_vertex_buffer,
             glyph_index_buffer,
+            blur_vertices,
+            blur_indices,
+            blur_vertex_buffer,
+            blur_index_buffer,
             mask_atlas,
-            color_atlas,
-            animated_atlas,
             mask_texture,
+            color_atlas,
             color_texture,
+            animated_atlas,
             animated_texture,
-            bind_group,
+            blur_atlas,
+            blur_ping_texture,
+            blur_pong_texture,
+            bind_group_layout,
+            ping_bind_group,
+            pong_bind_group,
             rectangle_pipeline,
             shadow_pipeline,
             glyph_pipeline,
+            blur_pipeline,
         }
     }
 
-    pub fn resize(&mut self, config: &SurfaceConfiguration) {
+    pub fn blur_ping_texture_view(&self) -> TextureView {
+        self.blur_ping_texture.create_view(&Default::default())
+    }
+
+    pub fn blur_pong_texture_view(&self) -> TextureView {
+        self.blur_pong_texture.create_view(&Default::default())
+    }
+
+    pub fn resize(&mut self, device: &Device, config: &SurfaceConfiguration) {
         self.surface_size = [config.width as f32, config.height as f32];
+
+        self.blur_ping_texture = device.create_texture(&texture! {
+            label: "[TextPipeline] Blur ping texture",
+            size: [config.width, config.height],
+            format: TextureFormat::R8Unorm,
+            usage: RENDER_ATTACHMENT | STORAGE_BINDING | COPY_DST,
+        });
+        self.blur_pong_texture = device.create_texture(&texture! {
+            label: "[TextPipeline] Blur pong texture",
+            size: [config.width, config.height],
+            format: TextureFormat::R8Unorm,
+            usage: RENDER_ATTACHMENT | STORAGE_BINDING | COPY_DST,
+        });
+        self.ping_bind_group = device.create_bind_group(&bind_group! {
+            label: "[TextPipeline] Ping bind group",
+            layout: self.bind_group_layout,
+            entries: [
+                // Mask texture
+                { binding: 0, resource: Texture(self.mask_texture) },
+                // Color texture
+                { binding: 1, resource: Texture(self.color_texture) },
+                // Animated texture
+                { binding: 2, resource: Texture(self.animated_texture) },
+                // Ping blur texture
+                { binding: 3, resource: Texture(self.blur_ping_texture) },
+                // Sampler
+                { binding: 4, resource: Sampler(device.create_sampler(&Default::default())) },
+            ],
+        });
+        self.pong_bind_group = device.create_bind_group(&bind_group! {
+            label: "[TextPipeline] Pong bind group",
+            layout: self.bind_group_layout,
+            entries: [
+                // Mask texture
+                { binding: 0, resource: Texture(self.mask_texture) },
+                // Color texture
+                { binding: 1, resource: Texture(self.color_texture) },
+                // Animated texture
+                { binding: 2, resource: Texture(self.animated_texture) },
+                // Pong blur texture
+                { binding: 3, resource: Texture(self.blur_pong_texture) },
+                // Sampler
+                { binding: 4, resource: Sampler(device.create_sampler(&Default::default())) },
+            ],
+        });
     }
 
     pub fn rectangle(
@@ -403,41 +538,28 @@ impl TextPipeline {
     }
 
     pub fn pre_render(&mut self, queue: &Queue) {
-        queue.write_buffer(
-            &self.rectangle_vertex_buffer,
-            0,
-            bytemuck::cast_slice(&self.rectangle_vertices),
-        );
-        queue.write_buffer(
-            &self.rectangle_index_buffer,
-            0,
-            bytemuck::cast_slice(&self.rectangle_indices),
-        );
-        queue.write_buffer(
-            &self.shadow_vertex_buffer,
-            0,
-            bytemuck::cast_slice(&self.shadow_vertices),
-        );
-        queue.write_buffer(
-            &self.shadow_index_buffer,
-            0,
-            bytemuck::cast_slice(&self.shadow_indices),
-        );
-        queue.write_buffer(
-            &self.glyph_vertex_buffer,
-            0,
-            bytemuck::cast_slice(&self.glyph_vertices),
-        );
-        queue.write_buffer(
-            &self.glyph_index_buffer,
-            0,
-            bytemuck::cast_slice(&self.glyph_indices),
-        );
+        let rectangle_vertices = bytemuck::cast_slice(&self.rectangle_vertices);
+        let rectangle_indices = bytemuck::cast_slice(&self.rectangle_indices);
+        let shadow_vertices = bytemuck::cast_slice(&self.shadow_vertices);
+        let shadow_indices = bytemuck::cast_slice(&self.shadow_indices);
+        let glyph_vertices = bytemuck::cast_slice(&self.glyph_vertices);
+        let glyph_indices = bytemuck::cast_slice(&self.glyph_indices);
+        let blur_vertices = bytemuck::cast_slice(&self.blur_vertices);
+        let blur_indices = bytemuck::cast_slice(&self.blur_indices);
+
+        queue.write_buffer(&self.rectangle_vertex_buffer, 0, rectangle_vertices);
+        queue.write_buffer(&self.rectangle_index_buffer, 0, rectangle_indices);
+        queue.write_buffer(&self.shadow_vertex_buffer, 0, shadow_vertices);
+        queue.write_buffer(&self.shadow_index_buffer, 0, shadow_indices);
+        queue.write_buffer(&self.glyph_vertex_buffer, 0, glyph_vertices);
+        queue.write_buffer(&self.glyph_index_buffer, 0, glyph_indices);
+        queue.write_buffer(&self.blur_vertex_buffer, 0, blur_vertices);
+        queue.write_buffer(&self.blur_index_buffer, 0, blur_indices);
     }
 
     pub fn render_rectangles<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
         render_pass.set_pipeline(&self.rectangle_pipeline);
-        render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_bind_group(0, &self.ping_bind_group, &[]);
         render_pass.set_push_constants(
             ShaderStages::VERTEX_FRAGMENT,
             0,
@@ -455,7 +577,7 @@ impl TextPipeline {
 
     pub fn render_shadows<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
         render_pass.set_pipeline(&self.shadow_pipeline);
-        render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_bind_group(0, &self.ping_bind_group, &[]);
         render_pass.set_push_constants(
             ShaderStages::VERTEX_FRAGMENT,
             0,
@@ -471,9 +593,45 @@ impl TextPipeline {
         render_pass.draw_indexed(0..self.shadow_indices.len() as u32, 0, 0..1);
     }
 
+    pub fn blur_ping<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
+        render_pass.set_pipeline(&self.blur_pipeline);
+        render_pass.set_bind_group(0, &self.ping_bind_group, &[]);
+        render_pass.set_push_constants(
+            ShaderStages::VERTEX_FRAGMENT,
+            0,
+            bytemuck::cast_slice(&[
+                self.surface_size[0],
+                self.surface_size[1],
+                self.texture_size[0],
+                self.texture_size[1],
+            ]),
+        );
+        render_pass.set_vertex_buffer(0, self.blur_vertex_buffer.slice(..));
+        render_pass.set_index_buffer(self.blur_index_buffer.slice(..), IndexFormat::Uint32);
+        render_pass.draw_indexed(0..self.blur_indices.len() as u32, 0, 0..1);
+    }
+
+    pub fn blur_pong<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
+        render_pass.set_pipeline(&self.blur_pipeline);
+        render_pass.set_bind_group(0, &self.pong_bind_group, &[]);
+        render_pass.set_push_constants(
+            ShaderStages::VERTEX_FRAGMENT,
+            0,
+            bytemuck::cast_slice(&[
+                self.surface_size[0],
+                self.surface_size[1],
+                self.texture_size[0],
+                self.texture_size[1],
+            ]),
+        );
+        render_pass.set_vertex_buffer(0, self.blur_vertex_buffer.slice(..));
+        render_pass.set_index_buffer(self.blur_index_buffer.slice(..), IndexFormat::Uint32);
+        render_pass.draw_indexed(0..self.blur_indices.len() as u32, 0, 0..1);
+    }
+
     pub fn render_glyphs<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
         render_pass.set_pipeline(&self.glyph_pipeline);
-        render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_bind_group(0, &self.pong_bind_group, &[]);
         render_pass.set_push_constants(
             ShaderStages::VERTEX_FRAGMENT,
             0,
@@ -496,10 +654,13 @@ impl TextPipeline {
         self.shadow_indices.clear();
         self.glyph_vertices.clear();
         self.glyph_indices.clear();
+        self.blur_vertices.clear();
+        self.blur_indices.clear();
 
         self.mask_atlas.next_frame();
         self.color_atlas.next_frame();
         self.animated_atlas.next_frame();
+        self.blur_atlas.next_frame();
     }
 }
 

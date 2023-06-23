@@ -10,7 +10,8 @@ var<push_constant> CONSTANTS: Constants;
 @group(0) @binding(0) var MASK: texture_2d<f32>;
 @group(0) @binding(1) var COLOR: texture_2d<f32>;
 @group(0) @binding(2) var ANIMATED: texture_2d<f32>;
-@group(0) @binding(3) var SAMPLER: sampler;
+@group(0) @binding(3) var BLUR: texture_storage_2d<f32, read_write>;
+@group(0) @binding(4) var SAMPLER: sampler;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Rectangle                                         //
@@ -221,4 +222,30 @@ fn glyph_fragment(fragment: GlyphFragment) -> @location(0) vec4f {
             discard;
         }
     }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                              Blur                                              //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+// TODO
+struct BlurVertex {
+    @location(0) position: vec2i,
+}
+
+// TODO
+struct BlurFragment {
+    @builtin(position) position: vec4f,
+}
+
+@vertex
+fn blur_vertex(vertex: BlurVertex) -> BlurFragment {
+    var fragment: BlurFragment;
+
+    return fragment;
+}
+
+@fragment
+fn blur_fragment(fragment: BlurFragment) -> @location(0) vec4f {
+    discard;
 }
