@@ -48,13 +48,17 @@ impl Line {
     }
 
     /// Returns an iterator of contiguous `key(glyph)`.
-    pub fn segments<'a, T, F>(&'a self, key: F) -> impl 'a + Iterator<Item = (Range<Advance>, T)>
+    pub fn segments<'a, T, F>(
+        &'a self,
+        key: F,
+    ) -> impl 'a + Iterator<Item = (Range<Advance>, &'a [Glyph], T)>
     where
         T: 'a + PartialEq,
         F: 'a + FnMut(&Glyph) -> T,
     {
         LineSegments {
-            glyphs: self.glyphs.iter(),
+            glyphs: &self.glyphs,
+            iter: self.glyphs.iter(),
             current: None,
             key,
         }
@@ -67,8 +71,9 @@ impl Line {
 
 #[derive(Clone, Debug)]
 struct LineSegments<'a, T, F> {
-    glyphs: std::slice::Iter<'a, Glyph>,
-    current: Option<(Range<Advance>, T)>,
+    glyphs: &'a [Glyph],
+    iter: std::slice::Iter<'a, Glyph>,
+    current: Option<(Range<Advance>, Range<usize>, T)>,
     key: F,
 }
 
@@ -78,37 +83,43 @@ where
     T: PartialEq,
     F: FnMut(&Glyph) -> T,
 {
-    type Item = (Range<Advance>, T);
+    type Item = (Range<Advance>, &'a [Glyph], T);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match (self.current.take(), self.glyphs.next()) {
+        match (self.current.take(), self.iter.next()) {
             // Line/Glyphs is empty
             (None, None) => None,
             // First glyph
             (None, Some(glyph)) => {
                 self.current = Some((
                     glyph.offset..glyph.offset + glyph.advance,
+                    0..1,
                     (self.key)(glyph),
                 ));
                 self.next()
             }
-            // Last glyph
-            (Some((Range { start, end }, key)), None) => {
-                self.current = None; // To stop the iteration
-                Some((start..end, key))
+            // No more glyphs
+            (Some((advance, index, key)), None) => {
+                self.current = None; // To stop the iteration (input iter must be fused)
+                Some((advance, &self.glyphs[index], key))
             }
             // Same key
-            (Some((Range { start, end }, key)), Some(glyph)) if key == (self.key)(glyph) => {
-                self.current = Some((start..end + glyph.advance, key));
+            (Some((advance, index, key)), Some(glyph)) if key == (self.key)(glyph) => {
+                self.current = Some((
+                    advance.start..advance.end + glyph.advance,
+                    index.start..index.end + 1,
+                    key,
+                ));
                 self.next()
             }
             // New key
-            (Some((Range { start, end }, key)), Some(glyph)) => {
+            (Some((advance, index, key)), Some(glyph)) => {
                 self.current = Some((
                     glyph.offset..glyph.offset + glyph.advance,
+                    index.end..index.end + 1,
                     (self.key)(glyph),
                 ));
-                Some((start..end, key))
+                Some((advance, &self.glyphs[index], key))
             }
         }
     }

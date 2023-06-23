@@ -450,6 +450,7 @@ impl TextPipeline {
         time: Duration,
     ) {
         let region = ([region_top, region_left], [region_width, region_height]);
+        let mut scaler = line.scaler(context);
 
         // Discard when outside region. This suppposes that:
         // - glyphs are not bigger that line height (~ font size < line height)
@@ -469,9 +470,9 @@ impl TextPipeline {
         // Add backgrounds
         //
 
-        for (Range { start, end }, background) in line
+        for (Range { start, end }, _, background) in line
             .segments(|glyph| glyph.styles.background)
-            .filter(|(_, background)| background.a != 0)
+            .filter(|(_, _, background)| background.a != 0)
         {
             let left = left + start as i32;
             let width = (end - start) as u32;
@@ -487,54 +488,48 @@ impl TextPipeline {
         }
 
         //
+        // Add shadows
+        //
+
+        for (Range { start, end }, _, shadow) in line
+            .segments(|glyph| glyph.styles.shadow)
+            .filter_map(|(range, glyphs, shadow)| match shadow {
+                Some(shadow) if shadow.color.a != 0 => Some((range, glyphs, shadow)),
+                _ => None,
+            })
+        {
+            let left = left + start as i32;
+            let width = (end - start) as u32;
+
+            // Self::push_quad(
+            //     (&mut self.shadow_vertices, &mut self.shadow_indices),
+            //     ShadowVertex::quad(ty, region, ([top, left], [width, height]), [u, v]),
+            // );
+        }
+
+        //
         // Add glyphs
         //
 
-        let mut scaler = line.scaler(context);
-
-        for glyph in line.glyphs() {
-            let (ty, ([top, left], [width, height]), [u, v]) = if glyph.is_animated() {
-                if let Some((ty, [u, v], placement)) =
-                    self.insert_animated_glyph(queue, &mut scaler, glyph, time)
-                {
-                    debug_assert!(placement.top == 0 && placement.left == 0);
-
-                    // Centering vertically by hand
-                    let top =
-                        top + ((line_height as f32 - placement.width as f32) / 2.0).round() as i32;
-                    let left = left + glyph.offset.round() as i32;
-                    let width = placement.width;
-                    let height = placement.height;
-
-                    (ty, ([top, left], [width, height]), [u, v])
-                } else {
-                    continue;
-                }
+        for glyph in line
+            .glyphs()
+            .iter()
+            .filter(|glyph| glyph.styles.foreground.a != 0)
+        {
+            let (ty, ([top, left], [width, height]), [u, v]) = if let Some(inserted) = self
+                .insert_glyph(
+                    queue,
+                    &mut scaler,
+                    [top, left],
+                    line,
+                    line_height,
+                    time,
+                    glyph,
+                ) {
+                inserted
             } else {
-                if let Some((ty, [u, v], placement)) = self.insert_glyph(queue, &mut scaler, glyph)
-                {
-                    // Swash image has placement (vertical up from baseline)
-                    let top = top + line.size() as i32 - placement.top;
-                    let left = left + glyph.offset.round() as i32 + placement.left;
-                    let width = placement.width;
-                    let height = placement.height;
-
-                    (ty, ([top, left], [width, height]), [u, v])
-                } else {
-                    continue;
-                }
+                continue;
             };
-
-            if let Some(_shadow) = glyph
-                .styles
-                .shadow
-                .filter(|shadow| shadow.radius > 0 && shadow.color.a != 0)
-            {
-                Self::push_quad(
-                    (&mut self.shadow_vertices, &mut self.shadow_indices),
-                    ShadowVertex::quad(ty, region, ([top, left], [width, height]), [u, v]),
-                );
-            }
 
             Self::push_quad(
                 (&mut self.glyph_vertices, &mut self.glyph_indices),
@@ -682,8 +677,47 @@ impl TextPipeline {
         &mut self,
         queue: &Queue,
         scaler: &mut LineScaler,
+        [top, left]: [i32; 2],
+        line: &Line,
+        line_height: LineHeight,
+        time: Duration,
         glyph: &Glyph,
-    ) -> Option<(u32, [u32; 2], Placement)> {
+    ) -> Option<(u32, ([i32; 2], [u32; 2]), [u32; 2])> {
+        if glyph.is_animated() {
+            self.insert_animated_glyph(queue, scaler, glyph, time)
+                .map(|(ty, placement, [u, v])| {
+                    // Centering vertically by hand
+                    // FIXME top is wrong
+                    // TODO can we take care of that in AnimatedFont?
+                    debug_assert!(placement.top == 0 && placement.left == 0);
+                    let top =
+                        top + ((line_height as f32 - placement.width as f32) / 2.0).round() as i32;
+                    let left = left + glyph.offset.round() as i32;
+                    let width = placement.width;
+                    let height = placement.height;
+
+                    (ty, ([top, left], [width, height]), [u, v])
+                })
+        } else {
+            self.insert_non_animated_glyph(queue, scaler, glyph)
+                .map(|(ty, placement, [u, v])| {
+                    // Swash image has placement (vertical up from baseline)
+                    let top = top + line.size() as i32 - placement.top;
+                    let left = left + glyph.offset.round() as i32 + placement.left;
+                    let width = placement.width;
+                    let height = placement.height;
+
+                    (ty, ([top, left], [width, height]), [u, v])
+                })
+        }
+    }
+
+    fn insert_non_animated_glyph(
+        &mut self,
+        queue: &Queue,
+        scaler: &mut LineScaler,
+        glyph: &Glyph,
+    ) -> Option<(u32, Placement, [u32; 2])> {
         let key = glyph.key();
 
         // Check atlases for glyph
@@ -692,7 +726,7 @@ impl TextPipeline {
             let in_color = || self.color_atlas.get(&key).map(|v| (COLOR_GLYPH, v));
             in_mask().or_else(in_color)
         } {
-            return Some((ty, [u, v], *placement));
+            return Some((ty, *placement, [u, v]));
         }
 
         // Render glyph
@@ -732,7 +766,7 @@ impl TextPipeline {
             },
         );
 
-        Some((ty, [u, v], placement))
+        Some((ty, placement, [u, v]))
     }
 
     fn insert_animated_glyph(
@@ -741,13 +775,13 @@ impl TextPipeline {
         scaler: &mut LineScaler,
         glyph: &Glyph,
         time: Duration,
-    ) -> Option<(u32, [u32; 2], Placement)> {
+    ) -> Option<(u32, Placement, [u32; 2])> {
         let id = glyph.animated_id?;
         let key = (glyph.size, id, scaler.frame(glyph, time)?);
 
         // Check atlas for frame
         if let Some(([u, v], placement)) = self.animated_atlas.get(&key) {
-            return Some((ANIMATED_GLYPH, [u, v], *placement));
+            return Some((ANIMATED_GLYPH, *placement, [u, v]));
         }
 
         // Render frames
@@ -790,7 +824,7 @@ impl TextPipeline {
         }
 
         let ([u, v], placement) = self.animated_atlas.get(&key).unwrap();
-        Some((ANIMATED_GLYPH, [u, v], *placement))
+        Some((ANIMATED_GLYPH, *placement, [u, v]))
     }
 
     fn push_quad<T: Copy>(
