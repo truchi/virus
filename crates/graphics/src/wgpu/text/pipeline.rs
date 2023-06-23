@@ -65,7 +65,8 @@ pub struct TextPipeline {
     rectangle_pipeline: RenderPipeline,
     shadow_pipeline: RenderPipeline,
     glyph_pipeline: RenderPipeline,
-    blur_pipeline: RenderPipeline,
+    blur_ping_pipeline: RenderPipeline,
+    blur_pong_pipeline: RenderPipeline,
 }
 
 impl TextPipeline {
@@ -305,14 +306,24 @@ impl TextPipeline {
             targets: config_target,
             topology: TriangleList,
         });
-        let blur_pipeline = device.create_render_pipeline(&render_pipeline! {
-            label: "[TextPipeline] Blur pipeline",
+        let blur_ping_pipeline = device.create_render_pipeline(&render_pipeline! {
+            label: "[TextPipeline] Blur ping pipeline",
             layout: layout,
             module: module,
             vertex: "blur_vertex",
             buffers: [BlurVertex::buffer_layout()],
             fragment: "blur_fragment",
             targets: r8_target,
+            topology: TriangleList,
+        });
+        let blur_pong_pipeline = device.create_render_pipeline(&render_pipeline! {
+            label: "[TextPipeline] Blur pong pipeline",
+            layout: layout,
+            module: module,
+            vertex: "blur_vertex",
+            buffers: [BlurVertex::buffer_layout()],
+            fragment: "blur_fragment",
+            targets: config_target,
             topology: TriangleList,
         });
 
@@ -350,7 +361,8 @@ impl TextPipeline {
             rectangle_pipeline,
             shadow_pipeline,
             glyph_pipeline,
-            blur_pipeline,
+            blur_ping_pipeline,
+            blur_pong_pipeline,
         }
     }
 
@@ -559,7 +571,7 @@ impl TextPipeline {
 
     pub fn render_rectangles<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
         render_pass.set_pipeline(&self.rectangle_pipeline);
-        render_pass.set_bind_group(0, &self.ping_bind_group, &[]);
+        render_pass.set_bind_group(0, &self.pong_bind_group, &[]);
         render_pass.set_push_constants(
             ShaderStages::VERTEX_FRAGMENT,
             0,
@@ -577,7 +589,7 @@ impl TextPipeline {
 
     pub fn render_shadows<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
         render_pass.set_pipeline(&self.shadow_pipeline);
-        render_pass.set_bind_group(0, &self.ping_bind_group, &[]);
+        render_pass.set_bind_group(0, &self.pong_bind_group, &[]);
         render_pass.set_push_constants(
             ShaderStages::VERTEX_FRAGMENT,
             0,
@@ -594,7 +606,7 @@ impl TextPipeline {
     }
 
     pub fn blur_ping<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
-        render_pass.set_pipeline(&self.blur_pipeline);
+        render_pass.set_pipeline(&self.blur_ping_pipeline);
         render_pass.set_bind_group(0, &self.ping_bind_group, &[]);
         render_pass.set_push_constants(
             ShaderStages::VERTEX_FRAGMENT,
@@ -612,7 +624,7 @@ impl TextPipeline {
     }
 
     pub fn blur_pong<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
-        render_pass.set_pipeline(&self.blur_pipeline);
+        render_pass.set_pipeline(&self.blur_pong_pipeline);
         render_pass.set_bind_group(0, &self.pong_bind_group, &[]);
         render_pass.set_push_constants(
             ShaderStages::VERTEX_FRAGMENT,
