@@ -193,13 +193,13 @@ impl TextPipeline {
             label: "[TextPipeline] Blur ping texture",
             size: [config.width, config.height],
             format: TextureFormat::R8Unorm,
-            usage: RENDER_ATTACHMENT | STORAGE_BINDING | COPY_DST,
+            usage: RENDER_ATTACHMENT | TEXTURE_BINDING | COPY_DST,
         });
         let blur_pong_texture = device.create_texture(&texture! {
             label: "[TextPipeline] Blur pong texture",
             size: [config.width, config.height],
             format: TextureFormat::R8Unorm,
-            usage: RENDER_ATTACHMENT | STORAGE_BINDING | COPY_DST,
+            usage: RENDER_ATTACHMENT | TEXTURE_BINDING | COPY_DST,
         });
 
         mask_atlas.next_frame();
@@ -221,7 +221,7 @@ impl TextPipeline {
                 // Animated texture
                 { binding: 2, visibility: FRAGMENT, ty: Texture },
                 // Blur texture
-                { binding: 3, visibility: FRAGMENT, ty: StorageTexture(TextureFormat::R8Unorm) },
+                { binding: 3, visibility: FRAGMENT, ty: Texture },
                 // Sampler
                 { binding: 4, visibility: FRAGMENT, ty: Sampler(Filtering) },
             ],
@@ -369,13 +369,13 @@ impl TextPipeline {
             label: "[TextPipeline] Blur ping texture",
             size: [config.width, config.height],
             format: TextureFormat::R8Unorm,
-            usage: RENDER_ATTACHMENT | STORAGE_BINDING | COPY_DST,
+            usage: RENDER_ATTACHMENT | TEXTURE_BINDING | COPY_DST,
         });
         self.blur_pong_texture = device.create_texture(&texture! {
             label: "[TextPipeline] Blur pong texture",
             size: [config.width, config.height],
             format: TextureFormat::R8Unorm,
-            usage: RENDER_ATTACHMENT | STORAGE_BINDING | COPY_DST,
+            usage: RENDER_ATTACHMENT | TEXTURE_BINDING | COPY_DST,
         });
         self.ping_bind_group = device.create_bind_group(&bind_group! {
             label: "[TextPipeline] Ping bind group",

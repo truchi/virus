@@ -31,10 +31,9 @@ use wgpu::{
     LoadOp, Operations, Origin3d, PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology,
     PushConstantRange, Queue, RenderPass, RenderPassColorAttachment, RenderPassDescriptor,
     RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions, Sampler, SamplerBindingType,
-    ShaderStages, StorageTextureAccess, Surface, SurfaceConfiguration, Texture, TextureAspect,
-    TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages,
-    TextureView, TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexState,
-    VertexStepMode,
+    ShaderStages, Surface, SurfaceConfiguration, Texture, TextureAspect, TextureDescriptor,
+    TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureView,
+    TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexState, VertexStepMode,
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
@@ -77,8 +76,7 @@ impl Graphics {
         let (device, queue) = pollster::block_on(adapter.request_device(
             &DeviceDescriptor {
                 label: Some("Device descriptor"),
-                features: Features::PUSH_CONSTANTS
-                    | Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
+                features: Features::PUSH_CONSTANTS,
                 limits: Limits {
                     max_push_constant_size: 128,
                     ..Default::default()

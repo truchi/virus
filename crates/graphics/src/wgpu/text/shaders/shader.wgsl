@@ -10,7 +10,7 @@ var<push_constant> CONSTANTS: Constants;
 @group(0) @binding(0) var MASK: texture_2d<f32>;
 @group(0) @binding(1) var COLOR: texture_2d<f32>;
 @group(0) @binding(2) var ANIMATED: texture_2d<f32>;
-@group(0) @binding(3) var BLUR: texture_storage_2d<f32, read_write>;
+@group(0) @binding(3) var BLUR: texture_2d<f32>;
 @group(0) @binding(4) var SAMPLER: sampler;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
