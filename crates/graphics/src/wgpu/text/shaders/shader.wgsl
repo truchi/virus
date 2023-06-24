@@ -232,7 +232,7 @@ struct BlurVertex {
 struct BlurFragment {
     @builtin(position) position: vec4f,
     @location(0) uv: vec2f,
-    @location(1) radius: u32,
+    @location(1) radius: i32,
     @location(2) color: vec4f,
     @location(3) min: vec2f,
     @location(4) max: vec2f,
@@ -250,7 +250,7 @@ fn blur_ping_vertex(vertex: BlurVertex) -> BlurFragment {
         1.0,
     );
     fragment.uv = blur_position / CONSTANTS.surface;
-    fragment.radius = vertex.radius;
+    fragment.radius = i32(vertex.radius);
 
     // color, min, max: unused
     return fragment;
@@ -272,7 +272,7 @@ fn blur_pong_vertex(vertex: BlurVertex) -> BlurFragment {
         1.0,
     );
     fragment.uv = blur_position / CONSTANTS.surface;
-    fragment.radius = vertex.radius;
+    fragment.radius = i32(vertex.radius);
     fragment.color = pow(color, vec4f(2.2, 2.2, 2.2, 1.0));
     fragment.min = region_position;
     fragment.max = region_position + region_size;
@@ -282,8 +282,8 @@ fn blur_pong_vertex(vertex: BlurVertex) -> BlurFragment {
 
 @fragment
 fn blur_ping_fragment(fragment: BlurFragment) -> @location(0) vec4f {
-    let mask = textureSampleLevel(BLUR, SAMPLER, fragment.uv, 0.0).r;
-    return vec4f(mask, 0.0, 0.0, mask);
+    let blurred = blur(fragment.uv, vec2f(1.0, 0.0), fragment.radius);
+    return vec4f(blurred, 0.0, 0.0, 1.0);
 }
 
 @fragment
@@ -294,6 +294,19 @@ fn blur_pong_fragment(fragment: BlurFragment) -> @location(0) vec4f {
         discard;
     }
 
-    let mask = textureSampleLevel(BLUR, SAMPLER, fragment.uv, 0.0).r;
-    return vec4f(fragment.color.rgb, fragment.color.a * mask);
+    let blurred = blur(fragment.uv, vec2f(0.0, 1.0), fragment.radius);
+    return vec4f(fragment.color.rgb, fragment.color.a * blurred);
+}
+
+fn blur(uv: vec2f, direction: vec2f, radius: i32) -> f32 {
+    let dimensions = textureDimensions(BLUR);
+    let dir = direction / vec2f(dimensions);
+    
+    var blurred = textureSample(BLUR, SAMPLER, uv).r * f32(radius + 1);
+    for (var i = 1; i <= radius; i++) {
+        blurred += textureSample(BLUR, SAMPLER, uv - f32(i) * dir).r * f32(radius + 1 - i);
+        blurred += textureSample(BLUR, SAMPLER, uv + f32(i) * dir).r * f32(radius + 1 - i);
+    }
+    
+    return blurred / (1.0 + 2.0 * f32(radius) + f32(radius) * f32(radius));
 }

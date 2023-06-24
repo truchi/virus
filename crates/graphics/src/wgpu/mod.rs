@@ -200,7 +200,7 @@ impl Graphics {
             load: Load,
             store: true,
         });
-        // self.text_pipeline.render_glyphs(&mut render_pass);
+        self.text_pipeline.render_glyphs(&mut render_pass);
         self.line_pipeline.render(&self.queue, &mut render_pass);
         drop(render_pass);
 
