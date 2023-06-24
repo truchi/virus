@@ -16,15 +16,15 @@ pub struct Line {
     /// Glyphs.
     glyphs: Vec<Glyph>,
     /// Font size.
-    size: FontSize,
+    font_size: FontSize,
     /// Advance.
     advance: Advance,
 }
 
 impl Line {
     /// Returns a `LineShaper` for `size`.
-    pub fn shaper<'a>(context: &'a mut Context, size: FontSize) -> LineShaper<'a> {
-        LineShaper::new(context, size)
+    pub fn shaper<'a>(context: &'a mut Context, font_size: FontSize) -> LineShaper<'a> {
+        LineShaper::new(context, font_size)
     }
 
     /// Returns a `LineScaler` of this `Line`.
@@ -38,8 +38,8 @@ impl Line {
     }
 
     /// Returns the `FontSize` of this `Line`.
-    pub fn size(&self) -> FontSize {
-        self.size
+    pub fn font_size(&self) -> FontSize {
+        self.font_size
     }
 
     /// Returns the `Advance` of this `Line`.
@@ -145,7 +145,7 @@ pub struct LineShaper<'a> {
 
 impl<'a> LineShaper<'a> {
     /// Creates a new `LineShaper` at `size` with `context`.
-    pub fn new(context: &'a mut Context, size: FontSize) -> Self {
+    pub fn new(context: &'a mut Context, font_size: FontSize) -> Self {
         let (fonts, shape, _) = context.as_muts();
 
         Self {
@@ -153,7 +153,7 @@ impl<'a> LineShaper<'a> {
             shape,
             line: Line {
                 glyphs: Vec::new(),
-                size,
+                font_size,
                 advance: 0.,
             },
             bytes: 0,
@@ -171,7 +171,7 @@ impl<'a> LineShaper<'a> {
         let emoji = self.fonts.emoji();
         let font_key = font.key();
         let emoji_key = emoji.key();
-        let font_size = self.line.size;
+        let font_size = self.line.font_size;
         let emoji_size = self
             .fonts
             .emoji()
@@ -316,7 +316,7 @@ impl<'a> LineShaper<'a> {
 /// A [`Line`] scaler.
 pub struct LineScaler<'a> {
     context: &'a mut Context,
-    size: FontSize,
+    font_size: FontSize,
     render: Render<'static>,
 }
 
@@ -325,7 +325,7 @@ impl<'a> LineScaler<'a> {
     pub fn new(context: &'a mut Context, line: &'a Line) -> Self {
         Self {
             context,
-            size: line.size,
+            font_size: line.font_size,
             render: Render::new(SOURCES),
         }
     }
@@ -353,7 +353,7 @@ impl<'a> LineScaler<'a> {
         let font = fonts.get(glyph.font).expect("font");
         let scaler = &mut scale
             .builder(font)
-            .size(self.size as f32)
+            .size(self.font_size as f32)
             .hint(HINT)
             .build();
 

@@ -52,7 +52,7 @@ pub struct TextPipeline {
     color_texture: Texture,
     animated_atlas: Atlas<AnimatedGlyphKey, Placement>,
     animated_texture: Texture,
-    blur_atlas: Atlas<usize, Placement>,
+    blur_atlas: Atlas<usize, ()>,
     blur_ping_texture: Texture,
     blur_pong_texture: Texture,
 
@@ -310,9 +310,9 @@ impl TextPipeline {
             label: "[TextPipeline] Blur ping pipeline",
             layout: layout,
             module: module,
-            vertex: "blur_vertex",
+            vertex: "blur_ping_vertex",
             buffers: [BlurVertex::buffer_layout()],
-            fragment: "blur_fragment",
+            fragment: "blur_ping_fragment",
             targets: r8_target,
             topology: TriangleList,
         });
@@ -320,9 +320,9 @@ impl TextPipeline {
             label: "[TextPipeline] Blur pong pipeline",
             layout: layout,
             module: module,
-            vertex: "blur_vertex",
+            vertex: "blur_pong_vertex",
             buffers: [BlurVertex::buffer_layout()],
-            fragment: "blur_fragment",
+            fragment: "blur_pong_fragment",
             targets: config_target,
             topology: TriangleList,
         });
@@ -377,6 +377,8 @@ impl TextPipeline {
     pub fn resize(&mut self, device: &Device, config: &SurfaceConfiguration) {
         self.surface_size = [config.width as f32, config.height as f32];
 
+        self.blur_atlas
+            .clear_and_resize(Self::ALTAS_ROW_HEIGHT, config.width, config.height);
         self.blur_ping_texture = device.create_texture(&texture! {
             label: "[TextPipeline] Blur ping texture",
             size: [config.width, config.height],
@@ -454,15 +456,90 @@ impl TextPipeline {
 
         // Discard when outside region. This suppposes that:
         // - glyphs are not bigger that line height (~ font size < line height)
-        // - glyphs outside do not affect what's inside (~ no shadow FIXME)
+        // - glyphs outside do not affect what's inside (~ no shadow FIXME we can check that)
         // - no further transforms are applied in the shader
         // Of course the GPU would have done that for us. Don't fear to remove if necessary.
         {
-            let above = top + (line_height as i32) < 0;
-            let below = top >= region_height as i32;
+            // let above = top + (line_height as i32) < 0;
+            // let below = top >= region_height as i32;
 
-            if above || below {
-                return;
+            // if above || below {
+            //     return;
+            // }
+        }
+
+        //
+        // Add blurs
+        //
+
+        // TODO blur atlas/textures must be bigger than output surface!
+
+        for (Range { start, end }, glyphs, shadow) in line
+            .segments(|glyph| glyph.styles.shadow)
+            .filter_map(|(range, glyphs, shadow)| {
+                shadow
+                    .and_then(|shadow| shadow.color.is_visible().then_some((range, glyphs, shadow)))
+            })
+        {
+            let key = self.blur_atlas.len();
+            let [width, height] = [
+                2 * shadow.radius as u32 + (end - start).ceil() as u32,
+                2 * shadow.radius as u32 + line_height,
+            ];
+            let [shadow_top, shadow_left] = [
+                -(shadow.radius as i32) + top,
+                -(shadow.radius as i32) + left + start.round() as i32,
+            ];
+            let [blur_left, blur_top] = if self.blur_atlas.insert(key, (), [width, height]).is_ok()
+            {
+                self.blur_atlas.get(&key).unwrap().0
+            } else {
+                // Atlas/Texture is too small, forget about this shadow
+                // This can happen at startup/resize, and this is fine
+                // It can also happen when there is too much text to blur, with large radius...
+                continue;
+            };
+
+            Self::push_quad(
+                (&mut self.blur_vertices, &mut self.blur_indices),
+                BlurVertex::quad(
+                    region,
+                    [shadow_top, shadow_left],
+                    [blur_top, blur_left],
+                    [width, height],
+                    shadow,
+                ),
+            );
+
+            //
+            // Add shadows
+            //
+
+            for glyph in glyphs {
+                let (glyph_type, ([top, left], [width, height]), [u, v]) = if let Some(inserted) =
+                    self.insert_glyph(
+                        queue,
+                        &mut scaler,
+                        [
+                            shadow.radius as i32 + blur_top as i32,
+                            shadow.radius as i32
+                                + blur_left as i32
+                                + (glyph.offset - start).round() as i32,
+                        ],
+                        line.font_size(),
+                        line_height,
+                        time,
+                        glyph,
+                    ) {
+                    inserted
+                } else {
+                    continue;
+                };
+
+                Self::push_quad(
+                    (&mut self.shadow_vertices, &mut self.shadow_indices),
+                    ShadowVertex::quad(glyph_type, ([top, left], [width, height]), [u, v]),
+                );
             }
         }
 
@@ -472,7 +549,7 @@ impl TextPipeline {
 
         for (Range { start, end }, _, background) in line
             .segments(|glyph| glyph.styles.background)
-            .filter(|(_, _, background)| background.a != 0)
+            .filter(|(_, _, background)| background.is_visible())
         {
             let left = left + start as i32;
             let width = (end - start) as u32;
@@ -488,40 +565,20 @@ impl TextPipeline {
         }
 
         //
-        // Add shadows
-        //
-
-        for (Range { start, end }, _, shadow) in line
-            .segments(|glyph| glyph.styles.shadow)
-            .filter_map(|(range, glyphs, shadow)| match shadow {
-                Some(shadow) if shadow.color.a != 0 => Some((range, glyphs, shadow)),
-                _ => None,
-            })
-        {
-            let left = left + start as i32;
-            let width = (end - start) as u32;
-
-            // Self::push_quad(
-            //     (&mut self.shadow_vertices, &mut self.shadow_indices),
-            //     ShadowVertex::quad(ty, region, ([top, left], [width, height]), [u, v]),
-            // );
-        }
-
-        //
         // Add glyphs
         //
 
         for glyph in line
             .glyphs()
             .iter()
-            .filter(|glyph| glyph.styles.foreground.a != 0)
+            .filter(|glyph| glyph.styles.foreground.is_visible())
         {
-            let (ty, ([top, left], [width, height]), [u, v]) = if let Some(inserted) = self
+            let (glyph_type, ([top, left], [width, height]), [u, v]) = if let Some(inserted) = self
                 .insert_glyph(
                     queue,
                     &mut scaler,
-                    [top, left],
-                    line,
+                    [top, left + glyph.offset.round() as i32],
+                    line.font_size(),
                     line_height,
                     time,
                     glyph,
@@ -534,7 +591,7 @@ impl TextPipeline {
             Self::push_quad(
                 (&mut self.glyph_vertices, &mut self.glyph_indices),
                 GlyphVertex::quad(
-                    ty,
+                    glyph_type,
                     region,
                     ([top, left], [width, height]),
                     [u, v],
@@ -667,7 +724,7 @@ impl TextPipeline {
         self.mask_atlas.next_frame();
         self.color_atlas.next_frame();
         self.animated_atlas.next_frame();
-        self.blur_atlas.next_frame();
+        self.blur_atlas.clear();
     }
 }
 
@@ -678,37 +735,44 @@ impl TextPipeline {
         queue: &Queue,
         scaler: &mut LineScaler,
         [top, left]: [i32; 2],
-        line: &Line,
+        font_size: FontSize,
         line_height: LineHeight,
         time: Duration,
         glyph: &Glyph,
     ) -> Option<(u32, ([i32; 2], [u32; 2]), [u32; 2])> {
         if glyph.is_animated() {
-            self.insert_animated_glyph(queue, scaler, glyph, time)
-                .map(|(ty, placement, [u, v])| {
-                    // Centering vertically by hand
-                    // FIXME top is wrong
-                    // TODO can we take care of that in AnimatedFont?
-                    debug_assert!(placement.top == 0 && placement.left == 0);
-                    let top =
-                        top + ((line_height as f32 - placement.width as f32) / 2.0).round() as i32;
-                    let left = left + glyph.offset.round() as i32;
-                    let width = placement.width;
-                    let height = placement.height;
-
-                    (ty, ([top, left], [width, height]), [u, v])
-                })
+            self.insert_animated_glyph(queue, scaler, glyph, time).map(
+                |(glyph_type, placement, [u, v])| {
+                    // Animated glyph has screen coordinate system, from top of line
+                    let center =
+                        ((line_height as f32 - placement.height as f32) / 2.0).round() as i32;
+                    (
+                        glyph_type,
+                        (
+                            [top - placement.top + center, left + placement.left],
+                            [placement.width, placement.height],
+                        ),
+                        [u, v],
+                    )
+                },
+            )
         } else {
-            self.insert_non_animated_glyph(queue, scaler, glyph)
-                .map(|(ty, placement, [u, v])| {
-                    // Swash image has placement (vertical up from baseline)
-                    let top = top + line.size() as i32 - placement.top;
-                    let left = left + glyph.offset.round() as i32 + placement.left;
-                    let width = placement.width;
-                    let height = placement.height;
-
-                    (ty, ([top, left], [width, height]), [u, v])
-                })
+            self.insert_non_animated_glyph(queue, scaler, glyph).map(
+                |(glyph_type, placement, [u, v])| {
+                    // Swash image placement has vertical up, from baseline
+                    (
+                        glyph_type,
+                        (
+                            [
+                                top + font_size as i32 - placement.top,
+                                left + placement.left,
+                            ],
+                            [placement.width, placement.height],
+                        ),
+                        [u, v],
+                    )
+                },
+            )
         }
     }
 
@@ -721,12 +785,12 @@ impl TextPipeline {
         let key = glyph.key();
 
         // Check atlases for glyph
-        if let Some((ty, ([u, v], placement))) = {
+        if let Some((glyph_type, ([u, v], placement))) = {
             let in_mask = || self.mask_atlas.get(&key).map(|v| (MASK_GLYPH, v));
             let in_color = || self.color_atlas.get(&key).map(|v| (COLOR_GLYPH, v));
             in_mask().or_else(in_color)
         } {
-            return Some((ty, *placement, [u, v]));
+            return Some((glyph_type, *placement, [u, v]));
         }
 
         // Render glyph
@@ -735,7 +799,7 @@ impl TextPipeline {
         let [width, height] = [placement.width, placement.height];
 
         // Allocate glyph in atlas
-        let (ty, atlas, texture, channels) = match image.content {
+        let (glyph_type, atlas, texture, channels) = match image.content {
             Content::Mask => (MASK_GLYPH, &mut self.mask_atlas, &self.mask_texture, 1),
             Content::Color => (COLOR_GLYPH, &mut self.color_atlas, &self.color_texture, 4),
             Content::SubpixelMask => unreachable!(),
@@ -766,7 +830,7 @@ impl TextPipeline {
             },
         );
 
-        Some((ty, placement, [u, v]))
+        Some((glyph_type, placement, [u, v]))
     }
 
     fn insert_animated_glyph(

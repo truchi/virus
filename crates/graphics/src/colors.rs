@@ -64,4 +64,8 @@ impl Rgba {
     pub const fn solid(&self) -> Rgb {
         Rgb::new(self.r, self.g, self.b)
     }
+
+    pub fn is_visible(&self) -> bool {
+        self.a != 0
+    }
 }

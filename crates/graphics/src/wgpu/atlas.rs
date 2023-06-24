@@ -1,3 +1,5 @@
+// TODO solve the `.insert(); .get();` situation
+
 use std::collections::HashMap;
 use std::hash::Hash;
 
@@ -75,6 +77,11 @@ impl<K: Eq + Hash, V> Atlas<K, V> {
         }
     }
 
+    /// Returns the number of items.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
     /// Returns the position and value of the item for `key`.
     ///
     /// If this item is to be used in the current frame, you ***MUST*** call [`Atlas::insert()`].
@@ -149,6 +156,16 @@ impl<K: Eq + Hash, V> Atlas<K, V> {
 
     /// Clears the atlas.
     pub fn clear(&mut self) {
+        self.items.clear();
+        self.buckets.clear();
+        self.frame = 0;
+    }
+
+    /// Clears and resizes the atlas.
+    pub fn clear_and_resize(&mut self, row: u32, width: u32, height: u32) {
+        self.row = row.min(height);
+        self.width = width;
+        self.height = height;
         self.items.clear();
         self.buckets.clear();
         self.frame = 0;

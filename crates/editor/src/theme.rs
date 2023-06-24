@@ -167,20 +167,11 @@ impl Theme {
                 style,
                 underline: Default::default(),
                 strike: Default::default(),
-                foreground: Rgba {
-                    r,
-                    g,
-                    b,
-                    a: u8::MAX,
-                },
-                background: if r == 255 {
-                    Rgba::BLUE
-                } else {
-                    Default::default()
-                },
+                foreground: Rgba::new(r, g, b, u8::MAX),
+                background: Rgba::BLUE,
                 shadow: Some(Shadow {
-                    radius: 3,
-                    color: Rgba::RED,
+                    radius: 5,
+                    color: Rgba::new(b, r, g, u8::MAX),
                 }),
             }
         }

@@ -14,7 +14,10 @@ mod macros;
 
 use crate::{
     colors::Rgba,
-    text::{AnimatedGlyphKey, Context, FrameIndex, Glyph, GlyphKey, Line, LineHeight, LineScaler},
+    text::{
+        AnimatedGlyphKey, Context, FontSize, FrameIndex, Glyph, GlyphKey, Line, LineHeight,
+        LineScaler, Shadow,
+    },
 };
 use atlas::Atlas;
 use line::LinePipeline;
@@ -184,7 +187,7 @@ impl Graphics {
         let mut render_pass = encoder.begin_render_pass(&render_pass! {
             label: "Blur pong render pass",
             view: output_texture,
-            load: Clear(BLACK),
+            load: Load,
             store: true,
         });
         self.text_pipeline.blur_pong(&mut render_pass);
@@ -194,10 +197,10 @@ impl Graphics {
         let mut render_pass = encoder.begin_render_pass(&render_pass! {
             label: "Glyphs and line render pass",
             view: output_texture,
-            load: Clear(BLACK),
+            load: Load,
             store: true,
         });
-        self.text_pipeline.render_glyphs(&mut render_pass);
+        // self.text_pipeline.render_glyphs(&mut render_pass);
         self.line_pipeline.render(&self.queue, &mut render_pass);
         drop(render_pass);
 

@@ -151,7 +151,7 @@ impl Virus {
         self.ui.update(delta);
         self.ui.render(&self.document);
 
-        dbg!(delta);
+        // dbg!(delta);
         // if self.ui.is_animating() {
         //     flow.set_wait_timeout(std::time::Duration::from_millis(10_000));
         // } else {
