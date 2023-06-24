@@ -1,16 +1,7 @@
-mod text {
-    mod pipeline;
-    mod vertices;
-
-    use super::*;
-    use vertices::*;
-
-    pub use pipeline::TextPipeline;
-}
 mod atlas;
-mod blur;
 mod line;
 mod macros;
+mod text;
 
 use crate::{
     colors::Rgba,
@@ -28,12 +19,12 @@ use text::TextPipeline;
 use wgpu::{
     include_wgsl, vertex_attr_array, BindGroup, BindGroupDescriptor, BindGroupEntry,
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
-    BlendState, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, Color,
-    ColorTargetState, ColorWrites, CommandEncoderDescriptor, Device, DeviceDescriptor, Extent3d,
-    Features, FragmentState, ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, Limits,
-    LoadOp, Operations, Origin3d, PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology,
+    BlendState, Buffer, BufferAddress, BufferDescriptor, BufferUsages, Color, ColorTargetState,
+    ColorWrites, CommandEncoderDescriptor, Device, DeviceDescriptor, Extent3d, Features,
+    FragmentState, ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, Limits, LoadOp,
+    Operations, Origin3d, PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology,
     PushConstantRange, Queue, RenderPass, RenderPassColorAttachment, RenderPassDescriptor,
-    RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions, Sampler, SamplerBindingType,
+    RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions, SamplerBindingType,
     ShaderStages, Surface, SurfaceConfiguration, Texture, TextureAspect, TextureDescriptor,
     TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureView,
     TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexState, VertexStepMode,

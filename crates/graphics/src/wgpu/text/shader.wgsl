@@ -13,6 +13,30 @@ var<push_constant> CONSTANTS: Constants;
 @group(0) @binding(3) var BLUR: texture_2d<f32>;
 @group(0) @binding(4) var SAMPLER: sampler;
 
+// Clip region
+fn clip(position: vec4f, min: vec2f, max: vec2f) {
+    let inside = min <= position.xy & position.xy < max;
+
+    if !(inside.x && inside.y) {
+        discard;
+    }
+}
+
+// Blur
+fn blur(uv: vec2f, direction: vec2f, radius: i32) -> f32 {
+    let dimensions = textureDimensions(BLUR);
+    let dir = direction / vec2f(dimensions);
+    
+    var blurred = textureSample(BLUR, SAMPLER, uv).r * f32(radius + 1);
+    for (var i = 1; i <= radius; i++) {
+        blurred += textureSample(BLUR, SAMPLER, uv - f32(i) * dir).r * f32(radius + 1 - i);
+        blurred += textureSample(BLUR, SAMPLER, uv + f32(i) * dir).r * f32(radius + 1 - i);
+    }
+    
+    return blurred / (1.0 + 2.0 * f32(radius) + f32(radius) * f32(radius));
+}
+
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Rectangle                                         //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -59,10 +83,7 @@ fn rectangle_vertex(vertex: RectangleVertex) -> RectangleFragment {
 @fragment
 fn rectangle_fragment(fragment: RectangleFragment) -> @location(0) vec4f {
     // Clip region
-    let inside = fragment.min <= fragment.position.xy & fragment.position.xy < fragment.max;
-    if !(inside.x && inside.y) {
-        discard;
-    }
+    clip(fragment.position, fragment.min, fragment.max);
 
     // Background rectangle
     return fragment.color;
@@ -185,10 +206,7 @@ fn glyph_vertex(vertex: GlyphVertex) -> GlyphFragment {
 @fragment
 fn glyph_fragment(fragment: GlyphFragment) -> @location(0) vec4f {
     // Clip region
-    let inside = fragment.min <= fragment.position.xy & fragment.position.xy < fragment.max;
-    if !(inside.x && inside.y) {
-        discard;
-    }
+    clip(fragment.position, fragment.min, fragment.max);
 
     switch fragment.glyph_type {
         // Mask glyph
@@ -289,24 +307,8 @@ fn blur_ping_fragment(fragment: BlurFragment) -> @location(0) vec4f {
 @fragment
 fn blur_pong_fragment(fragment: BlurFragment) -> @location(0) vec4f {
     // Clip region
-    let inside = fragment.min <= fragment.position.xy & fragment.position.xy < fragment.max;
-    if !(inside.x && inside.y) {
-        discard;
-    }
+    clip(fragment.position, fragment.min, fragment.max);
 
     let blurred = blur(fragment.uv, vec2f(0.0, 1.0), fragment.radius);
     return vec4f(fragment.color.rgb, fragment.color.a * blurred);
-}
-
-fn blur(uv: vec2f, direction: vec2f, radius: i32) -> f32 {
-    let dimensions = textureDimensions(BLUR);
-    let dir = direction / vec2f(dimensions);
-    
-    var blurred = textureSample(BLUR, SAMPLER, uv).r * f32(radius + 1);
-    for (var i = 1; i <= radius; i++) {
-        blurred += textureSample(BLUR, SAMPLER, uv - f32(i) * dir).r * f32(radius + 1 - i);
-        blurred += textureSample(BLUR, SAMPLER, uv + f32(i) * dir).r * f32(radius + 1 - i);
-    }
-    
-    return blurred / (1.0 + 2.0 * f32(radius) + f32(radius) * f32(radius));
 }
