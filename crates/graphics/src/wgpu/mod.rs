@@ -10,7 +10,7 @@ use crate::{
         LineScaler, Shadow,
     },
 };
-use atlas::Atlas;
+use atlas::{Allocator, Horizontal};
 use line::LinePipeline;
 use macros::*;
 use std::{mem::size_of, ops::Range, time::Duration};

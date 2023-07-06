@@ -93,11 +93,11 @@ impl<'a> Init<'a> {
         &self,
         size: u32,
     ) -> (
-        (Atlas<GlyphKey, Placement>, Texture),
-        (Atlas<GlyphKey, Placement>, Texture),
-        (Atlas<AnimatedGlyphKey, Placement>, Texture),
+        (Allocator<Horizontal, GlyphKey, Placement>, Texture),
+        (Allocator<Horizontal, GlyphKey, Placement>, Texture),
+        (Allocator<Horizontal, AnimatedGlyphKey, Placement>, Texture),
     ) {
-        let mut mask_atlas = Atlas::new(TextPipeline::ALTAS_ROW_HEIGHT, size, size);
+        let mask_atlas = Allocator::new(size, size, TextPipeline::ALTAS_ROW_HEIGHT);
         let mask_texture = self.0.create_texture(&texture! {
             label: "[TextPipeline] Mask glyphs texture",
             size: [size, size],
@@ -105,7 +105,7 @@ impl<'a> Init<'a> {
             usage: TEXTURE_BINDING | COPY_DST,
         });
 
-        let mut color_atlas = Atlas::new(TextPipeline::ALTAS_ROW_HEIGHT, size, size);
+        let color_atlas = Allocator::new(size, size, TextPipeline::ALTAS_ROW_HEIGHT);
         let color_texture = self.0.create_texture(&texture! {
             label: "[TextPipeline] Color glyphs texture",
             size: [size, size],
@@ -113,17 +113,13 @@ impl<'a> Init<'a> {
             usage: TEXTURE_BINDING | COPY_DST,
         });
 
-        let mut animated_atlas = Atlas::new(TextPipeline::ALTAS_ROW_HEIGHT, size, size);
+        let animated_atlas = Allocator::new(size, size, TextPipeline::ALTAS_ROW_HEIGHT);
         let animated_texture = self.0.create_texture(&texture! {
             label: "[TextPipeline] Animated glyphs texture",
             size: [size, size],
             format: TextureFormat::Rgba8Unorm,
             usage: TEXTURE_BINDING | COPY_DST,
         });
-
-        mask_atlas.next_frame();
-        color_atlas.next_frame();
-        animated_atlas.next_frame();
 
         (
             (mask_atlas, mask_texture),

@@ -14,6 +14,7 @@ pub trait Axis {
 }
 
 /// Horizontal shelves.
+#[derive(Copy, Clone, Debug)]
 pub enum Horizontal {}
 
 impl Axis for Horizontal {
@@ -23,6 +24,7 @@ impl Axis for Horizontal {
 }
 
 /// Vertical shelves.
+#[derive(Copy, Clone, Debug)]
 pub enum Vertical {}
 
 impl Axis for Vertical {
@@ -64,6 +66,7 @@ struct Shelf {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// Error type for [`Allocator::insert()`].
+#[derive(Copy, Clone, Debug)]
 pub enum InsertError {
     /// The item is too big for the atlas' width/height/bin dimensions. Resize the atlas.
     WontFit,
@@ -102,23 +105,30 @@ impl<A: Axis, K: Clone + Eq + Hash, V> Allocator<A, K, V> {
     }
 
     /// Returns the width of the allocator.
-    fn width(&self) -> u32 {
+    pub fn width(&self) -> u32 {
         self.width
     }
 
     /// Returns the height of the allocator.
-    fn height(&self) -> u32 {
+    pub fn height(&self) -> u32 {
         self.height
     }
 
     /// Returns the bin main-axis size.
-    fn bin(&self) -> u32 {
+    pub fn bin(&self) -> u32 {
         self.bin
     }
 
     /// Returns the number of items in the allocator.
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.items.len()
+    }
+
+    /// Returns the position and value of the item for `key`.
+    pub fn get(&self, key: &K) -> Option<([u32; 2], &V)> {
+        self.items
+            .get(&key)
+            .map(|item| (A::flip(item.main, item.cross), &item.value))
     }
 
     /// Inserts an item for `key` with `([width, height], value)` provided through `f`
@@ -126,14 +136,14 @@ impl<A: Axis, K: Clone + Eq + Hash, V> Allocator<A, K, V> {
     ///
     /// If allocation fails, call [`Self::clear()`] before the next frame, or try a larger
     /// allocator.
-    fn insert<F: FnOnce() -> ([u32; 2], V)>(
+    pub fn insert(
         &mut self,
         key: K,
-        f: F,
+        value: V,
+        [width, height]: [u32; 2],
     ) -> Result<([u32; 2], &V), InsertError> {
         // Insert when not in cache already
         if self.items.get(&key).is_none() {
-            let ([width, height], value) = f();
             let [main, cross] = A::flip(width, height);
             let [_, self_cross] = A::flip(self.width, self.height);
 

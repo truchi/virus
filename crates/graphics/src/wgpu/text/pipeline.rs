@@ -28,13 +28,13 @@ pub struct TextPipeline {
     //
     // Atlases and textures
     //
-    mask_atlas: Atlas<GlyphKey, Placement>,
+    mask_atlas: Allocator<Horizontal, GlyphKey, Placement>,
     mask_texture: Texture,
-    color_atlas: Atlas<GlyphKey, Placement>,
+    color_atlas: Allocator<Horizontal, GlyphKey, Placement>,
     color_texture: Texture,
-    animated_atlas: Atlas<AnimatedGlyphKey, Placement>,
+    animated_atlas: Allocator<Horizontal, AnimatedGlyphKey, Placement>,
     animated_texture: Texture,
-    blur_atlas: Atlas<usize, ()>,
+    blur_atlas: Allocator<Horizontal, usize, ()>,
     blur_ping_texture: Texture,
     blur_pong_texture: Texture,
 
@@ -75,9 +75,8 @@ impl TextPipeline {
             (animated_atlas, animated_texture),
         ) = Init(device).atlases(max_texture_dimension);
 
-        let mut blur_atlas = Atlas::new(Self::ALTAS_ROW_HEIGHT, config.width, config.height);
+        let blur_atlas = Allocator::new(config.width, config.height, Self::ALTAS_ROW_HEIGHT);
         let [blur_ping_texture, blur_pong_texture] = Init(device).blur_textures(config);
-        blur_atlas.next_frame();
 
         // Bind groups
         let bind_group_layout = Init(device).bind_group_layout();
@@ -209,15 +208,15 @@ impl TextPipeline {
                 -(shadow.radius as i32) + top,
                 -(shadow.radius as i32) + left + start.round() as i32,
             ];
-            let [blur_left, blur_top] = if self.blur_atlas.insert(key, (), [width, height]).is_ok()
-            {
-                self.blur_atlas.get(&key).unwrap().0
-            } else {
-                // Atlas/Texture is too small, forget about this shadow
-                // This can happen at startup/resize, and this is fine
-                // It can also happen when there is too much text to blur, with large radius...
-                continue;
-            };
+            let [blur_left, blur_top] =
+                if let Ok(([x, y], ())) = self.blur_atlas.insert(key, (), [width, height]) {
+                    [x, y]
+                } else {
+                    // Atlas/Texture is too small, forget about this shadow
+                    // This can happen at startup/resize, and this is fine
+                    // It can also happen when there is too much text to blur, with large radius...
+                    continue;
+                };
 
             self.blurs.push(BlurVertex::quad(
                 region,
@@ -369,10 +368,6 @@ impl TextPipeline {
         self.shadows.clear();
         self.glyphs.clear();
         self.blurs.clear();
-
-        self.mask_atlas.next_frame();
-        self.color_atlas.next_frame();
-        self.animated_atlas.next_frame();
         self.blur_atlas.clear();
     }
 }
@@ -453,10 +448,7 @@ impl TextPipeline {
             Content::Color => (COLOR_GLYPH, &mut self.color_atlas, &self.color_texture, 4),
             Content::SubpixelMask => unreachable!(),
         };
-        let ([u, v], _) = {
-            atlas.insert(key, placement, [width, height]).unwrap();
-            atlas.get(&key).unwrap()
-        };
+        let ([u, v], _) = atlas.insert(key, placement, [width, height]).unwrap();
 
         // Insert glyph in atlas
         queue.write_texture(
@@ -506,13 +498,14 @@ impl TextPipeline {
             let [width, height] = [placement.width, placement.height];
 
             // Allocate frame in atlas
-            let ([u, v], _) = {
-                let key = (glyph.size, id, index as FrameIndex);
-                self.animated_atlas
-                    .insert(key, placement, [width, height])
-                    .unwrap();
-                self.animated_atlas.get(&key).unwrap()
-            };
+            let ([u, v], _) = self
+                .animated_atlas
+                .insert(
+                    (glyph.size, id, index as FrameIndex),
+                    placement,
+                    [width, height],
+                )
+                .unwrap();
 
             // Insert frame in atlas
             queue.write_texture(
