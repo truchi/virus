@@ -47,8 +47,6 @@ pub struct TextPipeline {
 }
 
 impl TextPipeline {
-    pub const ALTAS_ROW_HEIGHT: u32 = 400;
-
     pub fn new(device: &Device, config: &SurfaceConfiguration) -> Self {
         let limits = device.limits();
         let max_buffer_size = limits.max_buffer_size as usize;
@@ -67,7 +65,7 @@ impl TextPipeline {
         let (mask_texture, color_texture, animated_texture) =
             Init(device).atlases(max_texture_dimension);
         let atlases = Atlases::new(mask_texture, color_texture, animated_texture);
-        let blur_atlas = Allocator::new(config.width, config.height, Self::ALTAS_ROW_HEIGHT);
+        let blur_atlas = Allocator::new(config.width, config.height, None);
         let [blur_ping_texture, blur_pong_texture] = Init(device).blur_textures(config);
 
         // Bind groups
@@ -118,7 +116,7 @@ impl TextPipeline {
         self.constants.surface = [config.width as f32, config.height as f32];
 
         self.blur_atlas
-            .clear_and_resize(Self::ALTAS_ROW_HEIGHT, config.width, config.height);
+            .clear_and_resize(config.width, config.height, None);
         let [blur_ping_texture, blur_pong_texture] = Init(device).blur_textures(config);
         self.blur_ping_texture = blur_ping_texture;
         self.blur_pong_texture = blur_pong_texture;

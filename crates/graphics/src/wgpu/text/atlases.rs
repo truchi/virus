@@ -21,18 +21,22 @@ impl Atlases {
 
     pub fn new(mask_texture: Texture, color_texture: Texture, animated_texture: Texture) -> Self {
         Self {
-            mask_atlas: Allocator::new(mask_texture.width(), mask_texture.height(), Self::MASK_BIN),
+            mask_atlas: Allocator::new(
+                mask_texture.width(),
+                mask_texture.height(),
+                Some(Self::MASK_BIN),
+            ),
             mask_texture,
             color_atlas: Allocator::new(
                 color_texture.width(),
                 color_texture.height(),
-                Self::COLOR_BIN,
+                Some(Self::COLOR_BIN),
             ),
             color_texture,
             animated_atlas: Allocator::new(
                 animated_texture.width(),
                 animated_texture.height(),
-                Self::ANIMATED_BIN,
+                Some(Self::ANIMATED_BIN),
             ),
             animated_texture,
         }

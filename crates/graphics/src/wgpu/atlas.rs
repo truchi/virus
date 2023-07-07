@@ -90,11 +90,13 @@ pub struct Allocator<A: Axis, K: Clone + Eq + Hash, V> {
 
 impl<A: Axis, K: Clone + Eq + Hash, V> Allocator<A, K, V> {
     /// Creates a new empty allocator with `width` and `height`, and `bin` main-axis size.
-    pub fn new(width: u32, height: u32, bin: u32) -> Self {
+    pub fn new(width: u32, height: u32, bin: Option<u32>) -> Self {
+        let [main, _] = A::flip(width, height);
+
         Self {
             width,
             height,
-            bin: bin.min(A::flip(width, height)[0]),
+            bin: bin.unwrap_or(main).min(main),
             bins: Default::default(),
             items: Default::default(),
             _axis: PhantomData,
@@ -167,12 +169,13 @@ impl<A: Axis, K: Clone + Eq + Hash, V> Allocator<A, K, V> {
     }
 
     /// Clears and resizes the allocator.
-    pub fn clear_and_resize(&mut self, width: u32, height: u32, bin: u32) {
-        self.clear();
+    pub fn clear_and_resize(&mut self, width: u32, height: u32, bin: Option<u32>) {
+        let [main, _] = A::flip(width, height);
 
+        self.clear();
         self.width = width;
         self.height = height;
-        self.bin = bin.min(A::flip(width, height)[0]);
+        self.bin = bin.unwrap_or(main).min(main);
     }
 }
 
