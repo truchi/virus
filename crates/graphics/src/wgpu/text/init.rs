@@ -89,21 +89,22 @@ impl<'a> Init<'a> {
         )
     }
 
-    pub fn atlases(&self, size: u32) -> (Texture, Texture) {
-        (
-            self.0.create_texture(&texture! {
-                label: "[TextPipeline] Mask glyphs texture",
-                size: [size, size],
-                format: TextureFormat::R8Unorm,
-                usage: TEXTURE_BINDING | COPY_DST,
-            }),
-            self.0.create_texture(&texture! {
-                label: "[TextPipeline] Color glyphs texture",
-                size: [size, size],
-                format: TextureFormat::Rgba8Unorm,
-                usage: TEXTURE_BINDING | COPY_DST,
-            }),
-        )
+    pub fn mask_texture(&self, [width, height]: [u32; 2]) -> Texture {
+        self.0.create_texture(&texture! {
+            label: "[TextPipeline] Mask glyphs texture",
+            size: [width, height],
+            format: TextureFormat::R8Unorm,
+            usage: TEXTURE_BINDING | COPY_DST,
+        })
+    }
+
+    pub fn color_texture(&self, [width, height]: [u32; 2]) -> Texture {
+        self.0.create_texture(&texture! {
+            label: "[TextPipeline] Color glyphs texture",
+            size: [width, height],
+            format: TextureFormat::Rgba8Unorm,
+            usage: TEXTURE_BINDING | COPY_DST,
+        })
     }
 
     pub fn blur_textures(&self, [width, height]: [u32; 2]) -> [Texture; 2] {

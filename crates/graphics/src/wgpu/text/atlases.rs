@@ -92,6 +92,15 @@ impl Atlases {
                 .map(non_animated)
         }
     }
+
+    pub fn resize_mask(&mut self, mask_texture: Texture) {
+        self.mask_atlas.clear_and_resize(
+            mask_texture.width(),
+            mask_texture.height(),
+            Some(Self::MASK_BIN),
+        );
+        self.mask_texture = mask_texture;
+    }
 }
 
 /// Private.

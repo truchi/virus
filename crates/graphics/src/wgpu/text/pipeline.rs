@@ -1,5 +1,6 @@
 use super::*;
 
+const MASK_ATLAS_FACTOR: u32 = 1;
 const BLUR_ATLAS_FACTOR: u32 = 2;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -58,8 +59,13 @@ impl TextPipeline {
         let (rectangles, shadows, glyphs, blurs) = Init(device).buffers(max_buffer_size);
 
         // Atlases and textures
-        let (mask_texture, color_texture) = Init(device).atlases(max_texture_dimension);
-        let atlases = Atlases::new(mask_texture, color_texture);
+        let atlases = Atlases::new(
+            Init(device).mask_texture([
+                MASK_ATLAS_FACTOR * config.width,
+                MASK_ATLAS_FACTOR * config.height,
+            ]),
+            Init(device).color_texture([max_texture_dimension, max_texture_dimension]),
+        );
         let blur_atlas = Allocator::new(
             BLUR_ATLAS_FACTOR * config.width,
             BLUR_ATLAS_FACTOR * config.height,
@@ -116,6 +122,10 @@ impl TextPipeline {
     pub fn resize(&mut self, device: &Device, config: &SurfaceConfiguration) {
         self.constants.surface = [config.width as f32, config.height as f32];
 
+        self.atlases.resize_mask(Init(device).mask_texture([
+            MASK_ATLAS_FACTOR * config.width,
+            MASK_ATLAS_FACTOR * config.height,
+        ]));
         self.blur_atlas.clear_and_resize(
             BLUR_ATLAS_FACTOR * config.width,
             BLUR_ATLAS_FACTOR * config.height,
