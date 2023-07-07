@@ -106,17 +106,17 @@ impl<'a> Init<'a> {
         )
     }
 
-    pub fn blur_textures(&self, config: &SurfaceConfiguration) -> [Texture; 2] {
+    pub fn blur_textures(&self, [width, height]: [u32; 2]) -> [Texture; 2] {
         [
             self.0.create_texture(&texture! {
                 label: "[TextPipeline] Blur ping texture",
-                size: [config.width, config.height],
+                size: [width, height],
                 format: TextureFormat::R8Unorm,
                 usage: RENDER_ATTACHMENT | TEXTURE_BINDING | COPY_DST,
             }),
             self.0.create_texture(&texture! {
                 label: "[TextPipeline] Blur pong texture",
-                size: [config.width, config.height],
+                size: [width, height],
                 format: TextureFormat::R8Unorm,
                 usage: RENDER_ATTACHMENT | TEXTURE_BINDING | COPY_DST,
             }),
@@ -132,7 +132,7 @@ impl<'a> Init<'a> {
                 // Color texture
                 { binding: 1, visibility: VERTEX | FRAGMENT, ty: Texture },
                 // Blur texture
-                { binding: 2, visibility: FRAGMENT, ty: Texture },
+                { binding: 2, visibility: VERTEX | FRAGMENT, ty: Texture },
                 // Sampler
                 { binding: 3, visibility: FRAGMENT, ty: Sampler(Filtering) },
             ],

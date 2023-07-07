@@ -1,9 +1,6 @@
 use super::*;
 
-// TODO
-// - Confusion with pixel/channel width in atlas/texture?
-// - Blur atlas/textures must be bigger than output surface
-// - Early discard lines only when shadows don't bleed inside
+const BLUR_ATLAS_FACTOR: u32 = 2;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           TextPipeline                                         //
@@ -63,8 +60,15 @@ impl TextPipeline {
         // Atlases and textures
         let (mask_texture, color_texture) = Init(device).atlases(max_texture_dimension);
         let atlases = Atlases::new(mask_texture, color_texture);
-        let blur_atlas = Allocator::new(config.width, config.height, None);
-        let [blur_ping_texture, blur_pong_texture] = Init(device).blur_textures(config);
+        let blur_atlas = Allocator::new(
+            BLUR_ATLAS_FACTOR * config.width,
+            BLUR_ATLAS_FACTOR * config.height,
+            None,
+        );
+        let [blur_ping_texture, blur_pong_texture] = Init(device).blur_textures([
+            BLUR_ATLAS_FACTOR * config.width,
+            BLUR_ATLAS_FACTOR * config.height,
+        ]);
 
         // Bind groups
         let bind_group_layout = Init(device).bind_group_layout();
@@ -112,9 +116,15 @@ impl TextPipeline {
     pub fn resize(&mut self, device: &Device, config: &SurfaceConfiguration) {
         self.constants.surface = [config.width as f32, config.height as f32];
 
-        self.blur_atlas
-            .clear_and_resize(config.width, config.height, None);
-        let [blur_ping_texture, blur_pong_texture] = Init(device).blur_textures(config);
+        self.blur_atlas.clear_and_resize(
+            BLUR_ATLAS_FACTOR * config.width,
+            BLUR_ATLAS_FACTOR * config.height,
+            None,
+        );
+        let [blur_ping_texture, blur_pong_texture] = Init(device).blur_textures([
+            BLUR_ATLAS_FACTOR * config.width,
+            BLUR_ATLAS_FACTOR * config.height,
+        ]);
         self.blur_ping_texture = blur_ping_texture;
         self.blur_pong_texture = blur_pong_texture;
 
@@ -157,7 +167,7 @@ impl TextPipeline {
 
         // Discard when outside region. This suppposes that:
         // - glyphs are not bigger that line height (~ font size < line height)
-        // - glyphs outside do not affect what's inside (~ no shadows, TODO oops)
+        // - glyphs outside do not affect what's inside (~ no shadows, but that's fine)
         // - no further transforms are applied in the shader
         // Of course the GPU would have done that for us. Don't fear to remove if necessary.
         {

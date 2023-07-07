@@ -122,12 +122,13 @@ struct ShadowFragment {
 @vertex
 fn shadow_vertex(vertex: ShadowVertex) -> ShadowFragment {
     let position = vec2f(vertex.position.yx);
+    let blur_dimensions = vec2f(textureDimensions(BLUR));
     let uv = vec2f(vertex.uv);
 
     var fragment: ShadowFragment;
     fragment.position = vec4f(
-        0.0 + 2.0 * position.x / CONSTANTS.surface.x - 1.0,
-        0.0 - 2.0 * position.y / CONSTANTS.surface.y + 1.0,
+        0.0 + 2.0 * position.x / blur_dimensions.x - 1.0,
+        0.0 - 2.0 * position.y / blur_dimensions.y + 1.0,
         0.0,
         1.0,
     );
@@ -262,15 +263,16 @@ struct BlurFragment {
 @vertex
 fn blur_ping_vertex(vertex: BlurVertex) -> BlurFragment {
     let blur_position = vec2f(vertex.blur_position.yx);
+    let blur_dimensions = vec2f(textureDimensions(BLUR));
 
     var fragment: BlurFragment;
     fragment.position = vec4f(
-        0.0 + 2.0 * blur_position.x / CONSTANTS.surface.x - 1.0,
-        0.0 - 2.0 * blur_position.y / CONSTANTS.surface.y + 1.0,
+        0.0 + 2.0 * blur_position.x / blur_dimensions.x - 1.0,
+        0.0 - 2.0 * blur_position.y / blur_dimensions.y + 1.0,
         0.0,
         1.0,
     );
-    fragment.uv = blur_position / CONSTANTS.surface;
+    fragment.uv = blur_position / blur_dimensions;
     fragment.radius = i32(vertex.radius);
 
     // color, min, max: unused
@@ -283,6 +285,7 @@ fn blur_pong_vertex(vertex: BlurVertex) -> BlurFragment {
     let region_size = vec2f(vertex.region_size);
     let shadow_position = vec2f(vertex.shadow_position.yx);
     let blur_position = vec2f(vertex.blur_position.yx);
+    let blur_dimensions = vec2f(textureDimensions(BLUR));
     let color = vec4f(vertex.color) / 255.0;
 
     var fragment: BlurFragment;
@@ -292,7 +295,7 @@ fn blur_pong_vertex(vertex: BlurVertex) -> BlurFragment {
         0.0,
         1.0,
     );
-    fragment.uv = blur_position / CONSTANTS.surface;
+    fragment.uv = blur_position / blur_dimensions;
     fragment.radius = i32(vertex.radius);
     fragment.color = pow(color, vec4f(2.2, 2.2, 2.2, 1.0));
     fragment.min = region_position;
