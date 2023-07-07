@@ -1,3 +1,4 @@
+mod atlases;
 mod buffers;
 mod constants;
 mod init;
@@ -5,6 +6,7 @@ mod pipeline;
 mod vertices;
 
 use super::*;
+use atlases::*;
 use buffers::*;
 use constants::*;
 use init::*;

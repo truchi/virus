@@ -89,43 +89,27 @@ impl<'a> Init<'a> {
         )
     }
 
-    pub fn atlases(
-        &self,
-        size: u32,
-    ) -> (
-        (Allocator<Horizontal, GlyphKey, Placement>, Texture),
-        (Allocator<Horizontal, GlyphKey, Placement>, Texture),
-        (Allocator<Horizontal, AnimatedGlyphKey, Placement>, Texture),
-    ) {
-        let mask_atlas = Allocator::new(size, size, TextPipeline::ALTAS_ROW_HEIGHT);
-        let mask_texture = self.0.create_texture(&texture! {
+    pub fn atlases(&self, size: u32) -> (Texture, Texture, Texture) {
+        let mask = self.0.create_texture(&texture! {
             label: "[TextPipeline] Mask glyphs texture",
             size: [size, size],
             format: TextureFormat::R8Unorm,
             usage: TEXTURE_BINDING | COPY_DST,
         });
-
-        let color_atlas = Allocator::new(size, size, TextPipeline::ALTAS_ROW_HEIGHT);
-        let color_texture = self.0.create_texture(&texture! {
+        let color = self.0.create_texture(&texture! {
             label: "[TextPipeline] Color glyphs texture",
             size: [size, size],
             format: TextureFormat::Rgba8Unorm,
             usage: TEXTURE_BINDING | COPY_DST,
         });
-
-        let animated_atlas = Allocator::new(size, size, TextPipeline::ALTAS_ROW_HEIGHT);
-        let animated_texture = self.0.create_texture(&texture! {
+        let animated = self.0.create_texture(&texture! {
             label: "[TextPipeline] Animated glyphs texture",
             size: [size, size],
             format: TextureFormat::Rgba8Unorm,
             usage: TEXTURE_BINDING | COPY_DST,
         });
 
-        (
-            (mask_atlas, mask_texture),
-            (color_atlas, color_texture),
-            (animated_atlas, animated_texture),
-        )
+        (mask, color, animated)
     }
 
     pub fn blur_textures(&self, config: &SurfaceConfiguration) -> [Texture; 2] {
