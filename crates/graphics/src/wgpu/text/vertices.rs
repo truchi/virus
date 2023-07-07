@@ -1,7 +1,21 @@
 use super::*;
 
-pub const MASK_GLYPH: u32 = 0;
-pub const COLOR_GLYPH: u32 = 1;
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                            GlyphType                                           //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+unsafe impl bytemuck::Zeroable for GlyphType {}
+unsafe impl bytemuck::Pod for GlyphType {}
+
+/// [`GlyphType::MASK`]/[`GlyphType::COLOR`].
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct GlyphType(u32);
+
+impl GlyphType {
+    pub const MASK: Self = Self(0);
+    pub const COLOR: Self = Self(1);
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                         RectangleVertex                                        //
@@ -85,8 +99,8 @@ unsafe impl bytemuck::Pod for ShadowVertex {}
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct ShadowVertex {
-    /// Glyph type ([`MASK_GLYPH`]/[`COLOR_GLYPH`]).
-    glyph_type: u32,
+    /// Glyph type.
+    glyph_type: GlyphType,
     /// Vertex `[top, left]` coordinates in region.
     position: [i32; 2],
     /// Texture `[x, y]` coordinates.
@@ -108,7 +122,7 @@ impl ShadowVertex {
         }
     }
 
-    pub fn new(glyph_type: u32, [top, left]: [i32; 2], uv: [u32; 2]) -> Self {
+    pub fn new(glyph_type: GlyphType, [top, left]: [i32; 2], uv: [u32; 2]) -> Self {
         Self {
             glyph_type,
             position: [top, left],
@@ -117,7 +131,7 @@ impl ShadowVertex {
     }
 
     pub fn quad(
-        glyph_type: u32,
+        glyph_type: GlyphType,
         ([top, left], [width, height]): ([i32; 2], [u32; 2]),
         [u, v]: [u32; 2],
     ) -> [Self; 4] {
@@ -145,8 +159,8 @@ unsafe impl bytemuck::Pod for GlyphVertex {}
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct GlyphVertex {
-    /// Glyph type ([`MASK_GLYPH`]/[`COLOR_GLYPH`]).
-    glyph_type: u32,
+    /// Glyph type.
+    glyph_type: GlyphType,
     /// Region `[top, left]` world coordinates.
     region_position: [i32; 2],
     /// Region `[width, height]` size.
@@ -178,7 +192,7 @@ impl GlyphVertex {
     }
 
     pub fn new(
-        glyph_type: u32,
+        glyph_type: GlyphType,
         ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
         [top, left]: [i32; 2],
         uv: [u32; 2],
@@ -200,7 +214,7 @@ impl GlyphVertex {
     }
 
     pub fn quad(
-        glyph_type: u32,
+        glyph_type: GlyphType,
         ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
         ([top, left], [width, height]): ([i32; 2], [u32; 2]),
         [u, v]: [u32; 2],

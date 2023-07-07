@@ -58,8 +58,8 @@ impl Atlases {
         line_height: LineHeight,
         time: Duration,
         glyph: &Glyph,
-    ) -> Option<(u32, ([i32; 2], [u32; 2]), [u32; 2])> {
-        let animated = |(glyph_type, placement, [u, v]): (u32, Placement, [u32; 2])| {
+    ) -> Option<(GlyphType, ([i32; 2], [u32; 2]), [u32; 2])> {
+        let animated = |(glyph_type, placement, [u, v]): (GlyphType, Placement, [u32; 2])| {
             // Animated glyph has screen coordinate system, from top of line
             let center = ((line_height as f32 - placement.height as f32) / 2.0).round() as i32;
             let top = top - placement.top + center;
@@ -72,7 +72,7 @@ impl Atlases {
             )
         };
 
-        let non_animated = |(glyph_type, placement, [u, v]): (u32, Placement, [u32; 2])| {
+        let non_animated = |(glyph_type, placement, [u, v]): (GlyphType, Placement, [u32; 2])| {
             // Swash image placement has vertical up, from baseline
             let top = top + font_size as i32 - placement.top;
             let left = left + placement.left;
@@ -101,14 +101,18 @@ impl Atlases {
         queue: &Queue,
         scaler: &mut LineScaler,
         glyph: &Glyph,
-    ) -> Option<(u32, Placement, [u32; 2])> {
+    ) -> Option<(GlyphType, Placement, [u32; 2])> {
         let mask_key = glyph.key();
         let color_key = ColorKey::NonAnimated(mask_key);
 
         // Check atlases for glyph
         if let Some((glyph_type, ([u, v], placement))) = {
-            let in_mask = || self.mask_atlas.get(&mask_key).map(|v| (MASK_GLYPH, v));
-            let in_color = || self.color_atlas.get(&color_key).map(|v| (COLOR_GLYPH, v));
+            let in_mask = || self.mask_atlas.get(&mask_key).map(|v| (GlyphType::MASK, v));
+            let in_color = || {
+                self.color_atlas
+                    .get(&color_key)
+                    .map(|v| (GlyphType::COLOR, v))
+            };
             in_mask().or_else(in_color)
         } {
             return Some((glyph_type, *placement, [u, v]));
@@ -126,14 +130,14 @@ impl Atlases {
                     .mask_atlas
                     .insert(mask_key, placement, [width, height])
                     .unwrap();
-                (MASK_GLYPH, [u, v], &self.mask_texture, 1)
+                (GlyphType::MASK, [u, v], &self.mask_texture, 1)
             }
             Content::Color => {
                 let ([u, v], _) = self
                     .color_atlas
                     .insert(color_key, placement, [width, height])
                     .unwrap();
-                (COLOR_GLYPH, [u, v], &self.color_texture, 4)
+                (GlyphType::COLOR, [u, v], &self.color_texture, 4)
             }
             Content::SubpixelMask => unreachable!(),
         };
@@ -168,13 +172,13 @@ impl Atlases {
         scaler: &mut LineScaler,
         glyph: &Glyph,
         time: Duration,
-    ) -> Option<(u32, Placement, [u32; 2])> {
+    ) -> Option<(GlyphType, Placement, [u32; 2])> {
         let id = glyph.animated_id?;
         let key = ColorKey::Animated((glyph.size, id, scaler.frame(glyph, time)?));
 
         // Check atlas for frame
         if let Some(([u, v], placement)) = self.color_atlas.get(&key) {
-            return Some((COLOR_GLYPH, *placement, [u, v]));
+            return Some((GlyphType::COLOR, *placement, [u, v]));
         }
 
         // Render frames
@@ -218,6 +222,6 @@ impl Atlases {
         }
 
         let ([u, v], placement) = self.color_atlas.get(&key).unwrap();
-        Some((COLOR_GLYPH, *placement, [u, v]))
+        Some((GlyphType::COLOR, *placement, [u, v]))
     }
 }
