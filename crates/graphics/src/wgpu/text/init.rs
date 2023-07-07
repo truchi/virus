@@ -128,9 +128,9 @@ impl<'a> Init<'a> {
             label: "[TextPipeline] Bind group layout",
             entries: [
                 // Mask texture
-                { binding: 0, visibility: FRAGMENT, ty: Texture },
+                { binding: 0, visibility: VERTEX | FRAGMENT, ty: Texture },
                 // Color texture
-                { binding: 1, visibility: FRAGMENT, ty: Texture },
+                { binding: 1, visibility: VERTEX | FRAGMENT, ty: Texture },
                 // Blur texture
                 { binding: 2, visibility: FRAGMENT, ty: Texture },
                 // Sampler

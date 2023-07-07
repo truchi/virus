@@ -1,9 +1,6 @@
 struct Constants {
     // Surface `(width, height)` size.
     surface: vec2f,
-
-    // Texture `(width, height)` size.
-    texture: vec2f,
 }
 
 var<push_constant> CONSTANTS: Constants;
@@ -35,6 +32,21 @@ fn blur(uv: vec2f, direction: vec2f, radius: i32) -> f32 {
     return blurred / (1.0 + 2.0 * f32(radius) + f32(radius) * f32(radius));
 }
 
+fn dimensions(glyph_type: u32) -> vec2f {
+    switch glyph_type {
+        // Mask glyph
+        case 0u {
+            return vec2f(textureDimensions(MASK));
+        }
+        // Color glyph
+        case 1u {
+            return vec2f(textureDimensions(COLOR));
+        }
+        default {
+            return vec2f(0.0, 0.0);
+        }
+    }
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Rectangle                                         //
@@ -120,7 +132,7 @@ fn shadow_vertex(vertex: ShadowVertex) -> ShadowFragment {
         1.0,
     );
     fragment.glyph_type = vertex.glyph_type;
-    fragment.uv = uv / CONSTANTS.texture;
+    fragment.uv = uv / dimensions(vertex.glyph_type);
 
     return fragment;
 }
@@ -190,7 +202,7 @@ fn glyph_vertex(vertex: GlyphVertex) -> GlyphFragment {
         1.0,
     );
     fragment.glyph_type = vertex.glyph_type;
-    fragment.uv = uv / CONSTANTS.texture;
+    fragment.uv = uv / dimensions(vertex.glyph_type);
     fragment.color = pow(color, vec4f(2.2, 2.2, 2.2, 1.0));
     fragment.min = region_position;
     fragment.max = region_position + region_size;

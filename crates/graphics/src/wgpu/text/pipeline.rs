@@ -55,7 +55,6 @@ impl TextPipeline {
         // Constants
         let constants = Constants {
             surface: [config.width as f32, config.height as f32],
-            texture: [max_texture_dimension as f32, max_texture_dimension as f32],
         };
 
         // Buffers
