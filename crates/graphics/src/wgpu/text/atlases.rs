@@ -1,25 +1,30 @@
 use super::*;
 
+type MaskKey = GlyphKey;
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+enum ColorKey {
+    NonAnimated(GlyphKey),
+    Animated(AnimatedGlyphKey),
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Atlases                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 #[derive(Debug)]
 pub struct Atlases {
-    mask_atlas: Allocator<Horizontal, GlyphKey, Placement>,
+    mask_atlas: Allocator<Horizontal, MaskKey, Placement>,
     mask_texture: Texture,
-    color_atlas: Allocator<Horizontal, GlyphKey, Placement>,
+    color_atlas: Allocator<Horizontal, ColorKey, Placement>,
     color_texture: Texture,
-    animated_atlas: Allocator<Horizontal, AnimatedGlyphKey, Placement>,
-    animated_texture: Texture,
 }
 
 impl Atlases {
     const MASK_BIN: u32 = 400;
     const COLOR_BIN: u32 = 400;
-    const ANIMATED_BIN: u32 = 400;
 
-    pub fn new(mask_texture: Texture, color_texture: Texture, animated_texture: Texture) -> Self {
+    pub fn new(mask_texture: Texture, color_texture: Texture) -> Self {
         Self {
             mask_atlas: Allocator::new(
                 mask_texture.width(),
@@ -33,12 +38,6 @@ impl Atlases {
                 Some(Self::COLOR_BIN),
             ),
             color_texture,
-            animated_atlas: Allocator::new(
-                animated_texture.width(),
-                animated_texture.height(),
-                Some(Self::ANIMATED_BIN),
-            ),
-            animated_texture,
         }
     }
 
@@ -48,10 +47,6 @@ impl Atlases {
 
     pub fn color_texture(&self) -> &Texture {
         &self.color_texture
-    }
-
-    pub fn animated_texture(&self) -> &Texture {
-        &self.animated_texture
     }
 
     pub fn insert_glyph(
@@ -107,12 +102,13 @@ impl Atlases {
         scaler: &mut LineScaler,
         glyph: &Glyph,
     ) -> Option<(u32, Placement, [u32; 2])> {
-        let key = glyph.key();
+        let mask_key = glyph.key();
+        let color_key = ColorKey::NonAnimated(mask_key);
 
         // Check atlases for glyph
         if let Some((glyph_type, ([u, v], placement))) = {
-            let in_mask = || self.mask_atlas.get(&key).map(|v| (MASK_GLYPH, v));
-            let in_color = || self.color_atlas.get(&key).map(|v| (COLOR_GLYPH, v));
+            let in_mask = || self.mask_atlas.get(&mask_key).map(|v| (MASK_GLYPH, v));
+            let in_color = || self.color_atlas.get(&color_key).map(|v| (COLOR_GLYPH, v));
             in_mask().or_else(in_color)
         } {
             return Some((glyph_type, *placement, [u, v]));
@@ -124,12 +120,23 @@ impl Atlases {
         let [width, height] = [placement.width, placement.height];
 
         // Allocate glyph in atlas
-        let (glyph_type, atlas, texture, channels) = match image.content {
-            Content::Mask => (MASK_GLYPH, &mut self.mask_atlas, &self.mask_texture, 1),
-            Content::Color => (COLOR_GLYPH, &mut self.color_atlas, &self.color_texture, 4),
+        let (glyph_type, [u, v], texture, channels) = match image.content {
+            Content::Mask => {
+                let ([u, v], _) = self
+                    .mask_atlas
+                    .insert(mask_key, placement, [width, height])
+                    .unwrap();
+                (MASK_GLYPH, [u, v], &self.mask_texture, 1)
+            }
+            Content::Color => {
+                let ([u, v], _) = self
+                    .color_atlas
+                    .insert(color_key, placement, [width, height])
+                    .unwrap();
+                (COLOR_GLYPH, [u, v], &self.color_texture, 4)
+            }
             Content::SubpixelMask => unreachable!(),
         };
-        let ([u, v], _) = atlas.insert(key, placement, [width, height]).unwrap();
 
         // Insert glyph in atlas
         queue.write_texture(
@@ -163,11 +170,11 @@ impl Atlases {
         time: Duration,
     ) -> Option<(u32, Placement, [u32; 2])> {
         let id = glyph.animated_id?;
-        let key = (glyph.size, id, scaler.frame(glyph, time)?);
+        let key = ColorKey::Animated((glyph.size, id, scaler.frame(glyph, time)?));
 
         // Check atlas for frame
-        if let Some(([u, v], placement)) = self.animated_atlas.get(&key) {
-            return Some((ANIMATED_GLYPH, *placement, [u, v]));
+        if let Some(([u, v], placement)) = self.color_atlas.get(&key) {
+            return Some((COLOR_GLYPH, *placement, [u, v]));
         }
 
         // Render frames
@@ -180,9 +187,9 @@ impl Atlases {
 
             // Allocate frame in atlas
             let ([u, v], _) = self
-                .animated_atlas
+                .color_atlas
                 .insert(
-                    (glyph.size, id, index as FrameIndex),
+                    ColorKey::Animated((glyph.size, id, index as FrameIndex)),
                     placement,
                     [width, height],
                 )
@@ -191,7 +198,7 @@ impl Atlases {
             // Insert frame in atlas
             queue.write_texture(
                 ImageCopyTexture {
-                    texture: &self.animated_texture,
+                    texture: &self.color_texture,
                     mip_level: 0,
                     origin: Origin3d { x: u, y: v, z: 0 },
                     aspect: TextureAspect::All,
@@ -210,7 +217,7 @@ impl Atlases {
             );
         }
 
-        let ([u, v], placement) = self.animated_atlas.get(&key).unwrap();
-        Some((ANIMATED_GLYPH, *placement, [u, v]))
+        let ([u, v], placement) = self.color_atlas.get(&key).unwrap();
+        Some((COLOR_GLYPH, *placement, [u, v]))
     }
 }

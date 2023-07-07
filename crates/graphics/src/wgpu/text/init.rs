@@ -89,27 +89,21 @@ impl<'a> Init<'a> {
         )
     }
 
-    pub fn atlases(&self, size: u32) -> (Texture, Texture, Texture) {
-        let mask = self.0.create_texture(&texture! {
-            label: "[TextPipeline] Mask glyphs texture",
-            size: [size, size],
-            format: TextureFormat::R8Unorm,
-            usage: TEXTURE_BINDING | COPY_DST,
-        });
-        let color = self.0.create_texture(&texture! {
-            label: "[TextPipeline] Color glyphs texture",
-            size: [size, size],
-            format: TextureFormat::Rgba8Unorm,
-            usage: TEXTURE_BINDING | COPY_DST,
-        });
-        let animated = self.0.create_texture(&texture! {
-            label: "[TextPipeline] Animated glyphs texture",
-            size: [size, size],
-            format: TextureFormat::Rgba8Unorm,
-            usage: TEXTURE_BINDING | COPY_DST,
-        });
-
-        (mask, color, animated)
+    pub fn atlases(&self, size: u32) -> (Texture, Texture) {
+        (
+            self.0.create_texture(&texture! {
+                label: "[TextPipeline] Mask glyphs texture",
+                size: [size, size],
+                format: TextureFormat::R8Unorm,
+                usage: TEXTURE_BINDING | COPY_DST,
+            }),
+            self.0.create_texture(&texture! {
+                label: "[TextPipeline] Color glyphs texture",
+                size: [size, size],
+                format: TextureFormat::Rgba8Unorm,
+                usage: TEXTURE_BINDING | COPY_DST,
+            }),
+        )
     }
 
     pub fn blur_textures(&self, config: &SurfaceConfiguration) -> [Texture; 2] {
@@ -137,12 +131,10 @@ impl<'a> Init<'a> {
                 { binding: 0, visibility: FRAGMENT, ty: Texture },
                 // Color texture
                 { binding: 1, visibility: FRAGMENT, ty: Texture },
-                // Animated texture
-                { binding: 2, visibility: FRAGMENT, ty: Texture },
                 // Blur texture
-                { binding: 3, visibility: FRAGMENT, ty: Texture },
+                { binding: 2, visibility: FRAGMENT, ty: Texture },
                 // Sampler
-                { binding: 4, visibility: FRAGMENT, ty: Sampler(Filtering) },
+                { binding: 3, visibility: FRAGMENT, ty: Sampler(Filtering) },
             ],
         })
     }
@@ -152,7 +144,6 @@ impl<'a> Init<'a> {
         bind_group_layout: &BindGroupLayout,
         mask_texture: &Texture,
         color_texture: &Texture,
-        animated_texture: &Texture,
         blur_ping_texture: &Texture,
         blur_pong_texture: &Texture,
     ) -> [BindGroup; 2] {
@@ -165,12 +156,10 @@ impl<'a> Init<'a> {
                     { binding: 0, resource: Texture(mask_texture) },
                     // Color texture
                     { binding: 1, resource: Texture(color_texture) },
-                    // Animated texture
-                    { binding: 2, resource: Texture(animated_texture) },
                     // Ping blur texture
-                    { binding: 3, resource: Texture(blur_ping_texture) },
+                    { binding: 2, resource: Texture(blur_ping_texture) },
                     // Sampler
-                    { binding: 4, resource: Sampler(self.0.create_sampler(&Default::default())) },
+                    { binding: 3, resource: Sampler(self.0.create_sampler(&Default::default())) },
                 ],
             }),
             self.0.create_bind_group(&bind_group! {
@@ -181,12 +170,10 @@ impl<'a> Init<'a> {
                     { binding: 0, resource: Texture(mask_texture) },
                     // Color texture
                     { binding: 1, resource: Texture(color_texture) },
-                    // Animated texture
-                    { binding: 2, resource: Texture(animated_texture) },
                     // Pong blur texture
-                    { binding: 3, resource: Texture(blur_pong_texture) },
+                    { binding: 2, resource: Texture(blur_pong_texture) },
                     // Sampler
-                    { binding: 4, resource: Sampler(self.0.create_sampler(&Default::default())) },
+                    { binding: 3, resource: Sampler(self.0.create_sampler(&Default::default())) },
                 ],
             }),
         ]

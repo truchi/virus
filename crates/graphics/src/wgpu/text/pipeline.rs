@@ -62,9 +62,8 @@ impl TextPipeline {
         let (rectangles, shadows, glyphs, blurs) = Init(device).buffers(max_buffer_size);
 
         // Atlases and textures
-        let (mask_texture, color_texture, animated_texture) =
-            Init(device).atlases(max_texture_dimension);
-        let atlases = Atlases::new(mask_texture, color_texture, animated_texture);
+        let (mask_texture, color_texture) = Init(device).atlases(max_texture_dimension);
+        let atlases = Atlases::new(mask_texture, color_texture);
         let blur_atlas = Allocator::new(config.width, config.height, None);
         let [blur_ping_texture, blur_pong_texture] = Init(device).blur_textures(config);
 
@@ -74,7 +73,6 @@ impl TextPipeline {
             &bind_group_layout,
             atlases.mask_texture(),
             atlases.color_texture(),
-            atlases.animated_texture(),
             &blur_ping_texture,
             &blur_pong_texture,
         );
@@ -125,7 +123,6 @@ impl TextPipeline {
             &self.bind_group_layout,
             &self.atlases.mask_texture(),
             &self.atlases.color_texture(),
-            &self.atlases.animated_texture(),
             &self.blur_ping_texture,
             &self.blur_pong_texture,
         );

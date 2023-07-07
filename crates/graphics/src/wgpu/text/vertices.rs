@@ -2,7 +2,6 @@ use super::*;
 
 pub const MASK_GLYPH: u32 = 0;
 pub const COLOR_GLYPH: u32 = 1;
-pub const ANIMATED_GLYPH: u32 = 2;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                         RectangleVertex                                        //
@@ -86,7 +85,7 @@ unsafe impl bytemuck::Pod for ShadowVertex {}
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct ShadowVertex {
-    /// Glyph type ([`MASK_GLYPH`]/[`COLOR_GLYPH`]/[`ANIMATED_GLYPH`]).
+    /// Glyph type ([`MASK_GLYPH`]/[`COLOR_GLYPH`]).
     glyph_type: u32,
     /// Vertex `[top, left]` coordinates in region.
     position: [i32; 2],
@@ -146,7 +145,7 @@ unsafe impl bytemuck::Pod for GlyphVertex {}
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct GlyphVertex {
-    /// Glyph type ([`MASK_GLYPH`]/[`COLOR_GLYPH`]/[`ANIMATED_GLYPH`]).
+    /// Glyph type ([`MASK_GLYPH`]/[`COLOR_GLYPH`]).
     glyph_type: u32,
     /// Region `[top, left]` world coordinates.
     region_position: [i32; 2],

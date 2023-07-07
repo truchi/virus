@@ -9,9 +9,8 @@ struct Constants {
 var<push_constant> CONSTANTS: Constants;
 @group(0) @binding(0) var MASK: texture_2d<f32>;
 @group(0) @binding(1) var COLOR: texture_2d<f32>;
-@group(0) @binding(2) var ANIMATED: texture_2d<f32>;
-@group(0) @binding(3) var BLUR: texture_2d<f32>;
-@group(0) @binding(4) var SAMPLER: sampler;
+@group(0) @binding(2) var BLUR: texture_2d<f32>;
+@group(0) @binding(3) var SAMPLER: sampler;
 
 // Clip region
 fn clip(position: vec4f, min: vec2f, max: vec2f) {
@@ -94,7 +93,7 @@ fn rectangle_fragment(fragment: RectangleFragment) -> @location(0) vec4f {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 struct ShadowVertex {
-    // Glyph type (0: mask, 1: color, 2: animated).
+    // Glyph type (0: mask, 1: color).
     @location(0) glyph_type: u32,
     // Vertex `(top, left)` coordinates.
     @location(1) position: vec2i,
@@ -139,10 +138,6 @@ fn shadow_fragment(fragment: ShadowFragment) -> @location(0) vec4f {
         case 1u {
             mask = textureSampleLevel(COLOR, SAMPLER, fragment.uv, 0.0).a;
         }
-        // Animated glyph
-        case 2u {
-            mask = textureSampleLevel(ANIMATED, SAMPLER, fragment.uv, 0.0).a;
-        }
         default {
             discard;
         }
@@ -156,7 +151,7 @@ fn shadow_fragment(fragment: ShadowFragment) -> @location(0) vec4f {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 struct GlyphVertex {
-    // Glyph type (0: mask, 1: color, 2: animated).
+    // Glyph type (0: mask, 1: color).
     @location(0) glyph_type: u32,
     // Region `(top, left)` world coordinates.
     @location(1) region_position: vec2i,
@@ -217,10 +212,6 @@ fn glyph_fragment(fragment: GlyphFragment) -> @location(0) vec4f {
         // Color glyph
         case 1u {
             return textureSampleLevel(COLOR, SAMPLER, fragment.uv, 0.0);
-        }
-        // Animated glyph
-        case 2u {
-            return textureSampleLevel(ANIMATED, SAMPLER, fragment.uv, 0.0);
         }
         default {
             discard;
