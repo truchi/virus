@@ -22,6 +22,14 @@ impl<T> Buffers<T> {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn len(&self) -> u32 {
+        self.indices.len() as u32
+    }
+
     pub fn push(&mut self, [top_left, top_right, bottom_left, bottom_right]: [T; 4])
     where
         T: Clone,
@@ -46,18 +54,34 @@ impl<T> Buffers<T> {
         ]);
     }
 
-    pub fn write(&mut self, queue: &Queue)
+    pub fn write(&self, queue: &Queue)
     where
         T: bytemuck::Pod,
     {
-        queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
-        queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&self.indices));
+        if !self.is_empty() {
+            queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
+            queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&self.indices));
+        }
     }
 
-    pub fn render<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), IndexFormat::Uint32);
-        render_pass.draw_indexed(0..self.indices.len() as u32, 0, 0..1);
+    pub fn render<'pass>(
+        &'pass self,
+        render_pass: &mut RenderPass<'pass>,
+        constants: &Constants,
+        bind_group: &'pass BindGroup,
+        pipeline: &'pass RenderPipeline,
+    ) {
+        if !self.is_empty() {
+            let constants = constants.as_array();
+            let constants = bytemuck::cast_slice(&constants);
+
+            render_pass.set_pipeline(pipeline);
+            render_pass.set_bind_group(0, bind_group, &[]);
+            render_pass.set_push_constants(Constants::STAGES, 0, constants);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(self.index_buffer.slice(..), INDEX_FORMAT);
+            render_pass.draw_indexed(0..self.len(), 0, 0..1);
+        }
     }
 
     pub fn clear(&mut self) {

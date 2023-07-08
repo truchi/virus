@@ -121,7 +121,6 @@ impl TextPipeline {
 
     pub fn resize(&mut self, device: &Device, config: &SurfaceConfiguration) {
         self.constants.surface = [config.width as f32, config.height as f32];
-
         self.atlases.resize_mask(Init(device).mask_texture([
             MASK_ATLAS_FACTOR * config.width,
             MASK_ATLAS_FACTOR * config.height,
@@ -131,22 +130,17 @@ impl TextPipeline {
             BLUR_ATLAS_FACTOR * config.height,
             None,
         );
-        let [blur_ping_texture, blur_pong_texture] = Init(device).blur_textures([
+        [self.blur_ping_texture, self.blur_pong_texture] = Init(device).blur_textures([
             BLUR_ATLAS_FACTOR * config.width,
             BLUR_ATLAS_FACTOR * config.height,
         ]);
-        self.blur_ping_texture = blur_ping_texture;
-        self.blur_pong_texture = blur_pong_texture;
-
-        let [ping_bind_group, pong_bind_group] = Init(device).bind_groups(
+        [self.ping_bind_group, self.pong_bind_group] = Init(device).bind_groups(
             &self.bind_group_layout,
             &self.atlases.mask_texture(),
             &self.atlases.color_texture(),
             &self.blur_ping_texture,
             &self.blur_pong_texture,
         );
-        self.ping_bind_group = ping_bind_group;
-        self.pong_bind_group = pong_bind_group;
     }
 
     pub fn rectangle(
@@ -312,7 +306,7 @@ impl TextPipeline {
         }
     }
 
-    pub fn pre_render(&mut self, queue: &Queue) {
+    pub fn pre_render(&self, queue: &Queue) {
         self.rectangles.write(queue);
         self.shadows.write(queue);
         self.glyphs.write(queue);
@@ -320,45 +314,45 @@ impl TextPipeline {
     }
 
     pub fn render_rectangles<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
-        self.render(
+        self.rectangles.render(
             render_pass,
-            &self.rectangles,
+            &self.constants,
             &self.pong_bind_group,
             &self.rectangle_pipeline,
         );
     }
 
     pub fn render_shadows<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
-        self.render(
+        self.shadows.render(
             render_pass,
-            &self.shadows,
+            &self.constants,
             &self.pong_bind_group,
             &self.shadow_pipeline,
         );
     }
 
     pub fn blur_ping<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
-        self.render(
+        self.blurs.render(
             render_pass,
-            &self.blurs,
+            &self.constants,
             &self.ping_bind_group,
             &self.blur_ping_pipeline,
         );
     }
 
     pub fn blur_pong<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
-        self.render(
+        self.blurs.render(
             render_pass,
-            &self.blurs,
+            &self.constants,
             &self.pong_bind_group,
             &self.blur_pong_pipeline,
         );
     }
 
     pub fn render_glyphs<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
-        self.render(
+        self.glyphs.render(
             render_pass,
-            &self.glyphs,
+            &self.constants,
             &self.pong_bind_group,
             &self.glyph_pipeline,
         );
@@ -370,24 +364,5 @@ impl TextPipeline {
         self.glyphs.clear();
         self.blurs.clear();
         self.blur_atlas.clear();
-    }
-}
-
-/// Private.
-impl TextPipeline {
-    fn render<'pass, T>(
-        &self,
-        render_pass: &mut RenderPass<'pass>,
-        buffers: &'pass Buffers<T>,
-        bind_group: &'pass BindGroup,
-        pipeline: &'pass RenderPipeline,
-    ) {
-        let constants = self.constants.as_array();
-        let constants = bytemuck::cast_slice(&constants);
-
-        render_pass.set_pipeline(pipeline);
-        render_pass.set_bind_group(0, bind_group, &[]);
-        render_pass.set_push_constants(ShaderStages::VERTEX_FRAGMENT, 0, constants);
-        buffers.render(render_pass);
     }
 }

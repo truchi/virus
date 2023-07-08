@@ -103,21 +103,6 @@ impl<A: Axis, K: Clone + Eq + Hash, V> Allocator<A, K, V> {
         }
     }
 
-    /// Returns the width of the allocator.
-    pub fn width(&self) -> u32 {
-        self.width
-    }
-
-    /// Returns the height of the allocator.
-    pub fn height(&self) -> u32 {
-        self.height
-    }
-
-    /// Returns the bin main-axis size.
-    pub fn bin(&self) -> u32 {
-        self.bin
-    }
-
     /// Returns the number of items in the allocator.
     pub fn len(&self) -> usize {
         self.items.len()

@@ -31,6 +31,8 @@ use wgpu::{
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
+const INDEX_FORMAT: IndexFormat = IndexFormat::Uint32;
+
 type Index = u32;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
