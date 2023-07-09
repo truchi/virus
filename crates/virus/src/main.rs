@@ -4,8 +4,7 @@ mod events;
 mod fps;
 mod virus;
 
-// 🦀🚀🔥✅💸🇫🇷🇺🇸🤠🇨🇦🦫🐲🐱👨❤️❤️‍🔥 //
-// 00112233445566778899001122
+// 🦠: a 😍 editor in 🦀 with ❤️
 fn main() -> () {
-    virus::Virus::run("virus") // 🦀
+    virus::Virus::run("virus")
 }
