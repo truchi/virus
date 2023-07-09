@@ -158,7 +158,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
         self.highlights();
         self.render_line_numbers();
         self.render_document();
-        self.render_selection(self.document.selection());
+        self.render_selection(self.document.selection().to_range());
         self.render_scrollbar();
     }
 

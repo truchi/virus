@@ -1,4 +1,5 @@
-use tree_sitter::{InputEdit, Point};
+use std::ops::Range;
+use tree_sitter::{InputEdit, Node, Point};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Cursor                                            //
@@ -62,6 +63,29 @@ impl Cursor {
                 input_edit.new_end_position.column,
             ),
         )
+    }
+
+    pub fn from_range(range: tree_sitter::Range) -> Range<Self> {
+        let tree_sitter::Range {
+            start_byte: start_index,
+            start_point:
+                Point {
+                    row: start_line,
+                    column: start_column,
+                },
+            end_byte: end_index,
+            end_point:
+                Point {
+                    row: end_line,
+                    column: end_column,
+                },
+        } = range;
+
+        Self::new(start_index, start_line, start_column)..Self::new(end_index, end_line, end_column)
+    }
+
+    pub fn from_node(node: Node) -> Range<Self> {
+        Self::from_range(node.range())
     }
 }
 

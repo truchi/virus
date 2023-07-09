@@ -5,8 +5,47 @@ use std::{
     io::{BufReader, BufWriter, Write},
     ops::Range,
 };
-use tree_sitter::{Parser, Query, Tree};
+use tree_sitter::{Node, Parser, Query, Tree};
 use virus_common::Cursor;
+
+#[derive(Copy, Clone, Debug)]
+pub enum Selection {
+    Range { start: Cursor, end: Cursor },
+    Ast { start: Cursor, end: Cursor },
+}
+
+impl Default for Selection {
+    fn default() -> Self {
+        Self::Range {
+            start: Cursor::default(),
+            end: Cursor::default(),
+        }
+    }
+}
+
+impl Selection {
+    pub fn range(Range { start, end }: Range<Cursor>) -> Self {
+        Self::Range { start, end }
+    }
+
+    pub fn ast(Range { start, end }: Range<Cursor>) -> Self {
+        Self::Ast { start, end }
+    }
+
+    pub fn as_range(&self) -> Option<Range<Cursor>> {
+        match *self {
+            Self::Range { start, end } => Some(start..end),
+            _ => None,
+        }
+    }
+
+    pub fn to_range(&self) -> Range<Cursor> {
+        match *self {
+            Self::Range { start, end } => start..end,
+            Self::Ast { start, end } => start..end,
+        }
+    }
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Document                                           //
@@ -16,7 +55,7 @@ use virus_common::Cursor;
 pub struct Document {
     path: Option<String>,
     rope: Rope,
-    selection: Range<Cursor>, // Byte cursor, but ropey uses char indices...
+    selection: Selection,
     language: Option<Language>,
     parser: Option<Parser>,
     tree: Option<Tree>,
@@ -28,7 +67,7 @@ impl Document {
         Self {
             path: None,
             rope: Default::default(),
-            selection: Cursor::ZERO..Cursor::ZERO,
+            selection: Default::default(),
             language,
             parser: language.map(|language| language.parser()).flatten(),
             tree: None,
@@ -97,11 +136,11 @@ impl Document {
         &self.rope
     }
 
-    pub fn selection(&self) -> Range<Cursor> {
-        self.selection.clone()
+    pub fn selection(&self) -> Selection {
+        self.selection
     }
 
-    pub fn selection_mut(&mut self) -> &mut Range<Cursor> {
+    pub fn selection_mut(&mut self) -> &mut Selection {
         &mut self.selection
     }
 
@@ -133,35 +172,71 @@ impl Document {
 /// Movements.
 impl Document {
     pub fn move_up(&mut self) {
-        let (start, end) = (self.selection.start, self.selection.end);
-        debug_assert!(start == end);
-
-        let cursor = self.rope.grapheme_above(start);
-        self.selection = cursor..cursor;
+        match self.selection {
+            Selection::Range { start, .. } => {
+                // TODO start != end?
+                let cursor = self.rope.grapheme_above(start);
+                self.selection = Selection::range(cursor..cursor);
+            }
+            Selection::Ast { start, end } => {
+                if let Some(node) = self.find_node(start..end) {
+                    let node = prev_or_last_sibling(node);
+                    dbg!(node.kind());
+                    self.selection = Selection::ast(Cursor::from_node(node));
+                }
+            }
+        }
     }
 
     pub fn move_down(&mut self) {
-        let (start, end) = (self.selection.start, self.selection.end);
-        debug_assert!(start == end);
-
-        let cursor = self.rope.grapheme_below(start);
-        self.selection = cursor..cursor;
+        match self.selection {
+            Selection::Range { start, .. } => {
+                // TODO start != end?
+                let cursor = self.rope.grapheme_below(start);
+                self.selection = Selection::range(cursor..cursor);
+            }
+            Selection::Ast { start, end } => {
+                if let Some(node) = self.find_node(start..end) {
+                    let node = next_or_first_sibling(node);
+                    dbg!(node.kind());
+                    self.selection = Selection::ast(Cursor::from_node(node));
+                }
+            }
+        }
     }
 
     pub fn move_prev(&mut self) {
-        let (start, end) = (self.selection.start, self.selection.end);
-        debug_assert!(start == end);
-
-        let cursor = self.rope.prev_grapheme(start);
-        self.selection = cursor..cursor;
+        match self.selection {
+            Selection::Range { start, .. } => {
+                // TODO start != end?
+                let cursor = self.rope.prev_grapheme(start);
+                self.selection = Selection::range(cursor..cursor);
+            }
+            Selection::Ast { start, end } => {
+                if let Some(node) = self.find_node(start..end) {
+                    let node = node.parent().unwrap_or(node);
+                    dbg!(node.kind());
+                    self.selection = Selection::ast(Cursor::from_node(node));
+                }
+            }
+        }
     }
 
     pub fn move_next(&mut self) {
-        let (start, end) = (self.selection.start, self.selection.end);
-        debug_assert!(start == end);
-
-        let cursor = self.rope.next_grapheme(start);
-        self.selection = cursor..cursor;
+        match self.selection {
+            Selection::Range { start, .. } => {
+                // TODO start != end?
+                let cursor = self.rope.next_grapheme(start);
+                self.selection = Selection::range(cursor..cursor);
+            }
+            Selection::Ast { start, end } => {
+                if let Some(node) = self.find_node(start..end) {
+                    let node = node.child(0).unwrap_or(node);
+                    dbg!(node.kind());
+                    self.selection = Selection::ast(Cursor::from_node(node));
+                }
+            }
+        }
     }
 }
 
@@ -170,8 +245,9 @@ impl Document {
     pub fn edit_str(&mut self, str: &str) {
         // TODO edit cursors and tree
 
-        let start = self.selection.start.index;
-        let end = self.selection.end.index;
+        let Range { start, end } = self.selection.to_range();
+        let start = start.index;
+        let end = end.index;
         let start_char = self.rope.byte_to_char(start);
 
         if start != end {
@@ -187,24 +263,23 @@ impl Document {
     }
 
     pub fn edit_char(&mut self, char: char) {
-        let (start, end) = (self.selection.start, self.selection.end);
+        let Range { start, end } = self.selection.to_range();
 
         self.rope.edit_char(start..end, char);
         self.dirty = true;
 
         let cursor = self.rope.cursor_at_index(start.index + char.len_utf8());
         self.edit_tree(start, end, cursor);
-        self.selection = cursor..cursor;
+        self.selection = Selection::range(cursor..cursor);
     }
 
     pub fn backspace(&mut self) -> Result<(), ()> {
-        let (start, end) = (self.selection.start, self.selection.end);
+        let Range { start, end } = self.selection.to_range();
 
         if start != end {
             return Err(());
         }
 
-        let end = self.selection.end;
         let start = self.rope.prev_grapheme(end);
 
         if start != end {
@@ -213,7 +288,7 @@ impl Document {
             self.dirty = true;
 
             self.edit_tree(start, end, start);
-            self.selection = start..start;
+            self.selection = Selection::range(start..start);
         }
 
         Ok(())
@@ -227,4 +302,27 @@ impl Document {
             tree.edit(&Cursor::into_input_edit(start, old_end, new_end));
         }
     }
+
+    fn find_node(&self, range: Range<Cursor>) -> Option<Node> {
+        self.tree.as_ref().and_then(|tree| {
+            tree.root_node()
+                .descendant_for_point_range(range.start.into(), range.end.into())
+        })
+    }
+}
+
+fn prev_or_last_sibling(node: Node) -> Node {
+    node.prev_sibling().unwrap_or_else(|| {
+        node.parent()
+            .and_then(|parent| parent.child(parent.child_count() - 1))
+            .unwrap_or(node)
+    })
+}
+
+fn next_or_first_sibling(node: Node) -> Node {
+    node.next_sibling().unwrap_or_else(|| {
+        node.parent()
+            .and_then(|parent| parent.child(0))
+            .unwrap_or(node)
+    })
 }

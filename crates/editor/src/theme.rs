@@ -169,10 +169,11 @@ impl Theme {
                 strike: Default::default(),
                 foreground: Rgba::new(r, g, b, u8::MAX),
                 background: Rgba::TRANSPARENT,
-                shadow: Some(Shadow {
-                    radius: 10,
-                    color: Rgba::new(b, r, g, u8::MAX),
-                }),
+                shadow: None,
+                // shadow: Some(Shadow {
+                //     radius: 10,
+                //     color: Rgba::new(b, r, g, u8::MAX),
+                // }),
             }
         }
 

@@ -34,8 +34,8 @@ impl Ui {
             HIGHLIGHT_QUERY.into(),
             context.fonts().get("Victor").unwrap().key(),
             Theme::dracula(),
-            32,
-            40,
+            16,
+            20,
         );
 
         Self {

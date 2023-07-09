@@ -1,6 +1,7 @@
 use crate::events::{Event, Events};
 use std::time::Instant;
-use virus_editor::document::Document;
+use virus_common::Cursor;
+use virus_editor::document::{Document, Selection};
 use virus_ui::ui::Ui;
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
@@ -26,6 +27,9 @@ impl Virus {
         let ui = Ui::new(window);
         let mut document = Document::open(std::env::args().skip(1).next().unwrap()).unwrap();
         document.parse();
+
+        // TODO
+        *document.selection_mut() = Selection::ast(Cursor::default()..Cursor::default());
 
         Self {
             events,
@@ -121,6 +125,7 @@ impl Virus {
             }
         }
 
+        // TODO handle that better
         self.document.parse();
     }
 
