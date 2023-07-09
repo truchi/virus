@@ -1,4 +1,4 @@
-use crate::{language::Language, rope::RopeExt};
+use crate::{language::Language, rope::RopeExt, walk::Walk};
 use ropey::Rope;
 use std::{
     fs::{File, OpenOptions},
@@ -180,7 +180,7 @@ impl Document {
             }
             Selection::Ast { start, end } => {
                 if let Some(node) = self.find_node(start..end) {
-                    let node = prev_or_last_sibling(node);
+                    let node = Walk(node).prev_or_last_sibling().0;
                     dbg!(node.kind());
                     self.selection = Selection::ast(Cursor::from_node(node));
                 }
@@ -197,7 +197,7 @@ impl Document {
             }
             Selection::Ast { start, end } => {
                 if let Some(node) = self.find_node(start..end) {
-                    let node = next_or_first_sibling(node);
+                    let node = Walk(node).next_or_first_sibling().0;
                     dbg!(node.kind());
                     self.selection = Selection::ast(Cursor::from_node(node));
                 }
@@ -214,7 +214,7 @@ impl Document {
             }
             Selection::Ast { start, end } => {
                 if let Some(node) = self.find_node(start..end) {
-                    let node = node.parent().unwrap_or(node);
+                    let node = Walk(node).parent_or_node().0;
                     dbg!(node.kind());
                     self.selection = Selection::ast(Cursor::from_node(node));
                 }
@@ -231,7 +231,7 @@ impl Document {
             }
             Selection::Ast { start, end } => {
                 if let Some(node) = self.find_node(start..end) {
-                    let node = node.child(0).unwrap_or(node);
+                    let node = Walk(node).first_child_or_node().0;
                     dbg!(node.kind());
                     self.selection = Selection::ast(Cursor::from_node(node));
                 }
@@ -304,25 +304,21 @@ impl Document {
     }
 
     fn find_node(&self, range: Range<Cursor>) -> Option<Node> {
-        self.tree.as_ref().and_then(|tree| {
-            tree.root_node()
-                .descendant_for_point_range(range.start.into(), range.end.into())
-        })
+        let mut node = self
+            .tree
+            .as_ref()?
+            .root_node()
+            .descendant_for_point_range(range.start.into(), range.end.into())?;
+
+        // Make sure parent's range != node's range,
+        // or we are trapped in this node!
+        while let Some(parent) = node
+            .parent()
+            .filter(|parent| parent.byte_range() == node.byte_range())
+        {
+            node = parent;
+        }
+
+        Some(node)
     }
-}
-
-fn prev_or_last_sibling(node: Node) -> Node {
-    node.prev_sibling().unwrap_or_else(|| {
-        node.parent()
-            .and_then(|parent| parent.child(parent.child_count() - 1))
-            .unwrap_or(node)
-    })
-}
-
-fn next_or_first_sibling(node: Node) -> Node {
-    node.next_sibling().unwrap_or_else(|| {
-        node.parent()
-            .and_then(|parent| parent.child(0))
-            .unwrap_or(node)
-    })
 }
