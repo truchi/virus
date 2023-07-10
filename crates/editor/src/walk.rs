@@ -1,6 +1,6 @@
 use tree_sitter::Node;
 
-const SKIP: &[&str] = &["{", "}", "(", ")", "[", "]", "::", ":", ";", ",", "."];
+const SKIP: &[&str] = &["{", "}", "(", ")", "[", "]", "\"", "::", ":", ";", ",", "."];
 
 fn check(node: &Node) -> bool {
     !SKIP.contains(&node.kind())
