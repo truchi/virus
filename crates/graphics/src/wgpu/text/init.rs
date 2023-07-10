@@ -102,7 +102,7 @@ impl<'a> Init<'a> {
         self.0.create_texture(&texture! {
             label: "[TextPipeline] Color glyphs texture",
             size: [width, height],
-            format: TextureFormat::Rgba8Unorm,
+            format: TextureFormat::Rgba8UnormSrgb,
             usage: TEXTURE_BINDING | COPY_DST,
         })
     }
