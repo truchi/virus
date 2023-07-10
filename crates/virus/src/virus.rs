@@ -112,10 +112,10 @@ impl Virus {
                 self.document.move_down();
             }
             LEFT if modifiers.alt() => {
-                self.document.move_prev();
+                self.document.move_left();
             }
             RIGHT if modifiers.alt() => {
-                self.document.move_next();
+                self.document.move_right();
             }
             SAVE if modifiers.alt() => {
                 self.document.save().unwrap();

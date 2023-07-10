@@ -39,10 +39,73 @@ impl Selection {
         }
     }
 
+    pub fn as_ast(&self) -> Option<Range<Cursor>> {
+        match *self {
+            Self::Ast { start, end } => Some(start..end),
+            _ => None,
+        }
+    }
+
     pub fn to_range(&self) -> Range<Cursor> {
         match *self {
             Self::Range { start, end } => start..end,
             Self::Ast { start, end } => start..end,
+        }
+    }
+
+    pub fn move_up(&self, document: &Document) -> Option<Self> {
+        match *self {
+            Selection::Range { start, .. } => {
+                // TODO start != end?
+                let cursor = document.rope.grapheme_above(start);
+                Some(Self::range(cursor..cursor))
+            }
+            Selection::Ast { start, end } => document
+                .find_node(start..end)
+                .map(|node| Cursor::from_node(Walk(node).prev_or_last_sibling().0))
+                .map(Selection::ast),
+        }
+    }
+
+    pub fn move_down(&mut self, document: &Document) -> Option<Self> {
+        match *self {
+            Selection::Range { start, .. } => {
+                // TODO start != end?
+                let cursor = document.rope.grapheme_below(start);
+                Some(Selection::range(cursor..cursor))
+            }
+            Selection::Ast { start, end } => document
+                .find_node(start..end)
+                .map(|node| Cursor::from_node(Walk(node).next_or_first_sibling().0))
+                .map(Self::ast),
+        }
+    }
+
+    pub fn move_left(&mut self, document: &Document) -> Option<Self> {
+        match *self {
+            Selection::Range { start, .. } => {
+                // TODO start != end?
+                let cursor = document.rope.prev_grapheme(start);
+                Some(Selection::range(cursor..cursor))
+            }
+            Selection::Ast { start, end } => document
+                .find_node(start..end)
+                .map(|node| Cursor::from_node(Walk(node).parent_or_node().0))
+                .map(Self::ast),
+        }
+    }
+
+    pub fn move_right(&mut self, document: &Document) -> Option<Self> {
+        match *self {
+            Selection::Range { start, .. } => {
+                // TODO start != end?
+                let cursor = document.rope.next_grapheme(start);
+                Some(Selection::range(cursor..cursor))
+            }
+            Selection::Ast { start, end } => document
+                .find_node(start..end)
+                .map(|node| Cursor::from_node(Walk(node).first_child_or_node().0))
+                .map(Self::ast),
         }
     }
 }
@@ -112,6 +175,7 @@ impl Document {
     }
 
     pub fn parse(&mut self) -> Option<&Tree> {
+        // TODO is_tree_dirty(/is_file_dirty)
         if let Some(parser) = self.parser.as_mut() {
             self.tree = parser.parse_with(
                 &mut |index, _| {
@@ -172,70 +236,26 @@ impl Document {
 /// Movements.
 impl Document {
     pub fn move_up(&mut self) {
-        match self.selection {
-            Selection::Range { start, .. } => {
-                // TODO start != end?
-                let cursor = self.rope.grapheme_above(start);
-                self.selection = Selection::range(cursor..cursor);
-            }
-            Selection::Ast { start, end } => {
-                if let Some(node) = self.find_node(start..end) {
-                    let node = Walk(node).prev_or_last_sibling().0;
-                    dbg!(node.kind());
-                    self.selection = Selection::ast(Cursor::from_node(node));
-                }
-            }
+        if let Some(selection) = self.selection().move_up(self) {
+            self.selection = selection;
         }
     }
 
     pub fn move_down(&mut self) {
-        match self.selection {
-            Selection::Range { start, .. } => {
-                // TODO start != end?
-                let cursor = self.rope.grapheme_below(start);
-                self.selection = Selection::range(cursor..cursor);
-            }
-            Selection::Ast { start, end } => {
-                if let Some(node) = self.find_node(start..end) {
-                    let node = Walk(node).next_or_first_sibling().0;
-                    dbg!(node.kind());
-                    self.selection = Selection::ast(Cursor::from_node(node));
-                }
-            }
+        if let Some(selection) = self.selection().move_down(self) {
+            self.selection = selection;
         }
     }
 
-    pub fn move_prev(&mut self) {
-        match self.selection {
-            Selection::Range { start, .. } => {
-                // TODO start != end?
-                let cursor = self.rope.prev_grapheme(start);
-                self.selection = Selection::range(cursor..cursor);
-            }
-            Selection::Ast { start, end } => {
-                if let Some(node) = self.find_node(start..end) {
-                    let node = Walk(node).parent_or_node().0;
-                    dbg!(node.kind());
-                    self.selection = Selection::ast(Cursor::from_node(node));
-                }
-            }
+    pub fn move_left(&mut self) {
+        if let Some(selection) = self.selection().move_left(self) {
+            self.selection = selection;
         }
     }
 
-    pub fn move_next(&mut self) {
-        match self.selection {
-            Selection::Range { start, .. } => {
-                // TODO start != end?
-                let cursor = self.rope.next_grapheme(start);
-                self.selection = Selection::range(cursor..cursor);
-            }
-            Selection::Ast { start, end } => {
-                if let Some(node) = self.find_node(start..end) {
-                    let node = Walk(node).first_child_or_node().0;
-                    dbg!(node.kind());
-                    self.selection = Selection::ast(Cursor::from_node(node));
-                }
-            }
+    pub fn move_right(&mut self) {
+        if let Some(selection) = self.selection().move_right(self) {
+            self.selection = selection;
         }
     }
 }
