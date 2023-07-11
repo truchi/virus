@@ -2,7 +2,7 @@ use ropey::Rope;
 use std::{borrow::Cow, ops::Range, time::Duration};
 use virus_common::Cursor;
 use virus_editor::{
-    document::Document,
+    document::{Document, Selection},
     highlights::{Highlight, Highlights},
     theme::Theme,
 };
@@ -159,7 +159,35 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
         self.render_line_numbers();
         self.render_document();
         self.render_selection(self.document.selection().to_range());
+        self.render_ast_helpers();
         self.render_scrollbar();
+    }
+}
+
+impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
+    fn row(&self, cursor: Cursor) -> i32 {
+        1 + cursor.line as i32 * self.view.line_height as i32 - self.scroll_top as i32
+    }
+
+    fn column(&self, cursor: Cursor) -> i32 {
+        1 + self.line_numbers_width.ceil() as i32
+            + (if let Some(line) = self
+                .view
+                .lines
+                .iter()
+                .find_map(|(index, line)| (*index == cursor.line).then_some(line))
+            {
+                line.glyphs()
+                    .iter()
+                    .find_map(|glyph| {
+                        // TODO: consecutive glyphs may have same range!
+                        (glyph.range.end as usize > cursor.column).then_some(glyph.offset)
+                    })
+                    .unwrap_or_else(|| line.advance())
+                    .round() as i32
+            } else {
+                0
+            })
     }
 
     fn highlights(&mut self) {
@@ -273,41 +301,40 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
     }
 
     fn render_selection(&mut self, selection: Range<Cursor>) {
+        fn render_outline(
+            renderer: &mut Renderer,
+            top: Option<i32>,
+            bottom: Option<i32>,
+            left: i32,
+            right: i32,
+        ) {
+            for (i, color) in Renderer::OUTLINES {
+                if let Some(top) = top {
+                    renderer
+                        .draw
+                        .polyline([([top + i, left], color), ([top + i, right], color)]);
+                }
+
+                if let Some(bottom) = bottom {
+                    renderer
+                        .draw
+                        .polyline([([bottom - i, left], color), ([bottom - i, right], color)]);
+                }
+            }
+        }
+
         let width = self.draw.width() as i32;
         let height = self.view.line_height as i32;
-
-        let row = |cursor: Cursor| 1 + cursor.line as i32 * height - self.scroll_top as i32;
-        let column = |cursor: Cursor| {
-            1 + self.line_numbers_width.ceil() as i32
-                + (if let Some(line) = self
-                    .view
-                    .lines
-                    .iter()
-                    .find_map(|(index, line)| (*index == cursor.line).then_some(line))
-                {
-                    line.glyphs()
-                        .iter()
-                        .find_map(|glyph| {
-                            // TODO: consecutive glyphs may have same range!
-                            (glyph.range.end as usize > cursor.column).then_some(glyph.offset)
-                        })
-                        .unwrap_or_else(|| line.advance())
-                        .round() as i32
-                } else {
-                    0
-                })
-        };
-
-        let top = row(selection.start);
-        let bottom = row(selection.end);
-        let start = column(selection.start);
-        let end = column(selection.end);
+        let top = self.row(selection.start);
+        let bottom = self.row(selection.end);
+        let start = self.column(selection.start);
+        let end = self.column(selection.end);
 
         // Caret
         if selection.start.index == selection.end.index {
             let bottom = top + height;
 
-            self.render_outline(Some(top), Some(bottom), 0, width);
+            render_outline(self, Some(top), Some(bottom), 0, width);
 
             for (i, color) in Self::CARETS {
                 self.draw
@@ -320,8 +347,8 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
         else if selection.start.line == selection.end.line {
             let bottom = top + height;
 
-            self.render_outline(Some(top), Some(bottom), 0, start);
-            self.render_outline(Some(top), Some(bottom), end, width);
+            render_outline(self, Some(top), Some(bottom), 0, start);
+            render_outline(self, Some(top), Some(bottom), end, width);
 
             for (i, color) in Self::CARETS {
                 self.draw.polyline([
@@ -338,8 +365,8 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             let middle = top + height;
             let bottom = middle + height;
 
-            self.render_outline(Some(top), None, 0, start);
-            self.render_outline(None, Some(bottom), end, width);
+            render_outline(self, Some(top), None, 0, start);
+            render_outline(self, None, Some(bottom), end, width);
 
             for (i, color) in Self::CARETS {
                 self.draw.polyline([
@@ -360,8 +387,8 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
         else {
             let (top1, top2, bottom1, bottom2) = (top, top + height, bottom, bottom + height);
 
-            self.render_outline(Some(top1), None, 0, start);
-            self.render_outline(None, Some(bottom2), end, width);
+            render_outline(self, Some(top1), None, 0, start);
+            render_outline(self, None, Some(bottom2), end, width);
 
             for (i, color) in Self::CARETS {
                 self.draw.polyline([
@@ -380,17 +407,83 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
         }
     }
 
-    fn render_outline(&mut self, top: Option<i32>, bottom: Option<i32>, left: i32, right: i32) {
-        for (i, color) in Self::OUTLINES {
-            if let Some(top) = top {
-                self.draw
-                    .polyline([([top + i, left], color), ([top + i, right], color)]);
-            }
+    fn render_ast_helpers(&mut self) {
+        const UP_DOWN: &str = "↕";
+        const UP: &str = "↑";
+        const DOWN: &str = "↓";
+        const LEFT: &str = "←";
+        const RIGHT: &str = "→";
+        const STYLES: Styles = Styles {
+            weight: FontWeight::Regular,
+            style: FontStyle::Normal,
+            foreground: Rgba::WHITE,
+            background: Rgba::TRANSPARENT,
+            underline: false,
+            strike: false,
+            shadow: None,
+        };
 
-            if let Some(bottom) = bottom {
-                self.draw
-                    .polyline([([bottom - i, left], color), ([bottom - i, right], color)]);
+        let range = match self.document.selection().as_ast() {
+            Some(range) => range,
+            None => return,
+        };
+        let [up, down, left, right] = std::array::from_fn(|i| {
+            [
+                Selection::move_up,
+                Selection::move_down,
+                Selection::move_left,
+                Selection::move_right,
+            ][i](self.document.selection(), self.document)
+            .and_then(|selection| selection.as_ast())
+            .filter(|selection| *selection != range)
+            .map(|range| range.start)
+        });
+
+        fn draw(renderer: &mut Renderer, cursor: Cursor, str: &str) {
+            let line = {
+                let mut shaper = Line::shaper(renderer.context, renderer.view.font_size);
+                shaper.push(&str, renderer.view.family, STYLES);
+                shaper.line()
+            };
+
+            renderer.draw.glyphs(
+                renderer.context,
+                [
+                    renderer.row(cursor),
+                    renderer.column(cursor)
+                        - (str == LEFT)
+                            .then(|| line.glyphs().first())
+                            .flatten()
+                            .map(|glyph| glyph.advance as i32)
+                            .unwrap_or_default(),
+                ],
+                &line,
+                0,
+                Default::default(),
+            );
+        }
+
+        match (up, down) {
+            (Some(up), Some(down)) if up == down => {
+                draw(self, up, UP_DOWN);
             }
+            _ => {
+                if let Some(cursor) = up {
+                    draw(self, cursor, UP);
+                }
+
+                if let Some(cursor) = down {
+                    draw(self, cursor, DOWN);
+                }
+            }
+        }
+
+        if let Some(cursor) = left {
+            draw(self, cursor, LEFT);
+        }
+
+        if let Some(cursor) = right {
+            draw(self, cursor, RIGHT);
         }
     }
 

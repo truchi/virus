@@ -67,7 +67,7 @@ impl Selection {
         }
     }
 
-    pub fn move_down(&mut self, document: &Document) -> Option<Self> {
+    pub fn move_down(&self, document: &Document) -> Option<Self> {
         match *self {
             Selection::Range { start, .. } => {
                 // TODO start != end?
@@ -81,7 +81,7 @@ impl Selection {
         }
     }
 
-    pub fn move_left(&mut self, document: &Document) -> Option<Self> {
+    pub fn move_left(&self, document: &Document) -> Option<Self> {
         match *self {
             Selection::Range { start, .. } => {
                 // TODO start != end?
@@ -95,7 +95,7 @@ impl Selection {
         }
     }
 
-    pub fn move_right(&mut self, document: &Document) -> Option<Self> {
+    pub fn move_right(&self, document: &Document) -> Option<Self> {
         match *self {
             Selection::Range { start, .. } => {
                 // TODO start != end?
@@ -200,8 +200,8 @@ impl Document {
         &self.rope
     }
 
-    pub fn selection(&self) -> Selection {
-        self.selection
+    pub fn selection(&self) -> &Selection {
+        &self.selection
     }
 
     pub fn selection_mut(&mut self) -> &mut Selection {
