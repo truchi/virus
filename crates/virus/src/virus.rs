@@ -22,6 +22,9 @@ pub struct Virus {
 }
 
 impl Virus {
+    const FRAMES_PER_SECOND: u8 = 30;
+    const MILLIS_PER_FRAME: u128 = 1000 / Virus::FRAMES_PER_SECOND as u128;
+
     fn new(window: Window) -> Self {
         let events = Events::new();
         let ui = Ui::new(window);
@@ -150,18 +153,28 @@ impl Virus {
 
     fn on_redraw(&mut self, flow: &mut ControlFlow) {
         let now = Instant::now();
-        let delta = now - self.last_render.unwrap_or(now);
-        self.last_render = Some(now);
 
+        let delta = if let Some(last_render) = self.last_render {
+            let delta = now - last_render;
+
+            if delta.as_millis() < Self::MILLIS_PER_FRAME {
+                return;
+            }
+
+            delta
+        } else {
+            Default::default()
+        };
+
+        self.last_render = Some(now);
         self.ui.update(delta);
         self.ui.render(&self.document);
 
-        // dbg!(delta);
-        // if self.ui.is_animating() {
-        //     flow.set_wait_timeout(std::time::Duration::from_millis(10_000));
-        // } else {
-        //     flow.set_wait();
-        // }
+        if self.ui.is_animating() {
+            flow.set_poll();
+        } else {
+            flow.set_wait();
+        }
     }
 
     fn on_close(&mut self, flow: &mut ControlFlow) {}

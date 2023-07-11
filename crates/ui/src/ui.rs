@@ -53,7 +53,9 @@ impl Ui {
     }
 
     pub fn is_animating(&self) -> bool {
-        self.scroll_top.is_animating() || self.scrollbar_alpha.is_animating()
+        self.document_view.is_animating()
+            || self.scroll_top.is_animating()
+            || self.scrollbar_alpha.is_animating()
     }
 
     pub fn scroll_up(&mut self) {

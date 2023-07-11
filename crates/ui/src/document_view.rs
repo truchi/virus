@@ -25,6 +25,7 @@ pub struct DocumentView {
     font_size: FontSize,
     line_height: LineHeight,
     rope: Rope,
+    is_animating: bool,
     range: Range<usize>,
     lines: Vec<(usize, Line)>,
 }
@@ -44,6 +45,7 @@ impl DocumentView {
             font_size,
             line_height,
             rope: Default::default(),
+            is_animating: false,
             range: 0..0,
             lines: Vec::default(),
         }
@@ -63,6 +65,10 @@ impl DocumentView {
 
     pub fn rope(&self) -> &Rope {
         &self.rope
+    }
+
+    pub fn is_animating(&self) -> bool {
+        self.is_animating
     }
 
     pub fn render(
@@ -203,7 +209,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
         // Apply margins: half that line range above and below
         let margin = (self.end - self.start) / 2;
         let start = self.start.saturating_sub(margin);
-        let end = (self.end + margin).max(self.rope_lines + 1);
+        let end = (self.end + margin).min(self.rope_lines + 1);
 
         self.view.lines.clear();
         self.view.range = start..end;
@@ -287,8 +293,15 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
 
     fn render_document(&mut self) {
         let left = self.line_numbers_width.ceil() as i32;
+        let mut is_animating = false;
 
-        for (index, line) in &self.view.lines {
+        for (index, line) in self
+            .view
+            .lines
+            .iter()
+            .skip_while(|(index, _)| *index < self.start)
+            .take_while(|(index, _)| *index <= self.end)
+        {
             let top = *index as i32 * self.view.line_height as i32 - self.scroll_top as i32;
             self.draw.glyphs(
                 self.context,
@@ -297,7 +310,13 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
                 self.view.line_height as u32,
                 self.time,
             );
+
+            if line.has_animated_glyphs() {
+                is_animating = true;
+            }
         }
+
+        self.view.is_animating = is_animating;
     }
 
     fn render_selection(&mut self, selection: Range<Cursor>) {

@@ -19,6 +19,8 @@ pub struct Line {
     font_size: FontSize,
     /// Advance.
     advance: Advance,
+    /// Has animated glyphs?
+    has_animated_glyphs: bool,
 }
 
 impl Line {
@@ -45,6 +47,11 @@ impl Line {
     /// Returns the `Advance` of this `Line`.
     pub fn advance(&self) -> Advance {
         self.advance
+    }
+
+    /// Returns `true` if this `Line` has animated glyphs.
+    pub fn has_animated_glyphs(&self) -> bool {
+        self.has_animated_glyphs
     }
 
     /// Returns an iterator of contiguous `key(glyph)`.
@@ -155,6 +162,7 @@ impl<'a> LineShaper<'a> {
                 glyphs: Vec::new(),
                 font_size,
                 advance: 0.,
+                has_animated_glyphs: false,
             },
             bytes: 0,
         }
@@ -292,12 +300,17 @@ impl<'a> LineShaper<'a> {
         shaper.shape_with(|cluster| {
             debug_assert!(cluster.glyphs.len() <= 1);
 
+            let animated_id = animated_glyph_id(cluster.source);
+            if animated_id.is_some() {
+                line.has_animated_glyphs = true;
+            }
+
             for glyph in cluster.glyphs {
                 line.glyphs.push(Glyph {
                     font,
                     size,
                     id: glyph.id,
-                    animated_id: animated_glyph_id(cluster.source),
+                    animated_id,
                     offset: line.advance,
                     advance: glyph.advance,
                     range: cluster.source,
