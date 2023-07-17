@@ -20,14 +20,15 @@ use wgpu::{
     include_wgsl, vertex_attr_array, BindGroup, BindGroupDescriptor, BindGroupEntry,
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
     BlendState, Buffer, BufferAddress, BufferDescriptor, BufferUsages, Color, ColorTargetState,
-    ColorWrites, CommandEncoderDescriptor, Device, DeviceDescriptor, Extent3d, Features,
-    FragmentState, ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, Limits, LoadOp,
-    Operations, Origin3d, PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology,
-    PushConstantRange, Queue, RenderPass, RenderPassColorAttachment, RenderPassDescriptor,
-    RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions, SamplerBindingType,
-    ShaderStages, Surface, SurfaceConfiguration, Texture, TextureAspect, TextureDescriptor,
-    TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureView,
-    TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexState, VertexStepMode,
+    ColorWrites, CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Extent3d,
+    Features, FragmentState, ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, Limits,
+    LoadOp, Operations, Origin3d, PipelineLayoutDescriptor, PresentMode, PrimitiveState,
+    PrimitiveTopology, PushConstantRange, Queue, RenderPass, RenderPassColorAttachment,
+    RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions,
+    SamplerBindingType, ShaderStages, Surface, SurfaceConfiguration, Texture, TextureAspect,
+    TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages,
+    TextureView, TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexState,
+    VertexStepMode,
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
@@ -83,11 +84,19 @@ impl Graphics {
         .unwrap();
 
         // Configure surface
-        let size = window.inner_size();
-        let config = surface
-            .get_default_config(&adapter, size.width, size.height)
-            .unwrap();
-        assert!(config.format == TextureFormat::Bgra8UnormSrgb);
+        let config = {
+            let size = window.inner_size();
+            let capabilities = surface.get_capabilities(&adapter);
+            SurfaceConfiguration {
+                usage: TextureUsages::RENDER_ATTACHMENT,
+                format: capabilities.formats[0],
+                width: size.width,
+                height: size.height,
+                present_mode: PresentMode::Fifo,
+                alpha_mode: CompositeAlphaMode::Auto,
+                view_formats: vec![],
+            }
+        };
         surface.configure(&device, &config);
 
         // Pipelines

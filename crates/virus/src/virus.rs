@@ -24,7 +24,7 @@ pub struct Virus {
 }
 
 impl Virus {
-    const FRAMES_PER_SECOND: u8 = 30;
+    const FRAMES_PER_SECOND: u8 = 60;
     const MILLIS_PER_FRAME: u128 = 1000 / Virus::FRAMES_PER_SECOND as u128;
 
     fn new(window: Window) -> Self {
