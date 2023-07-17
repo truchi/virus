@@ -104,17 +104,21 @@ impl Virus {
             BACKSPACE => {
                 self.document.backspace().unwrap();
             }
-            UP if modifiers.alt() => {
-                self.document.move_up();
-            }
             'I' if modifiers.alt() => {
                 self.ui.scroll_up();
             }
             'K' if modifiers.alt() => {
                 self.ui.scroll_down();
             }
+            UP if modifiers.alt() => {
+                self.document.move_up();
+                self.ui
+                    .ensure_selection_is_visible(self.document.selection());
+            }
             DOWN if modifiers.alt() => {
                 self.document.move_down();
+                self.ui
+                    .ensure_selection_is_visible(self.document.selection());
             }
             LEFT if modifiers.alt() => {
                 self.document.move_left();

@@ -3,7 +3,10 @@ use crate::{
     tween::{Tween, Tweened},
 };
 use std::time::Duration;
-use virus_editor::{document::Document, theme::Theme};
+use virus_editor::{
+    document::{Document, Selection},
+    theme::Theme,
+};
 use virus_graphics::{
     text::{Context, Font, Fonts},
     wgpu::Graphics,
@@ -12,6 +15,7 @@ use winit::window::Window;
 
 const HIGHLIGHT_QUERY: &str = include_str!("../../editor/treesitter/rust/highlights.scm");
 const SCROLL_DURATION: Duration = Duration::from_millis(500);
+const SCROLL_TWEEN: Tween = Tween::ExpoOut;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                                 Ui                                             //
@@ -60,13 +64,7 @@ impl Ui {
 
     pub fn scroll_up(&mut self) {
         let scroll = self.screen_height_in_lines() / 2 * self.document_view.line_height();
-
-        self.scroll_top.to(
-            self.scroll_top.end().saturating_sub(scroll),
-            SCROLL_DURATION,
-            Tween::ExpoOut,
-        );
-        self.scrollbar_alpha = Tweened::with_animation(255, 0, SCROLL_DURATION, Tween::ExpoOut);
+        self.scroll_to(self.scroll_top.end().saturating_sub(scroll))
     }
 
     pub fn scroll_down(&mut self) {
@@ -76,10 +74,21 @@ impl Ui {
 
         if rope_lines > screen_height_in_lines {
             let end = self.scroll_top.end() + screen_height_in_lines / 2 * line_height;
-            let end = end.min((rope_lines - screen_height_in_lines) * line_height);
+            self.scroll_to(end.min((rope_lines - screen_height_in_lines) * line_height));
+        }
+    }
 
-            self.scroll_top.to(end, SCROLL_DURATION, Tween::ExpoOut);
-            self.scrollbar_alpha = Tweened::with_animation(255, 0, SCROLL_DURATION, Tween::ExpoOut);
+    pub fn ensure_selection_is_visible(&mut self, selection: &Selection) {
+        let line_height = self.document_view.line_height();
+        let screen_height_in_lines = self.screen_height_in_lines();
+        let line = selection.to_range().start.line as u32;
+        let start = self.scroll_top.end() / line_height;
+        let end = start + screen_height_in_lines;
+
+        if line < start {
+            self.scroll_to(line * line_height);
+        } else if line >= end {
+            self.scroll_to((line - screen_height_in_lines + 1) * line_height);
         }
     }
 
@@ -121,6 +130,12 @@ impl Ui {
         let top = (size.height - height) as i32 / 2;
 
         ([top, 0], [size.width, height])
+    }
+
+    fn scroll_to(&mut self, scroll_top: u32) {
+        self.scroll_top
+            .to(scroll_top, SCROLL_DURATION, SCROLL_TWEEN);
+        self.scrollbar_alpha = Tweened::with_animation(255, 0, SCROLL_DURATION, SCROLL_TWEEN);
     }
 }
 
