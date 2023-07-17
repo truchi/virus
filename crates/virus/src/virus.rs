@@ -1,3 +1,5 @@
+//! 🦠: a 😍 editor in 🦀 with ❤️
+
 use crate::events::{Event, Events};
 use std::time::Instant;
 use virus_common::Cursor;
