@@ -1,6 +1,6 @@
 use crate::{
-    document_view::DocumentView,
     tween::{Tween, Tweened},
+    views::DocumentView,
 };
 use std::time::Duration;
 use virus_editor::{
