@@ -1,6 +1,6 @@
 use crate::{
     tween::{Tween, Tweened},
-    views::DocumentView,
+    views::{DocumentView, FilesView},
 };
 use std::time::Duration;
 use virus_editor::{
@@ -8,7 +8,8 @@ use virus_editor::{
     theme::Theme,
 };
 use virus_graphics::{
-    text::{Context, Font, Fonts},
+    colors::Rgba,
+    text::{Context, Font, FontSize, Fonts, LineHeight},
     wgpu::Graphics,
 };
 use winit::window::Window;
@@ -16,6 +17,9 @@ use winit::window::Window;
 const HIGHLIGHT_QUERY: &str = include_str!("../../editor/treesitter/rust/highlights.scm");
 const SCROLL_DURATION: Duration = Duration::from_millis(500);
 const SCROLL_TWEEN: Tween = Tween::ExpoOut;
+
+const FONT_SIZE: FontSize = 16;
+const LINE_HEIGHT: LineHeight = 20;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                                 Ui                                             //
@@ -28,19 +32,23 @@ pub struct Ui {
     scroll_top: Tweened<u32>,
     scrollbar_alpha: Tweened<u8>,
     time: Duration,
+    files_view: FilesView,
 }
 
 impl Ui {
     pub fn new(window: Window) -> Self {
         let graphics = Graphics::new(window);
         let context = Context::new(fonts());
+        let family = context.fonts().get("Victor").unwrap();
+
         let document_view = DocumentView::new(
             HIGHLIGHT_QUERY.into(),
-            context.fonts().get("Victor").unwrap().key(),
+            family.key(),
             Theme::dracula(),
-            16,
-            20,
+            FONT_SIZE,
+            LINE_HEIGHT,
         );
+        let files_view = FilesView::new(family.key(), FONT_SIZE, LINE_HEIGHT, Rgba::BLACK);
 
         Self {
             graphics,
@@ -49,6 +57,7 @@ impl Ui {
             scroll_top: Tweened::new(0),
             scrollbar_alpha: Tweened::new(0),
             time: Duration::ZERO,
+            files_view,
         }
     }
 
@@ -113,6 +122,8 @@ impl Ui {
             self.scrollbar_alpha.current(),
             self.time,
         );
+        self.files_view
+            .render(&mut self.context, &mut self.graphics.draw(region));
 
         self.graphics.render();
     }

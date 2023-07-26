@@ -298,6 +298,11 @@ impl FontFamily {
 
         None
     }
+
+    /// Returns the best match for `FontWeight::Regular` and `FontStyle::Normal` in this family.
+    pub fn best_match_regular_normal(&self) -> Option<FontKey> {
+        self.best_match(FontWeight::Regular, FontStyle::Normal)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //

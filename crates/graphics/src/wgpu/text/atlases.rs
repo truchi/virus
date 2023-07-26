@@ -138,7 +138,7 @@ impl Atlases {
                 let ([u, v], _) = self
                     .mask_atlas
                     .insert(mask_key, placement, [width, height])
-                    .unwrap();
+                    .ok()?; // TODO!!!!!
                 (GlyphType::MASK, [u, v], &self.mask_texture, 1)
             }
             Content::Color => {

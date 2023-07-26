@@ -230,9 +230,19 @@ impl<'a> Draw<'a> {
         self.region.0[0]
     }
 
+    /// Returns the bottom coordinate of the drawing region.
+    pub fn bottom(&self) -> i32 {
+        self.top() + self.height() as i32
+    }
+
     /// Returns the left coordinate of the drawing region.
     pub fn left(&self) -> i32 {
         self.region.0[1]
+    }
+
+    /// Returns the right coordinate of the drawing region.
+    pub fn right(&self) -> i32 {
+        self.left() + self.width() as i32
     }
 
     /// Returns the width of the drawing region.
@@ -243,6 +253,29 @@ impl<'a> Draw<'a> {
     /// Returns the height of the drawing region.
     pub fn height(&self) -> u32 {
         self.region.1[1]
+    }
+
+    /// Crops relative to the current region.
+    pub fn draw(
+        &mut self,
+        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
+    ) -> Draw {
+        let (top, bottom) = (
+            region_top.clamp(0, self.height() as i32),
+            (region_top + region_height as i32).clamp(0, self.height() as i32),
+        );
+        let (left, right) = (
+            region_left.clamp(0, self.width() as i32),
+            (region_left + region_width as i32).clamp(0, self.width() as i32),
+        );
+
+        Draw {
+            region: (
+                [self.top() + top, self.left() + left],
+                [(right - left) as u32, (bottom - top) as u32],
+            ),
+            graphics: self.graphics,
+        }
     }
 
     /// Draws glyphs.

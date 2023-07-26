@@ -285,7 +285,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
                 self.context,
                 [top, left],
                 &line,
-                self.view.line_height as u32,
+                self.view.line_height,
                 self.time,
             );
         }
