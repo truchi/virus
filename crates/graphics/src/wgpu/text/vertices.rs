@@ -18,6 +18,18 @@ impl GlyphType {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                              Quad                                              //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+#[derive(Copy, Clone, Debug)]
+pub struct Quad<T> {
+    pub top_left: T,
+    pub top_right: T,
+    pub bottom_left: T,
+    pub bottom_right: T,
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                         RectangleVertex                                        //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
@@ -75,17 +87,17 @@ impl RectangleVertex {
         ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
         ([top, left], [width, height]): ([i32; 2], [u32; 2]),
         color: Rgba,
-    ) -> [Self; 4] {
+    ) -> Quad<Self> {
         let region = ([region_top, region_left], [region_width, region_height]);
         let right = left + width as i32;
         let bottom = top + height as i32;
 
-        [
-            Self::new(region, [top, left], color),
-            Self::new(region, [top, right], color),
-            Self::new(region, [bottom, left], color),
-            Self::new(region, [bottom, right], color),
-        ]
+        Quad {
+            top_left: Self::new(region, [top, left], color),
+            top_right: Self::new(region, [top, right], color),
+            bottom_left: Self::new(region, [bottom, left], color),
+            bottom_right: Self::new(region, [bottom, right], color),
+        }
     }
 }
 
@@ -134,18 +146,18 @@ impl ShadowVertex {
         glyph_type: GlyphType,
         ([top, left], [width, height]): ([i32; 2], [u32; 2]),
         [u, v]: [u32; 2],
-    ) -> [Self; 4] {
+    ) -> Quad<Self> {
         let right = left + width as i32;
         let bottom = top + height as i32;
         let u2 = u + width;
         let v2 = v + height;
 
-        [
-            Self::new(glyph_type, [top, left], [u, v]),
-            Self::new(glyph_type, [top, right], [u2, v]),
-            Self::new(glyph_type, [bottom, left], [u, v2]),
-            Self::new(glyph_type, [bottom, right], [u2, v2]),
-        ]
+        Quad {
+            top_left: Self::new(glyph_type, [top, left], [u, v]),
+            top_right: Self::new(glyph_type, [top, right], [u2, v]),
+            bottom_left: Self::new(glyph_type, [bottom, left], [u, v2]),
+            bottom_right: Self::new(glyph_type, [bottom, right], [u2, v2]),
+        }
     }
 }
 
@@ -219,19 +231,19 @@ impl GlyphVertex {
         ([top, left], [width, height]): ([i32; 2], [u32; 2]),
         [u, v]: [u32; 2],
         color: Rgba,
-    ) -> [Self; 4] {
+    ) -> Quad<Self> {
         let region = ([region_top, region_left], [region_width, region_height]);
         let right = left + width as i32;
         let bottom = top + height as i32;
         let u2 = u + width;
         let v2 = v + height;
 
-        [
-            Self::new(glyph_type, region, [top, left], [u, v], color),
-            Self::new(glyph_type, region, [top, right], [u2, v], color),
-            Self::new(glyph_type, region, [bottom, left], [u, v2], color),
-            Self::new(glyph_type, region, [bottom, right], [u2, v2], color),
-        ]
+        Quad {
+            top_left: Self::new(glyph_type, region, [top, left], [u, v], color),
+            top_right: Self::new(glyph_type, region, [top, right], [u2, v], color),
+            bottom_left: Self::new(glyph_type, region, [bottom, left], [u, v2], color),
+            bottom_right: Self::new(glyph_type, region, [bottom, right], [u2, v2], color),
+        }
     }
 }
 
@@ -304,38 +316,38 @@ impl BlurVertex {
         [blur_top, blur_left]: [u32; 2],
         [width, height]: [u32; 2],
         shadow: Shadow,
-    ) -> [Self; 4] {
+    ) -> Quad<Self> {
         let region = ([region_top, region_left], [region_width, region_height]);
         let shadow_right = shadow_left + width as i32;
         let shadow_bottom = shadow_top + height as i32;
         let blur_right = blur_left + width;
         let blur_bottom = blur_top + height;
 
-        [
-            Self::new(
+        Quad {
+            top_left: Self::new(
                 region,
                 [shadow_top, shadow_left],
                 [blur_top, blur_left],
                 shadow,
             ),
-            Self::new(
+            top_right: Self::new(
                 region,
                 [shadow_top, shadow_right],
                 [blur_top, blur_right],
                 shadow,
             ),
-            Self::new(
+            bottom_left: Self::new(
                 region,
                 [shadow_bottom, shadow_left],
                 [blur_bottom, blur_left],
                 shadow,
             ),
-            Self::new(
+            bottom_right: Self::new(
                 region,
                 [shadow_bottom, shadow_right],
                 [blur_bottom, blur_right],
                 shadow,
             ),
-        ]
+        }
     }
 }

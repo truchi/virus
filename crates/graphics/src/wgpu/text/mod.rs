@@ -18,8 +18,6 @@ const MAX_RECTANGLES: usize = 1_000;
 const MAX_SHADOWS: usize = 10_000;
 const MAX_GLYPHS: usize = 10_000;
 const MAX_BLURS: usize = 1_000;
-const RECTANGLE_VERTEX_SIZE: usize = size_of::<RectangleVertex>();
-const SHADOW_VERTEX_SIZE: usize = size_of::<ShadowVertex>();
-const GLYPH_VERTEX_SIZE: usize = size_of::<GlyphVertex>();
-const BLUR_VERTEX_SIZE: usize = size_of::<GlyphVertex>();
-const INDEX_SIZE: usize = size_of::<Index>();
+
+const VERTICES_PER_QUAD: usize = 4;
+const INDICES_PER_QUAD: usize = 6;

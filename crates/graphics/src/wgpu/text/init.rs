@@ -7,23 +7,21 @@ use super::*;
 pub struct Init<'a>(pub &'a Device);
 
 impl<'a> Init<'a> {
-    pub fn buffers(
-        &self,
-        max_buffer_size: usize,
-    ) -> (
-        Buffers<RectangleVertex>,
-        Buffers<ShadowVertex>,
-        Buffers<GlyphVertex>,
-        Buffers<BlurVertex>,
-    ) {
-        let rectangle_vertex_buffer_size = 4 * MAX_RECTANGLES * RECTANGLE_VERTEX_SIZE;
-        let rectangle_index_buffer_size = 6 * MAX_RECTANGLES * INDEX_SIZE;
-        let shadow_vertex_buffer_size = 4 * MAX_SHADOWS * SHADOW_VERTEX_SIZE;
-        let shadow_index_buffer_size = 6 * MAX_SHADOWS * INDEX_SIZE;
-        let glyph_vertex_buffer_size = 4 * MAX_GLYPHS * GLYPH_VERTEX_SIZE;
-        let glyph_index_buffer_size = 6 * MAX_GLYPHS * INDEX_SIZE;
-        let blur_vertex_buffer_size = 4 * MAX_BLURS * BLUR_VERTEX_SIZE;
-        let blur_index_buffer_size = 6 * MAX_BLURS * INDEX_SIZE;
+    pub fn buffers(&self, max_buffer_size: usize) -> Buffers {
+        fn size<const MAX_QUADS: usize, Vertex>() -> [usize; 2] {
+            [
+                size_of::<Vertex>() * VERTICES_PER_QUAD * MAX_QUADS,
+                size_of::<Index>() * INDICES_PER_QUAD * MAX_QUADS,
+            ]
+        }
+
+        let [rectangle_vertex_buffer_size, rectangle_index_buffer_size] =
+            size::<MAX_RECTANGLES, RectangleVertex>();
+        let [shadow_vertex_buffer_size, shadow_index_buffer_size] =
+            size::<MAX_SHADOWS, ShadowVertex>();
+        let [glyph_vertex_buffer_size, glyph_index_buffer_size] = size::<MAX_GLYPHS, GlyphVertex>();
+        let [blur_vertex_buffer_size, blur_index_buffer_size] = size::<MAX_BLURS, BlurVertex>();
+
         assert!(rectangle_vertex_buffer_size <= max_buffer_size);
         assert!(rectangle_index_buffer_size <= max_buffer_size);
         assert!(shadow_vertex_buffer_size <= max_buffer_size);
@@ -33,59 +31,47 @@ impl<'a> Init<'a> {
         assert!(blur_vertex_buffer_size <= max_buffer_size);
         assert!(blur_index_buffer_size <= max_buffer_size);
 
-        (
-            Buffers::with_capacity(
-                self.0.create_buffer(&buffer! {
-                    label: "[TextPipeline] Rectangle vertex buffer",
-                    size: rectangle_vertex_buffer_size,
-                    usage: VERTEX | COPY_DST,
-                }),
-                self.0.create_buffer(&buffer! {
-                    label: "[TextPipeline] Rectangle index buffer",
-                    size: rectangle_index_buffer_size,
-                    usage: INDEX | COPY_DST,
-                }),
-                MAX_RECTANGLES,
-            ),
-            Buffers::with_capacity(
-                self.0.create_buffer(&buffer! {
-                    label: "[TextPipeline] Shadow vertex buffer",
-                    size: shadow_vertex_buffer_size,
-                    usage: VERTEX | COPY_DST,
-                }),
-                self.0.create_buffer(&buffer! {
-                    label: "[TextPipeline] Shadow index buffer",
-                    size: shadow_index_buffer_size,
-                    usage: INDEX | COPY_DST,
-                }),
-                MAX_SHADOWS,
-            ),
-            Buffers::with_capacity(
-                self.0.create_buffer(&buffer! {
-                    label: "[TextPipeline] Glyph vertex buffer",
-                    size: glyph_vertex_buffer_size,
-                    usage: VERTEX | COPY_DST,
-                }),
-                self.0.create_buffer(&buffer! {
-                    label: "[TextPipeline] Glyph index buffer",
-                    size: glyph_index_buffer_size,
-                    usage: INDEX | COPY_DST,
-                }),
-                MAX_GLYPHS,
-            ),
-            Buffers::with_capacity(
-                self.0.create_buffer(&buffer! {
-                    label: "[TextPipeline] Blur vertex buffer",
-                    size: blur_vertex_buffer_size,
-                    usage: VERTEX | COPY_DST,
-                }),
-                self.0.create_buffer(&buffer! {
-                    label: "[TextPipeline] Blur index buffer",
-                    size: blur_index_buffer_size,
-                    usage: INDEX | COPY_DST,
-                }),
-                MAX_BLURS,
-            ),
+        Buffers::new(
+            self.0.create_buffer(&buffer! {
+                label: "[TextPipeline] Rectangle vertex buffer",
+                size: rectangle_vertex_buffer_size,
+                usage: VERTEX | COPY_DST,
+            }),
+            self.0.create_buffer(&buffer! {
+                label: "[TextPipeline] Rectangle index buffer",
+                size: rectangle_index_buffer_size,
+                usage: INDEX | COPY_DST,
+            }),
+            self.0.create_buffer(&buffer! {
+                label: "[TextPipeline] Shadow vertex buffer",
+                size: shadow_vertex_buffer_size,
+                usage: VERTEX | COPY_DST,
+            }),
+            self.0.create_buffer(&buffer! {
+                label: "[TextPipeline] Shadow index buffer",
+                size: shadow_index_buffer_size,
+                usage: INDEX | COPY_DST,
+            }),
+            self.0.create_buffer(&buffer! {
+                label: "[TextPipeline] Glyph vertex buffer",
+                size: glyph_vertex_buffer_size,
+                usage: VERTEX | COPY_DST,
+            }),
+            self.0.create_buffer(&buffer! {
+                label: "[TextPipeline] Glyph index buffer",
+                size: glyph_index_buffer_size,
+                usage: INDEX | COPY_DST,
+            }),
+            self.0.create_buffer(&buffer! {
+                label: "[TextPipeline] Blur vertex buffer",
+                size: blur_vertex_buffer_size,
+                usage: VERTEX | COPY_DST,
+            }),
+            self.0.create_buffer(&buffer! {
+                label: "[TextPipeline] Blur index buffer",
+                size: blur_index_buffer_size,
+                usage: INDEX | COPY_DST,
+            }),
         )
     }
 

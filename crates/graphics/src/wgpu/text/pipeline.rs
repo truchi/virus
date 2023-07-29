@@ -16,12 +16,9 @@ pub struct TextPipeline {
     constants: Constants,
 
     //
-    // Vertices and indices
+    // Buffers
     //
-    rectangles: Buffers<RectangleVertex>,
-    shadows: Buffers<ShadowVertex>,
-    glyphs: Buffers<GlyphVertex>,
-    blurs: Buffers<BlurVertex>,
+    buffers: Buffers,
 
     //
     // Atlases and textures
@@ -56,7 +53,7 @@ impl TextPipeline {
         };
 
         // Buffers
-        let (rectangles, shadows, glyphs, blurs) = Init(device).buffers(max_buffer_size);
+        let buffers = Init(device).buffers(max_buffer_size);
 
         // Atlases and textures
         let atlases = Atlases::new(
@@ -92,10 +89,7 @@ impl TextPipeline {
 
         Self {
             constants,
-            rectangles,
-            shadows,
-            glyphs,
-            blurs,
+            buffers,
             atlases,
             blur_atlas,
             blur_ping_texture,
@@ -149,11 +143,16 @@ impl TextPipeline {
         ([top, left], [width, height]): ([i32; 2], [u32; 2]),
         color: Rgba,
     ) {
-        self.rectangles.push(RectangleVertex::quad(
-            ([region_top, region_left], [region_width, region_height]),
-            ([top, left], [width, height]),
-            color,
-        ));
+        let layer = 0; // TODO
+
+        self.buffers.push_rectangle(
+            layer,
+            RectangleVertex::quad(
+                ([region_top, region_left], [region_width, region_height]),
+                ([top, left], [width, height]),
+                color,
+            ),
+        );
     }
 
     pub fn glyphs(
@@ -166,6 +165,7 @@ impl TextPipeline {
         line_height: LineHeight,
         time: Duration,
     ) {
+        let layer = 0; // TODO
         let region = ([region_top, region_left], [region_width, region_height]);
         let mut scaler = line.scaler(context);
 
@@ -213,13 +213,16 @@ impl TextPipeline {
                     continue;
                 };
 
-            self.blurs.push(BlurVertex::quad(
-                region,
-                [shadow_top, shadow_left],
-                [blur_top, blur_left],
-                [width, height],
-                shadow,
-            ));
+            self.buffers.push_blur(
+                layer,
+                BlurVertex::quad(
+                    region,
+                    [shadow_top, shadow_left],
+                    [blur_top, blur_left],
+                    [width, height],
+                    shadow,
+                ),
+            );
 
             //
             // Add shadows
@@ -246,11 +249,10 @@ impl TextPipeline {
                     continue;
                 };
 
-                self.shadows.push(ShadowVertex::quad(
-                    glyph_type,
-                    ([top, left], [width, height]),
-                    [u, v],
-                ));
+                self.buffers.push_shadow(
+                    layer,
+                    ShadowVertex::quad(glyph_type, ([top, left], [width, height]), [u, v]),
+                );
             }
         }
 
@@ -265,11 +267,14 @@ impl TextPipeline {
             let left = left + start as i32;
             let width = (end - start) as u32;
 
-            self.rectangles.push(RectangleVertex::quad(
-                ([region_top, region_left], [region_width, region_height]),
-                ([top, left], [width, line_height]),
-                background,
-            ));
+            self.buffers.push_rectangle(
+                layer,
+                RectangleVertex::quad(
+                    ([region_top, region_left], [region_width, region_height]),
+                    ([top, left], [width, line_height]),
+                    background,
+                ),
+            );
         }
 
         //
@@ -296,25 +301,28 @@ impl TextPipeline {
                 continue;
             };
 
-            self.glyphs.push(GlyphVertex::quad(
-                glyph_type,
-                region,
-                ([top, left], [width, height]),
-                [u, v],
-                glyph.styles.foreground,
-            ));
+            self.buffers.push_glyph(
+                layer,
+                GlyphVertex::quad(
+                    glyph_type,
+                    region,
+                    ([top, left], [width, height]),
+                    [u, v],
+                    glyph.styles.foreground,
+                ),
+            );
         }
     }
 
-    pub fn pre_render(&self, queue: &Queue) {
-        self.rectangles.write(queue);
-        self.shadows.write(queue);
-        self.glyphs.write(queue);
-        self.blurs.write(queue);
+    pub fn pre_render(&mut self, queue: &Queue) {
+        self.buffers.pre_render(queue);
     }
 
     pub fn render_rectangles<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
-        self.rectangles.render(
+        let layer = 0; // TODO
+
+        self.buffers.render_rectangles(
+            layer,
             render_pass,
             &self.constants,
             &self.pong_bind_group,
@@ -323,7 +331,10 @@ impl TextPipeline {
     }
 
     pub fn render_shadows<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
-        self.shadows.render(
+        let layer = 0; // TODO
+
+        self.buffers.render_shadows(
+            layer,
             render_pass,
             &self.constants,
             &self.pong_bind_group,
@@ -332,7 +343,10 @@ impl TextPipeline {
     }
 
     pub fn blur_ping<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
-        self.blurs.render(
+        let layer = 0; // TODO
+
+        self.buffers.render_blurs(
+            layer,
             render_pass,
             &self.constants,
             &self.ping_bind_group,
@@ -341,7 +355,10 @@ impl TextPipeline {
     }
 
     pub fn blur_pong<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
-        self.blurs.render(
+        let layer = 0; // TODO
+
+        self.buffers.render_blurs(
+            layer,
             render_pass,
             &self.constants,
             &self.pong_bind_group,
@@ -350,7 +367,10 @@ impl TextPipeline {
     }
 
     pub fn render_glyphs<'pass>(&'pass self, render_pass: &mut RenderPass<'pass>) {
-        self.glyphs.render(
+        let layer = 0; // TODO
+
+        self.buffers.render_glyphs(
+            layer,
             render_pass,
             &self.constants,
             &self.pong_bind_group,
@@ -359,10 +379,7 @@ impl TextPipeline {
     }
 
     pub fn post_render(&mut self) {
-        self.rectangles.clear();
-        self.shadows.clear();
-        self.glyphs.clear();
-        self.blurs.clear();
+        self.buffers.clear();
         self.blur_atlas.clear();
     }
 }
