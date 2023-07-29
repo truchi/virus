@@ -14,6 +14,8 @@ use vertices::*;
 
 pub use pipeline::TextPipeline;
 
+// We limit how many objects can go in a GPU Buffer,
+// because they are created with their size.
 const MAX_RECTANGLES: usize = 1_000;
 const MAX_SHADOWS: usize = 10_000;
 const MAX_GLYPHS: usize = 10_000;

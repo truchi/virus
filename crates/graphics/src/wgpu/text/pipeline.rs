@@ -1,5 +1,7 @@
 use super::*;
 
+// How many times the surface must the altases be.
+// (The color atlas is at `limits.max_texture_dimension_2d`)
 const MASK_ATLAS_FACTOR: u32 = 1;
 const BLUR_ATLAS_FACTOR: u32 = 2;
 
@@ -10,27 +12,12 @@ const BLUR_ATLAS_FACTOR: u32 = 2;
 /// Text pipeline.
 #[derive(Debug)]
 pub struct TextPipeline {
-    //
-    // Constants
-    //
     constants: Constants,
-
-    //
-    // Buffers
-    //
     buffers: Buffers,
-
-    //
-    // Atlases and textures
-    //
     atlases: Atlases,
     blur_atlas: Allocator<Horizontal, usize, ()>,
     blur_ping_texture: Texture,
     blur_pong_texture: Texture,
-
-    //
-    // Bind group and pipelines
-    //
     bind_group_layout: BindGroupLayout,
     ping_bind_group: BindGroup,
     pong_bind_group: BindGroup,
@@ -47,15 +34,10 @@ impl TextPipeline {
         let max_buffer_size = limits.max_buffer_size as usize;
         let max_texture_dimension = limits.max_texture_dimension_2d;
 
-        // Constants
         let constants = Constants {
             surface: [config.width as f32, config.height as f32],
         };
-
-        // Buffers
         let buffers = Init(device).buffers(max_buffer_size);
-
-        // Atlases and textures
         let atlases = Atlases::new(
             Init(device).mask_texture([
                 MASK_ATLAS_FACTOR * config.width,
@@ -72,8 +54,6 @@ impl TextPipeline {
             BLUR_ATLAS_FACTOR * config.width,
             BLUR_ATLAS_FACTOR * config.height,
         ]);
-
-        // Bind groups
         let bind_group_layout = Init(device).bind_group_layout();
         let [ping_bind_group, pong_bind_group] = Init(device).bind_groups(
             &bind_group_layout,
@@ -82,8 +62,6 @@ impl TextPipeline {
             &blur_ping_texture,
             &blur_pong_texture,
         );
-
-        // Pipelines
         let [rectangle_pipeline, shadow_pipeline, glyph_pipeline, blur_ping_pipeline, blur_pong_pipeline] =
             Init(device).pipelines(config, &bind_group_layout);
 
