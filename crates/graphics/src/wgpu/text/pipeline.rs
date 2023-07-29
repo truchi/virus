@@ -37,13 +37,13 @@ impl TextPipeline {
         let buffers = Init(device).buffers(max_buffer_size);
         let atlases = Atlases::new(
             Init(device).mask_texture([
-                MASK_ATLAS_FACTOR * config.width,
-                MASK_ATLAS_FACTOR * config.height,
+                max_texture_dimension.min(MASK_ATLAS_FACTOR * config.width),
+                max_texture_dimension.min(MASK_ATLAS_FACTOR * config.height),
             ]),
             Init(device).color_texture([max_texture_dimension, max_texture_dimension]),
             Init(device).blur_textures([
-                BLUR_ATLAS_FACTOR * config.width,
-                BLUR_ATLAS_FACTOR * config.height,
+                max_texture_dimension.min(BLUR_ATLAS_FACTOR * config.width),
+                max_texture_dimension.min(BLUR_ATLAS_FACTOR * config.height),
             ]),
         );
         let bind_group_layout = Init(device).bind_group_layout();
@@ -85,14 +85,16 @@ impl TextPipeline {
     }
 
     pub fn resize(&mut self, device: &Device, config: &SurfaceConfiguration) {
+        let max_texture_dimension = device.limits().max_texture_dimension_2d;
+
         self.constants.surface = [config.width as f32, config.height as f32];
         self.atlases.resize_mask(Init(device).mask_texture([
-            MASK_ATLAS_FACTOR * config.width,
-            MASK_ATLAS_FACTOR * config.height,
+            max_texture_dimension.min(MASK_ATLAS_FACTOR * config.width),
+            max_texture_dimension.min(MASK_ATLAS_FACTOR * config.height),
         ]));
         self.atlases.resize_blur(Init(device).blur_textures([
-            BLUR_ATLAS_FACTOR * config.width,
-            BLUR_ATLAS_FACTOR * config.height,
+            max_texture_dimension.min(BLUR_ATLAS_FACTOR * config.width),
+            max_texture_dimension.min(BLUR_ATLAS_FACTOR * config.height),
         ]));
         [self.ping_bind_group, self.pong_bind_group] = Init(device).bind_groups(
             &self.bind_group_layout,
