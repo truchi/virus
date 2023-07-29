@@ -15,9 +15,6 @@ pub struct TextPipeline {
     constants: Constants,
     buffers: Buffers,
     atlases: Atlases,
-    blur_atlas: Allocator<Horizontal, usize, ()>,
-    blur_ping_texture: Texture,
-    blur_pong_texture: Texture,
     bind_group_layout: BindGroupLayout,
     ping_bind_group: BindGroup,
     pong_bind_group: BindGroup,
@@ -44,23 +41,18 @@ impl TextPipeline {
                 MASK_ATLAS_FACTOR * config.height,
             ]),
             Init(device).color_texture([max_texture_dimension, max_texture_dimension]),
+            Init(device).blur_textures([
+                BLUR_ATLAS_FACTOR * config.width,
+                BLUR_ATLAS_FACTOR * config.height,
+            ]),
         );
-        let blur_atlas = Allocator::new(
-            BLUR_ATLAS_FACTOR * config.width,
-            BLUR_ATLAS_FACTOR * config.height,
-            None,
-        );
-        let [blur_ping_texture, blur_pong_texture] = Init(device).blur_textures([
-            BLUR_ATLAS_FACTOR * config.width,
-            BLUR_ATLAS_FACTOR * config.height,
-        ]);
         let bind_group_layout = Init(device).bind_group_layout();
         let [ping_bind_group, pong_bind_group] = Init(device).bind_groups(
             &bind_group_layout,
             atlases.mask_texture(),
             atlases.color_texture(),
-            &blur_ping_texture,
-            &blur_pong_texture,
+            &atlases.blur_ping_texture(),
+            &atlases.blur_pong_texture(),
         );
         let [rectangle_pipeline, shadow_pipeline, glyph_pipeline, blur_ping_pipeline, blur_pong_pipeline] =
             Init(device).pipelines(config, &bind_group_layout);
@@ -69,9 +61,6 @@ impl TextPipeline {
             constants,
             buffers,
             atlases,
-            blur_atlas,
-            blur_ping_texture,
-            blur_pong_texture,
             bind_group_layout,
             ping_bind_group,
             pong_bind_group,
@@ -84,11 +73,15 @@ impl TextPipeline {
     }
 
     pub fn blur_ping_texture_view(&self) -> TextureView {
-        self.blur_ping_texture.create_view(&Default::default())
+        self.atlases
+            .blur_ping_texture()
+            .create_view(&Default::default())
     }
 
     pub fn blur_pong_texture_view(&self) -> TextureView {
-        self.blur_pong_texture.create_view(&Default::default())
+        self.atlases
+            .blur_pong_texture()
+            .create_view(&Default::default())
     }
 
     pub fn resize(&mut self, device: &Device, config: &SurfaceConfiguration) {
@@ -97,21 +90,16 @@ impl TextPipeline {
             MASK_ATLAS_FACTOR * config.width,
             MASK_ATLAS_FACTOR * config.height,
         ]));
-        self.blur_atlas.clear_and_resize(
+        self.atlases.resize_blur(Init(device).blur_textures([
             BLUR_ATLAS_FACTOR * config.width,
             BLUR_ATLAS_FACTOR * config.height,
-            None,
-        );
-        [self.blur_ping_texture, self.blur_pong_texture] = Init(device).blur_textures([
-            BLUR_ATLAS_FACTOR * config.width,
-            BLUR_ATLAS_FACTOR * config.height,
-        ]);
+        ]));
         [self.ping_bind_group, self.pong_bind_group] = Init(device).bind_groups(
             &self.bind_group_layout,
             &self.atlases.mask_texture(),
             &self.atlases.color_texture(),
-            &self.blur_ping_texture,
-            &self.blur_pong_texture,
+            &self.atlases.blur_ping_texture(),
+            &self.atlases.blur_pong_texture(),
         );
     }
 
@@ -172,7 +160,6 @@ impl TextPipeline {
                     .and_then(|shadow| shadow.color.is_visible().then_some((range, glyphs, shadow)))
             })
         {
-            let key = self.blur_atlas.len();
             let [width, height] = [
                 2 * shadow.radius as u32 + (end - start).ceil() as u32,
                 2 * shadow.radius as u32 + line_height,
@@ -181,9 +168,9 @@ impl TextPipeline {
                 -(shadow.radius as i32) + top,
                 -(shadow.radius as i32) + left + start.round() as i32,
             ];
-            let [blur_left, blur_top] =
-                if let Ok(([x, y], ())) = self.blur_atlas.insert(key, (), [width, height]) {
-                    [x, y]
+            let [blur_top, blur_left] =
+                if let Some([top, left]) = self.atlases.insert_blur([width, height]) {
+                    [top, left]
                 } else {
                     // Atlas/Texture is too small, forget about this shadow
                     // This can happen at startup/resize, and this is fine
@@ -358,6 +345,6 @@ impl TextPipeline {
 
     pub fn post_render(&mut self) {
         self.buffers.clear();
-        self.blur_atlas.clear();
+        self.atlases.clear_blurs();
     }
 }

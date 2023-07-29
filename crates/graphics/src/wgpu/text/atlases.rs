@@ -18,13 +18,23 @@ pub struct Atlases {
     mask_texture: Texture,
     color_atlas: Allocator<Horizontal, ColorKey, Placement>,
     color_texture: Texture,
+    blur_atlas: Allocator<Horizontal, usize, ()>,
+    blur_ping_texture: Texture,
+    blur_pong_texture: Texture,
 }
 
 impl Atlases {
     const MASK_BIN: u32 = 400;
     const COLOR_BIN: u32 = 400;
 
-    pub fn new(mask_texture: Texture, color_texture: Texture) -> Self {
+    pub fn new(
+        mask_texture: Texture,
+        color_texture: Texture,
+        [blur_ping_texture, blur_pong_texture]: [Texture; 2],
+    ) -> Self {
+        debug_assert!(blur_ping_texture.width() == blur_pong_texture.width());
+        debug_assert!(blur_ping_texture.height() == blur_pong_texture.height());
+
         Self {
             mask_atlas: Allocator::new(
                 mask_texture.width(),
@@ -38,6 +48,9 @@ impl Atlases {
                 Some(Self::COLOR_BIN),
             ),
             color_texture,
+            blur_atlas: Allocator::new(blur_ping_texture.width(), blur_ping_texture.height(), None),
+            blur_ping_texture,
+            blur_pong_texture,
         }
     }
 
@@ -49,6 +62,14 @@ impl Atlases {
         &self.color_texture
     }
 
+    pub fn blur_ping_texture(&self) -> &Texture {
+        &self.blur_ping_texture
+    }
+
+    pub fn blur_pong_texture(&self) -> &Texture {
+        &self.blur_pong_texture
+    }
+
     pub fn insert_glyph(
         &mut self,
         queue: &Queue,
@@ -58,7 +79,14 @@ impl Atlases {
         line_height: LineHeight,
         time: Duration,
         glyph: &Glyph,
-    ) -> Option<(GlyphType, ([i32; 2], [u32; 2]), [u32; 2])> {
+    ) -> Option<(
+        GlyphType,
+        (
+            /* [top, left] */ [i32; 2],
+            /* [width, height] */ [u32; 2],
+        ),
+        /* [u, v] */ [u32; 2],
+    )> {
         let animated = |(glyph_type, placement, [u, v]): (GlyphType, Placement, [u32; 2])| {
             // Animated glyph has screen coordinate system, from top of line
             let center = ((line_height as f32 - placement.height as f32) / 2.0).round() as i32;
@@ -93,6 +121,13 @@ impl Atlases {
         }
     }
 
+    pub fn insert_blur(&mut self, [width, height]: [u32; 2]) -> Option</* [top, left] */ [u32; 2]> {
+        self.blur_atlas
+            .insert(self.blur_atlas.len(), (), [width, height])
+            .ok()
+            .map(|([x, y], _)| [y, x])
+    }
+
     pub fn resize_mask(&mut self, mask_texture: Texture) {
         self.mask_atlas.clear_and_resize(
             mask_texture.width(),
@@ -100,6 +135,23 @@ impl Atlases {
             Some(Self::MASK_BIN),
         );
         self.mask_texture = mask_texture;
+    }
+
+    pub fn resize_blur(&mut self, [blur_ping_texture, blur_pong_texture]: [Texture; 2]) {
+        debug_assert!(blur_ping_texture.width() == blur_pong_texture.width());
+        debug_assert!(blur_ping_texture.height() == blur_pong_texture.height());
+
+        self.blur_atlas.clear_and_resize(
+            blur_ping_texture.width(),
+            blur_ping_texture.height(),
+            None,
+        );
+        self.blur_ping_texture = blur_ping_texture;
+        self.blur_pong_texture = blur_pong_texture;
+    }
+
+    pub fn clear_blurs(&mut self) {
+        self.blur_atlas.clear();
     }
 }
 
