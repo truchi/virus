@@ -154,6 +154,7 @@ impl Graphics {
             });
 
         self.text_pipeline.pre_render(&self.queue);
+        self.line_pipeline.pre_render(&self.queue);
 
         // Render rectangles in output texture
         let mut render_pass = encoder.begin_render_pass(&render_pass! {
@@ -203,7 +204,7 @@ impl Graphics {
             store: true,
         });
         self.text_pipeline.render_glyphs(&mut render_pass);
-        self.line_pipeline.render(&self.queue, &mut render_pass);
+        self.line_pipeline.render(&mut render_pass);
         drop(render_pass);
 
         // Flush
@@ -211,6 +212,7 @@ impl Graphics {
         output.present();
 
         self.text_pipeline.post_render();
+        self.line_pipeline.post_render();
     }
 }
 

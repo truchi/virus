@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::HashMap;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Vertex                                            //
@@ -56,13 +57,19 @@ impl Vertex {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                              Pipeline                                          //
+//                                             Pipeline                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// Line pipeline.
 pub struct LinePipeline {
     surface_size: [f32; 2],
-    vertices: Vec<Vertex>,
+    vertices: HashMap<
+        /* layer */ u32,
+        (
+            /* vertices */ Vec<Vertex>,
+            /* start vertex in buffer */ u32,
+        ),
+    >,
     vertex_buffer: Buffer,
     bind_group: BindGroup,
     pipeline: RenderPipeline,
@@ -123,7 +130,7 @@ impl LinePipeline {
 
         Self {
             surface_size: [config.width as f32, config.height as f32],
-            vertices: Vec::with_capacity(1_024),
+            vertices: Default::default(),
             vertex_buffer,
             bind_group,
             pipeline,
@@ -139,6 +146,7 @@ impl LinePipeline {
         ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
         points: T,
     ) {
+        let layer = 0; // TODO
         let region = ([region_top, region_left], [region_width, region_height]);
 
         let mut points = points.into_iter();
@@ -149,26 +157,48 @@ impl LinePipeline {
             return;
         };
 
+        let vertices = &mut self.vertices.entry(layer).or_default().0;
         for curr in points {
-            self.vertices.push(Vertex::new(region, prev.0, prev.1));
-            self.vertices.push(Vertex::new(region, curr.0, curr.1));
+            vertices.push(Vertex::new(region, prev.0, prev.1));
+            vertices.push(Vertex::new(region, curr.0, curr.1));
             prev = curr;
         }
     }
 
-    pub fn render<'pass>(&'pass mut self, queue: &Queue, render_pass: &mut RenderPass<'pass>) {
-        queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
+    pub fn pre_render(&mut self, queue: &Queue) {
+        let mut offset = 0; // in bytes, for write_buffer()
+        let mut index = 0; // in vertex, for draw()
 
-        render_pass.set_pipeline(&self.pipeline);
-        render_pass.set_bind_group(0, &self.bind_group, &[]);
-        render_pass.set_push_constants(
-            ShaderStages::VERTEX_FRAGMENT,
-            0,
-            bytemuck::cast_slice(&[self.surface_size[0], self.surface_size[1]]),
-        );
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.draw(0..self.vertices.len() as u32, 0..1);
+        for (vertices, start) in self.vertices.values_mut() {
+            let bytes = bytemuck::cast_slice(&vertices);
+            queue.write_buffer(&self.vertex_buffer, offset, bytes);
 
+            *start = index;
+
+            offset += bytes.len() as BufferAddress;
+            index += vertices.len() as u32;
+        }
+    }
+
+    pub fn render<'pass>(&'pass mut self, render_pass: &mut RenderPass<'pass>) {
+        let layer = 0; // TODO
+
+        self.vertices.get(&layer).map(|(vertices, start)| {
+            let start = *start;
+
+            render_pass.set_pipeline(&self.pipeline);
+            render_pass.set_bind_group(0, &self.bind_group, &[]);
+            render_pass.set_push_constants(
+                ShaderStages::VERTEX_FRAGMENT,
+                0,
+                bytemuck::cast_slice(&[self.surface_size[0], self.surface_size[1]]),
+            );
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.draw(start..start + vertices.len() as u32, 0..1);
+        });
+    }
+
+    pub fn post_render(&mut self) {
         self.vertices.clear();
     }
 }

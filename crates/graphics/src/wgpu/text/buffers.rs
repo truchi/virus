@@ -297,6 +297,8 @@ impl Buffers {
     }
 
     pub fn clear(&mut self) {
+        // NOTE: we don't clear the `HashMap`! That would drop the `Vec`s.
+
         for layer in self.layers.values_mut() {
             layer.rectangle.clear();
             layer.shadow.clear();
