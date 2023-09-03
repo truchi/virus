@@ -156,12 +156,11 @@ fn fonts() -> Fonts {
     use virus_graphics::text::FontWeight::*;
 
     // YOUR CAN GIVE AN EMPTY FOLDER HERE
-    const ANIMATED_FONT: &str = "/home/romain/Desktop/noto_animated_emoji";
+    const ANIMATED_FONT: &str = "/Users/romain/perso/noto_animated_emoji";
 
     // YOU HAVE TO GIVE FONTS FROM YOUR DISK HERE
-    const EMOJI: &str = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf";
-    const VICTOR_REGULAR: &str =
-        "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-Regular.ttf";
+    const EMOJI: &str = "/Users/romain/Library/Fonts/NotoColorEmoji.ttf";
+    const VICTOR_REGULAR: &str = "/Users/romain/Library/Fonts/VictorMono-Regular.ttf";
 
     // const UBUNTU: &str = "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf";
 

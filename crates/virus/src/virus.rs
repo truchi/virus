@@ -85,7 +85,7 @@ impl Virus {
     fn on_char(&mut self, char: char, flow: &mut ControlFlow) {
         const TAB: char = '\t';
         const ENTER: char = '\r';
-        const BACKSPACE: char = '\u{8}';
+        const BACKSPACE: char = '\u{8}'; // Not emitted on MacOS?
         const ESCAPE: char = '\u{1b}';
         const UP: char = 'i';
         const DOWN: char = 'k';
@@ -104,29 +104,29 @@ impl Virus {
             BACKSPACE => {
                 self.document.backspace().unwrap();
             }
-            'I' if modifiers.alt() => {
+            'I' if modifiers.logo() => {
                 self.ui.scroll_up();
             }
-            'K' if modifiers.alt() => {
+            'K' if modifiers.logo() => {
                 self.ui.scroll_down();
             }
-            UP if modifiers.alt() => {
+            UP if modifiers.logo() => {
                 self.document.move_up();
                 self.ui
                     .ensure_selection_is_visible(self.document.selection());
             }
-            DOWN if modifiers.alt() => {
+            DOWN if modifiers.logo() => {
                 self.document.move_down();
                 self.ui
                     .ensure_selection_is_visible(self.document.selection());
             }
-            LEFT if modifiers.alt() => {
+            LEFT if modifiers.logo() => {
                 self.document.move_left();
             }
-            RIGHT if modifiers.alt() => {
+            RIGHT if modifiers.logo() => {
                 self.document.move_right();
             }
-            SAVE if modifiers.alt() => {
+            SAVE if modifiers.logo() => {
                 self.document.save().unwrap();
             }
             _ => {
@@ -141,6 +141,7 @@ impl Virus {
     fn on_pressed(&mut self, key: VirtualKeyCode, flow: &mut ControlFlow) {
         match key {
             VirtualKeyCode::Escape => flow.set_exit(),
+            VirtualKeyCode::Back => self.document.backspace().unwrap(),
             _ => {}
         }
     }
@@ -176,6 +177,7 @@ impl Virus {
         self.ui.update(delta);
         self.ui.render(&self.document);
 
+        // TODO: constant redraw on MacOS?
         if self.ui.is_animating() {
             flow.set_poll();
         } else {
