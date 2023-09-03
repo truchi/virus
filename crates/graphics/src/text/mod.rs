@@ -16,12 +16,12 @@ pub use context::*;
 pub use font::*;
 pub use line::*;
 
-use crate::colors::Rgba;
 use swash::{
     scale::{Source, StrikeWith},
     text::{cluster::SourceRange, Script},
     GlyphId,
 };
+use virus_common::Rgba;
 
 const SCRIPT: Script = Script::Unknown;
 const FEATURES: &'static [(&'static str, u16)] = &[("dlig", 1), ("calt", 1)];

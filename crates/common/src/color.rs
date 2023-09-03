@@ -1,8 +1,10 @@
+use crate::muck;
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                                Rgb                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// A `RGB` color.
+/// An `RGB` color.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
 pub struct Rgb {
     pub r: u8,
@@ -35,7 +37,10 @@ impl Rgb {
 //                                               Rgba                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// A `RGBA` color.
+muck!(unsafe Rgba => Uint8x4);
+
+/// An `RGBA` color.
+#[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
 pub struct Rgba {
     pub r: u8,
@@ -67,5 +72,11 @@ impl Rgba {
 
     pub fn is_visible(&self) -> bool {
         self.a != 0
+    }
+}
+
+impl From<Rgba> for [u8; 4] {
+    fn from(color: Rgba) -> Self {
+        [color.r, color.g, color.b, color.a]
     }
 }

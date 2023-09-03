@@ -1,5 +1,6 @@
 use std::ops::Index;
-use virus_graphics::{colors::Rgba, text::Styles};
+use virus_common::Rgba;
+use virus_graphics::text::Styles;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             ThemeKey                                           //

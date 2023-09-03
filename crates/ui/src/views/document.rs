@@ -1,13 +1,12 @@
 use ropey::Rope;
 use std::{borrow::Cow, ops::Range, time::Duration};
-use virus_common::Cursor;
+use virus_common::{Cursor, Rgb, Rgba};
 use virus_editor::{
     document::{Document, Selection},
     highlights::{Highlight, Highlights},
     theme::Theme,
 };
 use virus_graphics::{
-    colors::{Rgb, Rgba},
     text::{
         Advance, Context, FontFamilyKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
     },

@@ -1,7 +1,7 @@
 #![allow(unused)]
 
+use virus_common::{Rgb, Rgba};
 use virus_graphics::{
-    colors::Rgba,
     text::{
         Context, FontFamilyKey, FontKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
     },

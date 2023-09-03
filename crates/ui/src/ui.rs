@@ -3,12 +3,12 @@ use crate::{
     views::{DocumentView, FilesView},
 };
 use std::time::Duration;
+use virus_common::Rgba;
 use virus_editor::{
     document::{Document, Selection},
     theme::Theme,
 };
 use virus_graphics::{
-    colors::Rgba,
     text::{Context, Font, FontSize, Fonts, LineHeight},
     wgpu::Graphics,
 };

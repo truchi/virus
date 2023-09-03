@@ -6,3 +6,5 @@ edition.workspace = true
 
 [dependencies]
 tree-sitter.workspace = true
+bytemuck.workspace = true
+wgpu.workspace = true
