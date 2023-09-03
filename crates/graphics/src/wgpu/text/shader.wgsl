@@ -22,27 +22,27 @@ fn clip(position: vec4f, min: vec2f, max: vec2f) {
 fn blur(uv: vec2f, direction: vec2f, radius: i32) -> f32 {
     let dimensions = textureDimensions(BLUR);
     let dir = direction / vec2f(dimensions);
-    
+
     var blurred = textureSample(BLUR, SAMPLER, uv).r * f32(radius + 1);
     for (var i = 1; i <= radius; i++) {
         blurred += textureSample(BLUR, SAMPLER, uv - f32(i) * dir).r * f32(radius + 1 - i);
         blurred += textureSample(BLUR, SAMPLER, uv + f32(i) * dir).r * f32(radius + 1 - i);
     }
-    
+
     return blurred / (1.0 + 2.0 * f32(radius) + f32(radius) * f32(radius));
 }
 
 fn dimensions(glyph_type: u32) -> vec2f {
     switch glyph_type {
         // Mask glyph
-        case 0u {
+        case 0u: {
             return vec2f(textureDimensions(MASK));
         }
         // Color glyph
-        case 1u {
+        case 1u: {
             return vec2f(textureDimensions(COLOR));
         }
-        default {
+        default: {
             return vec2f(0.0, 0.0);
         }
     }
@@ -144,15 +144,15 @@ fn shadow_fragment(fragment: ShadowFragment) -> @location(0) vec4f {
 
     switch fragment.glyph_type {
         // Mask glyph
-        case 0u {
+        case 0u: {
             mask = textureSampleLevel(MASK, SAMPLER, fragment.uv, 0.0).r;
         }
         // Color glyph
-        case 1u {
+        case 1u: {
             mask = textureSampleLevel(COLOR, SAMPLER, fragment.uv, 0.0).a;
         }
-        default {
-            discard;
+        default: {
+          discard;
         }
     }
 
@@ -218,15 +218,15 @@ fn glyph_fragment(fragment: GlyphFragment) -> @location(0) vec4f {
 
     switch fragment.glyph_type {
         // Mask glyph
-        case 0u {
+        case 0u: {
             let mask = textureSampleLevel(MASK, SAMPLER, fragment.uv, 0.0).r;
             return vec4f(fragment.color.rgb, fragment.color.a * mask);
         }
         // Color glyph
-        case 1u {
+        case 1u: {
             return textureSampleLevel(COLOR, SAMPLER, fragment.uv, 0.0);
         }
-        default {
+        default: {
             discard;
         }
     }
