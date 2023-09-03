@@ -6,7 +6,7 @@ struct Constants {
 }
 
 struct Instance {
-    @builtin(vertex_index) my_index: u32,
+    @builtin(vertex_index) index: u32,
     // Vertex `(top, left)` position.
     @location(0) position: vec2i,
     // Vertex `(width, height)` size.
@@ -22,23 +22,41 @@ struct Fragment {
 
 @vertex
 fn vertex(instance: Instance) -> Fragment {
-    // TODO
+    let width = f32(instance.size.x);
+    let height = f32(instance.size.y);
+    let top = f32(instance.position.x);
+    let left = f32(instance.position.y);
+    let bottom = top + height;
+    let right = left + width;
 
-    let region_position = vec2f(instance.region_position.yx);
-    let region_size = vec2f(instance.region_size);
-    let position = vec2f(instance.position.yx);
-    let color = vec4f(instance.color) / 255.0;
+    var position: vec2f;
+    switch instance.index {
+        // Bottom right
+        case 1u, 5u: {
+            position = vec2f(right, bottom);
+        }
+        // Top right
+        case 2u: {
+            position = vec2f(right, top);
+        }
+        // Bottom left
+        case 4u: {
+            position = vec2f(left, bottom);
+        }
+        // Top left
+        default: {
+            position = vec2f(left, top);
+        }
+    }
 
     var fragment: Fragment;
     fragment.position = vec4f(
-        0.0 + 2.0 * (position.x + region_position.x) / CONSTANTS.surface.x - 1.0,
-        0.0 - 2.0 * (position.y + region_position.y) / CONSTANTS.surface.y + 1.0,
+        0.0 + 2.0 * position.x / CONSTANTS.surface.x - 1.0,
+        0.0 - 2.0 * position.y / CONSTANTS.surface.y + 1.0,
         0.0,
         1.0,
     );
-    fragment.color = pow(color, vec4f(2.2, 2.2, 2.2, 1.0));
-    fragment.min = region_position;
-    fragment.max = region_position + region_size;
+    fragment.color = pow(vec4f(instance.color) / 255.0, vec4f(2.2, 2.2, 2.2, 1.0));
 
     return fragment;
 }

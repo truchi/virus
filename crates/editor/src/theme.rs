@@ -169,7 +169,8 @@ impl Theme {
                 underline: Default::default(),
                 strike: Default::default(),
                 foreground: Rgba::new(r, g, b, u8::MAX),
-                background: Rgba::TRANSPARENT,
+                // background: Rgba::TRANSPARENT,
+                background: Rgba::new(255 - r, 255 - g, 255 - b, u8::MAX),
                 shadow: None,
                 // shadow: Some(Shadow {
                 //     radius: 10,

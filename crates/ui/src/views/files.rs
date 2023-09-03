@@ -1,11 +1,11 @@
 #![allow(unused)]
 
-use virus_common::{Rgb, Rgba};
+use virus_common::{Rectangle, Rgb, Rgba};
 use virus_graphics::{
     text::{
         Context, FontFamilyKey, FontKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
     },
-    wgpu::Draw,
+    wgpu::new::Draw,
 };
 
 const MIN_WIDTH: f32 = 0.5;
@@ -123,13 +123,12 @@ impl<'a, 'b, 'c> Renderer<'a, 'b, 'c> {
 
     fn render_background(&mut self) {
         self.draw.rectangle(
-            (
-                [self.top as i32, self.left as i32],
-                [
-                    (self.columns as f32 * self.advance).round() as u32,
-                    self.rows * self.line_height,
-                ],
-            ),
+            Rectangle {
+                top: self.top as i32,
+                left: self.left as i32,
+                width: (self.columns as f32 * self.advance).round() as u32,
+                height: self.rows * self.line_height,
+            },
             // self.background,
             Rgba::RED,
         );

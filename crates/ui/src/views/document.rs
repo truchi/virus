@@ -1,6 +1,6 @@
 use ropey::Rope;
 use std::{borrow::Cow, ops::Range, time::Duration};
-use virus_common::{Cursor, Rgb, Rgba};
+use virus_common::{Cursor, Position, Rectangle, Rgb, Rgba};
 use virus_editor::{
     document::{Document, Selection},
     highlights::{Highlight, Highlights},
@@ -10,7 +10,7 @@ use virus_graphics::{
     text::{
         Advance, Context, FontFamilyKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
     },
-    wgpu::Draw,
+    wgpu::new::Draw,
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -134,7 +134,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
         time: Duration,
     ) -> Self {
         let start = (scroll_top as f32 / view.line_height as f32).floor() as usize;
-        let end = start + (draw.height() as f32 / view.line_height as f32).ceil() as usize;
+        let end = start + (draw.region().height as f32 / view.line_height as f32).ceil() as usize;
         let rope_lines = document.rope().len_lines() - 1;
         let advance = context
             .fonts()
@@ -282,10 +282,10 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
 
             self.draw.glyphs(
                 self.context,
-                [top, left],
+                Position { top, left },
                 &line,
                 self.view.line_height,
-                self.time,
+                // self.time, // TODO
             );
         }
     }
@@ -304,10 +304,10 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             let top = *index as i32 * self.view.line_height as i32 - self.scroll_top as i32;
             self.draw.glyphs(
                 self.context,
-                [top, left],
+                Position { top, left },
                 &line,
                 self.view.line_height as u32,
-                self.time,
+                // self.time, // TODO
             );
 
             if line.has_animated_glyphs() {
@@ -326,22 +326,23 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             left: i32,
             right: i32,
         ) {
-            for (i, color) in Renderer::OUTLINES {
-                if let Some(top) = top {
-                    renderer
-                        .draw
-                        .polyline([([top + i, left], color), ([top + i, right], color)]);
-                }
+            // TODO
+            // for (i, color) in Renderer::OUTLINES {
+            //     if let Some(top) = top {
+            //         renderer
+            //             .draw
+            //             .polyline([([top + i, left], color), ([top + i, right], color)]);
+            //     }
 
-                if let Some(bottom) = bottom {
-                    renderer
-                        .draw
-                        .polyline([([bottom - i, left], color), ([bottom - i, right], color)]);
-                }
-            }
+            //     if let Some(bottom) = bottom {
+            //         renderer
+            //             .draw
+            //             .polyline([([bottom - i, left], color), ([bottom - i, right], color)]);
+            //     }
+            // }
         }
 
-        let width = self.draw.width() as i32;
+        let width = self.draw.region().width as i32;
         let height = self.view.line_height as i32;
         let top = self.row(selection.start);
         let bottom = self.row(selection.end);
@@ -355,10 +356,11 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             render_outline(self, Some(top), Some(bottom), 0, width);
 
             for (i, color) in Self::CARETS {
-                self.draw
-                    .polyline([([top, start - i], color), ([bottom, start - i], color)]);
-                self.draw
-                    .polyline([([top, start + i], color), ([bottom, start + i], color)]);
+                // TODO
+                // self.draw
+                //     .polyline([([top, start - i], color), ([bottom, start - i], color)]);
+                // self.draw
+                //     .polyline([([top, start + i], color), ([bottom, start + i], color)]);
             }
         }
         // Single line
@@ -369,13 +371,14 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             render_outline(self, Some(top), Some(bottom), end, width);
 
             for (i, color) in Self::CARETS {
-                self.draw.polyline([
-                    ([top + i, start + i], color),
-                    ([top + i, end - i], color),
-                    ([bottom - i, end - i], color),
-                    ([bottom - i, start + i], color),
-                    ([top + i, start + i], color),
-                ]);
+                // TODO
+                // self.draw.polyline([
+                //     ([top + i, start + i], color),
+                //     ([top + i, end - i], color),
+                //     ([bottom - i, end - i], color),
+                //     ([bottom - i, start + i], color),
+                //     ([top + i, start + i], color),
+                // ]);
             }
         }
         // Two non-overlapping lines
@@ -387,18 +390,19 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             render_outline(self, None, Some(bottom), end, width);
 
             for (i, color) in Self::CARETS {
-                self.draw.polyline([
-                    ([top + i, width], color),
-                    ([top + i, start + i], color),
-                    ([middle - i, start + i], color),
-                    ([middle - i, width], color),
-                ]);
-                self.draw.polyline([
-                    ([middle + i, 0], color),
-                    ([middle + i, end - i], color),
-                    ([bottom - i, end - i], color),
-                    ([bottom - i, 0], color),
-                ]);
+                // TODO
+                // self.draw.polyline([
+                //     ([top + i, width], color),
+                //     ([top + i, start + i], color),
+                //     ([middle - i, start + i], color),
+                //     ([middle - i, width], color),
+                // ]);
+                // self.draw.polyline([
+                //     ([middle + i, 0], color),
+                //     ([middle + i, end - i], color),
+                //     ([bottom - i, end - i], color),
+                //     ([bottom - i, 0], color),
+                // ]);
             }
         }
         // Two lines or more
@@ -409,18 +413,19 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             render_outline(self, None, Some(bottom2), end, width);
 
             for (i, color) in Self::CARETS {
-                self.draw.polyline([
-                    ([top2 + i, 0], color),
-                    ([top2 + i, start + i], color),
-                    ([top1 + i, start + i], color),
-                    ([top1 + i, width], color),
-                ]);
-                self.draw.polyline([
-                    ([bottom1 - i, width], color),
-                    ([bottom1 - i, end - i], color),
-                    ([bottom2 - i, end - i], color),
-                    ([bottom2 - i, 0], color),
-                ]);
+                // TODO
+                // self.draw.polyline([
+                //     ([top2 + i, 0], color),
+                //     ([top2 + i, start + i], color),
+                //     ([top1 + i, start + i], color),
+                //     ([top1 + i, width], color),
+                // ]);
+                // self.draw.polyline([
+                //     ([bottom1 - i, width], color),
+                //     ([bottom1 - i, end - i], color),
+                //     ([bottom2 - i, end - i], color),
+                //     ([bottom2 - i, 0], color),
+                // ]);
             }
         }
     }
@@ -463,21 +468,20 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
                 shaper.push(&str, renderer.view.family, STYLES);
                 shaper.line()
             };
+            let top = renderer.row(cursor);
+            let left = renderer.column(cursor)
+                - (str == LEFT)
+                    .then(|| line.glyphs().first())
+                    .flatten()
+                    .map(|glyph| glyph.advance as i32)
+                    .unwrap_or_default();
 
             renderer.draw.glyphs(
                 renderer.context,
-                [
-                    renderer.row(cursor),
-                    renderer.column(cursor)
-                        - (str == LEFT)
-                            .then(|| line.glyphs().first())
-                            .flatten()
-                            .map(|glyph| glyph.advance as i32)
-                            .unwrap_or_default(),
-                ],
+                Position { top, left },
                 &line,
                 0,
-                Default::default(),
+                // Default::default(), // TODO
             );
         }
 
@@ -506,7 +510,7 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
     }
 
     fn render_scrollbar(&mut self) {
-        let region_height_in_lines = self.draw.height() / self.view.line_height();
+        let region_height_in_lines = self.draw.region().height / self.view.line_height();
 
         if self.rope_lines <= region_height_in_lines as usize {
             return;
@@ -515,15 +519,14 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
         let scroll_top_in_lines = self.scroll_top as f32 / self.view.line_height() as f32;
         let top = scroll_top_in_lines / self.rope_lines as f32;
         let height = region_height_in_lines as f32 / self.rope_lines as f32;
+        let rectangle = Rectangle {
+            top: (top * self.draw.region().height as f32).round() as i32,
+            height: (height * self.draw.region().height as f32).round() as u32,
+            left: (self.advance / 2.0).round() as i32,
+            width: (self.advance / 4.0).round() as u32,
+        };
 
-        let top = (top * self.draw.height() as f32).round() as i32;
-        let height = (height * self.draw.height() as f32).round() as u32;
-        let left = (self.advance / 2.0).round() as i32;
-        let width = (self.advance / 4.0).round() as u32;
-
-        self.draw.rectangle(
-            ([top, left], [width, height]),
-            Self::SCROLLBAR.transparent(self.scrollbar_alpha),
-        );
+        self.draw
+            .rectangle(rectangle, Self::SCROLLBAR.transparent(self.scrollbar_alpha));
     }
 }

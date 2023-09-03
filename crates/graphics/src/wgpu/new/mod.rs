@@ -144,10 +144,11 @@ impl Graphics {
     /// Resizes the surface to the window's logical size.
     pub fn resize(&mut self) {
         let size = self.window.inner_size();
-
         self.config.width = size.width;
         self.config.height = size.height;
+
         self.surface.configure(&self.device, &self.config);
+        self.rectangle.resize(&self.device, &self.config);
     }
 
     /// Returns the `Draw`ing API.
@@ -169,6 +170,22 @@ impl Graphics {
                 label: Some("Encoder"),
             });
 
+        // Render rectangles in output texture
+        let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+            label: Some("Render pass"),
+            color_attachments: &[Some(RenderPassColorAttachment {
+                view: &output_texture,
+                resolve_target: None,
+                ops: Operations {
+                    load: LoadOp::Clear(Color::BLACK),
+                    store: true,
+                },
+            })],
+            depth_stencil_attachment: None,
+        });
+        self.rectangle.render(0, &self.queue, &mut render_pass);
+        drop(render_pass);
+
         // Flush
         self.queue.submit([encoder.finish()]);
         output.present();
@@ -187,8 +204,18 @@ pub struct Draw<'a> {
 }
 
 impl<'a> Draw<'a> {
+    /// Returns the current region.
+    pub fn region(&self) -> Rectangle {
+        self.region
+    }
+
+    /// Returns the current layer.
+    pub fn layer(&self) -> u32 {
+        self.layer
+    }
+
     /// Further restricts the current region.
-    pub fn region(&mut self, region: Rectangle) -> Option<Draw> {
+    pub fn draw(&mut self, region: Rectangle) -> Option<Draw> {
         self.region.region(region).map(|region| Draw {
             graphics: self.graphics,
             layer: self.layer,
@@ -207,10 +234,27 @@ impl<'a> Draw<'a> {
     pub fn glyphs(
         &mut self,
         context: &mut Context,
-        position: Position,
+        Position { top, left }: Position,
         line: &Line,
         line_height: LineHeight,
-        time: Duration,
     ) {
+        //
+        // Add backgrounds
+        //
+
+        for (Range { start, end }, _, background) in line
+            .segments(|glyph| glyph.styles.background)
+            .filter(|(_, _, background)| background.is_visible())
+        {
+            self.rectangle(
+                Rectangle {
+                    top,
+                    left: left + start as i32,
+                    width: (end - start) as u32,
+                    height: line_height,
+                },
+                background,
+            );
+        }
     }
 }

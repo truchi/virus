@@ -3,14 +3,14 @@ use crate::{
     views::{DocumentView, FilesView},
 };
 use std::time::Duration;
-use virus_common::Rgba;
+use virus_common::{Rectangle, Rgba};
 use virus_editor::{
     document::{Document, Selection},
     theme::Theme,
 };
 use virus_graphics::{
     text::{Context, Font, FontSize, Fonts, LineHeight},
-    wgpu::Graphics,
+    wgpu::new::Graphics,
 };
 use winit::window::Window;
 
@@ -116,14 +116,14 @@ impl Ui {
 
         self.document_view.render(
             &mut self.context,
-            &mut self.graphics.draw(region),
+            &mut self.graphics.draw(0, region),
             document,
             self.scroll_top.current(),
             self.scrollbar_alpha.current(),
             self.time,
         );
         self.files_view
-            .render(&mut self.context, &mut self.graphics.draw(region));
+            .render(&mut self.context, &mut self.graphics.draw(1, region));
 
         self.graphics.render();
     }
@@ -135,12 +135,16 @@ impl Ui {
         self.window().inner_size().height / self.document_view.line_height()
     }
 
-    fn region(&self) -> ([i32; 2], [u32; 2]) {
+    fn region(&self) -> Rectangle {
         let size = self.window().inner_size();
         let height = self.screen_height_in_lines() * self.document_view.line_height();
-        let top = (size.height - height) as i32 / 2;
 
-        ([top, 0], [size.width, height])
+        Rectangle {
+            top: (size.height - height) as i32 / 2,
+            left: 0,
+            width: size.width,
+            height,
+        }
     }
 
     fn scroll_to(&mut self, scroll_top: u32) {

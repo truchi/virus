@@ -1,7 +1,8 @@
+pub mod new;
+
 mod atlas;
 mod line;
 mod macros;
-mod new;
 mod text;
 
 use crate::text::{

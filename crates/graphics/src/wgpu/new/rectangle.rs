@@ -146,7 +146,7 @@ impl Pipeline {
             render_pass.set_bind_group(0, &self.bind_group, &[]);
             render_pass.set_push_constants(Constants::STAGES, 0, bytemuck::cast_slice(&constants));
             render_pass.set_vertex_buffer(0, self.buffer.slice(..));
-            render_pass.draw(0..1, 0..instances.len() as u32);
+            render_pass.draw(0..6, 0..instances.len() as u32);
         }
     }
 }
