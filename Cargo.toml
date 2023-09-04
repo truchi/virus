@@ -21,7 +21,7 @@ ropey = "1.6"
 unicode-segmentation = "1.10"
 unicode-width = "0.1"
 tween = "2.0.1"
-wgpu = "0.16"
+wgpu = "0.17"
 pollster = "0.3"
 bytemuck = "1.13"
 image = { version = "0.24", default-features = false, features = ["png"] }

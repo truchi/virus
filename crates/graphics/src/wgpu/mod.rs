@@ -1,6 +1,7 @@
 pub mod new;
 
 mod atlas;
+mod atlas2;
 mod line;
 mod macros;
 mod text;
