@@ -1,5 +1,4 @@
 use super::*;
-use std::collections::BTreeMap;
 
 macro_rules! label {
     ($label:literal) => {
@@ -16,56 +15,52 @@ muck!(unsafe Instance => Instance: [Position, Size, Rgba]);
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct Instance {
+    /// Rectangle position.
     position: Position,
+    /// Rectangle size.
     size: Size,
+    /// Rectangle color.
     color: Rgba,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                            Pipeline                                            //
+//                                               Init                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// Rectangle pipeline.
-#[derive(Debug)]
-pub struct Pipeline {
-    constants: Constants,
-    layers: BTreeMap<u32, Vec<Instance>>,
-    buffer: Buffer,
-    bind_group: BindGroup,
-    pipeline: RenderPipeline,
-}
+pub struct Init<'a>(pub &'a Device);
 
-impl Pipeline {
-    pub fn new(device: &Device, config: &SurfaceConfiguration) -> Self {
-        let limits = device.limits();
-        let max_buffer_size = limits.max_buffer_size as usize;
-        let max_texture_dimension = limits.max_texture_dimension_2d;
-
-        let constants = Constants {
-            surface: [config.width as f32, config.height as f32],
-        };
-
-        let buffer = device.create_buffer(&BufferDescriptor {
+impl<'a> Init<'a> {
+    pub fn buffer(&self, size: BufferAddress) -> Buffer {
+        self.0.create_buffer(&BufferDescriptor {
             label: label!("Instance buffer"),
-            size: max_buffer_size as BufferAddress, // TODO limit this size
+            size,
             usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
             mapped_at_creation: false,
-        });
+        })
+    }
 
-        let layers = Default::default();
-
-        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+    pub fn bind_group_layout(&self) -> BindGroupLayout {
+        self.0.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: label!("Bind group layout"),
             entries: &[],
-        });
+        })
+    }
 
-        let bind_group = device.create_bind_group(&BindGroupDescriptor {
+    pub fn bind_group(&self, bind_group_layout: &BindGroupLayout) -> BindGroup {
+        self.0.create_bind_group(&BindGroupDescriptor {
             label: label!("Bind group"),
             layout: &bind_group_layout,
             entries: &[],
-        });
+        })
+    }
 
-        let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+    pub fn pipeline(
+        &self,
+        config: &SurfaceConfiguration,
+        bind_group_layout: &BindGroupLayout,
+        module: &ShaderModule,
+    ) -> RenderPipeline {
+        let pipeline_layout = self.0.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: label!("Pipeline layout"),
             bind_group_layouts: &[&bind_group_layout],
             push_constant_ranges: &[PushConstantRange {
@@ -74,8 +69,7 @@ impl Pipeline {
             }],
         });
 
-        let module = device.create_shader_module(include_wgsl!("rectangle.wgsl"));
-        let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+        self.0.create_render_pipeline(&RenderPipelineDescriptor {
             label: label!("Pipeline"),
             layout: Some(&pipeline_layout),
             vertex: VertexState {
@@ -99,7 +93,41 @@ impl Pipeline {
                 })],
             }),
             multiview: None,
-        });
+        })
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                            Pipeline                                            //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+/// Rectangle pipeline.
+#[derive(Debug)]
+pub struct Pipeline {
+    constants: Constants,
+    layers: BTreeMap<u32, Vec<Instance>>,
+    buffer: Buffer,
+    bind_group: BindGroup,
+    pipeline: RenderPipeline,
+}
+
+impl Pipeline {
+    pub fn new(device: &Device, config: &SurfaceConfiguration) -> Self {
+        let limits = device.limits();
+        let max_buffer_size = limits.max_buffer_size;
+
+        let constants = Constants {
+            surface: [config.width as f32, config.height as f32],
+        };
+        let buffer = Init(device).buffer(max_buffer_size); // TODO limit this size
+        let layers = Default::default();
+        let bind_group_layout = Init(device).bind_group_layout();
+        let bind_group = Init(device).bind_group(&bind_group_layout);
+        let pipeline = Init(device).pipeline(
+            config,
+            &bind_group_layout,
+            &device.create_shader_module(include_wgsl!("rectangle.wgsl")),
+        );
 
         Self {
             constants,
@@ -119,10 +147,14 @@ impl Pipeline {
             return;
         };
 
+        if !color.is_visible() {
+            return;
+        }
+
         self.layers.entry(layer).or_default().push(Instance {
             position: rectangle.position(),
             size: rectangle.size(),
-            color: color.into(),
+            color,
         });
     }
 
@@ -147,6 +179,12 @@ impl Pipeline {
             render_pass.set_push_constants(Constants::STAGES, 0, bytemuck::cast_slice(&constants));
             render_pass.set_vertex_buffer(0, self.buffer.slice(..));
             render_pass.draw(0..6, 0..instances.len() as u32);
+        }
+    }
+
+    pub fn post_render(&mut self) {
+        for layer in self.layers.values_mut() {
+            layer.clear();
         }
     }
 }

@@ -1,57 +1,5 @@
-// use std::hash::Hash;
-// use virus_common::{Position, Size};
-
-// /// Error type for [`Allocator::insert()`].
-// #[derive(Copy, Clone, Debug)]
-// pub enum InsertError {
-//     /// The item is too big for the atlas' width/height/bin dimensions. Resize the atlas.
-//     WontFit,
-//     /// The item is too big for the atlas' remaining space. Clear the atlas.
-//     OutOfSpace,
-// }
-
-// /// Atlas allocation.
-// pub trait Allocator {
-//     // /// Returns the number of items in the allocator.
-//     // fn len(&self) -> usize;
-
-//     // /// Returns the width of the allocator.
-//     // fn width(&self) -> u32;
-
-//     // /// Returns the height of the allocator.
-//     // fn height(&self) -> u32;
-
-//     /// Inserts an item with `size`.
-//     fn insert(&mut self, size: Size) -> Result<(), InsertError>;
-
-//     /// Clears the allocator.
-//     fn clear(&mut self);
-
-//     /// Clears and resizes the allocator.
-//     fn resize(&mut self, size: Size, bin: Option<u32>);
-// }
-
-// /// Atlas caching.
-// pub trait Cache<K: Clone + Eq + Hash, V> {
-//     /// Returns `true` if the cache contains `key`.
-//     fn contains(&self, key: &K) -> bool {
-//         self.get(key).is_some()
-//     }
-
-//     /// Returns the value of `key`.
-//     fn get(&self, key: &K) -> Option<&V>;
-
-//     /// Inserts `key` with `value`.
-//     fn insert(&mut self, key: K, value: V);
-
-//     /// Clears the cache.
-//     fn clear(&mut self);
-// }
-
-// pub trait Buffer {}
-
 use std::{collections::HashMap, hash::Hash, marker::PhantomData};
-use virus_common::{Rectangle, Size};
+use virus_common::{Position, Rectangle, Size};
 use wgpu::{Extent3d, ImageCopyTexture, ImageDataLayout, Origin3d, Queue, Texture, TextureAspect};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -88,7 +36,7 @@ impl Axis for Vertical {
 //                                              Item                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// An [`Allocator`] item.
+/// An [`Atlas`] item.
 #[derive(Copy, Clone, Debug)]
 struct Item<V> {
     /// The main-axis coordinate.
@@ -99,11 +47,20 @@ struct Item<V> {
     value: V,
 }
 
+impl<V> Item<V> {
+    /// Returns the position of the item.
+    fn position<A: Axis>(&self) -> Position {
+        let [left, top] = A::flip(self.main as i32, self.cross as i32);
+
+        Position { top, left }
+    }
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Shelf                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// An [`Allocator`] shelf.
+/// An [`Atlas`] shelf.
 #[derive(Copy, Clone, Debug)]
 struct Shelf {
     /// The occupied main-axis size.
@@ -113,21 +70,23 @@ struct Shelf {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                           Allocator                                            //
+//                                             Atlas                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// Error type for [`Allocator::insert()`].
+/// Error type for [`Atlas::insert()`].
 #[derive(Copy, Clone, Debug)]
-pub enum InsertError {
+pub enum AtlasError {
+    /// The item already exists in the atlas.
+    KeyExists,
     /// The item is too big for the atlas' width/height/bin dimensions. Resize the atlas.
     WontFit,
     /// The item is too big for the atlas' remaining space. Clear the atlas.
     OutOfSpace,
 }
 
-/// An atlas allocator.
+/// An atlas.
 #[derive(Debug)]
-pub struct Allocator<A: Axis, K: Clone + Eq + Hash, V> {
+pub struct Atlas<A: Axis, K: Clone + Eq + Hash, V> {
     /// The bin main-axis size.
     bin: u32,
     /// The bins of the atlas.
@@ -140,14 +99,13 @@ pub struct Allocator<A: Axis, K: Clone + Eq + Hash, V> {
     _axis: PhantomData<A>,
 }
 
-impl<A: Axis, K: Clone + Eq + Hash, V> Allocator<A, K, V> {
-    /// Creates a new empty allocator into `texture` with `bin` main-axis size.
-    pub fn new(texture: Texture, bin: Option<u32>) -> Self {
-        let [width, height] = [texture.width(), texture.height()];
-        let [main, _] = A::flip(width, height);
+impl<A: Axis, K: Clone + Eq + Hash, V> Atlas<A, K, V> {
+    /// Creates a new empty atlas into `texture` with `bin` main-axis size.
+    pub fn new(texture: Texture, bin: u32) -> Self {
+        let [main, _] = A::flip(texture.width(), texture.height());
 
         Self {
-            bin: bin.unwrap_or(main).min(main),
+            bin: bin.min(main),
             bins: Default::default(),
             items: Default::default(),
             texture,
@@ -155,72 +113,75 @@ impl<A: Axis, K: Clone + Eq + Hash, V> Allocator<A, K, V> {
         }
     }
 
-    /// Returns the number of items in the allocator.
-    pub fn len(&self) -> usize {
-        self.items.len()
-    }
-
     /// Returns the position and value of the item for `key`.
-    pub fn get(&self, key: &K) -> Option<([u32; 2], &V)> {
+    pub fn get(&self, key: &K) -> Option<(Position, &V)> {
         self.items
             .get(&key)
-            .map(|item| (A::flip(item.main, item.cross), &item.value))
+            .map(|item| (item.position::<A>(), &item.value))
+    }
+
+    /// Returns the GPU texture.
+    pub fn texture(&self) -> &Texture {
+        &self.texture
     }
 
     /// Inserts an item for `key` with `([width, height], value)` provided through `f`
     /// (only called when the item does not exist already).
     ///
     /// If allocation fails, call [`Self::clear()`] before the next frame, or try a larger
-    /// allocator.
+    /// atlas.
     pub fn insert(
         &mut self,
         queue: &Queue,
         key: K,
         value: V,
         size: Size,
-    ) -> Result<([u32; 2], &V), InsertError> {
-        // Insert when not in cache already
-        if self.items.get(&key).is_none() {
-            let [main, cross] = A::flip(size.width, size.height);
-            let [_, self_cross] = A::flip(self.texture.width(), self.texture.height());
-
-            // Check dimensions
-            if !(main <= self.bin && cross <= self_cross) {
-                return Err(InsertError::WontFit);
-            }
-
-            // Insert or fail
-            if self.try_insert(&key, value, [main, cross]).is_err() {
-                return Err(InsertError::OutOfSpace);
-            }
+        bytes: &[u8],
+    ) -> Result<(Position, &V), AtlasError> {
+        // Check if key exists
+        if self.items.contains_key(&key) {
+            return Err(AtlasError::KeyExists);
         }
+
+        let [main, cross] = A::flip(size.width, size.height);
+        let [_, self_cross] = A::flip(self.texture.width(), self.texture.height());
+
+        // Check dimensions
+        if !(main <= self.bin && cross <= self_cross) {
+            return Err(AtlasError::WontFit);
+        }
+
+        // Insert or fail
+        self.try_insert(&key, value, [main, cross])?;
 
         // Lookup cache
         let item = self.items.get(&key).unwrap();
-        Ok((A::flip(item.main, item.cross), &item.value))
+        let position = item.position::<A>();
+        self.write(queue, position & size, bytes);
+
+        Ok((position, &item.value))
     }
 
-    /// Clears the allocator.
+    /// Clears the atlas.
     pub fn clear(&mut self) {
         self.items.clear();
         self.bins.clear();
     }
 
-    /// Clears and resizes the allocator.
-    pub fn clear_and_resize(&mut self, texture: Texture, bin: Option<u32>) {
-        let [width, height] = [texture.width(), texture.height()];
-        let [main, _] = A::flip(width, height);
+    /// Clears and resizes the atlas.
+    pub fn clear_and_resize(&mut self, texture: Texture, bin: u32) {
+        let [main, _] = A::flip(texture.width(), texture.height());
 
         self.clear();
-        self.bin = bin.unwrap_or(main).min(main);
+        self.bin = bin.min(main);
         self.texture = texture;
     }
 }
 
 /// Private.
-impl<A: Axis, K: Clone + Eq + Hash, V> Allocator<A, K, V> {
+impl<A: Axis, K: Clone + Eq + Hash, V> Atlas<A, K, V> {
     /// Tries to insert an item.
-    fn try_insert(&mut self, key: &K, value: V, [main, cross]: [u32; 2]) -> Result<(), ()> {
+    fn try_insert(&mut self, key: &K, value: V, [main, cross]: [u32; 2]) -> Result<(), AtlasError> {
         let [self_main, self_cross] = A::flip(self.texture.width(), self.texture.height());
 
         // Main-axis position in the atlas
@@ -306,7 +267,7 @@ impl<A: Axis, K: Clone + Eq + Hash, V> Allocator<A, K, V> {
             return Ok(());
         }
 
-        Err(())
+        Err(AtlasError::OutOfSpace)
     }
 
     /// Writes `data` in texture.

@@ -1,14 +1,19 @@
 #![allow(unused)]
 
+mod glyph;
 mod rectangle;
 
-use super::atlas::{Allocator, Horizontal};
+use super::atlas2::{Atlas, AtlasError, Horizontal};
 use crate::text::{
     AnimatedGlyphKey, Context, FontSize, FrameIndex, Glyph, GlyphKey, Line, LineHeight, LineScaler,
     Shadow,
 };
+use std::collections::BTreeMap;
 use std::{mem::size_of, ops::Range, time::Duration};
-use swash::{scale::image::Content, zeno::Placement};
+use swash::{
+    scale::image::{Content, Image},
+    zeno::Placement,
+};
 use virus_common::{muck, Position, Rectangle, Rgba, Size, WithAttributes};
 use wgpu::{
     include_wgsl, vertex_attr_array, BindGroup, BindGroupDescriptor, BindGroupEntry,
@@ -16,13 +21,13 @@ use wgpu::{
     BlendState, Buffer, BufferAddress, BufferDescriptor, BufferUsages, Color, ColorTargetState,
     ColorWrites, CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Extent3d,
     Features, FragmentState, ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, Limits,
-    LoadOp, Operations, Origin3d, PipelineLayoutDescriptor, PresentMode, PrimitiveState,
-    PrimitiveTopology, PushConstantRange, Queue, RenderPass, RenderPassColorAttachment,
-    RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions,
-    SamplerBindingType, ShaderStages, Surface, SurfaceConfiguration, Texture, TextureAspect,
-    TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages,
-    TextureView, TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexState,
-    VertexStepMode,
+    LoadOp, Operations, Origin3d, PipelineLayout, PipelineLayoutDescriptor, PresentMode,
+    PrimitiveState, PrimitiveTopology, PushConstantRange, Queue, RenderPass,
+    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
+    RequestAdapterOptions, SamplerBindingType, ShaderModule, ShaderStages, Surface,
+    SurfaceConfiguration, Texture, TextureAspect, TextureDescriptor, TextureDimension,
+    TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDimension,
+    VertexAttribute, VertexBufferLayout, VertexState, VertexStepMode,
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
@@ -34,7 +39,7 @@ type Index = u32;
 //                                            Constants                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct Constants {
     pub surface: [f32; 2],
 }
@@ -65,6 +70,7 @@ pub struct Graphics {
     device: Device,
     queue: Queue,
     rectangle: rectangle::Pipeline,
+    glyph: glyph::Pipeline,
 }
 
 impl Graphics {
@@ -117,6 +123,7 @@ impl Graphics {
 
         // Pipelines
         let rectangle = rectangle::Pipeline::new(&device, &config);
+        let glyph = glyph::Pipeline::new(&device, &config);
 
         Self {
             window,
@@ -125,6 +132,7 @@ impl Graphics {
             device,
             queue,
             rectangle,
+            glyph,
         }
     }
 
@@ -149,6 +157,7 @@ impl Graphics {
 
         self.surface.configure(&self.device, &self.config);
         self.rectangle.resize(&self.device, &self.config);
+        self.glyph.resize(&self.device, &self.config);
     }
 
     /// Returns the `Draw`ing API.
@@ -162,6 +171,7 @@ impl Graphics {
 
     /// Renders to the screen.
     pub fn render(&mut self) {
+        // Get output texture from surface
         let output = self.surface.get_current_texture().unwrap();
         let output_texture = output.texture.create_view(&Default::default());
         let mut encoder = self
@@ -172,7 +182,7 @@ impl Graphics {
 
         // Render rectangles in output texture
         let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-            label: Some("Render pass"),
+            label: Some("Rectangle render pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
                 view: &output_texture,
                 resolve_target: None,
@@ -186,9 +196,29 @@ impl Graphics {
         self.rectangle.render(0, &self.queue, &mut render_pass);
         drop(render_pass);
 
+        // Render glyphs in output texture
+        let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+            label: Some("Glyphs render pass"),
+            color_attachments: &[Some(RenderPassColorAttachment {
+                view: &output_texture,
+                resolve_target: None,
+                ops: Operations {
+                    load: LoadOp::Load,
+                    store: true,
+                },
+            })],
+            depth_stencil_attachment: None,
+        });
+        self.glyph.render(0, &self.queue, &mut render_pass);
+        drop(render_pass);
+
         // Flush
         self.queue.submit([encoder.finish()]);
         output.present();
+
+        // Clear pipelines
+        self.rectangle.post_render();
+        self.glyph.post_render();
     }
 }
 
@@ -230,11 +260,32 @@ impl<'a> Draw<'a> {
             .push(self.layer, self.region, rectangle, color);
     }
 
+    /// Draws a glyph.
+    pub fn glyph<F: FnOnce() -> Option<Image>>(
+        &mut self,
+        position: Position,
+        font_size: FontSize,
+        key: GlyphKey,
+        color: Rgba,
+        image: F,
+    ) {
+        self.graphics.glyph.push(
+            &self.graphics.queue,
+            self.layer,
+            self.region,
+            position,
+            font_size,
+            key,
+            color,
+            image,
+        );
+    }
+
     /// Draws glyphs.
     pub fn glyphs(
         &mut self,
         context: &mut Context,
-        Position { top, left }: Position,
+        position: Position,
         line: &Line,
         line_height: LineHeight,
     ) {
@@ -242,18 +293,35 @@ impl<'a> Draw<'a> {
         // Add backgrounds
         //
 
-        for (Range { start, end }, _, background) in line
-            .segments(|glyph| glyph.styles.background)
-            .filter(|(_, _, background)| background.is_visible())
+        for (Range { start, end }, _, background) in line.segments(|glyph| glyph.styles.background)
         {
             self.rectangle(
                 Rectangle {
-                    top,
-                    left: left + start as i32,
+                    top: position.top,
+                    left: position.left + start as i32,
                     width: (end - start) as u32,
                     height: line_height,
                 },
                 background,
+            );
+        }
+
+        //
+        // Add glyphs
+        //
+
+        let mut scaler = line.scaler(context);
+
+        for glyph in line.glyphs() {
+            self.glyph(
+                Position {
+                    top: position.top,
+                    left: position.left + glyph.offset.round() as i32,
+                },
+                line.font_size(),
+                glyph.key(),
+                glyph.styles.foreground,
+                || scaler.render(&glyph),
             );
         }
     }

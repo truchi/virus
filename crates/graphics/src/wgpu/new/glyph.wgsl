@@ -1,3 +1,7 @@
+@group(0) @binding(0) var MASK: texture_2d<f32>;
+@group(0) @binding(1) var COLOR: texture_2d<f32>;
+@group(0) @binding(2) var SAMPLER: sampler;
+
 var<push_constant> CONSTANTS: Constants;
 
 struct Constants {
@@ -14,23 +18,33 @@ fn to_clip(position: vec2f) -> vec4f {
     );
 }
 
+fn to_texture(ty: u32, uv: vec2f) -> vec2f {
+    switch ty {
+        // Mask glyph
+        case 0u: { return uv / vec2f(textureDimensions(MASK)); }
+        // Color glyph
+        case 1u: { return uv / vec2f(textureDimensions(COLOR)); }
+        // Unreachable
+        default: { return vec2f(0.0, 0.0); }
+    }
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                               Vertex                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 struct Instance {
     @builtin(vertex_index) index: u32,
-    // Rectangle `(top, left)` position.
-    @location(0) position: vec2i,
-    // Rectangle `(width, height)` size.
-    @location(1) size: vec2u,
-    // Rectangle sRGBA color.
-    @location(2) color: vec4u,
-}
-
-struct Fragment {
-    @builtin(position) position: vec4f,
-    @location(0) color: vec4f,
+    // Glyph type (0: mask, 1: color).
+    @location(0) ty: u32,
+    // Glyph `(top, left)` position.
+    @location(1) position: vec2i,
+    // Glyph `(width, height)` size.
+    @location(2) size: vec2u,
+    // Texture `(x, y)` position.
+    @location(3) uv: vec2i,
+    // Glyph sRGBA color.
+    @location(4) color: vec4u,
 }
 
 fn position(index: u32, position: vec2i, size: vec2u) -> vec2f {
@@ -67,6 +81,8 @@ fn color(color: vec4u) -> vec4f {
 fn vertex(instance: Instance) -> Fragment {
     var fragment: Fragment;
     fragment.position = to_clip(position(instance.index, instance.position, instance.size));
+    fragment.ty = instance.ty;
+    fragment.uv = to_texture(instance.ty, position(instance.index, instance.uv, instance.size));
     fragment.color = color(instance.color);
 
     return fragment;
@@ -76,7 +92,27 @@ fn vertex(instance: Instance) -> Fragment {
 //                                              Fragment                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+struct Fragment {
+    @builtin(position) position: vec4f,
+    @location(0) ty: u32,
+    @location(1) uv: vec2f,
+    @location(2) color: vec4f,
+}
+
 @fragment
 fn fragment(fragment: Fragment) -> @location(0) vec4f {
-    return fragment.color;
+    switch fragment.ty {
+        // Mask glyph
+        case 0u: {
+            let mask = textureSampleLevel(MASK, SAMPLER, fragment.uv, 0.0).r;
+            return vec4f(fragment.color.rgb, fragment.color.a * mask);
+        }
+        // Color glyph
+        case 1u: {
+            return textureSampleLevel(COLOR, SAMPLER, fragment.uv, 0.0);
+        }
+        default: {
+            discard;
+        }
+    }
 }

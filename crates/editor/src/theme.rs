@@ -159,7 +159,6 @@ impl Theme {
         use virus_graphics::text::{
             FontStyle::{self, *},
             FontWeight::{self, *},
-            Shadow,
         };
 
         fn style(r: u8, g: u8, b: u8, weight: FontWeight, style: FontStyle) -> Styles {
@@ -169,13 +168,8 @@ impl Theme {
                 underline: Default::default(),
                 strike: Default::default(),
                 foreground: Rgba::new(r, g, b, u8::MAX),
-                // background: Rgba::TRANSPARENT,
-                background: Rgba::new(255 - r, 255 - g, 255 - b, u8::MAX),
+                background: Rgba::new(255 - r, 255 - g, 255 - b, 50),
                 shadow: None,
-                // shadow: Some(Shadow {
-                //     radius: 10,
-                //     color: Rgba::new(b, r, g, u8::MAX),
-                // }),
             }
         }
 
