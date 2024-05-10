@@ -169,7 +169,6 @@ impl Theme {
                 strike: Default::default(),
                 foreground: Rgba::new(r, g, b, u8::MAX),
                 background: Rgba::new(255 - r, 255 - g, 255 - b, 50),
-                shadow: None,
             }
         }
 

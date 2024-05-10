@@ -6,11 +6,15 @@ mod rectangle;
 
 use crate::text::{
     AnimatedGlyphKey, Context, FontSize, FrameIndex, Glyph, GlyphKey, Line, LineHeight, LineScaler,
-    Shadow,
 };
 use atlas::{Atlas, AtlasError};
-use std::collections::BTreeMap;
-use std::{mem::size_of, ops::Range, time::Duration};
+use std::{
+    collections::{BTreeMap, HashMap},
+    hash::Hash,
+    mem::size_of,
+    ops::Range,
+    time::Duration,
+};
 use swash::{
     scale::image::{Content, Image},
     zeno::Placement,

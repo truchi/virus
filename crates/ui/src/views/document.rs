@@ -267,7 +267,6 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             background: Rgba::TRANSPARENT,
             underline: false,
             strike: false,
-            shadow: None,
         };
 
         for number in self.start..=self.end.min(self.rope_lines.saturating_sub(1)) {
@@ -443,7 +442,6 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             background: Rgba::TRANSPARENT,
             underline: false,
             strike: false,
-            shadow: None,
         };
 
         let range = match self.document.selection().as_ast() {

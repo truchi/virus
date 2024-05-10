@@ -102,12 +102,6 @@ impl Glyph {
 //                                             Styles                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub struct Shadow {
-    pub radius: u8,
-    pub color: Rgba,
-}
-
 /// Glyph styles.
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Styles {
@@ -117,5 +111,4 @@ pub struct Styles {
     pub background: Rgba,
     pub underline: bool,
     pub strike: bool,
-    pub shadow: Option<Shadow>,
 }
