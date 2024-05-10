@@ -6,18 +6,15 @@
 //!
 //! It would be nice to crop what we shape/scale of a line on the horizontal axis.
 
-mod animated;
-mod context;
 mod font;
 mod line;
 
-pub use animated::*;
-pub use context::*;
 pub use font::*;
 pub use line::*;
 
 use swash::{
-    scale::{Source, StrikeWith},
+    scale::{ScaleContext, Source, StrikeWith},
+    shape::ShapeContext,
     text::{cluster::SourceRange, Script},
     GlyphId,
 };
@@ -44,7 +41,7 @@ pub type FontSize = u8;
 //                                            LineHeight                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// LineHeight unit (`u32`).
+/// Line height unit (`u32`).
 pub type LineHeight = u32;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -62,6 +59,21 @@ pub type Advance = f32;
 pub type GlyphKey = (FontKey, FontSize, GlyphId);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                             Styles                                             //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+/// [`Glyph`] styles.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct Styles {
+    pub weight: FontWeight,
+    pub style: FontStyle,
+    pub foreground: Rgba,
+    pub background: Rgba,
+    pub underline: bool,
+    pub strike: bool,
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                               Glyph                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
@@ -74,8 +86,6 @@ pub struct Glyph {
     pub size: FontSize,
     /// Glyph id.
     pub id: GlyphId,
-    /// Animated glyph id.
-    pub animated_id: Option<AnimatedGlyphId>,
     /// Glyph advance offset.
     pub offset: Advance,
     /// Glyph advance.
@@ -91,24 +101,39 @@ impl Glyph {
     pub fn key(&self) -> GlyphKey {
         (self.font, self.size, self.id)
     }
-
-    /// Returns `true` if this glyph can be animated.
-    pub fn is_animated(&self) -> bool {
-        self.animated_id.is_some()
-    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                             Styles                                             //
+//                                             Context                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// Glyph styles.
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub struct Styles {
-    pub weight: FontWeight,
-    pub style: FontStyle,
-    pub foreground: Rgba,
-    pub background: Rgba,
-    pub underline: bool,
-    pub strike: bool,
+/// Context for font shaping and scaling.
+pub struct Context {
+    /// Font cache.
+    fonts: Fonts,
+    /// Shape context.
+    shape: ShapeContext,
+    /// Scale context.
+    scale: ScaleContext,
+}
+
+impl Context {
+    /// Creates a new `Context` with `fonts`.
+    pub fn new(fonts: Fonts) -> Self {
+        Self {
+            fonts,
+            shape: Default::default(),
+            scale: Default::default(),
+        }
+    }
+
+    /// Returns the font cache.
+    pub fn fonts(&self) -> &Fonts {
+        &self.fonts
+    }
+
+    /// Returns a tuple of mutable references.
+    pub fn as_muts(&mut self) -> (&mut Fonts, &mut ShapeContext, &mut ScaleContext) {
+        (&mut self.fonts, &mut self.shape, &mut self.scale)
+    }
 }

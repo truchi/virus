@@ -1,5 +1,5 @@
 use ropey::Rope;
-use std::{borrow::Cow, ops::Range, time::Duration};
+use std::{borrow::Cow, ops::Range};
 use virus_common::{Cursor, Position, Rectangle, Rgb, Rgba};
 use virus_editor::{
     document::{Document, Selection},
@@ -24,7 +24,6 @@ pub struct DocumentView {
     font_size: FontSize,
     line_height: LineHeight,
     rope: Rope,
-    is_animating: bool,
     range: Range<usize>,
     lines: Vec<(usize, Line)>,
 }
@@ -44,7 +43,6 @@ impl DocumentView {
             font_size,
             line_height,
             rope: Default::default(),
-            is_animating: false,
             range: 0..0,
             lines: Vec::default(),
         }
@@ -66,10 +64,6 @@ impl DocumentView {
         &self.rope
     }
 
-    pub fn is_animating(&self) -> bool {
-        self.is_animating
-    }
-
     pub fn render(
         &mut self,
         context: &mut Context,
@@ -77,18 +71,8 @@ impl DocumentView {
         document: &Document,
         scroll_top: u32,
         scrollbar_alpha: u8,
-        time: Duration,
     ) {
-        Renderer::new(
-            self,
-            context,
-            draw,
-            document,
-            scroll_top,
-            scrollbar_alpha,
-            time,
-        )
-        .render();
+        Renderer::new(self, context, draw, document, scroll_top, scrollbar_alpha).render();
     }
 }
 
@@ -103,7 +87,6 @@ struct Renderer<'a, 'b, 'c, 'd, 'e> {
     document: &'e Document,
     scroll_top: u32,
     scrollbar_alpha: u8,
-    time: Duration,
     start: usize,
     end: usize,
     rope_lines: usize,
@@ -131,7 +114,6 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
         document: &'e Document,
         scroll_top: u32,
         scrollbar_alpha: u8,
-        time: Duration,
     ) -> Self {
         let start = (scroll_top as f32 / view.line_height as f32).floor() as usize;
         let end = start + (draw.region().height as f32 / view.line_height as f32).ceil() as usize;
@@ -150,7 +132,6 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             document,
             scroll_top,
             scrollbar_alpha,
-            time,
             start,
             end,
             rope_lines,
@@ -284,14 +265,12 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
                 Position { top, left },
                 &line,
                 self.view.line_height,
-                // self.time, // TODO
             );
         }
     }
 
     fn render_document(&mut self) {
         let left = self.line_numbers_width.ceil() as i32;
-        let mut is_animating = false;
 
         for (index, line) in self
             .view
@@ -306,15 +285,8 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
                 Position { top, left },
                 &line,
                 self.view.line_height as u32,
-                // self.time, // TODO
             );
-
-            if line.has_animated_glyphs() {
-                is_animating = true;
-            }
         }
-
-        self.view.is_animating = is_animating;
     }
 
     fn render_selection(&mut self, selection: Range<Cursor>) {
@@ -474,13 +446,9 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
                     .map(|glyph| glyph.advance as i32)
                     .unwrap_or_default();
 
-            renderer.draw.glyphs(
-                renderer.context,
-                Position { top, left },
-                &line,
-                0,
-                // Default::default(), // TODO
-            );
+            renderer
+                .draw
+                .glyphs(renderer.context, Position { top, left }, &line, 0);
         }
 
         match (up, down) {

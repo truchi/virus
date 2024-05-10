@@ -1,7 +1,6 @@
+use super::{Advance, FontSize};
 use std::{collections::HashMap, path::Path};
 use swash::{CacheKey, FontDataRef, FontRef};
-
-use super::{Advance, AnimatedFont, FontSize};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             FontWeight                                         //
@@ -106,7 +105,7 @@ impl FontStyle {
 //                                              FontKey                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// A font key.
+/// A [`Font`] key.
 pub type FontKey = CacheKey;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -322,18 +321,15 @@ pub struct Fonts {
     families: HashMap<FontFamilyKey, FontFamily>,
     /// The emoji fallback font.
     emoji: Font,
-    /// The animated emoji font.
-    animated: AnimatedFont,
 }
 
 impl Fonts {
     /// Returns a new `Fonts` with `emoji` fallback.
-    pub fn new(emoji: Font, animated: AnimatedFont) -> Self {
+    pub fn new(emoji: Font) -> Self {
         Self {
             fonts: Default::default(),
             families: Default::default(),
             emoji,
-            animated,
         }
     }
 
@@ -360,11 +356,6 @@ impl Fonts {
     /// Returns a `FontRef` to the emoji font.
     pub fn emoji(&self) -> &Font {
         &self.emoji
-    }
-
-    /// Returns the animated emoji font.
-    pub fn animated(&self) -> &AnimatedFont {
-        &self.animated
     }
 }
 
@@ -540,7 +531,7 @@ mod tests {
         let emoji = key();
 
         // Create fonts
-        let mut fonts = Fonts::new(font(emoji), Default::default());
+        let mut fonts = Fonts::new(font(emoji));
 
         // Emoji font exists
         assert!(fonts.get(emoji).unwrap().key() == emoji);

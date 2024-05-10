@@ -31,7 +31,6 @@ pub struct Ui {
     document_view: DocumentView,
     scroll_top: Tweened<u32>,
     scrollbar_alpha: Tweened<u8>,
-    time: Duration,
     files_view: FilesView,
 }
 
@@ -56,7 +55,6 @@ impl Ui {
             document_view,
             scroll_top: Tweened::new(0),
             scrollbar_alpha: Tweened::new(0),
-            time: Duration::ZERO,
             files_view,
         }
     }
@@ -66,9 +64,7 @@ impl Ui {
     }
 
     pub fn is_animating(&self) -> bool {
-        self.document_view.is_animating()
-            || self.scroll_top.is_animating()
-            || self.scrollbar_alpha.is_animating()
+        self.scroll_top.is_animating() || self.scrollbar_alpha.is_animating()
     }
 
     pub fn scroll_up(&mut self) {
@@ -108,7 +104,6 @@ impl Ui {
     pub fn update(&mut self, delta: Duration) {
         self.scroll_top.step(delta);
         self.scrollbar_alpha.step(delta);
-        self.time += delta;
     }
 
     pub fn render(&mut self, document: &Document) {
@@ -120,7 +115,6 @@ impl Ui {
             document,
             self.scroll_top.current(),
             self.scrollbar_alpha.current(),
-            self.time,
         );
         self.files_view
             .render(&mut self.context, &mut self.graphics.draw(1, region));
@@ -155,12 +149,8 @@ impl Ui {
 }
 
 fn fonts() -> Fonts {
-    use virus_graphics::text::AnimatedFont;
     use virus_graphics::text::FontStyle::*;
     use virus_graphics::text::FontWeight::*;
-
-    // YOUR CAN GIVE AN EMPTY FOLDER HERE
-    const ANIMATED_FONT: &str = "/Users/romain/perso/noto_animated_emoji";
 
     // YOU HAVE TO GIVE FONTS FROM YOUR DISK HERE
     const EMOJI: &str = "/Users/romain/Library/Fonts/NotoColorEmoji.ttf";
@@ -254,10 +244,7 @@ fn fonts() -> Fonts {
     // const VICTOR_BOLD_OBLIQUE: &str =
     //     "/home/romain/.local/share/fonts/VictorMono/TTF/VictorMono-BoldOblique.ttf";
 
-    let mut fonts = Fonts::new(
-        Font::from_file(EMOJI).unwrap(),
-        AnimatedFont::new(ANIMATED_FONT.into()).unwrap(),
-    );
+    let mut fonts = Fonts::new(Font::from_file(EMOJI).unwrap());
 
     // let ubuntu = fonts.set(Font::from_file(UBUNTU).unwrap());
 

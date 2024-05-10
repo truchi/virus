@@ -1,5 +1,5 @@
 use crate::text::*;
-use std::{ops::Range, time::Duration};
+use std::ops::Range;
 use swash::{
     scale::{image::Image, Render},
     shape::{ShapeContext, Shaper},
@@ -19,8 +19,6 @@ pub struct Line {
     font_size: FontSize,
     /// Advance.
     advance: Advance,
-    /// Has animated glyphs?
-    has_animated_glyphs: bool,
 }
 
 impl Line {
@@ -47,11 +45,6 @@ impl Line {
     /// Returns the `Advance` of this `Line`.
     pub fn advance(&self) -> Advance {
         self.advance
-    }
-
-    /// Returns `true` if this `Line` has animated glyphs.
-    pub fn has_animated_glyphs(&self) -> bool {
-        self.has_animated_glyphs
     }
 
     /// Returns an iterator of contiguous `key(glyph)`.
@@ -162,7 +155,6 @@ impl<'a> LineShaper<'a> {
                 glyphs: Vec::new(),
                 font_size,
                 advance: 0.,
-                has_animated_glyphs: false,
             },
             bytes: 0,
         }
@@ -185,16 +177,6 @@ impl<'a> LineShaper<'a> {
             .emoji()
             .size_for_advance(2.0 * font.advance_for_size(font_size));
 
-        let animated_glyph_id = {
-            let offset = self.bytes as usize;
-            let animated = self.fonts.animated();
-            move |range: SourceRange| {
-                let Range { start, end } = range.to_range();
-                animated
-                    .get_by_str(&str[start - offset..end - offset])
-                    .map(|animated_glyph| animated_glyph.id())
-            }
-        };
         let line = &mut self.line;
         let mut font_or_emoji = FontOrEmoji::Font;
         let mut cluster = CharCluster::default();
@@ -206,19 +188,12 @@ impl<'a> LineShaper<'a> {
                 (FontOrEmoji::Font, FontOrEmoji::Font) => {}
                 (FontOrEmoji::Emoji, FontOrEmoji::Emoji) => {}
                 (FontOrEmoji::Font, FontOrEmoji::Emoji) => {
-                    Self::flush(
-                        line,
-                        shaper,
-                        emoji_key,
-                        emoji_size,
-                        styles,
-                        animated_glyph_id,
-                    );
+                    Self::flush(line, shaper, emoji_key, emoji_size, styles);
                     font_or_emoji = FontOrEmoji::Font;
                     shaper = Self::build(self.shape, font, font_size);
                 }
                 (FontOrEmoji::Emoji, FontOrEmoji::Font) => {
-                    Self::flush(line, shaper, font_key, font_size, styles, |_| None);
+                    Self::flush(line, shaper, font_key, font_size, styles);
                     font_or_emoji = FontOrEmoji::Emoji;
                     shaper = Self::build(self.shape, emoji, emoji_size);
                 }
@@ -229,15 +204,8 @@ impl<'a> LineShaper<'a> {
         }
 
         match font_or_emoji {
-            FontOrEmoji::Font => Self::flush(line, shaper, font_key, font_size, styles, |_| None),
-            FontOrEmoji::Emoji => Self::flush(
-                line,
-                shaper,
-                emoji_key,
-                emoji_size,
-                styles,
-                animated_glyph_id,
-            ),
+            FontOrEmoji::Font => Self::flush(line, shaper, font_key, font_size, styles),
+            FontOrEmoji::Emoji => Self::flush(line, shaper, emoji_key, emoji_size, styles),
         }
     }
 
@@ -289,28 +257,15 @@ impl<'a> LineShaper<'a> {
         }
     }
 
-    fn flush(
-        line: &mut Line,
-        shaper: Shaper,
-        font: FontKey,
-        size: FontSize,
-        styles: Styles,
-        animated_glyph_id: impl Fn(SourceRange) -> Option<AnimatedGlyphId>,
-    ) {
+    fn flush(line: &mut Line, shaper: Shaper, font: FontKey, size: FontSize, styles: Styles) {
         shaper.shape_with(|cluster| {
             debug_assert!(cluster.glyphs.len() <= 1);
-
-            let animated_id = animated_glyph_id(cluster.source);
-            if animated_id.is_some() {
-                line.has_animated_glyphs = true;
-            }
 
             for glyph in cluster.glyphs {
                 line.glyphs.push(Glyph {
                     font,
                     size,
                     id: glyph.id,
-                    animated_id,
                     offset: line.advance,
                     advance: glyph.advance,
                     range: cluster.source,
@@ -343,25 +298,8 @@ impl<'a> LineScaler<'a> {
         }
     }
 
-    /// Returns the index of the frame for animated `glyph` at `time`.
-    pub fn frame(&self, glyph: &Glyph, time: Duration) -> Option<FrameIndex> {
-        Some(
-            self.context
-                .fonts()
-                .animated()
-                .get_by_id(glyph.animated_id?)
-                .unwrap()
-                .frame(time),
-        )
-    }
-
     /// Renders `glyph`.
     pub fn render(&mut self, glyph: &Glyph) -> Option<Image> {
-        if glyph.animated_id.is_some() {
-            debug_assert!(false);
-            return None;
-        }
-
         let (fonts, _, scale) = self.context.as_muts();
         let font = fonts.get(glyph.font).expect("font");
         let scaler = &mut scale
@@ -371,22 +309,5 @@ impl<'a> LineScaler<'a> {
             .build();
 
         self.render.render(scaler, glyph.id)
-    }
-
-    /// Renders animated `glyph`.
-    pub fn render_animated(&mut self, glyph: &Glyph) -> Option<Vec<Image>> {
-        let id = if let Some(id) = glyph.animated_id {
-            id
-        } else {
-            debug_assert!(false);
-            return None;
-        };
-
-        self.context
-            .fonts()
-            .animated()
-            .get_by_id(id)?
-            .render(glyph.advance.floor() as u32)
-            .ok()
     }
 }

@@ -4,9 +4,7 @@ mod atlas;
 mod glyph;
 mod rectangle;
 
-use crate::text::{
-    AnimatedGlyphKey, Context, FontSize, FrameIndex, Glyph, GlyphKey, Line, LineHeight, LineScaler,
-};
+use crate::text::{Context, FontSize, Glyph, GlyphKey, Line, LineHeight, LineScaler};
 use atlas::{Atlas, AtlasError};
 use std::{
     collections::{BTreeMap, HashMap},
