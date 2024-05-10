@@ -1,13 +1,14 @@
 #![allow(unused)]
 
+mod atlas;
 mod glyph;
 mod rectangle;
 
-use super::atlas2::{Atlas, AtlasError, Horizontal};
 use crate::text::{
     AnimatedGlyphKey, Context, FontSize, FrameIndex, Glyph, GlyphKey, Line, LineHeight, LineScaler,
     Shadow,
 };
+use atlas::{Atlas, AtlasError, Horizontal};
 use std::collections::BTreeMap;
 use std::{mem::size_of, ops::Range, time::Duration};
 use swash::{

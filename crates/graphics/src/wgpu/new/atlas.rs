@@ -113,16 +113,16 @@ impl<A: Axis, K: Clone + Eq + Hash, V> Atlas<A, K, V> {
         }
     }
 
+    /// Returns the GPU texture.
+    pub fn texture(&self) -> &Texture {
+        &self.texture
+    }
+
     /// Returns the position and value of the item for `key`.
     pub fn get(&self, key: &K) -> Option<(Position, &V)> {
         self.items
             .get(&key)
             .map(|item| (item.position::<A>(), &item.value))
-    }
-
-    /// Returns the GPU texture.
-    pub fn texture(&self) -> &Texture {
-        &self.texture
     }
 
     /// Inserts an item for `key` with `([width, height], value)` provided through `f`
@@ -157,7 +157,7 @@ impl<A: Axis, K: Clone + Eq + Hash, V> Atlas<A, K, V> {
         // Lookup cache
         let item = self.items.get(&key).unwrap();
         let position = item.position::<A>();
-        self.write(queue, position & size, bytes);
+        self.write(queue, (position, size).into(), bytes);
 
         Ok((position, &item.value))
     }

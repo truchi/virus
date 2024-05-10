@@ -1,8 +1,8 @@
 use crate::muck;
-use std::ops::{Add, BitAnd, Neg, Sub};
+use std::ops::{Add, Neg, Sub};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                              Point                                             //
+//                                            Position                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 muck!(unsafe Position => Sint32x2);
@@ -12,13 +12,6 @@ muck!(unsafe Position => Sint32x2);
 pub struct Position {
     pub top: i32,
     pub left: i32,
-}
-
-impl Position {
-    /// Translates the position by `translation`.
-    pub fn translate(self, translation: Self) -> Self {
-        self + translation
-    }
 }
 
 impl Neg for Position {
@@ -138,14 +131,9 @@ impl Rectangle {
         self.left + self.width as i32
     }
 
-    /// Translates the rectangle by `translation`.
-    pub fn translate(self, translation: Position) -> Self {
-        self + translation
-    }
-
     /// Crops the rectangle to `max`.
     pub fn crop(self, max: Size) -> Self {
-        self.position() & self.size().crop(max)
+        Self::from((self.position(), self.size().crop(max)))
     }
 
     /// Returns the intersection of `self` and `other`.
@@ -169,7 +157,7 @@ impl Rectangle {
 
     /// Translates and crops the rectangle to `region`.
     pub fn region(&self, region: Self) -> Option<Self> {
-        self.translate(region.position()).intersection(region)
+        (*self + region.position()).intersection(region)
     }
 }
 
@@ -184,24 +172,11 @@ impl From<(Position, Size)> for Rectangle {
     }
 }
 
-impl BitAnd<Size> for Position {
-    type Output = Rectangle;
-
-    fn bitand(self, rhs: Size) -> Self::Output {
-        Rectangle::from((self, rhs))
-    }
-}
-
 impl Add<Position> for Rectangle {
     type Output = Self;
 
     fn add(self, rhs: Position) -> Self::Output {
-        Self {
-            top: self.top + rhs.top,
-            left: self.left + rhs.left,
-            width: self.width,
-            height: self.height,
-        }
+        (self.position() + rhs, self.size()).into()
     }
 }
 
@@ -209,12 +184,7 @@ impl Sub<Position> for Rectangle {
     type Output = Self;
 
     fn sub(self, rhs: Position) -> Self::Output {
-        Self {
-            top: self.top - rhs.top,
-            left: self.left - rhs.left,
-            width: self.width,
-            height: self.height,
-        }
+        (self.position() - rhs, self.size()).into()
     }
 }
 
@@ -222,12 +192,7 @@ impl Add<Size> for Rectangle {
     type Output = Self;
 
     fn add(self, rhs: Size) -> Self::Output {
-        Self {
-            top: self.top,
-            left: self.left,
-            width: self.width + rhs.width,
-            height: self.height + rhs.height,
-        }
+        (self.position(), self.size() + rhs).into()
     }
 }
 
@@ -235,11 +200,6 @@ impl Sub<Size> for Rectangle {
     type Output = Self;
 
     fn sub(self, rhs: Size) -> Self::Output {
-        Self {
-            top: self.top,
-            left: self.left,
-            width: self.width - rhs.width,
-            height: self.height - rhs.height,
-        }
+        (self.position(), self.size() - rhs).into()
     }
 }
