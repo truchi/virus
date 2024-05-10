@@ -1,10 +1,4 @@
 //! Text shaping and scaling.
-//!
-//! ### Areas of improvement
-//!
-//! [`LineShaper::push`] cannot produce ligatures across calls. There must be a way...
-//!
-//! It would be nice to crop what we shape/scale of a line on the horizontal axis.
 
 mod font;
 mod line;

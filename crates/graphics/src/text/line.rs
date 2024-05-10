@@ -4,6 +4,7 @@ use swash::{
     scale::{image::Image, Render},
     shape::{ShapeContext, Shaper},
     text::cluster::{CharCluster, Parser, Status, Token},
+    Charmap,
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -13,21 +14,21 @@ use swash::{
 /// A line of shaped [`Glyph`]s.
 #[derive(Clone, Debug)]
 pub struct Line {
-    /// Glyphs.
+    /// The shaped glyphs in this line.
     glyphs: Vec<Glyph>,
-    /// Font size.
+    /// The font size of this line.
     font_size: FontSize,
-    /// Advance.
+    /// The advance of this line.
     advance: Advance,
 }
 
 impl Line {
-    /// Returns a `LineShaper` for `size`.
+    /// Returns a `LineShaper` at `font_size`.
     pub fn shaper<'a>(context: &'a mut Context, font_size: FontSize) -> LineShaper<'a> {
         LineShaper::new(context, font_size)
     }
 
-    /// Returns a `LineScaler` of this `Line`.
+    /// Returns a `LineScaler` for this `Line`.
     pub fn scaler<'a>(&'a self, context: &'a mut Context) -> LineScaler<'a> {
         LineScaler::new(context, self)
     }
@@ -160,14 +161,12 @@ impl<'a> LineShaper<'a> {
         }
     }
 
-    /// Feeds `str` to the `LineShaper` with font `styles`.
-    ///
-    /// Not able to produce ligature across calls to this function.
+    /// Feeds `str` to the `LineShaper` with `family` and `styles`.
     pub fn push(&mut self, str: &str, family: FontFamilyKey, styles: Styles) {
         let font = self
             .fonts
             .get((family, styles.weight, styles.style))
-            .unwrap();
+            .expect("Font not found in font cache");
         let emoji = self.fonts.emoji();
         let font_key = font.key();
         let emoji_key = emoji.key();
@@ -176,6 +175,8 @@ impl<'a> LineShaper<'a> {
             .fonts
             .emoji()
             .size_for_advance(2.0 * font.advance_for_size(font_size));
+        let font_charmap = font.as_ref().charmap();
+        let emoji_charmap = emoji.as_ref().charmap();
 
         let line = &mut self.line;
         let mut font_or_emoji = FontOrEmoji::Font;
@@ -184,18 +185,21 @@ impl<'a> LineShaper<'a> {
         let mut parser = Parser::new(SCRIPT, str.char_indices().map(Self::token(self.bytes)));
 
         while parser.next(&mut cluster) {
-            match (Self::select(font, emoji, &mut cluster), font_or_emoji) {
+            match (
+                font_or_emoji,
+                Self::select(&mut cluster, font_charmap, emoji_charmap),
+            ) {
                 (FontOrEmoji::Font, FontOrEmoji::Font) => {}
                 (FontOrEmoji::Emoji, FontOrEmoji::Emoji) => {}
-                (FontOrEmoji::Font, FontOrEmoji::Emoji) => {
-                    Self::flush(line, shaper, emoji_key, emoji_size, styles);
-                    font_or_emoji = FontOrEmoji::Font;
-                    shaper = Self::build(self.shape, font, font_size);
-                }
                 (FontOrEmoji::Emoji, FontOrEmoji::Font) => {
+                    Self::flush(line, shaper, emoji_key, emoji_size, styles);
+                    shaper = Self::build(self.shape, font, font_size);
+                    font_or_emoji = FontOrEmoji::Font;
+                }
+                (FontOrEmoji::Font, FontOrEmoji::Emoji) => {
                     Self::flush(line, shaper, font_key, font_size, styles);
-                    font_or_emoji = FontOrEmoji::Emoji;
                     shaper = Self::build(self.shape, emoji, emoji_size);
+                    font_or_emoji = FontOrEmoji::Emoji;
                 }
             };
 
@@ -229,38 +233,33 @@ impl<'a> LineShaper<'a> {
 
     fn build<'b>(shape: &'b mut ShapeContext, font: &'b Font, size: FontSize) -> Shaper<'b> {
         shape
-            .builder(font)
+            .builder(font.as_ref())
             .script(SCRIPT)
             .size(size as f32)
             .features(FEATURES)
             .build()
     }
 
-    // TODO cache charmaps
-    fn select(font: &Font, emoji: &Font, cluster: &mut CharCluster) -> FontOrEmoji {
-        match cluster.map(|ch| font.as_ref().charmap().map(ch)) {
+    fn select(cluster: &mut CharCluster, font: Charmap, emoji: Charmap) -> FontOrEmoji {
+        match cluster.map(|char| font.map(char)) {
             Status::Discard => {
-                // Make sure to map cluster with correct font
-                cluster.map(|ch| emoji.as_ref().charmap().map(ch));
+                cluster.map(|char| emoji.map(char));
                 FontOrEmoji::Emoji
             }
-            Status::Complete => FontOrEmoji::Font,
-            Status::Keep => match cluster.map(|ch| emoji.as_ref().charmap().map(ch)) {
+            Status::Keep => match cluster.map(|char| emoji.map(char)) {
                 Status::Discard => {
-                    // Make sure to map cluster with correct font
-                    cluster.map(|ch| font.as_ref().charmap().map(ch));
+                    cluster.map(|char| font.map(char));
                     FontOrEmoji::Font
                 }
-                Status::Complete => FontOrEmoji::Emoji,
                 Status::Keep => FontOrEmoji::Emoji,
+                Status::Complete => FontOrEmoji::Emoji,
             },
+            Status::Complete => FontOrEmoji::Font,
         }
     }
 
     fn flush(line: &mut Line, shaper: Shaper, font: FontKey, size: FontSize, styles: Styles) {
         shaper.shape_with(|cluster| {
-            debug_assert!(cluster.glyphs.len() <= 1);
-
             for glyph in cluster.glyphs {
                 line.glyphs.push(Glyph {
                     font,
@@ -299,15 +298,20 @@ impl<'a> LineScaler<'a> {
     }
 
     /// Renders `glyph`.
-    pub fn render(&mut self, glyph: &Glyph) -> Option<Image> {
+    pub fn render(&mut self, glyph: &Glyph) -> Image {
         let (fonts, _, scale) = self.context.as_muts();
-        let font = fonts.get(glyph.font).expect("font");
+        let font = fonts.get(glyph.font).expect("Font not found in font cache");
         let scaler = &mut scale
-            .builder(font)
+            .builder(font.as_ref())
             .size(self.font_size as f32)
             .hint(HINT)
             .build();
 
-        self.render.render(scaler, glyph.id)
+        if let Some(image) = self.render.render(scaler, glyph.id) {
+            image
+        } else {
+            debug_assert!(false, "No image for glyph");
+            Image::default()
+        }
     }
 }

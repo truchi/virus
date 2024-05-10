@@ -291,7 +291,7 @@ impl Pipeline {
         );
     }
 
-    pub fn push<F: FnOnce() -> Option<Image>>(
+    pub fn push<F: FnOnce() -> Image>(
         &mut self,
         queue: &Queue,
         layer: u32,
@@ -322,13 +322,7 @@ impl Pipeline {
         } {
             (ty, uv, placement)
         } else {
-            let image = if let Some(image) = image() {
-                image
-            } else {
-                debug_assert!(false, "No image for glyph");
-                return;
-            };
-
+            let image = image();
             let (ty, atlas) = match image.content {
                 Content::Mask => (Type::MASK, &mut self.mask),
                 Content::Color => (Type::COLOR, &mut self.color),

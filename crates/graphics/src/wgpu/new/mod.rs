@@ -264,7 +264,7 @@ impl<'a> Draw<'a> {
     }
 
     /// Draws a glyph.
-    pub fn glyph<F: FnOnce() -> Option<Image>>(
+    pub fn glyph<F: FnOnce() -> Image>(
         &mut self,
         position: Position,
         font_size: FontSize,

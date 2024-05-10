@@ -129,7 +129,7 @@ impl Font {
         let font = FontRef::from_index(&data, 0)?;
         let key = font.key;
 
-        debug_assert!(font.offset == 0);
+        debug_assert!(font.offset == 0, "Actually no idea what this is about");
         Some(Self { data, key })
     }
 
@@ -159,12 +159,6 @@ impl Font {
         let metrics = self.as_ref().metrics(&[]);
 
         (advance * metrics.units_per_em as f32 / metrics.average_width as f32).round() as FontSize
-    }
-}
-
-impl<'a> From<&'a Font> for FontRef<'a> {
-    fn from(font: &'a Font) -> Self {
-        font.as_ref()
     }
 }
 
@@ -343,6 +337,11 @@ impl Fonts {
         &self.families
     }
 
+    /// Returns the emoji font.
+    pub fn emoji(&self) -> &Font {
+        &self.emoji
+    }
+
     /// Indexes in the collection.
     pub fn get<I: FontsGet>(&self, key: I) -> Option<I::Output<'_>> {
         key.get(self)
@@ -351,11 +350,6 @@ impl Fonts {
     /// Inserts in the collection.
     pub fn set<I: FontsSet>(&mut self, key: I) -> Result<I::Output, I::Error> {
         key.set(self)
-    }
-
-    /// Returns a `FontRef` to the emoji font.
-    pub fn emoji(&self) -> &Font {
-        &self.emoji
     }
 }
 
@@ -384,6 +378,7 @@ pub trait FontsGet {
     fn get<'fonts>(self, fonts: &'fonts Fonts) -> Option<Self::Output<'fonts>>;
 }
 
+/// Returns the font for this font key.
 impl FontsGet for FontKey {
     type Output<'fonts> = &'fonts Font;
 
@@ -396,6 +391,7 @@ impl FontsGet for FontKey {
     }
 }
 
+/// Returns the font family for this font family key.
 impl FontsGet for FontFamilyKey {
     type Output<'fonts> = &'fonts FontFamily;
 
@@ -404,6 +400,7 @@ impl FontsGet for FontFamilyKey {
     }
 }
 
+/// Returns the best matching font for this font family key, font weight and font style.
 impl FontsGet for (FontFamilyKey, FontWeight, FontStyle) {
     type Output<'fonts> = &'fonts Font;
 
@@ -412,6 +409,7 @@ impl FontsGet for (FontFamilyKey, FontWeight, FontStyle) {
     }
 }
 
+/// Returns the font family for this font family name.
 impl FontsGet for &str {
     type Output<'fonts> = &'fonts FontFamily;
 
@@ -437,6 +435,7 @@ pub enum InsertFontError {
     FontExists(Font),
 }
 
+/// Inserts this font.
 impl FontsSet for Font {
     type Output = FontKey;
     type Error = InsertFontError;
@@ -460,6 +459,7 @@ pub enum InsertVariantError {
     VariantExists(FontKey),
 }
 
+/// Attaches this font key to this font family, font weight and font style.
 impl FontsSet for (FontFamilyKey, FontWeight, FontStyle, FontKey) {
     type Output = (FontFamilyKey, FontKey);
     type Error = InsertVariantError;
@@ -489,6 +489,7 @@ pub enum CreateFamilyError {
     NameExists(FontFamilyKey),
 }
 
+/// Creates a font family for this font family name.
 impl FontsSet for String {
     type Output = FontFamilyKey;
     type Error = CreateFamilyError;
@@ -520,14 +521,8 @@ mod tests {
         use InsertFontError::*;
         use InsertVariantError::*;
 
-        fn key() -> FontKey {
-            FontKey::new()
-        }
-
-        fn font(key: FontKey) -> Font {
-            Font { data: vec![], key }
-        }
-
+        let key = || FontKey::new();
+        let font = |key: FontKey| Font { data: vec![], key };
         let emoji = key();
 
         // Create fonts
