@@ -225,8 +225,8 @@ pub struct Pipeline {
     constants: Constants,
     layers: BTreeMap<u32, Vec<Instance>>,
     buffer: Buffer,
-    mask: Atlas<Horizontal, GlyphKey, Placement>,
-    color: Atlas<Horizontal, GlyphKey, Placement>,
+    mask: Atlas<GlyphKey, Placement>,
+    color: Atlas<GlyphKey, Placement>,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
     pipeline: RenderPipeline,
@@ -325,6 +325,7 @@ impl Pipeline {
             let image = if let Some(image) = image() {
                 image
             } else {
+                debug_assert!(false, "No image for glyph");
                 return;
             };
 
@@ -346,8 +347,11 @@ impl Pipeline {
             ) {
                 Ok((uv, placement)) => (ty, uv, placement),
                 Err(AtlasError::KeyExists) => unreachable!(),
-                Err(AtlasError::WontFit) => return,
-                Err(AtlasError::OutOfSpace) => unimplemented!(),
+                Err(AtlasError::OutOfSpace) => todo!(),
+                Err(AtlasError::WontFit) => {
+                    debug_assert!(false, "Glyph does not fit the atlas");
+                    return;
+                }
             }
         };
 

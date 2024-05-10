@@ -8,7 +8,7 @@ use crate::text::{
     AnimatedGlyphKey, Context, FontSize, FrameIndex, Glyph, GlyphKey, Line, LineHeight, LineScaler,
     Shadow,
 };
-use atlas::{Atlas, AtlasError, Horizontal};
+use atlas::{Atlas, AtlasError};
 use std::collections::BTreeMap;
 use std::{mem::size_of, ops::Range, time::Duration};
 use swash::{

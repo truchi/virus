@@ -3,56 +3,30 @@ use virus_common::{Position, Rectangle, Size};
 use wgpu::{Extent3d, ImageCopyTexture, ImageDataLayout, Origin3d, Queue, Texture, TextureAspect};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                              Axes                                              //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-/// Shelves axis.
-pub trait Axis {
-    /// Flips `a` and `b` when [`Vertical`].
-    fn flip<T>(a: T, b: T) -> [T; 2];
-}
-
-/// Horizontal shelves.
-#[derive(Copy, Clone, Debug)]
-pub enum Horizontal {}
-
-impl Axis for Horizontal {
-    fn flip<T>(a: T, b: T) -> [T; 2] {
-        [a, b]
-    }
-}
-
-/// Vertical shelves.
-#[derive(Copy, Clone, Debug)]
-pub enum Vertical {}
-
-impl Axis for Vertical {
-    fn flip<T>(a: T, b: T) -> [T; 2] {
-        [b, a]
-    }
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Item                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// An [`Atlas`] item.
 #[derive(Copy, Clone, Debug)]
 struct Item<V> {
-    /// The main-axis coordinate.
-    main: u32,
-    /// The cross-axis coordinate.
-    cross: u32,
-    /// The value.
+    /// The top coordinate of the item in the atlas.
+    top: u32,
+    /// The left coordinate of the item in the atlas.
+    left: u32,
+    /// The value associated with the item.
     value: V,
 }
 
 impl<V> Item<V> {
     /// Returns the position of the item.
-    fn position<A: Axis>(&self) -> Position {
-        let [left, top] = A::flip(self.main as i32, self.cross as i32);
+    fn position(&self) -> Position {
+        debug_assert!(i32::try_from(self.top).is_ok());
+        debug_assert!(i32::try_from(self.left).is_ok());
 
-        Position { top, left }
+        Position {
+            top: self.top as i32,
+            left: self.left as i32,
+        }
     }
 }
 
@@ -63,10 +37,10 @@ impl<V> Item<V> {
 /// An [`Atlas`] shelf.
 #[derive(Copy, Clone, Debug)]
 struct Shelf {
-    /// The occupied main-axis size.
-    main: u32,
-    /// The cross-axis size of the largest item.
-    cross: u32,
+    /// The occupied width of the shelf.
+    width: u32,
+    /// The height of the largest item in the shelf.
+    height: u32,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -78,38 +52,33 @@ struct Shelf {
 pub enum AtlasError {
     /// The item already exists in the atlas.
     KeyExists,
-    /// The item is too big for the atlas' width/height/bin dimensions. Resize the atlas.
-    WontFit,
     /// The item is too big for the atlas' remaining space. Clear the atlas.
     OutOfSpace,
+    /// The item is too big for the atlas' width/height/bin dimensions. Resize the atlas.
+    WontFit,
 }
 
 /// An atlas.
 #[derive(Debug)]
-pub struct Atlas<A: Axis, K: Clone + Eq + Hash, V> {
-    /// The bin main-axis size.
-    bin: u32,
+pub struct Atlas<K: Clone + Eq + Hash, V> {
+    /// The width of bins (last may be smaller).
+    bin_width: u32,
     /// The bins of the atlas.
     bins: Vec<Vec<Shelf>>,
     /// The items in the atlas.
     items: HashMap<K, Item<V>>,
     /// The GPU texture.
     texture: Texture,
-    /// The shelves' axis.
-    _axis: PhantomData<A>,
 }
 
-impl<A: Axis, K: Clone + Eq + Hash, V> Atlas<A, K, V> {
-    /// Creates a new empty atlas into `texture` with `bin` main-axis size.
-    pub fn new(texture: Texture, bin: u32) -> Self {
-        let [main, _] = A::flip(texture.width(), texture.height());
-
+impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
+    /// Creates a new empty atlas into `texture` with `bin_witdth`.
+    pub fn new(texture: Texture, bin_width: u32) -> Self {
         Self {
-            bin: bin.min(main),
+            bin_width: bin_width.min(texture.width()),
             bins: Default::default(),
             items: Default::default(),
             texture,
-            _axis: PhantomData,
         }
     }
 
@@ -122,7 +91,7 @@ impl<A: Axis, K: Clone + Eq + Hash, V> Atlas<A, K, V> {
     pub fn get(&self, key: &K) -> Option<(Position, &V)> {
         self.items
             .get(&key)
-            .map(|item| (item.position::<A>(), &item.value))
+            .map(|item| (item.position(), &item.value))
     }
 
     /// Inserts an item for `key` with `([width, height], value)` provided through `f`
@@ -130,6 +99,8 @@ impl<A: Axis, K: Clone + Eq + Hash, V> Atlas<A, K, V> {
     ///
     /// If allocation fails, call [`Self::clear()`] before the next frame, or try a larger
     /// atlas.
+    //
+    // TODO: Take a function returning the image data.
     pub fn insert(
         &mut self,
         queue: &Queue,
@@ -138,28 +109,16 @@ impl<A: Axis, K: Clone + Eq + Hash, V> Atlas<A, K, V> {
         size: Size,
         bytes: &[u8],
     ) -> Result<(Position, &V), AtlasError> {
-        // Check if key exists
         if self.items.contains_key(&key) {
             return Err(AtlasError::KeyExists);
         }
 
-        let [main, cross] = A::flip(size.width, size.height);
-        let [_, self_cross] = A::flip(self.texture.width(), self.texture.height());
+        self.try_insert(&key, value, size)?;
 
-        // Check dimensions
-        if !(main <= self.bin && cross <= self_cross) {
-            return Err(AtlasError::WontFit);
-        }
-
-        // Insert or fail
-        self.try_insert(&key, value, [main, cross])?;
-
-        // Lookup cache
         let item = self.items.get(&key).unwrap();
-        let position = item.position::<A>();
-        self.write(queue, (position, size).into(), bytes);
+        self.write(queue, (item.position(), size).into(), bytes);
 
-        Ok((position, &item.value))
+        Ok((item.position(), &item.value))
     }
 
     /// Clears the atlas.
@@ -170,99 +129,101 @@ impl<A: Axis, K: Clone + Eq + Hash, V> Atlas<A, K, V> {
 
     /// Clears and resizes the atlas.
     pub fn clear_and_resize(&mut self, texture: Texture, bin: u32) {
-        let [main, _] = A::flip(texture.width(), texture.height());
-
         self.clear();
-        self.bin = bin.min(main);
+        self.bin_width = bin.min(texture.width());
         self.texture = texture;
     }
 }
 
 /// Private.
-impl<A: Axis, K: Clone + Eq + Hash, V> Atlas<A, K, V> {
+impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
     /// Tries to insert an item.
-    fn try_insert(&mut self, key: &K, value: V, [main, cross]: [u32; 2]) -> Result<(), AtlasError> {
-        let [self_main, self_cross] = A::flip(self.texture.width(), self.texture.height());
+    fn try_insert(
+        &mut self,
+        key: &K,
+        value: V,
+        Size { width, height }: Size,
+    ) -> Result<(), AtlasError> {
+        if !((width <= self.bin_width) && (height <= self.texture.height())) {
+            return Err(AtlasError::WontFit);
+        }
 
-        // Main-axis position in the atlas
-        let mut bin_position = 0;
+        let mut bin_left = 0;
 
         for bin in &mut self.bins {
-            // Main-axis size
-            let bin_size = self.bin.min(self_main - bin_position);
-
-            // Cross-axis position in the bin
-            let mut shelf_position = 0;
+            let bin_width = self.bin_width.min(self.texture.width() - bin_left);
+            let mut shelf_top = 0;
 
             if let Some((open, closeds)) = bin.split_last_mut() {
-                // Fits in closed shelf?
                 for closed in closeds {
-                    if (main <= bin_size - closed.main) && (cross <= closed.cross) {
+                    // Fits in closed shelf?
+                    if (width <= bin_width - closed.width) && (height <= closed.height) {
                         self.items.insert(
                             key.clone(),
                             Item {
-                                main: bin_position + closed.main,
-                                cross: shelf_position,
+                                top: shelf_top,
+                                left: bin_left + closed.width,
                                 value,
                             },
                         );
-                        closed.main += main;
+                        closed.width += width;
 
                         return Ok(());
                     }
 
-                    shelf_position += closed.cross;
+                    shelf_top += closed.height;
                 }
 
                 // Fits in open shelf?
-                if (main <= bin_size - open.main) && (cross <= self_cross - shelf_position) {
+                if (width <= bin_width - open.width)
+                    && (height <= self.texture.height() - shelf_top)
+                {
                     self.items.insert(
                         key.clone(),
                         Item {
-                            main: bin_position + open.main,
-                            cross: shelf_position,
+                            top: shelf_top,
+                            left: bin_left + open.width,
                             value,
                         },
                     );
-                    open.main += main;
-                    open.cross = open.cross.max(cross);
+                    open.width += width;
+                    open.height = open.height.max(height);
 
                     return Ok(());
                 }
 
-                shelf_position += open.cross;
+                shelf_top += open.height;
             }
 
             // Fits in new shelf?
-            if (main <= bin_size) && (cross <= self_cross - shelf_position) {
+            if (width <= bin_width) && (height <= self.texture.height() - shelf_top) {
                 self.items.insert(
                     key.clone(),
                     Item {
-                        main: bin_position,
-                        cross: shelf_position,
+                        top: shelf_top,
+                        left: bin_left,
                         value,
                     },
                 );
-                bin.push(Shelf { main, cross });
+                bin.push(Shelf { width, height });
 
                 return Ok(());
             }
 
-            bin_position += bin_size;
+            bin_left += bin_width;
         }
 
         // Fits in new bin?
-        debug_assert!(cross <= self_cross);
-        if main <= self.bin.min(self_main - bin_position) {
+        if width <= self.bin_width.min(self.texture.width() - bin_left) {
             self.items.insert(
                 key.clone(),
                 Item {
-                    main: bin_position,
-                    cross: 0,
+                    top: 0,
+                    left: bin_left,
                     value,
                 },
             );
-            self.bins.push(vec![Shelf { main, cross }]);
+            self.bins.push(vec![Shelf { width, height }]);
 
             return Ok(());
         }
