@@ -153,7 +153,8 @@ fn fonts() -> Fonts {
     use virus_graphics::text::FontWeight::*;
 
     // YOU HAVE TO GIVE FONTS FROM YOUR DISK HERE
-    const EMOJI: &str = "/Users/romain/Library/Fonts/NotoColorEmoji.ttf";
+    // const EMOJI: &str = "/Users/romain/Library/Fonts/NotoColorEmoji.ttf";
+    const EMOJI: &str = "/System/Library/Fonts/Apple Color Emoji.ttc";
     const VICTOR_REGULAR: &str = "/Users/romain/Library/Fonts/VictorMono-Regular.ttf";
 
     // const UBUNTU: &str = "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf";

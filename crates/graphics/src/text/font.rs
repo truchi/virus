@@ -116,6 +116,8 @@ pub type FontKey = CacheKey;
 pub struct Font {
     /// Font data.
     data: Vec<u8>,
+    /// Font offset.
+    offset: u32,
     /// Font key.
     key: FontKey,
 }
@@ -127,17 +129,17 @@ impl Font {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Option<Self> {
         let data = std::fs::read(path).ok()?;
         let font = FontRef::from_index(&data, 0)?;
+        let offset = font.offset;
         let key = font.key;
 
-        debug_assert!(font.offset == 0, "Actually no idea what this is about");
-        Some(Self { data, key })
+        Some(Self { data, offset, key })
     }
 
     /// Returns a `FontRef` from this `Font`.
     pub fn as_ref(&self) -> FontRef {
         FontRef {
             data: &self.data,
-            offset: 0,
+            offset: self.offset,
             key: self.key,
         }
     }
@@ -522,7 +524,11 @@ mod tests {
         use InsertVariantError::*;
 
         let key = || FontKey::new();
-        let font = |key: FontKey| Font { data: vec![], key };
+        let font = |key: FontKey| Font {
+            data: vec![],
+            offset: 0,
+            key,
+        };
         let emoji = key();
 
         // Create fonts
