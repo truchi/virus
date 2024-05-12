@@ -1,37 +1,30 @@
 use graphics::text::Font;
 use swash::FontDataRef;
 
-// const RECURSIVE_VF: &str =
-//     "/home/romain/.local/share/fonts/Recursive/Recursive_Desktop/Recursive_VF_1.084.ttf";
-// const RECURSIVE: &str =
-//     "/home/romain/.local/share/fonts/Recursive/Recursive_Code/RecMonoDuotone/RecMonoDuotone-Regular-1.084.ttf";
-// const FIRA: &str =
-//     "/home/romain/.local/share/fonts/FiraCodeNerdFont/Fira Code Regular Nerd Font Complete Mono.ttf";
-const EMOJI: &str = "/Users/romain/Library/Fonts/NotoColorEmoji.ttf";
+const NOTO_EMOJI: &str = "/Users/romain/Library/Fonts/NotoColorEmoji.ttf";
+const APPLE_EMOJI: &str = "/System/Library/Fonts/Apple Color Emoji.ttc";
 
 fn main() {
-    // println!("Recursive VF");
-    // Font::from_file(RECURSIVE_VF).unwrap();
-    // vf.inspect();
-    // println!();
+    inspect("Noto Emoji", NOTO_EMOJI);
+    inspect("Apple Emoji", APPLE_EMOJI);
+}
 
-    // println!("Recursive");
-    // Font::from_file(RECURSIVE).unwrap().inspect();
-    // println!();
+fn inspect(name: &str, path: &str) {
+    println!("================================================");
+    println!("{name}");
+    println!("================================================");
 
-    // println!("Fira");
-    // Font::from_file(FIRA).unwrap().inspect();
-    // println!();
-
-    println!("Emoji");
-    let emoji = Font::from_file(EMOJI).unwrap();
-    emoji.inspect();
+    let font = Font::from_file(path).unwrap();
+    font.inspect();
     println!();
 
-    let data_ref = FontDataRef::new(emoji.as_ref().data).unwrap();
+    let data = FontDataRef::new(font.as_ref().data).unwrap();
+    dbg!(data.len());
+    dbg!(data.is_collection());
+    dbg!(data.get(1).is_some());
+    dbg!(data.fonts().len());
+    println!();
 
-    dbg!(data_ref.len());
-    dbg!(data_ref.is_collection());
-    dbg!(data_ref.get(1).is_some());
-    dbg!(data_ref.fonts().len());
+    dbg!(font.as_ref().metrics(&[]));
+    println!();
 }

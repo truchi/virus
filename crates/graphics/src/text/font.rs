@@ -149,18 +149,18 @@ impl Font {
         self.key
     }
 
-    /// Returns the advance giving `size`.
+    /// Returns the advance given `size`.
     pub fn advance_for_size(&self, size: FontSize) -> Advance {
         let metrics = self.as_ref().metrics(&[]);
 
-        size as f32 * metrics.average_width as f32 / metrics.units_per_em as f32
+        size as Advance * metrics.max_width / metrics.units_per_em as Advance
     }
 
-    /// Returns the size giving `advance`.
+    /// Returns the size given `advance`.
     pub fn size_for_advance(&self, advance: Advance) -> FontSize {
         let metrics = self.as_ref().metrics(&[]);
 
-        (advance * metrics.units_per_em as f32 / metrics.average_width as f32).round() as FontSize
+        (advance * metrics.units_per_em as Advance / metrics.max_width).round() as FontSize
     }
 }
 
