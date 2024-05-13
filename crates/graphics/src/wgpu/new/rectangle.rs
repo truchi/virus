@@ -12,6 +12,7 @@ macro_rules! label {
 
 muck!(unsafe Instance => Instance: [Position, Size, Rgba]);
 
+/// Instance.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct Instance {
@@ -27,10 +28,11 @@ struct Instance {
 //                                               Init                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-pub struct Init<'a>(pub &'a Device);
+/// Inits the `Pipeline`.
+struct Init<'a>(&'a Device);
 
 impl<'a> Init<'a> {
-    pub fn buffer(&self, size: BufferAddress) -> Buffer {
+    fn buffer(&self, size: BufferAddress) -> Buffer {
         self.0.create_buffer(&BufferDescriptor {
             label: label!("Instance buffer"),
             size,
@@ -39,14 +41,14 @@ impl<'a> Init<'a> {
         })
     }
 
-    pub fn bind_group_layout(&self) -> BindGroupLayout {
+    fn bind_group_layout(&self) -> BindGroupLayout {
         self.0.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: label!("Bind group layout"),
             entries: &[],
         })
     }
 
-    pub fn bind_group(&self, bind_group_layout: &BindGroupLayout) -> BindGroup {
+    fn bind_group(&self, bind_group_layout: &BindGroupLayout) -> BindGroup {
         self.0.create_bind_group(&BindGroupDescriptor {
             label: label!("Bind group"),
             layout: &bind_group_layout,
@@ -54,7 +56,7 @@ impl<'a> Init<'a> {
         })
     }
 
-    pub fn pipeline(
+    fn pipeline(
         &self,
         config: &SurfaceConfiguration,
         bind_group_layout: &BindGroupLayout,
@@ -65,7 +67,7 @@ impl<'a> Init<'a> {
             bind_group_layouts: &[&bind_group_layout],
             push_constant_ranges: &[PushConstantRange {
                 stages: Constants::STAGES,
-                range: 0..Constants::SIZE as u32,
+                range: 0..Constants::size(),
             }],
         });
 
@@ -101,7 +103,7 @@ impl<'a> Init<'a> {
 //                                            Pipeline                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// Rectangle pipeline.
+/// Pipeline.
 #[derive(Debug)]
 pub struct Pipeline {
     constants: Constants,
@@ -112,6 +114,7 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
+    /// Creates a new `Pipeline` for `device` and `config`.
     pub fn new(device: &Device, config: &SurfaceConfiguration) -> Self {
         let limits = device.limits();
         let max_buffer_size = limits.max_buffer_size;
@@ -138,10 +141,12 @@ impl Pipeline {
         }
     }
 
+    /// Resizes the `Pipeline`.
     pub fn resize(&mut self, device: &Device, config: &SurfaceConfiguration) {
         self.constants.resize(config);
     }
 
+    /// Pushes a `rectangle` to be rendered for `layer` in `region` with `color`.
     pub fn push(&mut self, layer: u32, region: Rectangle, rectangle: Rectangle, color: Rgba) {
         let Some(rectangle) = rectangle.region(region) else {
             return;
@@ -158,13 +163,14 @@ impl Pipeline {
         });
     }
 
+    /// Renders `layer`.
     pub fn render<'pass>(
         &'pass self,
         layer: u32,
         queue: &Queue,
         render_pass: &mut RenderPass<'pass>,
     ) {
-        let instances: &[Instance] = self
+        let instances = self
             .layers
             .get(&layer)
             .map(Vec::as_slice)
@@ -182,6 +188,7 @@ impl Pipeline {
         }
     }
 
+    /// Clears layers.
     pub fn post_render(&mut self) {
         for layer in self.layers.values_mut() {
             layer.clear();

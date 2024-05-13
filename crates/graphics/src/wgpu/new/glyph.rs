@@ -6,10 +6,10 @@ macro_rules! label {
     };
 }
 
-const MASK_BIN: u32 = 400;
-const COLOR_BIN: u32 = 400;
-const MASK_ATLAS_FACTOR: u32 = 2;
-const COLOR_ATLAS_FACTOR: u32 = 2;
+const MASK_ATLAS_BIN_WIDTH: u32 = 400;
+const COLOR_ATLAS_BIN_WIDTH: u32 = 400;
+const MASK_ATLAS_SURFACE_FACTOR: u32 = 2;
+const COLOR_ATLAS_SURFACE_FACTOR: u32 = 2;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Type                                              //
@@ -17,7 +17,7 @@ const COLOR_ATLAS_FACTOR: u32 = 2;
 
 muck!(unsafe Type => Uint32);
 
-/// [`Type::MASK`]/[`Type::COLOR`].
+/// Type: [`Type::MASK`]/[`Type::COLOR`].
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct Type(u32);
@@ -33,6 +33,7 @@ impl Type {
 
 muck!(unsafe Instance => Instance: [Type, Position, Size, Position, Rgba]);
 
+/// Instance.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct Instance {
@@ -52,10 +53,11 @@ struct Instance {
 //                                               Init                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-pub struct Init<'a>(pub &'a Device);
+/// Inits the `Pipeline`.
+struct Init<'a>(&'a Device);
 
 impl<'a> Init<'a> {
-    pub fn buffer(&self, size: BufferAddress) -> Buffer {
+    fn buffer(&self, size: BufferAddress) -> Buffer {
         self.0.create_buffer(&BufferDescriptor {
             label: label!("Instance buffer"),
             size,
@@ -64,16 +66,12 @@ impl<'a> Init<'a> {
         })
     }
 
-    pub fn mask_texture(
-        &self,
-        max_texture_dimension: u32,
-        config: &SurfaceConfiguration,
-    ) -> Texture {
+    fn mask_texture(&self, max_texture_dimension: u32, config: &SurfaceConfiguration) -> Texture {
         self.0.create_texture(&TextureDescriptor {
             label: label!("Mask texture"),
             size: Extent3d {
-                width: max_texture_dimension.min(MASK_ATLAS_FACTOR * config.width),
-                height: max_texture_dimension.min(MASK_ATLAS_FACTOR * config.height),
+                width: max_texture_dimension.min(MASK_ATLAS_SURFACE_FACTOR * config.width),
+                height: max_texture_dimension.min(MASK_ATLAS_SURFACE_FACTOR * config.height),
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -85,16 +83,12 @@ impl<'a> Init<'a> {
         })
     }
 
-    pub fn color_texture(
-        &self,
-        max_texture_dimension: u32,
-        config: &SurfaceConfiguration,
-    ) -> Texture {
+    fn color_texture(&self, max_texture_dimension: u32, config: &SurfaceConfiguration) -> Texture {
         self.0.create_texture(&TextureDescriptor {
             label: label!("Color texture"),
             size: Extent3d {
-                width: max_texture_dimension.min(COLOR_ATLAS_FACTOR * config.width),
-                height: max_texture_dimension.min(COLOR_ATLAS_FACTOR * config.height),
+                width: max_texture_dimension.min(COLOR_ATLAS_SURFACE_FACTOR * config.width),
+                height: max_texture_dimension.min(COLOR_ATLAS_SURFACE_FACTOR * config.height),
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -106,7 +100,7 @@ impl<'a> Init<'a> {
         })
     }
 
-    pub fn bind_group_layout(&self) -> BindGroupLayout {
+    fn bind_group_layout(&self) -> BindGroupLayout {
         self.0.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: label!("Bind group layout"),
             entries: &[
@@ -143,7 +137,7 @@ impl<'a> Init<'a> {
         })
     }
 
-    pub fn bind_group(
+    fn bind_group(
         &self,
         bind_group_layout: &BindGroupLayout,
         mask: &Texture,
@@ -172,7 +166,7 @@ impl<'a> Init<'a> {
         })
     }
 
-    pub fn pipeline(
+    fn pipeline(
         &self,
         config: &SurfaceConfiguration,
         bind_group_layout: &BindGroupLayout,
@@ -183,7 +177,7 @@ impl<'a> Init<'a> {
             bind_group_layouts: &[&bind_group_layout],
             push_constant_ranges: &[PushConstantRange {
                 stages: Constants::STAGES,
-                range: 0..Constants::SIZE as u32,
+                range: 0..Constants::size(),
             }],
         });
 
@@ -219,7 +213,7 @@ impl<'a> Init<'a> {
 //                                            Pipeline                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// Rectangle pipeline.
+/// Pipeline.
 #[derive(Debug)]
 pub struct Pipeline {
     constants: Constants,
@@ -233,6 +227,7 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
+    /// Creates a new `Pipeline` for `device` and `config`.
     pub fn new(device: &Device, config: &SurfaceConfiguration) -> Self {
         let limits = device.limits();
         let max_buffer_size = limits.max_buffer_size;
@@ -244,11 +239,11 @@ impl Pipeline {
         let buffer = Init(device).buffer(max_buffer_size); // TODO limit size
         let mask = Atlas::new(
             Init(device).mask_texture(max_texture_dimension, config),
-            MASK_BIN,
+            MASK_ATLAS_BIN_WIDTH,
         );
         let color = Atlas::new(
             Init(device).color_texture(max_texture_dimension, config),
-            COLOR_BIN,
+            COLOR_ATLAS_BIN_WIDTH,
         );
         let layers = Default::default();
         let bind_group_layout = Init(device).bind_group_layout();
@@ -272,17 +267,18 @@ impl Pipeline {
         }
     }
 
+    /// Resizes the `Pipeline`.
     pub fn resize(&mut self, device: &Device, config: &SurfaceConfiguration) {
         let max_texture_dimension = device.limits().max_texture_dimension_2d;
 
         self.constants.resize(config);
         self.mask.clear_and_resize(
             Init(device).mask_texture(max_texture_dimension, config),
-            MASK_BIN,
+            MASK_ATLAS_BIN_WIDTH,
         );
         self.color.clear_and_resize(
             Init(device).color_texture(max_texture_dimension, config),
-            COLOR_BIN,
+            COLOR_ATLAS_BIN_WIDTH,
         );
         self.bind_group = Init(device).bind_group(
             &self.bind_group_layout,
@@ -291,6 +287,10 @@ impl Pipeline {
         );
     }
 
+    /// Pushes a glyph `key` to be rendered for `layer` in `region`
+    /// with `position`, `font_size` and `color`.
+    ///
+    /// Image data will be obtained through `ìmage` and only called if not in atlas already.
     pub fn push<F: FnOnce() -> Image>(
         &mut self,
         queue: &Queue,
@@ -349,14 +349,16 @@ impl Pipeline {
             }
         };
 
-        // TODO apply region to position, size and uv
+        // TODO crop to region
         self.layers.entry(layer).or_default().push(Instance {
             ty,
-            // Swash image placement has vertical up, from baseline
-            position: Position {
-                top: region.top + position.top + font_size as i32 - placement.top,
-                left: region.left + position.left + placement.left,
-            },
+            position: region.position()
+                + position
+                + Position {
+                    // Swash image placement has vertical up, from baseline
+                    top: font_size as i32 - placement.top,
+                    left: placement.left,
+                },
             size: Size {
                 width: placement.width,
                 height: placement.height,
@@ -366,13 +368,14 @@ impl Pipeline {
         });
     }
 
+    /// Renders `layer`.
     pub fn render<'pass>(
         &'pass self,
         layer: u32,
         queue: &Queue,
         render_pass: &mut RenderPass<'pass>,
     ) {
-        let instances: &[Instance] = self
+        let instances = self
             .layers
             .get(&layer)
             .map(Vec::as_slice)
@@ -390,6 +393,7 @@ impl Pipeline {
         }
     }
 
+    /// Clears layers.
     pub fn post_render(&mut self) {
         for layer in self.layers.values_mut() {
             layer.clear();

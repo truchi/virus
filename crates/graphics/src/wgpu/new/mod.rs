@@ -6,10 +6,11 @@ mod rectangle;
 
 use crate::text::{Context, FontSize, Glyph, GlyphKey, Line, LineHeight, LineScaler};
 use atlas::{Atlas, AtlasError};
+use glyph::Pipeline as GlyphPipeline;
+use rectangle::Pipeline as RectanglePipeline;
 use std::{
     collections::{BTreeMap, HashMap},
     hash::Hash,
-    mem::size_of,
     ops::Range,
     time::Duration,
 };
@@ -34,30 +35,28 @@ use wgpu::{
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
-const INDEX_FORMAT: IndexFormat = IndexFormat::Uint32;
-
-type Index = u32;
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            Constants                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Copy, Clone, Debug)]
-pub struct Constants {
-    pub surface: [f32; 2],
+#[derive(Copy, Clone, Default, Debug)]
+struct Constants {
+    surface: [f32; 2],
 }
 
 impl Constants {
-    // /!\
-    pub const SIZE: u32 = 2 * size_of::<f32>() as u32;
-    pub const STAGES: ShaderStages = ShaderStages::VERTEX_FRAGMENT;
+    const STAGES: ShaderStages = ShaderStages::VERTEX_FRAGMENT;
 
-    pub fn as_array(&self) -> [f32; 2] {
+    fn as_array(&self) -> [f32; 2] {
         [self.surface[0], self.surface[1]]
     }
 
-    pub fn resize(&mut self, config: &SurfaceConfiguration) {
+    fn resize(&mut self, config: &SurfaceConfiguration) {
         self.surface = [config.width as f32, config.height as f32];
+    }
+
+    fn size() -> u32 {
+        std::mem::size_of_val(&Self::default().as_array()) as u32
     }
 }
 
@@ -72,8 +71,8 @@ pub struct Graphics {
     config: SurfaceConfiguration,
     device: Device,
     queue: Queue,
-    rectangle: rectangle::Pipeline,
-    glyph: glyph::Pipeline,
+    rectangle: RectanglePipeline,
+    glyph: GlyphPipeline,
 }
 
 impl Graphics {
@@ -125,8 +124,8 @@ impl Graphics {
         surface.configure(&device, &config);
 
         // Pipelines
-        let rectangle = rectangle::Pipeline::new(&device, &config);
-        let glyph = glyph::Pipeline::new(&device, &config);
+        let rectangle = RectanglePipeline::new(&device, &config);
+        let glyph = GlyphPipeline::new(&device, &config);
 
         Self {
             window,

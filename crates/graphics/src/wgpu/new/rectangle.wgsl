@@ -28,11 +28,6 @@ struct Instance {
     @location(2) color: vec4u,
 }
 
-struct Fragment {
-    @builtin(position) position: vec4f,
-    @location(0) color: vec4f,
-}
-
 fn position(index: u32, position: vec2i, size: vec2u) -> vec2f {
     let width = f32(size.x);
     let height = f32(size.y);
@@ -75,6 +70,11 @@ fn vertex(instance: Instance) -> Fragment {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Fragment                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+struct Fragment {
+    @builtin(position) position: vec4f,
+    @location(0) color: vec4f,
+}
 
 @fragment
 fn fragment(fragment: Fragment) -> @location(0) vec4f {

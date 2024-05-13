@@ -92,13 +92,10 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
             .map(|item| (item.position(), &item.value))
     }
 
-    /// Inserts an item for `key` with `([width, height], value)` provided through `f`
-    /// (only called when the item does not exist already).
+    /// Inserts an item for `key` with `size` and `value`.
     ///
     /// If allocation fails, call [`Self::clear()`] before the next frame, or try a larger
     /// atlas.
-    //
-    // TODO: Take a function returning the image data.
     pub fn insert(
         &mut self,
         queue: &Queue,
