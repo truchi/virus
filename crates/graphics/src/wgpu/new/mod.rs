@@ -210,9 +210,9 @@ impl Graphics {
         output.present();
 
         // Clear pipelines
-        self.rectangle.post_render();
-        self.glyph.post_render();
-        self.line.post_render();
+        self.rectangle.clear();
+        self.glyph.clear();
+        self.line.clear();
     }
 }
 
@@ -322,6 +322,15 @@ impl<'a> Draw<'a> {
 
     /// Draws a polyline.
     pub fn polyline<T: IntoIterator<Item = (Position, Rgba)>>(&mut self, points: T) {
-        self.graphics.line.polyline(self.layer, self.region, points);
+        self.graphics
+            .line
+            .points(self.layer, self.region, points, false);
+    }
+
+    /// Draws a polygon.
+    pub fn polygon<T: IntoIterator<Item = (Position, Rgba)>>(&mut self, points: T) {
+        self.graphics
+            .line
+            .points(self.layer, self.region, points, true);
     }
 }

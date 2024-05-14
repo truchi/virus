@@ -349,12 +349,11 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             render_outline(self, Some(top), Some(bottom), end, width);
 
             for (i, color) in Self::CARETS {
-                self.draw.polyline([
+                self.draw.polygon([
                     (pos(top + i, start + i), color),
                     (pos(top + i, end - i), color),
                     (pos(bottom - i, end - i), color),
                     (pos(bottom - i, start + i), color),
-                    (pos(top + i, start + i), color),
                 ]);
             }
         }

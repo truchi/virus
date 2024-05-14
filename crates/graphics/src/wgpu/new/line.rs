@@ -145,38 +145,37 @@ impl Pipeline {
     }
 
     /// Pushes `points` to be rendered for `layer` in `region`.
-    pub fn polyline<T: IntoIterator<Item = (Position, Rgba)>>(
+    pub fn points<T: IntoIterator<Item = (Position, Rgba)>>(
         &mut self,
         layer: u32,
         region: Rectangle,
         points: T,
+        closed: bool,
     ) {
-        // TODO crop to region
+        // TODO crop to region: this is very challenging so should be done in shader...
 
-        let mut points = points.into_iter();
-        let (mut prev_position, mut prev_color) = if let Some(prev) = points.next() {
-            prev
+        let mut points = points.into_iter().map(|(position, color)| Vertex {
+            position: position + region.position(),
+            color,
+        });
+
+        let (first, mut prev, layer) = if let Some(first) = points.next() {
+            (first, first, self.layers.entry(layer).or_default())
         } else {
-            debug_assert!(false);
+            debug_assert!(false, "No points");
             return;
         };
-        prev_position = prev_position + region.position();
 
-        let layer = &mut self.layers.entry(layer).or_default();
-        for (mut curr_position, curr_color) in points {
-            curr_position = curr_position + region.position();
+        for curr in points {
+            layer.push(prev);
+            layer.push(curr);
 
-            layer.push(Vertex {
-                position: prev_position,
-                color: prev_color,
-            });
-            layer.push(Vertex {
-                position: curr_position,
-                color: curr_color,
-            });
+            prev = curr;
+        }
 
-            prev_position = curr_position;
-            prev_color = curr_color;
+        if closed {
+            layer.push(prev);
+            layer.push(first);
         }
     }
 
@@ -206,7 +205,7 @@ impl Pipeline {
     }
 
     /// Clears layers.
-    pub fn post_render(&mut self) {
+    pub fn clear(&mut self) {
         for layer in self.layers.values_mut() {
             layer.clear();
         }

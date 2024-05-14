@@ -189,7 +189,7 @@ impl Pipeline {
     }
 
     /// Clears layers.
-    pub fn post_render(&mut self) {
+    pub fn clear(&mut self) {
         for layer in self.layers.values_mut() {
             layer.clear();
         }
