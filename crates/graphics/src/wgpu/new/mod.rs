@@ -2,11 +2,13 @@
 
 mod atlas;
 mod glyph;
+mod line;
 mod rectangle;
 
 use crate::text::{Context, FontSize, Glyph, GlyphKey, Line, LineHeight, LineScaler};
 use atlas::{Atlas, AtlasError};
 use glyph::Pipeline as GlyphPipeline;
+use line::Pipeline as LinePipeline;
 use rectangle::Pipeline as RectanglePipeline;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -73,6 +75,7 @@ pub struct Graphics {
     queue: Queue,
     rectangle: RectanglePipeline,
     glyph: GlyphPipeline,
+    line: LinePipeline,
 }
 
 impl Graphics {
@@ -126,6 +129,7 @@ impl Graphics {
         // Pipelines
         let rectangle = RectanglePipeline::new(&device, &config);
         let glyph = GlyphPipeline::new(&device, &config);
+        let line = LinePipeline::new(&device, &config);
 
         Self {
             window,
@@ -135,6 +139,7 @@ impl Graphics {
             queue,
             rectangle,
             glyph,
+            line,
         }
     }
 
@@ -200,7 +205,7 @@ impl Graphics {
 
         // Render glyphs in output texture
         let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-            label: Some("Glyphs render pass"),
+            label: Some("Glyph render pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
                 view: &output_texture,
                 resolve_target: None,
@@ -214,6 +219,22 @@ impl Graphics {
         self.glyph.render(0, &self.queue, &mut render_pass);
         drop(render_pass);
 
+        // Render lines in output texture
+        let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+            label: Some("Line render pass"),
+            color_attachments: &[Some(RenderPassColorAttachment {
+                view: &output_texture,
+                resolve_target: None,
+                ops: Operations {
+                    load: LoadOp::Load,
+                    store: true,
+                },
+            })],
+            depth_stencil_attachment: None,
+        });
+        self.line.render(0, &self.queue, &mut render_pass);
+        drop(render_pass);
+
         // Flush
         self.queue.submit([encoder.finish()]);
         output.present();
@@ -221,6 +242,7 @@ impl Graphics {
         // Clear pipelines
         self.rectangle.post_render();
         self.glyph.post_render();
+        self.line.post_render();
     }
 }
 
@@ -326,5 +348,10 @@ impl<'a> Draw<'a> {
                 || scaler.render(&glyph),
             );
         }
+    }
+
+    /// Draws a polyline.
+    pub fn polyline<T: IntoIterator<Item = (Position, Rgba)>>(&mut self, points: T) {
+        self.graphics.line.polyline(self.layer, self.region, points);
     }
 }

@@ -80,6 +80,10 @@ impl DocumentView {
 //                                            Renderer                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+fn pos(top: i32, left: i32) -> Position {
+    Position { top, left }
+}
+
 struct Renderer<'a, 'b, 'c, 'd, 'e> {
     view: &'a mut DocumentView,
     context: &'b mut Context,
@@ -297,20 +301,20 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             left: i32,
             right: i32,
         ) {
-            // TODO
-            // for (i, color) in Renderer::OUTLINES {
-            //     if let Some(top) = top {
-            //         renderer
-            //             .draw
-            //             .polyline([([top + i, left], color), ([top + i, right], color)]);
-            //     }
+            for (i, color) in Renderer::OUTLINES {
+                if let Some(top) = top {
+                    renderer
+                        .draw
+                        .polyline([(pos(top + i, left), color), (pos(top + i, right), color)]);
+                }
 
-            //     if let Some(bottom) = bottom {
-            //         renderer
-            //             .draw
-            //             .polyline([([bottom - i, left], color), ([bottom - i, right], color)]);
-            //     }
-            // }
+                if let Some(bottom) = bottom {
+                    renderer.draw.polyline([
+                        (pos(bottom - i, left), color),
+                        (pos(bottom - i, right), color),
+                    ]);
+                }
+            }
         }
 
         let width = self.draw.region().width as i32;
@@ -327,11 +331,14 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             render_outline(self, Some(top), Some(bottom), 0, width);
 
             for (i, color) in Self::CARETS {
-                // TODO
-                // self.draw
-                //     .polyline([([top, start - i], color), ([bottom, start - i], color)]);
-                // self.draw
-                //     .polyline([([top, start + i], color), ([bottom, start + i], color)]);
+                self.draw.polyline([
+                    (pos(top, start - i), color),
+                    (pos(bottom, start - i), color),
+                ]);
+                self.draw.polyline([
+                    (pos(top, start + i), color),
+                    (pos(bottom, start + i), color),
+                ]);
             }
         }
         // Single line
@@ -342,14 +349,13 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             render_outline(self, Some(top), Some(bottom), end, width);
 
             for (i, color) in Self::CARETS {
-                // TODO
-                // self.draw.polyline([
-                //     ([top + i, start + i], color),
-                //     ([top + i, end - i], color),
-                //     ([bottom - i, end - i], color),
-                //     ([bottom - i, start + i], color),
-                //     ([top + i, start + i], color),
-                // ]);
+                self.draw.polyline([
+                    (pos(top + i, start + i), color),
+                    (pos(top + i, end - i), color),
+                    (pos(bottom - i, end - i), color),
+                    (pos(bottom - i, start + i), color),
+                    (pos(top + i, start + i), color),
+                ]);
             }
         }
         // Two non-overlapping lines
@@ -361,19 +367,18 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             render_outline(self, None, Some(bottom), end, width);
 
             for (i, color) in Self::CARETS {
-                // TODO
-                // self.draw.polyline([
-                //     ([top + i, width], color),
-                //     ([top + i, start + i], color),
-                //     ([middle - i, start + i], color),
-                //     ([middle - i, width], color),
-                // ]);
-                // self.draw.polyline([
-                //     ([middle + i, 0], color),
-                //     ([middle + i, end - i], color),
-                //     ([bottom - i, end - i], color),
-                //     ([bottom - i, 0], color),
-                // ]);
+                self.draw.polyline([
+                    (pos(top + i, width), color),
+                    (pos(top + i, start + i), color),
+                    (pos(middle - i, start + i), color),
+                    (pos(middle - i, width), color),
+                ]);
+                self.draw.polyline([
+                    (pos(middle + i, 0), color),
+                    (pos(middle + i, end - i), color),
+                    (pos(bottom - i, end - i), color),
+                    (pos(bottom - i, 0), color),
+                ]);
             }
         }
         // Two lines or more
@@ -384,19 +389,18 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
             render_outline(self, None, Some(bottom2), end, width);
 
             for (i, color) in Self::CARETS {
-                // TODO
-                // self.draw.polyline([
-                //     ([top2 + i, 0], color),
-                //     ([top2 + i, start + i], color),
-                //     ([top1 + i, start + i], color),
-                //     ([top1 + i, width], color),
-                // ]);
-                // self.draw.polyline([
-                //     ([bottom1 - i, width], color),
-                //     ([bottom1 - i, end - i], color),
-                //     ([bottom2 - i, end - i], color),
-                //     ([bottom2 - i, 0], color),
-                // ]);
+                self.draw.polyline([
+                    (pos(top2 + i, 0), color),
+                    (pos(top2 + i, start + i), color),
+                    (pos(top1 + i, start + i), color),
+                    (pos(top1 + i, width), color),
+                ]);
+                self.draw.polyline([
+                    (pos(bottom1 - i, width), color),
+                    (pos(bottom1 - i, end - i), color),
+                    (pos(bottom2 - i, end - i), color),
+                    (pos(bottom2 - i, 0), color),
+                ]);
             }
         }
     }
