@@ -187,7 +187,7 @@ impl Graphics {
                 label: Some("Encoder"),
             });
 
-        // Render rectangles in output texture
+        // Render pipelines in output texture
         let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some("Rectangle render pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
@@ -201,37 +201,7 @@ impl Graphics {
             depth_stencil_attachment: None,
         });
         self.rectangle.render(0, &self.queue, &mut render_pass);
-        drop(render_pass);
-
-        // Render glyphs in output texture
-        let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-            label: Some("Glyph render pass"),
-            color_attachments: &[Some(RenderPassColorAttachment {
-                view: &output_texture,
-                resolve_target: None,
-                ops: Operations {
-                    load: LoadOp::Load,
-                    store: true,
-                },
-            })],
-            depth_stencil_attachment: None,
-        });
         self.glyph.render(0, &self.queue, &mut render_pass);
-        drop(render_pass);
-
-        // Render lines in output texture
-        let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-            label: Some("Line render pass"),
-            color_attachments: &[Some(RenderPassColorAttachment {
-                view: &output_texture,
-                resolve_target: None,
-                ops: Operations {
-                    load: LoadOp::Load,
-                    store: true,
-                },
-            })],
-            depth_stencil_attachment: None,
-        });
         self.line.render(0, &self.queue, &mut render_pass);
         drop(render_pass);
 

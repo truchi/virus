@@ -18,7 +18,7 @@ fn to_clip(position: vec2f) -> vec4f {
 //                                               Vertex                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-struct Instance {
+struct Vertex {
     // Point `(top, left)` position.
     @location(0) position: vec2i,
     // Point sRGBA color.
@@ -30,10 +30,10 @@ fn color(color: vec4u) -> vec4f {
 }
 
 @vertex
-fn vertex(instance: Instance) -> Fragment {
+fn vertex(vertex: Vertex) -> Fragment {
     var fragment: Fragment;
-    fragment.position = to_clip(vec2f(instance.position.yx));
-    fragment.color = color(instance.color);
+    fragment.position = to_clip(vec2f(vertex.position.yx));
+    fragment.color = color(vertex.color);
 
     return fragment;
 }

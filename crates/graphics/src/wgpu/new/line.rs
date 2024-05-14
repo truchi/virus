@@ -7,15 +7,15 @@ macro_rules! label {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                            Instance                                            //
+//                                             Vertex                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-muck!(unsafe Instance => Vertex: [Position, Rgba]);
+muck!(unsafe Vertex => Vertex: [Position, Rgba]);
 
-/// Instance.
+/// Vertex.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-struct Instance {
+struct Vertex {
     /// Point position.
     position: Position,
     /// Point color.
@@ -32,7 +32,7 @@ struct Init<'a>(&'a Device);
 impl<'a> Init<'a> {
     fn buffer(&self, size: BufferAddress) -> Buffer {
         self.0.create_buffer(&BufferDescriptor {
-            label: label!("Instance buffer"),
+            label: label!("Vertex buffer"),
             size,
             usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
             mapped_at_creation: false,
@@ -75,7 +75,7 @@ impl<'a> Init<'a> {
             vertex: VertexState {
                 module: &module,
                 entry_point: "vertex",
-                buffers: &[Instance::buffer_layout()],
+                buffers: &[Vertex::buffer_layout()],
             },
             primitive: PrimitiveState {
                 topology: PrimitiveTopology::LineList,
@@ -105,7 +105,7 @@ impl<'a> Init<'a> {
 #[derive(Debug)]
 pub struct Pipeline {
     constants: Constants,
-    layers: BTreeMap<u32, Vec<Instance>>,
+    layers: BTreeMap<u32, Vec<Vertex>>,
     buffer: Buffer,
     bind_group: BindGroup,
     pipeline: RenderPipeline,
@@ -144,7 +144,7 @@ impl Pipeline {
         self.constants.resize(config);
     }
 
-    /// TODO doc
+    /// Pushes `points` to be rendered for `layer` in `region`.
     pub fn polyline<T: IntoIterator<Item = (Position, Rgba)>>(
         &mut self,
         layer: u32,
@@ -166,11 +166,11 @@ impl Pipeline {
         for (mut curr_position, curr_color) in points {
             curr_position = curr_position + region.position();
 
-            layer.push(Instance {
+            layer.push(Vertex {
                 position: prev_position,
                 color: prev_color,
             });
-            layer.push(Instance {
+            layer.push(Vertex {
                 position: curr_position,
                 color: curr_color,
             });
@@ -187,21 +187,21 @@ impl Pipeline {
         queue: &Queue,
         render_pass: &mut RenderPass<'pass>,
     ) {
-        let instances = self
+        let vertices = self
             .layers
             .get(&layer)
             .map(Vec::as_slice)
             .unwrap_or_default();
 
-        if !instances.is_empty() {
+        if !vertices.is_empty() {
             let constants = self.constants.as_array();
 
-            queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(instances));
+            queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(vertices));
             render_pass.set_pipeline(&self.pipeline);
             render_pass.set_bind_group(0, &self.bind_group, &[]);
             render_pass.set_push_constants(Constants::STAGES, 0, bytemuck::cast_slice(&constants));
             render_pass.set_vertex_buffer(0, self.buffer.slice(..));
-            render_pass.draw(0..instances.len() as u32, 0..1);
+            render_pass.draw(0..vertices.len() as u32, 0..1);
         }
     }
 
