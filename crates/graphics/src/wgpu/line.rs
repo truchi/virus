@@ -1,58 +1,99 @@
 use super::*;
-use std::collections::HashMap;
+
+macro_rules! label {
+    ($label:literal) => {
+        Some(concat!("[LinePipeline] ", $label))
+    };
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                              Vertex                                            //
+//                                             Vertex                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+muck!(unsafe Vertex => Vertex: [Position, Rgba]);
+
+/// Vertex.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct Vertex {
-    /// Region `[top, left]` world coordinates.
-    region_position: [i32; 2],
-    /// Region `[width, height]` size.
-    region_size: [u32; 2],
-    /// Vertex `[top, left]` coordinates in region.
-    position: [i32; 2],
-    /// sRGBA color.
-    color: [u32; 4],
+    /// Point position.
+    position: Position,
+    /// Point color.
+    color: Rgba,
 }
 
-unsafe impl bytemuck::Zeroable for Vertex {}
-unsafe impl bytemuck::Pod for Vertex {}
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                               Init                                             //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-impl Vertex {
-    const ATTRIBUTES: [VertexAttribute; 4] = vertex_attr_array![
-        0 => Sint32x2, // region position
-        1 => Uint32x2, // region size
-        2 => Sint32x2, // position
-        3 => Uint32x4, // color
-    ];
+/// Inits the `Pipeline`.
+struct Init<'a>(&'a Device);
 
-    fn vertex_buffer_layout() -> VertexBufferLayout<'static> {
-        VertexBufferLayout {
-            array_stride: size_of::<Vertex>() as BufferAddress,
-            step_mode: VertexStepMode::Vertex,
-            attributes: &Self::ATTRIBUTES,
-        }
+impl<'a> Init<'a> {
+    fn buffer(&self, size: BufferAddress) -> Buffer {
+        self.0.create_buffer(&BufferDescriptor {
+            label: label!("Vertex buffer"),
+            size,
+            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        })
     }
 
-    fn new(
-        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
-        [top, left]: [i32; 2],
-        color: Rgba,
-    ) -> Self {
-        Self {
-            region_position: [region_top, region_left],
-            region_size: [region_width, region_height],
-            position: [top, left],
-            color: [
-                color.r as u32,
-                color.g as u32,
-                color.b as u32,
-                color.a as u32,
-            ],
-        }
+    fn bind_group_layout(&self) -> BindGroupLayout {
+        self.0.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: label!("Bind group layout"),
+            entries: &[],
+        })
+    }
+
+    fn bind_group(&self, bind_group_layout: &BindGroupLayout) -> BindGroup {
+        self.0.create_bind_group(&BindGroupDescriptor {
+            label: label!("Bind group"),
+            layout: &bind_group_layout,
+            entries: &[],
+        })
+    }
+
+    fn pipeline(
+        &self,
+        config: &SurfaceConfiguration,
+        bind_group_layout: &BindGroupLayout,
+        module: &ShaderModule,
+    ) -> RenderPipeline {
+        let pipeline_layout = self.0.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: label!("Pipeline layout"),
+            bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[PushConstantRange {
+                stages: Constants::STAGES,
+                range: 0..Constants::size(),
+            }],
+        });
+
+        self.0.create_render_pipeline(&RenderPipelineDescriptor {
+            label: label!("Pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: VertexState {
+                module: &module,
+                entry_point: "vertex",
+                buffers: &[Vertex::buffer_layout()],
+            },
+            primitive: PrimitiveState {
+                topology: PrimitiveTopology::LineList,
+                ..Default::default()
+            },
+            depth_stencil: None,
+            multisample: Default::default(),
+            fragment: Some(FragmentState {
+                module: &module,
+                entry_point: "fragment",
+                targets: &[Some(ColorTargetState {
+                    format: config.format,
+                    blend: Some(BlendState::ALPHA_BLENDING),
+                    write_mask: ColorWrites::ALL,
+                })],
+            }),
+            multiview: None,
+        })
     }
 }
 
@@ -60,145 +101,113 @@ impl Vertex {
 //                                             Pipeline                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// Line pipeline.
-pub struct LinePipeline {
-    surface_size: [f32; 2],
-    vertices: HashMap<
-        /* layer */ u32,
-        (
-            /* vertices */ Vec<Vertex>,
-            /* start vertex in buffer */ u32,
-        ),
-    >,
-    vertex_buffer: Buffer,
+/// Pipeline.
+#[derive(Debug)]
+pub struct Pipeline {
+    constants: Constants,
+    layers: BTreeMap<u32, Vec<Vertex>>,
+    buffer: Buffer,
     bind_group: BindGroup,
     pipeline: RenderPipeline,
 }
 
-impl LinePipeline {
+impl Pipeline {
+    /// Creates a new `Pipeline` for `device` and `config`.
     pub fn new(device: &Device, config: &SurfaceConfiguration) -> Self {
         let limits = device.limits();
+        let max_buffer_size = limits.max_buffer_size;
 
-        //
-        // Buffer
-        //
-
-        let vertex_buffer = device.create_buffer(&buffer! {
-            label: "[LinePipeline] Vertex buffer",
-            size: limits.max_buffer_size  / 2,
-            usage: VERTEX | COPY_DST,
-        });
-
-        //
-        // Bind group
-        //
-
-        let bind_group_layout = device.create_bind_group_layout(&bind_group_layout! {
-            label: "[LinePipeline] Texture bind group layout",
-            entries: [],
-        });
-        let bind_group = device.create_bind_group(&bind_group! {
-            label: "[LinePipeline] Texture bind group",
-            layout: bind_group_layout,
-            entries: [],
-        });
-
-        //
-        // Pipeline
-        //
-
-        let module = device.create_shader_module(include_wgsl!("line.wgsl"));
-        let pipeline_layout = device.create_pipeline_layout(&pipeline_layout! {
-            label: "[LinePipeline] Pipeline layout",
-            bind_group_layouts: [bind_group_layout],
-            push_constant_ranges: [(VERTEX_FRAGMENT, 0..8)],
-        });
-        let pipeline = device.create_render_pipeline(&render_pipeline! {
-            label: "[LinePipeline] Pipeline",
-            layout: pipeline_layout,
-            module: module,
-            vertex: "vertex",
-            buffers: [Vertex::vertex_buffer_layout()],
-            fragment: "fragment",
-            targets: [Some(ColorTargetState {
-                format: config.format,
-                blend: Some(BlendState::ALPHA_BLENDING),
-                write_mask: ColorWrites::ALL,
-            })],
-            topology: LineList,
-        });
+        let constants = Constants {
+            surface: [config.width as f32, config.height as f32],
+        };
+        let buffer = Init(device).buffer(max_buffer_size); // TODO limit this size
+        let layers = Default::default();
+        let bind_group_layout = Init(device).bind_group_layout();
+        let bind_group = Init(device).bind_group(&bind_group_layout);
+        let pipeline = Init(device).pipeline(
+            config,
+            &bind_group_layout,
+            &device.create_shader_module(include_wgsl!("line.wgsl")),
+        );
 
         Self {
-            surface_size: [config.width as f32, config.height as f32],
-            vertices: Default::default(),
-            vertex_buffer,
+            constants,
+            layers,
+            buffer,
             bind_group,
             pipeline,
         }
     }
 
-    pub fn resize(&mut self, size: PhysicalSize<u32>) {
-        self.surface_size = [size.width as f32, size.height as f32];
+    /// Resizes the `Pipeline`.
+    pub fn resize(&mut self, device: &Device, config: &SurfaceConfiguration) {
+        self.constants.resize(config);
     }
 
-    pub fn polyline<T: IntoIterator<Item = ([i32; 2], Rgba)>>(
+    /// Pushes `points` to be rendered for `layer` in `region`.
+    pub fn points<T: IntoIterator<Item = (Position, Rgba)>>(
         &mut self,
-        ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
+        layer: u32,
+        region: Rectangle,
         points: T,
+        closed: bool,
     ) {
-        let layer = 0; // TODO
-        let region = ([region_top, region_left], [region_width, region_height]);
+        // TODO crop to region: this is very challenging so should be done in shader...
 
-        let mut points = points.into_iter();
-        let mut prev = if let Some(prev) = points.next() {
-            prev
+        let mut points = points.into_iter().map(|(position, color)| Vertex {
+            position: position + region.position(),
+            color,
+        });
+
+        let (first, mut prev, layer) = if let Some(first) = points.next() {
+            (first, first, self.layers.entry(layer).or_default())
         } else {
-            debug_assert!(false);
+            debug_assert!(false, "No points");
             return;
         };
 
-        let vertices = &mut self.vertices.entry(layer).or_default().0;
         for curr in points {
-            vertices.push(Vertex::new(region, prev.0, prev.1));
-            vertices.push(Vertex::new(region, curr.0, curr.1));
+            layer.push(prev);
+            layer.push(curr);
+
             prev = curr;
         }
-    }
 
-    pub fn pre_render(&mut self, queue: &Queue) {
-        let mut offset = 0; // in bytes, for write_buffer()
-        let mut index = 0; // in vertex, for draw()
-
-        for (vertices, start) in self.vertices.values_mut() {
-            let bytes = bytemuck::cast_slice(&vertices);
-            queue.write_buffer(&self.vertex_buffer, offset, bytes);
-
-            *start = index;
-
-            offset += bytes.len() as BufferAddress;
-            index += vertices.len() as u32;
+        if closed {
+            layer.push(prev);
+            layer.push(first);
         }
     }
 
-    pub fn render<'pass>(&'pass mut self, render_pass: &mut RenderPass<'pass>) {
-        let layer = 0; // TODO
+    /// Renders `layer`.
+    pub fn render<'pass>(
+        &'pass self,
+        layer: u32,
+        queue: &Queue,
+        render_pass: &mut RenderPass<'pass>,
+    ) {
+        let vertices = self
+            .layers
+            .get(&layer)
+            .map(Vec::as_slice)
+            .unwrap_or_default();
 
-        self.vertices.get(&layer).map(|(vertices, start)| {
-            let start = *start;
+        if !vertices.is_empty() {
+            let constants = self.constants.as_array();
 
+            queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(vertices));
             render_pass.set_pipeline(&self.pipeline);
             render_pass.set_bind_group(0, &self.bind_group, &[]);
-            render_pass.set_push_constants(
-                ShaderStages::VERTEX_FRAGMENT,
-                0,
-                bytemuck::cast_slice(&[self.surface_size[0], self.surface_size[1]]),
-            );
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.draw(start..start + vertices.len() as u32, 0..1);
-        });
+            render_pass.set_push_constants(Constants::STAGES, 0, bytemuck::cast_slice(&constants));
+            render_pass.set_vertex_buffer(0, self.buffer.slice(..));
+            render_pass.draw(0..vertices.len() as u32, 0..1);
+        }
     }
 
-    pub fn post_render(&mut self) {
-        self.vertices.clear();
+    /// Clears layers.
+    pub fn clear(&mut self) {
+        for layer in self.layers.values_mut() {
+            layer.clear();
+        }
     }
 }

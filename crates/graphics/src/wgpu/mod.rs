@@ -1,315 +1,336 @@
-pub mod new;
+#![allow(unused)]
 
-// mod atlas;
-// mod atlas2;
-// mod line;
-// mod macros;
-// mod text;
+mod atlas;
+mod glyph;
+mod line;
+mod rectangle;
 
-// use crate::text::{
-//     AnimatedGlyphKey, Context, FontSize, FrameIndex, Glyph, GlyphKey, Line, LineHeight, LineScaler,
-//     Shadow,
-// };
-// use atlas::{Allocator, Horizontal};
-// use line::LinePipeline;
-// use macros::*;
-// use std::{mem::size_of, ops::Range, time::Duration};
-// use swash::{scale::image::Content, zeno::Placement};
-// use text::TextPipeline;
-// use virus_common::Rgba;
-// use wgpu::{
-//     include_wgsl, vertex_attr_array, BindGroup, BindGroupDescriptor, BindGroupEntry,
-//     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
-//     BlendState, Buffer, BufferAddress, BufferDescriptor, BufferUsages, Color, ColorTargetState,
-//     ColorWrites, CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Extent3d,
-//     Features, FragmentState, ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, Limits,
-//     LoadOp, Operations, Origin3d, PipelineLayoutDescriptor, PresentMode, PrimitiveState,
-//     PrimitiveTopology, PushConstantRange, Queue, RenderPass, RenderPassColorAttachment,
-//     RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions,
-//     SamplerBindingType, ShaderStages, Surface, SurfaceConfiguration, Texture, TextureAspect,
-//     TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages,
-//     TextureView, TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexState,
-//     VertexStepMode,
-// };
-// use winit::{dpi::PhysicalSize, window::Window};
+use crate::text::{Context, FontSize, Glyph, GlyphKey, Line, LineHeight, LineScaler};
+use atlas::{Atlas, AtlasError};
+use glyph::Pipeline as GlyphPipeline;
+use line::Pipeline as LinePipeline;
+use rectangle::Pipeline as RectanglePipeline;
+use std::{
+    collections::{BTreeMap, HashMap},
+    hash::Hash,
+    ops::Range,
+    time::Duration,
+};
+use swash::{
+    scale::image::{Content, Image},
+    zeno::Placement,
+};
+use virus_common::{muck, Position, Rectangle, Rgba, Size, WithAttributes};
+use wgpu::{
+    include_wgsl, vertex_attr_array, BindGroup, BindGroupDescriptor, BindGroupEntry,
+    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
+    BlendState, Buffer, BufferAddress, BufferDescriptor, BufferUsages, Color, ColorTargetState,
+    ColorWrites, CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Extent3d,
+    Features, FragmentState, ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, Limits,
+    LoadOp, Operations, Origin3d, PipelineLayout, PipelineLayoutDescriptor, PresentMode,
+    PrimitiveState, PrimitiveTopology, PushConstantRange, Queue, RenderPass,
+    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
+    RequestAdapterOptions, SamplerBindingType, ShaderModule, ShaderStages, Surface,
+    SurfaceConfiguration, Texture, TextureAspect, TextureDescriptor, TextureDimension,
+    TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDimension,
+    VertexAttribute, VertexBufferLayout, VertexState, VertexStepMode,
+};
+use winit::{dpi::PhysicalSize, window::Window};
 
-// const INDEX_FORMAT: IndexFormat = IndexFormat::Uint32;
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                            Constants                                           //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-// type Index = u32;
+#[derive(Copy, Clone, Default, Debug)]
+struct Constants {
+    surface: [f32; 2],
+}
 
-// // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-// //                                            Graphics                                            //
-// // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+impl Constants {
+    const STAGES: ShaderStages = ShaderStages::VERTEX_FRAGMENT;
 
-// /// WebGpu graphics.
-// pub struct Graphics {
-//     window: Window,   // Window and Surface MUST live as long as one another
-//     surface: Surface, // That's why they are both here, to make sure its safe
-//     config: SurfaceConfiguration,
-//     device: Device,
-//     queue: Queue,
-//     text_pipeline: TextPipeline,
-//     line_pipeline: LinePipeline,
-// }
+    fn as_array(&self) -> [f32; 2] {
+        [self.surface[0], self.surface[1]]
+    }
 
-// impl Graphics {
-//     /// Creates a new `Graphics`.
-//     pub fn new(window: Window) -> Self {
-//         // WGPU instance
-//         let instance = Instance::new(Default::default());
+    fn resize(&mut self, config: &SurfaceConfiguration) {
+        self.surface = [config.width as f32, config.height as f32];
+    }
 
-//         // Surface (window/canvas)
-//         //
-//         // SAFETY:
-//         // The surface needs to live as long as the window that created it.
-//         // State owns the window so this should be safe.
-//         let surface = unsafe { instance.create_surface(&window) }.unwrap();
+    fn size() -> u32 {
+        std::mem::size_of_val(&Self::default().as_array()) as u32
+    }
+}
 
-//         // Request adapter (device handle), device (gpu connection) and queue (handle to command queue)
-//         let adapter = pollster::block_on(instance.request_adapter(&RequestAdapterOptions {
-//             compatible_surface: Some(&surface),
-//             ..Default::default()
-//         }))
-//         .unwrap();
-//         let (device, queue) = pollster::block_on(adapter.request_device(
-//             &DeviceDescriptor {
-//                 label: Some("Device descriptor"),
-//                 features: Features::PUSH_CONSTANTS,
-//                 limits: Limits {
-//                     max_push_constant_size: 128,
-//                     ..Default::default()
-//                 },
-//             },
-//             None,
-//         ))
-//         .unwrap();
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                            Graphics                                            //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-//         // Configure surface
-//         let config = {
-//             let size = window.inner_size();
-//             let capabilities = surface.get_capabilities(&adapter);
-//             SurfaceConfiguration {
-//                 usage: TextureUsages::RENDER_ATTACHMENT,
-//                 format: capabilities.formats[0],
-//                 width: size.width,
-//                 height: size.height,
-//                 present_mode: PresentMode::Fifo,
-//                 alpha_mode: CompositeAlphaMode::Auto,
-//                 view_formats: vec![],
-//             }
-//         };
-//         surface.configure(&device, &config);
+/// WebGpu graphics.
+pub struct Graphics {
+    window: Window,   // Window and Surface MUST live as long as one another
+    surface: Surface, // That's why they are both here, to make sure its safe
+    config: SurfaceConfiguration,
+    device: Device,
+    queue: Queue,
+    rectangle: RectanglePipeline,
+    glyph: GlyphPipeline,
+    line: LinePipeline,
+}
 
-//         // Pipelines
-//         let text_pipeline = TextPipeline::new(&device, &config);
-//         let line_pipeline = LinePipeline::new(&device, &config);
+impl Graphics {
+    /// Creates a new `Graphics`.
+    pub fn new(window: Window) -> Self {
+        // WGPU instance
+        let instance = Instance::new(Default::default());
 
-//         Self {
-//             window,
-//             surface,
-//             config,
-//             device,
-//             queue,
-//             text_pipeline,
-//             line_pipeline,
-//         }
-//     }
+        // Surface (window/canvas)
+        //
+        // SAFETY:
+        // The surface needs to live as long as the window that created it.
+        // State owns the window so this should be safe.
+        let surface = unsafe { instance.create_surface(&window) }.unwrap();
 
-//     /// Returns the `Window`.
-//     pub fn window(&self) -> &Window {
-//         &self.window
-//     }
+        // Request adapter (device handle), device (gpu connection) and queue (handle to command queue)
+        let adapter = pollster::block_on(instance.request_adapter(&RequestAdapterOptions {
+            compatible_surface: Some(&surface),
+            ..Default::default()
+        }))
+        .unwrap();
+        let (device, queue) = pollster::block_on(adapter.request_device(
+            &DeviceDescriptor {
+                label: Some("Device descriptor"),
+                features: Features::PUSH_CONSTANTS,
+                limits: Limits {
+                    max_push_constant_size: 128,
+                    ..Default::default()
+                },
+            },
+            None,
+        ))
+        .unwrap();
 
-//     /// Resizes the surface to the window's logical size.
-//     pub fn resize(&mut self) {
-//         let size = self.window.inner_size();
+        // Configure surface
+        let config = {
+            let size = window.inner_size();
+            let capabilities = surface.get_capabilities(&adapter);
+            SurfaceConfiguration {
+                usage: TextureUsages::RENDER_ATTACHMENT,
+                format: capabilities.formats[0],
+                width: size.width,
+                height: size.height,
+                present_mode: PresentMode::Fifo,
+                alpha_mode: CompositeAlphaMode::Auto,
+                view_formats: vec![],
+            }
+        };
+        surface.configure(&device, &config);
 
-//         self.config.width = size.width;
-//         self.config.height = size.height;
-//         self.surface.configure(&self.device, &self.config);
-//         self.text_pipeline.resize(&self.device, &self.config);
-//         self.line_pipeline.resize(size);
-//     }
+        // Pipelines
+        let rectangle = RectanglePipeline::new(&device, &config);
+        let glyph = GlyphPipeline::new(&device, &config);
+        let line = LinePipeline::new(&device, &config);
 
-//     /// Returns the drawing API.
-//     pub fn draw(
-//         &mut self,
-//         ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
-//     ) -> Draw {
-//         Draw {
-//             graphics: self,
-//             region: ([region_top, region_left], [region_width, region_height]),
-//         }
-//     }
+        Self {
+            window,
+            surface,
+            config,
+            device,
+            queue,
+            rectangle,
+            glyph,
+            line,
+        }
+    }
 
-//     /// Renders to the screen.
-//     pub fn render(&mut self) {
-//         let output = self.surface.get_current_texture().unwrap();
-//         let output_texture = output.texture.create_view(&Default::default());
-//         let blur_ping_texture = self.text_pipeline.blur_ping_texture_view();
-//         let blur_pong_texture = self.text_pipeline.blur_pong_texture_view();
-//         let mut encoder = self
-//             .device
-//             .create_command_encoder(&CommandEncoderDescriptor {
-//                 label: Some("Encoder"),
-//             });
+    /// Returns the `Window`.
+    pub fn window(&self) -> &Window {
+        &self.window
+    }
 
-//         self.text_pipeline.pre_render(&self.queue);
-//         self.line_pipeline.pre_render(&self.queue);
+    /// Returns the size of the window/surface.
+    pub fn size(&self) -> Size {
+        Size {
+            width: self.config.width,
+            height: self.config.height,
+        }
+    }
 
-//         // Render rectangles in output texture
-//         let mut render_pass = encoder.begin_render_pass(&render_pass! {
-//             label: "Rectangles render pass",
-//             view: output_texture,
-//             load: Clear(BLACK),
-//             store: true,
-//         });
-//         self.text_pipeline.render_rectangles(&mut render_pass);
-//         drop(render_pass);
+    /// Resizes the surface to the window's logical size.
+    pub fn resize(&mut self) {
+        let size = self.window.inner_size();
+        self.config.width = size.width;
+        self.config.height = size.height;
 
-//         // Render shadows in ping texture
-//         let mut render_pass = encoder.begin_render_pass(&render_pass! {
-//             label: "Shadows render pass",
-//             view: blur_ping_texture,
-//             load: Clear(BLACK),
-//             store: true,
-//         });
-//         self.text_pipeline.render_shadows(&mut render_pass);
-//         drop(render_pass);
+        self.surface.configure(&self.device, &self.config);
+        self.rectangle.resize(&self.device, &self.config);
+        self.glyph.resize(&self.device, &self.config);
+    }
 
-//         // Blur ping texture in pong texture
-//         let mut render_pass = encoder.begin_render_pass(&render_pass! {
-//             label: "Blur ping render pass",
-//             view: blur_pong_texture,
-//             load: Clear(BLACK),
-//             store: true,
-//         });
-//         self.text_pipeline.blur_ping(&mut render_pass);
-//         drop(render_pass);
+    /// Returns the `Draw`ing API.
+    pub fn draw(&mut self, layer: u32, region: Rectangle) -> Draw {
+        Draw {
+            graphics: self,
+            layer,
+            region,
+        }
+    }
 
-//         // Blur pong texture in output texture
-//         let mut render_pass = encoder.begin_render_pass(&render_pass! {
-//             label: "Blur pong render pass",
-//             view: output_texture,
-//             load: Load,
-//             store: true,
-//         });
-//         self.text_pipeline.blur_pong(&mut render_pass);
-//         drop(render_pass);
+    /// Renders to the screen.
+    pub fn render(&mut self) {
+        // Get output texture from surface
+        let output = self.surface.get_current_texture().unwrap();
+        let output_texture = output.texture.create_view(&Default::default());
+        let mut encoder = self
+            .device
+            .create_command_encoder(&CommandEncoderDescriptor {
+                label: Some("Encoder"),
+            });
 
-//         // Render glyphs and lines in output texture
-//         let mut render_pass = encoder.begin_render_pass(&render_pass! {
-//             label: "Glyphs and line render pass",
-//             view: output_texture,
-//             load: Load,
-//             store: true,
-//         });
-//         self.text_pipeline.render_glyphs(&mut render_pass);
-//         self.line_pipeline.render(&mut render_pass);
-//         drop(render_pass);
+        // Render pipelines in output texture
+        let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+            label: Some("Rectangle render pass"),
+            color_attachments: &[Some(RenderPassColorAttachment {
+                view: &output_texture,
+                resolve_target: None,
+                ops: Operations {
+                    load: LoadOp::Clear(Color::BLACK),
+                    store: true,
+                },
+            })],
+            depth_stencil_attachment: None,
+        });
+        self.rectangle.render(0, &self.queue, &mut render_pass);
+        self.glyph.render(0, &self.queue, &mut render_pass);
+        self.line.render(0, &self.queue, &mut render_pass);
+        drop(render_pass);
 
-//         // Flush
-//         self.queue.submit([encoder.finish()]);
-//         output.present();
+        // Flush
+        self.queue.submit([encoder.finish()]);
+        output.present();
 
-//         self.text_pipeline.post_render();
-//         self.line_pipeline.post_render();
-//     }
-// }
+        // Clear pipelines
+        self.rectangle.clear();
+        self.glyph.clear();
+        self.line.clear();
+    }
+}
 
-// // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-// //                                              Draw                                              //
-// // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                              Draw                                              //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-// /// A drawing API for [`Graphics`].
-// pub struct Draw<'a> {
-//     graphics: &'a mut Graphics,
-//     region: ([i32; 2], [u32; 2]),
-// }
+/// A drawing API for [`Graphics`].
+pub struct Draw<'a> {
+    graphics: &'a mut Graphics,
+    layer: u32,
+    region: Rectangle,
+}
 
-// impl<'a> Draw<'a> {
-//     /// Returns the top coordinate of the drawing region.
-//     pub fn top(&self) -> i32 {
-//         self.region.0[0]
-//     }
+impl<'a> Draw<'a> {
+    /// Returns the current region.
+    pub fn region(&self) -> Rectangle {
+        self.region
+    }
 
-//     /// Returns the bottom coordinate of the drawing region.
-//     pub fn bottom(&self) -> i32 {
-//         self.top() + self.height() as i32
-//     }
+    /// Returns the current layer.
+    pub fn layer(&self) -> u32 {
+        self.layer
+    }
 
-//     /// Returns the left coordinate of the drawing region.
-//     pub fn left(&self) -> i32 {
-//         self.region.0[1]
-//     }
+    /// Further restricts the current region.
+    pub fn draw(&mut self, region: Rectangle) -> Option<Draw> {
+        self.region.region(region).map(|region| Draw {
+            graphics: self.graphics,
+            layer: self.layer,
+            region,
+        })
+    }
 
-//     /// Returns the right coordinate of the drawing region.
-//     pub fn right(&self) -> i32 {
-//         self.left() + self.width() as i32
-//     }
+    /// Draws a rectange.
+    pub fn rectangle(&mut self, rectangle: Rectangle, color: Rgba) {
+        self.graphics
+            .rectangle
+            .push(self.layer, self.region, rectangle, color);
+    }
 
-//     /// Returns the width of the drawing region.
-//     pub fn width(&self) -> u32 {
-//         self.region.1[0]
-//     }
+    /// Draws a glyph.
+    pub fn glyph<F: FnOnce() -> Image>(
+        &mut self,
+        position: Position,
+        font_size: FontSize,
+        key: GlyphKey,
+        color: Rgba,
+        image: F,
+    ) {
+        self.graphics.glyph.push(
+            &self.graphics.queue,
+            self.layer,
+            self.region,
+            position,
+            font_size,
+            key,
+            color,
+            image,
+        );
+    }
 
-//     /// Returns the height of the drawing region.
-//     pub fn height(&self) -> u32 {
-//         self.region.1[1]
-//     }
+    /// Draws glyphs.
+    pub fn glyphs(
+        &mut self,
+        context: &mut Context,
+        position: Position,
+        line: &Line,
+        line_height: LineHeight,
+    ) {
+        //
+        // Add backgrounds
+        //
 
-//     /// Crops relative to the current region.
-//     pub fn draw(
-//         &mut self,
-//         ([region_top, region_left], [region_width, region_height]): ([i32; 2], [u32; 2]),
-//     ) -> Draw {
-//         let (top, bottom) = (
-//             region_top.clamp(0, self.height() as i32),
-//             (region_top + region_height as i32).clamp(0, self.height() as i32),
-//         );
-//         let (left, right) = (
-//             region_left.clamp(0, self.width() as i32),
-//             (region_left + region_width as i32).clamp(0, self.width() as i32),
-//         );
+        for (Range { start, end }, _, background) in line.segments(|glyph| glyph.styles.background)
+        {
+            self.rectangle(
+                Rectangle {
+                    top: position.top,
+                    left: position.left + start as i32,
+                    width: (end - start) as u32,
+                    height: line_height,
+                },
+                background,
+            );
+        }
 
-//         Draw {
-//             region: (
-//                 [self.top() + top, self.left() + left],
-//                 [(right - left) as u32, (bottom - top) as u32],
-//             ),
-//             graphics: self.graphics,
-//         }
-//     }
+        //
+        // Add glyphs
+        //
 
-//     /// Draws glyphs.
-//     pub fn glyphs(
-//         &mut self,
-//         context: &mut Context,
-//         [top, left]: [i32; 2],
-//         line: &Line,
-//         line_height: LineHeight,
-//         time: Duration,
-//     ) {
-//         self.graphics.text_pipeline.glyphs(
-//             &self.graphics.queue,
-//             context,
-//             self.region,
-//             [top, left],
-//             line,
-//             line_height,
-//             time,
-//         );
-//     }
+        let mut scaler = line.scaler(context);
 
-//     /// Draws a rectange.
-//     pub fn rectangle(&mut self, ([top, left], [width, height]): ([i32; 2], [u32; 2]), color: Rgba) {
-//         self.graphics
-//             .text_pipeline
-//             .rectangle(self.region, ([top, left], [width, height]), color)
-//     }
+        for glyph in line.glyphs() {
+            self.glyph(
+                Position {
+                    top: position.top,
+                    left: position.left + glyph.offset.round() as i32,
+                },
+                line.font_size(),
+                glyph.key(),
+                glyph.styles.foreground,
+                || scaler.render(&glyph),
+            );
+        }
+    }
 
-//     /// Draws a polyline.
-//     pub fn polyline<T: IntoIterator<Item = ([i32; 2], Rgba)>>(&mut self, points: T) {
-//         self.graphics.line_pipeline.polyline(self.region, points);
-//     }
-// }
+    /// Draws a polyline.
+    pub fn polyline<T: IntoIterator<Item = (Position, Rgba)>>(&mut self, points: T) {
+        self.graphics
+            .line
+            .points(self.layer, self.region, points, false);
+    }
+
+    /// Draws a polygon.
+    pub fn polygon<T: IntoIterator<Item = (Position, Rgba)>>(&mut self, points: T) {
+        self.graphics
+            .line
+            .points(self.layer, self.region, points, true);
+    }
+}

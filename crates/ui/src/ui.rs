@@ -10,7 +10,7 @@ use virus_editor::{
 };
 use virus_graphics::{
     text::{Context, Font, FontSize, Fonts, LineHeight},
-    wgpu::new::Graphics,
+    wgpu::Graphics,
 };
 use winit::window::Window;
 

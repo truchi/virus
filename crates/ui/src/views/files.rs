@@ -5,7 +5,7 @@ use virus_graphics::{
     text::{
         Context, FontFamilyKey, FontKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
     },
-    wgpu::new::Draw,
+    wgpu::Draw,
 };
 
 const MIN_WIDTH: f32 = 0.5;
