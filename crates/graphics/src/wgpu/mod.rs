@@ -165,6 +165,7 @@ impl Graphics {
         self.surface.configure(&self.device, &self.config);
         self.rectangle.resize(&self.device, &self.config);
         self.glyph.resize(&self.device, &self.config);
+        self.line.resize(&self.device, &self.config);
     }
 
     /// Returns the `Draw`ing API.
