@@ -126,7 +126,7 @@ impl Virus {
     fn new(window: Window) -> Self {
         let events = Events::new();
         let ui = Ui::new(Arc::new(window));
-        let mut document = Document::open(std::env::args().skip(1).next().unwrap()).unwrap();
+        let mut document = Document::open(&std::env::args().skip(1).next().unwrap()).unwrap();
         document.parse();
 
         // TODO
@@ -159,7 +159,7 @@ impl Virus {
             Key::Str("l") if self.events.command() => self.document.move_right(),
             Key::Str("I") if self.events.command() => self.ui.scroll_up(),
             Key::Str("K") if self.events.command() => self.ui.scroll_down(),
-            Key::Str("s") if self.events.command() => self.document.save().unwrap(),
+            // Key::Str("s") if self.events.command() => self.document.save().unwrap(),
             Key::Str(str) => self.document.edit_char(str.chars().next().unwrap()), // TODO edit_str
             Key::Tab => (),
             Key::Space => self.document.edit_char(' '),

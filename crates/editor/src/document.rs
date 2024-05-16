@@ -1,12 +1,12 @@
-use crate::{language::Language, rope::RopeExt, walk::Walk};
+use crate::{highlights::Highlights, rope::RopeExt, walk::Walk};
 use ropey::Rope;
-use std::{
-    fs::{File, OpenOptions},
-    io::{BufReader, BufWriter, Write},
-    ops::Range,
-};
+use std::{fs::File, io::BufReader, ops::Range, usize};
 use tree_sitter::{Node, Parser, Query, Tree};
 use virus_common::Cursor;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                            Selection                                           //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 #[derive(Copy, Clone, Debug)]
 pub enum Selection {
@@ -55,12 +55,12 @@ impl Selection {
 
     pub fn move_up(&self, document: &Document) -> Option<Self> {
         match *self {
-            Selection::Range { start, .. } => {
+            Self::Range { start, .. } => {
                 // TODO start != end?
                 let cursor = document.rope.grapheme_above(start);
                 Some(Self::range(cursor..cursor))
             }
-            Selection::Ast { start, end } => document
+            Self::Ast { start, end } => document
                 .find_node(start..end)
                 .map(|node| Cursor::from_node(Walk(node).prev_or_last_sibling().0))
                 .map(Selection::ast),
@@ -69,12 +69,12 @@ impl Selection {
 
     pub fn move_down(&self, document: &Document) -> Option<Self> {
         match *self {
-            Selection::Range { start, .. } => {
+            Self::Range { start, .. } => {
                 // TODO start != end?
                 let cursor = document.rope.grapheme_below(start);
-                Some(Selection::range(cursor..cursor))
+                Some(Self::range(cursor..cursor))
             }
-            Selection::Ast { start, end } => document
+            Self::Ast { start, end } => document
                 .find_node(start..end)
                 .map(|node| Cursor::from_node(Walk(node).next_or_first_sibling().0))
                 .map(Self::ast),
@@ -83,12 +83,12 @@ impl Selection {
 
     pub fn move_left(&self, document: &Document) -> Option<Self> {
         match *self {
-            Selection::Range { start, .. } => {
+            Self::Range { start, .. } => {
                 // TODO start != end?
                 let cursor = document.rope.prev_grapheme(start);
-                Some(Selection::range(cursor..cursor))
+                Some(Self::range(cursor..cursor))
             }
-            Selection::Ast { start, end } => document
+            Self::Ast { start, end } => document
                 .find_node(start..end)
                 .map(|node| Cursor::from_node(Walk(node).parent_or_node().0))
                 .map(Self::ast),
@@ -97,12 +97,12 @@ impl Selection {
 
     pub fn move_right(&self, document: &Document) -> Option<Self> {
         match *self {
-            Selection::Range { start, .. } => {
+            Self::Range { start, .. } => {
                 // TODO start != end?
                 let cursor = document.rope.next_grapheme(start);
-                Some(Selection::range(cursor..cursor))
+                Some(Self::range(cursor..cursor))
             }
-            Selection::Ast { start, end } => document
+            Self::Ast { start, end } => document
                 .find_node(start..end)
                 .map(|node| Cursor::from_node(Walk(node).first_child_or_node().0))
                 .map(Self::ast),
@@ -111,91 +111,57 @@ impl Selection {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                             Document                                           //
+//                                            Document                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Default)]
 pub struct Document {
-    path: Option<String>,
     rope: Rope,
     selection: Selection,
-    language: Option<Language>,
-    parser: Option<Parser>,
-    tree: Option<Tree>,
-    dirty: bool,
+    highlights: Query,
+    parser: Parser,
+    tree: Tree,
 }
 
 impl Document {
-    pub fn empty(language: Option<Language>) -> Self {
-        Self {
-            path: None,
-            rope: Default::default(),
-            selection: Default::default(),
-            language,
-            parser: language.map(|language| language.parser()).flatten(),
-            tree: None,
-            dirty: false,
+    // NOTE
+    // This function is convenient for now.
+    // We will need to deal with unsupported languages later.
+    pub fn open(path: &str) -> std::io::Result<Self> {
+        if !path.ends_with(".rs") {
+            panic!("File type not supported");
         }
-    }
 
-    pub fn open(path: String) -> std::io::Result<Self> {
-        let rope = Rope::from_reader(&mut BufReader::new(File::open(&path)?))?;
-        let (language, parser) = if let Ok(language) = Language::try_from(path.as_str()) {
-            (Some(language), language.parser())
-        } else {
-            (None, None)
-        };
+        const HIGHLIGHTS_QUERY: &str = include_str!("../treesitter/rust/highlights.scm");
+        let language = tree_sitter_rust::language();
+
+        let rope = Rope::from_reader(&mut BufReader::new(File::open(path)?))?;
+        let highlights =
+            Query::new(&language, HIGHLIGHTS_QUERY).expect("Cannot create highlights query");
+        let mut parser = Parser::new();
+        parser
+            .set_language(&language)
+            .expect("Cannot set parser's language");
+        let tree = Self::parse_with(&rope, &mut parser, None);
 
         Ok(Self {
-            path: Some(path),
             rope,
             selection: Default::default(),
-            language,
+            highlights,
             parser,
-            tree: None,
-            dirty: false,
+            tree,
         })
     }
 
-    pub fn save(&mut self) -> std::io::Result<()> {
-        if let Some(path) = self.path.as_ref() {
-            if self.dirty {
-                let mut writer =
-                    BufWriter::new(OpenOptions::new().write(true).truncate(true).open(path)?);
-
-                for chunk in self.rope.chunks() {
-                    writer.write(chunk.as_bytes())?;
-                }
-            }
-
-            self.dirty = false;
-        }
-
-        Ok(())
-    }
-
-    pub fn parse(&mut self) -> Option<&Tree> {
-        // TODO is_tree_dirty(/is_file_dirty)
-        if let Some(parser) = self.parser.as_mut() {
-            self.tree = parser.parse_with(
-                &mut |index, _| {
-                    let (chunk, chunk_index, ..) = self.rope.chunk_at_byte(index);
-                    &chunk[index - chunk_index..]
-                },
-                self.tree.as_ref(),
-            );
-        }
-
-        self.tree.as_ref()
+    /// Reparses the AST.
+    ///
+    /// Call this function after your edits to the document to update the AST.
+    pub fn parse(&mut self) {
+        Self::parse_with(&self.rope, &mut self.parser, Some(&self.tree));
     }
 }
 
 /// Getters.
 impl Document {
-    pub fn path(&self) -> Option<&str> {
-        self.path.as_ref().map(|path| path.as_str())
-    }
-
     pub fn rope(&self) -> &Rope {
         &self.rope
     }
@@ -208,51 +174,37 @@ impl Document {
         &mut self.selection
     }
 
-    pub fn language(&self) -> Option<Language> {
-        self.language
+    pub fn highlights(&self, lines: Range<usize>) -> Highlights {
+        Highlights::new(&self.rope, self.tree.root_node(), lines, &self.highlights)
     }
 
-    pub fn parser(&self) -> Option<&Parser> {
-        self.parser.as_ref()
-    }
-
-    pub fn tree(&self) -> Option<&Tree> {
-        self.tree.as_ref()
-    }
-
-    pub fn is_dirty(&self) -> bool {
-        self.dirty
-    }
-
-    pub fn query(&self, query: &str) -> Option<Query> {
-        self.language
-            .and_then(|language| language.language())
-            .and_then(|language| Query::new(&language, query).ok())
+    pub fn tree(&self) -> &Tree {
+        &self.tree
     }
 }
 
 /// Movements.
 impl Document {
     pub fn move_up(&mut self) {
-        if let Some(selection) = self.selection().move_up(self) {
+        if let Some(selection) = self.selection.move_up(self) {
             self.selection = selection;
         }
     }
 
     pub fn move_down(&mut self) {
-        if let Some(selection) = self.selection().move_down(self) {
+        if let Some(selection) = self.selection.move_down(self) {
             self.selection = selection;
         }
     }
 
     pub fn move_left(&mut self) {
-        if let Some(selection) = self.selection().move_left(self) {
+        if let Some(selection) = self.selection.move_left(self) {
             self.selection = selection;
         }
     }
 
     pub fn move_right(&mut self) {
-        if let Some(selection) = self.selection().move_right(self) {
+        if let Some(selection) = self.selection.move_right(self) {
             self.selection = selection;
         }
     }
@@ -271,12 +223,10 @@ impl Document {
         if start != end {
             let end_char = self.rope.byte_to_char(end);
             self.rope.remove(start_char..end_char);
-            self.dirty = true;
         }
 
         if !str.is_empty() {
             self.rope.insert(start_char, str);
-            self.dirty = true;
         }
     }
 
@@ -284,7 +234,6 @@ impl Document {
         let Range { start, end } = self.selection.to_range();
 
         self.rope.edit_char(start..end, char);
-        self.dirty = true;
 
         let cursor = self.rope.cursor_at_index(start.index + char.len_utf8());
         self.edit_tree(start, end, cursor);
@@ -303,7 +252,6 @@ impl Document {
         if start != end {
             self.rope
                 .remove(self.rope.byte_to_char(start.index)..self.rope.byte_to_char(end.index));
-            self.dirty = true;
 
             self.edit_tree(start, end, start);
             self.selection = Selection::range(start..start);
@@ -315,16 +263,28 @@ impl Document {
 
 /// Private.
 impl Document {
+    fn parse_with(rope: &Rope, parser: &mut Parser, tree: Option<&Tree>) -> Tree {
+        // TODO We could skip this if document is not "dirty"
+
+        parser
+            .parse_with(
+                &mut |index, _| {
+                    let (chunk, chunk_index, ..) = rope.chunk_at_byte(index);
+                    &chunk[index - chunk_index..]
+                },
+                tree,
+            )
+            .expect("Cannot parse")
+    }
+
     fn edit_tree(&mut self, start: Cursor, old_end: Cursor, new_end: Cursor) {
-        if let Some(tree) = &mut self.tree {
-            tree.edit(&Cursor::into_input_edit(start, old_end, new_end));
-        }
+        self.tree
+            .edit(&Cursor::into_input_edit(start, old_end, new_end));
     }
 
     fn find_node(&self, range: Range<Cursor>) -> Option<Node> {
         let mut node = self
             .tree
-            .as_ref()?
             .root_node()
             .descendant_for_point_range(range.start.into(), range.end.into())?;
 

@@ -3,7 +3,7 @@ use std::{borrow::Cow, ops::Range};
 use virus_common::{Cursor, Position, Rectangle, Rgb, Rgba};
 use virus_editor::{
     document::{Document, Selection},
-    highlights::{Highlight, Highlights},
+    highlights::Highlight,
     theme::Theme,
 };
 use virus_graphics::{
@@ -18,7 +18,6 @@ use virus_graphics::{
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct DocumentView {
-    query: String,
     family: FontFamilyKey,
     theme: Theme,
     font_size: FontSize,
@@ -30,14 +29,12 @@ pub struct DocumentView {
 
 impl DocumentView {
     pub fn new(
-        query: String,
         family: FontFamilyKey,
         theme: Theme,
         font_size: FontSize,
         line_height: LineHeight,
     ) -> Self {
         Self {
-            query,
             family,
             theme,
             font_size,
@@ -204,13 +201,7 @@ impl<'view, 'context, 'draw, 'graphics, 'document>
         self.view.rope = self.document.rope().clone();
 
         // Compute lines
-        let highlights = Highlights::new(
-            self.document.rope(),
-            self.document.tree().unwrap().root_node(),
-            start..end,
-            &self.document.query(&self.view.query).unwrap(),
-        );
-
+        let highlights = self.document.highlights(start..end);
         let mut shaper = Line::shaper(self.context, self.view.font_size);
         let mut prev_line = None;
 
@@ -241,8 +232,8 @@ impl<'view, 'context, 'draw, 'graphics, 'document>
             );
         }
 
-        // Last line
         if let Some(line) = prev_line {
+            // Last line
             self.view.lines.push((line, shaper.line()));
         }
     }

@@ -14,7 +14,6 @@ use virus_graphics::{
 };
 use winit::window::Window;
 
-const HIGHLIGHT_QUERY: &str = include_str!("../../editor/treesitter/rust/highlights.scm");
 const SCROLL_DURATION: Duration = Duration::from_millis(500);
 const SCROLL_TWEEN: Tween = Tween::ExpoOut;
 
@@ -41,13 +40,8 @@ impl Ui {
         let context = Context::new(fonts());
         let family = context.fonts().get("Victor").unwrap();
 
-        let document_view = DocumentView::new(
-            HIGHLIGHT_QUERY.into(),
-            family.key(),
-            Theme::dracula(),
-            FONT_SIZE,
-            LINE_HEIGHT,
-        );
+        let document_view =
+            DocumentView::new(family.key(), Theme::dracula(), FONT_SIZE, LINE_HEIGHT);
         let files_view = FilesView::new(family.key(), FONT_SIZE, LINE_HEIGHT, Rgba::BLACK);
 
         Self {
