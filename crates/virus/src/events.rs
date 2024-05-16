@@ -2,30 +2,36 @@
 
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
-    event::{
-        ElementState, Event as WinitEvent, KeyboardInput, ModifiersState, VirtualKeyCode,
-        WindowEvent,
-    },
+    event::{ElementState, KeyEvent, Modifiers, WindowEvent},
+    keyboard::{Key as LogicalKey, ModifiersKeyState, NamedKey},
     window::{Window, WindowId},
 };
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                               Key                                              //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+#[derive(Copy, Clone, Debug)]
+pub enum Key<'event> {
+    Str(&'event str),
+    Tab,
+    Space,
+    Backspace,
+    Enter,
+    Escape,
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                                Event                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 #[derive(Copy, Clone, Debug)]
-pub enum Event {
-    Char(char),
-    Pressed(VirtualKeyCode),
-    Released(VirtualKeyCode),
-    Resized(PhysicalSize<u32>),
-    Moved(PhysicalPosition<i32>),
-    Focused,
-    Unfocused,
+pub enum Event<'event> {
+    Key(Key<'event>),
+    Resized,
     Redraw,
     Close,
     Closed,
-    Quit,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -36,7 +42,7 @@ const DEBUG: bool = false;
 
 #[derive(Debug)]
 pub struct Events {
-    modifiers: ModifiersState,
+    modifiers: Modifiers,
 }
 
 impl Events {
@@ -46,121 +52,82 @@ impl Events {
         }
     }
 
-    pub fn modifiers(&self) -> ModifiersState {
-        self.modifiers
+    pub fn shift(&self) -> bool {
+        self.left_shift() || self.right_shift()
     }
 
-    pub fn update<T: std::fmt::Debug>(
-        &mut self,
-        winit_event: &WinitEvent<T>,
-        window: &Window,
-    ) -> Option<Event> {
-        if DEBUG {
-            match winit_event {
-                WinitEvent::NewEvents(_) => {
-                    println!(
-                        "======================================================================="
-                    );
-                }
-                _ => {}
-            }
-        }
+    pub fn alt(&self) -> bool {
+        self.left_alt() || self.right_alt()
+    }
 
-        let event = match winit_event {
-            WinitEvent::NewEvents(_) => None,
-            WinitEvent::WindowEvent { window_id, event } => {
-                if window.id() == *window_id {
-                    match event {
-                        WindowEvent::Resized(size) => Some(Event::Resized(*size)),
-                        WindowEvent::Moved(position) => Some(Event::Moved(*position)),
-                        WindowEvent::CloseRequested => Some(Event::Close),
-                        WindowEvent::Destroyed => Some(Event::Closed),
-                        WindowEvent::DroppedFile(_) => None,
-                        WindowEvent::HoveredFile(_) => None,
-                        WindowEvent::HoveredFileCancelled => None,
-                        WindowEvent::ReceivedCharacter(char) => Some(Event::Char(*char)),
-                        WindowEvent::Focused(true) => Some(Event::Focused),
-                        WindowEvent::Focused(false) => Some(Event::Unfocused),
-                        WindowEvent::KeyboardInput {
-                            input:
-                                KeyboardInput {
-                                    virtual_keycode: None,
-                                    ..
-                                },
-                            ..
-                        } => None,
-                        WindowEvent::KeyboardInput {
-                            input:
-                                KeyboardInput {
-                                    virtual_keycode: Some(keycode),
-                                    state: ElementState::Pressed,
-                                    ..
-                                },
-                            ..
-                        } => Some(Event::Pressed(*keycode)),
-                        WindowEvent::KeyboardInput {
-                            input:
-                                KeyboardInput {
-                                    virtual_keycode: Some(keycode),
-                                    state: ElementState::Released,
-                                    ..
-                                },
-                            ..
-                        } => Some(Event::Released(*keycode)),
-                        WindowEvent::ModifiersChanged(modifiers) => {
-                            self.modifiers = *modifiers;
-                            None
-                        }
-                        WindowEvent::Ime(_) => None,
-                        WindowEvent::CursorMoved { .. } => None,
-                        WindowEvent::CursorEntered { .. } => None,
-                        WindowEvent::CursorLeft { .. } => None,
-                        WindowEvent::MouseWheel { .. } => None,
-                        WindowEvent::MouseInput { .. } => None,
-                        WindowEvent::TouchpadMagnify { .. } => None,
-                        WindowEvent::SmartMagnify { .. } => None,
-                        WindowEvent::TouchpadRotate { .. } => None,
-                        WindowEvent::TouchpadPressure { .. } => None,
-                        WindowEvent::AxisMotion { .. } => None,
-                        WindowEvent::Touch(_) => None,
-                        WindowEvent::ScaleFactorChanged { .. } => None,
-                        WindowEvent::ThemeChanged(_) => None,
-                        WindowEvent::Occluded(_) => None,
-                    }
-                } else {
-                    None
-                }
-            }
-            WinitEvent::DeviceEvent { .. } => None,
-            WinitEvent::UserEvent(_) => None,
-            WinitEvent::Suspended => None,
-            WinitEvent::Resumed => None,
-            WinitEvent::MainEventsCleared => {
-                window.request_redraw();
+    pub fn control(&self) -> bool {
+        self.left_control() || self.right_control()
+    }
+
+    pub fn command(&self) -> bool {
+        self.left_command() || self.right_command()
+    }
+
+    pub fn update<'event>(&mut self, event: &'event WindowEvent) -> Option<Event<'event>> {
+        match event {
+            WindowEvent::Resized(_) => Some(Event::Resized),
+            WindowEvent::CloseRequested => Some(Event::Close),
+            WindowEvent::Destroyed => Some(Event::Closed),
+            WindowEvent::KeyboardInput {
+                event: KeyEvent {
+                    logical_key, state, ..
+                },
+                ..
+            } if *state == ElementState::Pressed => match logical_key.as_ref() {
+                LogicalKey::Named(NamedKey::Tab) => Some(Event::Key(Key::Tab)),
+                LogicalKey::Named(NamedKey::Space) => Some(Event::Key(Key::Space)),
+                LogicalKey::Named(NamedKey::Backspace) => Some(Event::Key(Key::Backspace)),
+                LogicalKey::Named(NamedKey::Enter) => Some(Event::Key(Key::Enter)),
+                LogicalKey::Named(NamedKey::Escape) => Some(Event::Key(Key::Escape)),
+                LogicalKey::Character(str) => Some(Event::Key(Key::Str(str))),
+                _ => None,
+            },
+            WindowEvent::ModifiersChanged(modifiers) => {
+                self.modifiers = *modifiers;
                 None
             }
-            WinitEvent::RedrawRequested(_) => Some(Event::Redraw),
-            WinitEvent::RedrawEventsCleared => None,
-            WinitEvent::LoopDestroyed => Some(Event::Quit),
-        };
-
-        if DEBUG {
-            if let Some(event) = event {
-                println!("\x1B[0;32m{event:#?}\x1B[0m");
-            } else {
-                println!("\x1B[0;31m{winit_event:#?}\x1B[0m");
-            }
-
-            match winit_event {
-                WinitEvent::RedrawEventsCleared => {
-                    println!(
-                        "======================================================================="
-                    );
-                }
-                _ => {}
-            }
+            WindowEvent::RedrawRequested => Some(Event::Redraw),
+            _ => None,
         }
+    }
+}
 
-        event
+/// Private.
+impl Events {
+    fn left_shift(&self) -> bool {
+        self.modifiers.lshift_state() == ModifiersKeyState::Pressed
+    }
+
+    fn right_shift(&self) -> bool {
+        self.modifiers.rshift_state() == ModifiersKeyState::Pressed
+    }
+
+    fn left_alt(&self) -> bool {
+        self.modifiers.lalt_state() == ModifiersKeyState::Pressed
+    }
+
+    fn right_alt(&self) -> bool {
+        self.modifiers.ralt_state() == ModifiersKeyState::Pressed
+    }
+
+    fn left_control(&self) -> bool {
+        self.modifiers.lcontrol_state() == ModifiersKeyState::Pressed
+    }
+
+    fn right_control(&self) -> bool {
+        self.modifiers.rcontrol_state() == ModifiersKeyState::Pressed
+    }
+
+    fn left_command(&self) -> bool {
+        self.modifiers.lsuper_state() == ModifiersKeyState::Pressed
+    }
+
+    fn right_command(&self) -> bool {
+        self.modifiers.rsuper_state() == ModifiersKeyState::Pressed
     }
 }

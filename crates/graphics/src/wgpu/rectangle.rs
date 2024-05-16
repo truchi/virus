@@ -77,6 +77,7 @@ impl<'a> Init<'a> {
             vertex: VertexState {
                 module: &module,
                 entry_point: "vertex",
+                compilation_options: Default::default(),
                 buffers: &[Instance::buffer_layout()],
             },
             primitive: PrimitiveState {
@@ -88,6 +89,7 @@ impl<'a> Init<'a> {
             fragment: Some(FragmentState {
                 module: &module,
                 entry_point: "fragment",
+                compilation_options: Default::default(),
                 targets: &[Some(ColorTargetState {
                     format: config.format,
                     blend: Some(BlendState::ALPHA_BLENDING),

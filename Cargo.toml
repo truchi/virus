@@ -13,18 +13,18 @@ virus-editor = { path = "crates/editor", package = "editor" }
 virus-graphics = { path = "crates/graphics", package = "graphics" }
 virus-ui = { path = "crates/ui", package = "ui" }
 
-swash = "0.1.6"
-winit = "0.28"
-tree-sitter = "0.20"
-tree-sitter-rust = "0.20"
-ropey = "1.6"
-unicode-segmentation = "1.10"
-unicode-width = "0.1"
-tween = "2.0.1"
-wgpu = "0.17"
+bytemuck = "1.16"
+image = { version = "0.25", default-features = false, features = ["png"] }
 pollster = "0.3"
-bytemuck = "1.13"
-image = { version = "0.24", default-features = false, features = ["png"] }
+ropey = "1.6"
+swash = "0.1"
+tree-sitter = "0.22"
+tree-sitter-rust = "0.21"
+tween = "2.0"
+unicode-segmentation = "1.11"
+unicode-width = "0.1"
+wgpu = "0.20"
+winit = "0.30"
 
 [profile.dev]
 # Remove debug stuff in the binary

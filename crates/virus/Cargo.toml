@@ -8,5 +8,4 @@ edition.workspace = true
 virus-common.workspace = true
 virus-editor.workspace = true
 virus-ui.workspace = true
-
 winit.workspace = true

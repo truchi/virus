@@ -6,5 +6,5 @@ mod virus;
 
 // 🦠: a 😍 editor in 🦀 with ❤️
 fn main() -> () {
-    virus::Virus::run("virus")
+    virus::Virus::run()
 }

@@ -5,6 +5,6 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
-tree-sitter.workspace = true
 bytemuck.workspace = true
+tree-sitter.workspace = true
 wgpu.workspace = true

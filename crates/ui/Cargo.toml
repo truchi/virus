@@ -5,11 +5,10 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
+ropey.workspace = true
+swash.workspace = true
+tween.workspace = true
 virus-common.workspace = true
 virus-editor.workspace = true
 virus-graphics.workspace = true
-
-ropey.workspace = true
-swash.workspace = true
 winit.workspace = true
-tween.workspace = true

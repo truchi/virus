@@ -68,9 +68,9 @@ impl FilesView {
 //                                            Renderer                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-struct Renderer<'a, 'b, 'c> {
-    context: &'a mut Context,
-    draw: &'b mut Draw<'c>,
+struct Renderer<'context, 'draw, 'graphics> {
+    context: &'context mut Context,
+    draw: &'draw mut Draw<'graphics>,
     background: Rgba,
     family: FontFamilyKey,
     font_size: FontSize,
@@ -82,10 +82,10 @@ struct Renderer<'a, 'b, 'c> {
     columns: u32,
 }
 
-impl<'a, 'b, 'c> Renderer<'a, 'b, 'c> {
+impl<'context, 'draw, 'graphics> Renderer<'context, 'draw, 'graphics> {
     fn new(
-        context: &'a mut Context,
-        draw: &'b mut Draw<'c>,
+        context: &'context mut Context,
+        draw: &'draw mut Draw<'graphics>,
         background: Rgba,
         family: FontFamilyKey,
         font_size: FontSize,

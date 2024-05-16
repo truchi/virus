@@ -226,10 +226,8 @@ impl Document {
 
     pub fn query(&self, query: &str) -> Option<Query> {
         self.language
-            .map(|language| language.language())
-            .flatten()
-            .map(|language| Query::new(language, query).ok())
-            .flatten()
+            .and_then(|language| language.language())
+            .and_then(|language| Query::new(&language, query).ok())
     }
 }
 

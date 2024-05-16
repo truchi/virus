@@ -2,7 +2,7 @@ use crate::{
     tween::{Tween, Tweened},
     views::{DocumentView, FilesView},
 };
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 use virus_common::{Rectangle, Rgba};
 use virus_editor::{
     document::{Document, Selection},
@@ -26,6 +26,7 @@ const LINE_HEIGHT: LineHeight = 20;
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct Ui {
+    window: Arc<Window>,
     graphics: Graphics,
     context: Context,
     document_view: DocumentView,
@@ -35,8 +36,8 @@ pub struct Ui {
 }
 
 impl Ui {
-    pub fn new(window: Window) -> Self {
-        let graphics = Graphics::new(window);
+    pub fn new(window: Arc<Window>) -> Self {
+        let graphics = Graphics::new(&window);
         let context = Context::new(fonts());
         let family = context.fonts().get("Victor").unwrap();
 
@@ -50,6 +51,7 @@ impl Ui {
         let files_view = FilesView::new(family.key(), FONT_SIZE, LINE_HEIGHT, Rgba::BLACK);
 
         Self {
+            window,
             graphics,
             context,
             document_view,
@@ -60,7 +62,7 @@ impl Ui {
     }
 
     pub fn window(&self) -> &Window {
-        self.graphics.window()
+        &self.window
     }
 
     pub fn is_animating(&self) -> bool {
@@ -98,7 +100,7 @@ impl Ui {
     }
 
     pub fn resize(&mut self) {
-        self.graphics.resize();
+        self.graphics.resize(&self.window);
     }
 
     pub fn update(&mut self, delta: Duration) {
@@ -126,11 +128,11 @@ impl Ui {
 /// Private.
 impl Ui {
     fn screen_height_in_lines(&self) -> u32 {
-        self.window().inner_size().height / self.document_view.line_height()
+        self.window.inner_size().height / self.document_view.line_height()
     }
 
     fn region(&self) -> Rectangle {
-        let size = self.window().inner_size();
+        let size = self.window.inner_size();
         let height = self.screen_height_in_lines() * self.document_view.line_height();
 
         Rectangle {

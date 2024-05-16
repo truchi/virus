@@ -84,11 +84,11 @@ fn pos(top: i32, left: i32) -> Position {
     Position { top, left }
 }
 
-struct Renderer<'a, 'b, 'c, 'd, 'e> {
-    view: &'a mut DocumentView,
-    context: &'b mut Context,
-    draw: &'c mut Draw<'d>,
-    document: &'e Document,
+struct Renderer<'view, 'context, 'draw, 'graphics, 'document> {
+    view: &'view mut DocumentView,
+    context: &'context mut Context,
+    draw: &'draw mut Draw<'graphics>,
+    document: &'document Document,
     scroll_top: u32,
     scrollbar_alpha: u8,
     start: usize,
@@ -98,7 +98,9 @@ struct Renderer<'a, 'b, 'c, 'd, 'e> {
     line_numbers_width: Advance,
 }
 
-impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
+impl<'view, 'context, 'draw, 'graphics, 'document>
+    Renderer<'view, 'context, 'draw, 'graphics, 'document>
+{
     const CARETS: [(i32, Rgba); 3] = [
         (0, Rgb::WHITE.transparent(255)),
         (1, Rgb::WHITE.transparent(255 / 8)),
@@ -112,10 +114,10 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
     const SCROLLBAR: Rgb = Rgb::WHITE;
 
     fn new(
-        view: &'a mut DocumentView,
-        context: &'b mut Context,
-        draw: &'c mut Draw<'d>,
-        document: &'e Document,
+        view: &'view mut DocumentView,
+        context: &'context mut Context,
+        draw: &'draw mut Draw<'graphics>,
+        document: &'document Document,
         scroll_top: u32,
         scrollbar_alpha: u8,
     ) -> Self {
@@ -154,7 +156,9 @@ impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
     }
 }
 
-impl<'a, 'b, 'c, 'd, 'e> Renderer<'a, 'b, 'c, 'd, 'e> {
+impl<'view, 'context, 'draw, 'graphics, 'document>
+    Renderer<'view, 'context, 'draw, 'graphics, 'document>
+{
     fn row(&self, cursor: Cursor) -> i32 {
         1 + cursor.line as i32 * self.view.line_height as i32 - self.scroll_top as i32
     }

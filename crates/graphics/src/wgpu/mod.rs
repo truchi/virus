@@ -14,6 +14,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     hash::Hash,
     ops::Range,
+    sync::Arc,
     time::Duration,
 };
 use swash::{
@@ -30,7 +31,7 @@ use wgpu::{
     LoadOp, Operations, Origin3d, PipelineLayout, PipelineLayoutDescriptor, PresentMode,
     PrimitiveState, PrimitiveTopology, PushConstantRange, Queue, RenderPass,
     RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
-    RequestAdapterOptions, SamplerBindingType, ShaderModule, ShaderStages, Surface,
+    RequestAdapterOptions, SamplerBindingType, ShaderModule, ShaderStages, StoreOp, Surface,
     SurfaceConfiguration, Texture, TextureAspect, TextureDescriptor, TextureDimension,
     TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDimension,
     VertexAttribute, VertexBufferLayout, VertexState, VertexStepMode,
@@ -68,8 +69,7 @@ impl Constants {
 
 /// WebGpu graphics.
 pub struct Graphics {
-    window: Window,   // Window and Surface MUST live as long as one another
-    surface: Surface, // That's why they are both here, to make sure its safe
+    surface: Surface<'static>,
     config: SurfaceConfiguration,
     device: Device,
     queue: Queue,
@@ -80,16 +80,14 @@ pub struct Graphics {
 
 impl Graphics {
     /// Creates a new `Graphics`.
-    pub fn new(window: Window) -> Self {
+    pub fn new(window: &Arc<Window>) -> Self {
         // WGPU instance
         let instance = Instance::new(Default::default());
 
         // Surface (window/canvas)
-        //
-        // SAFETY:
-        // The surface needs to live as long as the window that created it.
-        // State owns the window so this should be safe.
-        let surface = unsafe { instance.create_surface(&window) }.unwrap();
+        let surface = instance
+            .create_surface(Arc::clone(window))
+            .expect("Cannot create surface");
 
         // Request adapter (device handle), device (gpu connection) and queue (handle to command queue)
         let adapter = pollster::block_on(instance.request_adapter(&RequestAdapterOptions {
@@ -100,8 +98,8 @@ impl Graphics {
         let (device, queue) = pollster::block_on(adapter.request_device(
             &DeviceDescriptor {
                 label: Some("Device descriptor"),
-                features: Features::PUSH_CONSTANTS,
-                limits: Limits {
+                required_features: Features::PUSH_CONSTANTS,
+                required_limits: Limits {
                     max_push_constant_size: 128,
                     ..Default::default()
                 },
@@ -120,6 +118,7 @@ impl Graphics {
                 width: size.width,
                 height: size.height,
                 present_mode: PresentMode::Fifo,
+                desired_maximum_frame_latency: 2,
                 alpha_mode: CompositeAlphaMode::Auto,
                 view_formats: vec![],
             }
@@ -132,7 +131,6 @@ impl Graphics {
         let line = LinePipeline::new(&device, &config);
 
         Self {
-            window,
             surface,
             config,
             device,
@@ -143,22 +141,9 @@ impl Graphics {
         }
     }
 
-    /// Returns the `Window`.
-    pub fn window(&self) -> &Window {
-        &self.window
-    }
-
-    /// Returns the size of the window/surface.
-    pub fn size(&self) -> Size {
-        Size {
-            width: self.config.width,
-            height: self.config.height,
-        }
-    }
-
     /// Resizes the surface to the window's logical size.
-    pub fn resize(&mut self) {
-        let size = self.window.inner_size();
+    pub fn resize(&mut self, window: &Window) {
+        let size = window.inner_size();
         self.config.width = size.width;
         self.config.height = size.height;
 
@@ -196,10 +181,12 @@ impl Graphics {
                 resolve_target: None,
                 ops: Operations {
                     load: LoadOp::Clear(Color::BLACK),
-                    store: true,
+                    store: StoreOp::Store,
                 },
             })],
             depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
         });
         self.rectangle.render(0, &self.queue, &mut render_pass);
         self.glyph.render(0, &self.queue, &mut render_pass);
@@ -222,13 +209,13 @@ impl Graphics {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// A drawing API for [`Graphics`].
-pub struct Draw<'a> {
-    graphics: &'a mut Graphics,
+pub struct Draw<'graphics> {
+    graphics: &'graphics mut Graphics,
     layer: u32,
     region: Rectangle,
 }
 
-impl<'a> Draw<'a> {
+impl<'graphics> Draw<'graphics> {
     /// Returns the current region.
     pub fn region(&self) -> Rectangle {
         self.region
@@ -237,15 +224,6 @@ impl<'a> Draw<'a> {
     /// Returns the current layer.
     pub fn layer(&self) -> u32 {
         self.layer
-    }
-
-    /// Further restricts the current region.
-    pub fn draw(&mut self, region: Rectangle) -> Option<Draw> {
-        self.region.region(region).map(|region| Draw {
-            graphics: self.graphics,
-            layer: self.layer,
-            region,
-        })
     }
 
     /// Draws a rectange.

@@ -5,11 +5,10 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
-virus-common.workspace = true
-virus-graphics.workspace = true
-
-tree-sitter.workspace = true
-tree-sitter-rust.workspace = true
 ropey.workspace = true
+tree-sitter-rust.workspace = true
+tree-sitter.workspace = true
 unicode-segmentation.workspace = true
 unicode-width.workspace = true
+virus-common.workspace = true
+virus-graphics.workspace = true

@@ -35,7 +35,7 @@ impl Language {
     pub fn parser(&self) -> Option<Parser> {
         self.language().map(|language| {
             let mut parser = Parser::new();
-            parser.set_language(language).unwrap();
+            parser.set_language(&language).unwrap();
             parser
         })
     }
