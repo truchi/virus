@@ -180,7 +180,22 @@ impl Graphics {
                 view: &output_texture,
                 resolve_target: None,
                 ops: Operations {
-                    load: LoadOp::Clear(Color::BLACK),
+                    load: LoadOp::Clear({
+                        // Catppuccin latte
+                        let base = Color {
+                            r: 0.937,
+                            g: 0.945,
+                            b: 0.960,
+                            a: 1.0,
+                        };
+                        let crust = Color {
+                            r: 0.862,
+                            g: 0.878,
+                            b: 0.909,
+                            a: 1.0,
+                        };
+                        crust
+                    }),
                     store: StoreOp::Store,
                 },
             })],

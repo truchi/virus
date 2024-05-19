@@ -57,7 +57,7 @@ pub type GlyphKey = (FontKey, FontSize, GlyphId);
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// [`Glyph`] styles.
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
 pub struct Styles {
     pub weight: FontWeight,
     pub style: FontStyle,

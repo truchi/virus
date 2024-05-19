@@ -157,79 +157,101 @@ impl Theme {
         &self.default
     }
 
-    /// Stupid shit for tests!
-    pub fn dracula() -> Self {
+    /// https://github.com/catppuccin/helix/blob/main/themes/default/catppuccin_latte.toml
+    pub fn catppuccin_latte() -> Self {
         use virus_graphics::text::{
             FontStyle::{self, *},
             FontWeight::{self, *},
         };
 
-        fn style(r: u8, g: u8, b: u8, weight: FontWeight, style: FontStyle) -> Styles {
+        fn style(color: &str, weight: FontWeight, style: FontStyle) -> Styles {
+            let (r, g, b) = (
+                u8::from_str_radix(&color[1..3], 16).unwrap(),
+                u8::from_str_radix(&color[3..5], 16).unwrap(),
+                u8::from_str_radix(&color[5..7], 16).unwrap(),
+            );
+
             Styles {
                 weight,
                 style,
                 underline: Default::default(),
                 strike: Default::default(),
                 foreground: Rgba::new(r, g, b, u8::MAX),
-                background: Rgba::new(255 - r, 255 - g, 255 - b, 50),
+                background: Default::default(),
             }
         }
 
-        let _background = style(40, 42, 54, Regular, Normal);
-        let _current = style(68, 71, 90, Regular, Normal);
-        let foreground = style(248, 248, 242, Regular, Normal);
-        let comment = style(98, 114, 164, Regular, Italic);
-        let cyan = style(139, 233, 253, Bold, Normal);
-        let green = style(80, 250, 123, Bold, Normal);
-        let orange = style(255, 184, 108, Regular, Normal);
-        let pink = style(255, 121, 198, Regular, Oblique);
-        let purple = style(189, 147, 249, Regular, Normal);
-        let red = style(255, 85, 85, Regular, Normal);
-        let yellow = style(241, 250, 140, Regular, Normal);
+        let _rosewater = "#dc8a78";
+        let _flamingo = "#dd7878";
+        let pink = "#ea76cb";
+        let mauve = "#8839ef";
+        let red = "#d20f39";
+        let maroon = "#e64553";
+        let peach = "#fe640b";
+        let yellow = "#df8e1d";
+        let green = "#40a02b";
+        let teal = "#179299";
+        let sky = "#04a5e5";
+        let sapphire = "#209fb5";
+        let blue = "#1e66f5";
+        let _lavender = "#7287fd";
+        let text = "#4c4f69";
+        let _subtext1 = "#5c5f77";
+        let _subtext0 = "#6c6f85";
+        let overlay2 = "#7c7f93";
+        let _overlay1 = "#8c8fa1";
+        let _overlay0 = "#9ca0b0";
+        let _surface2 = "#acb0be";
+        let _surface1 = "#bcc0cc";
+        let _surface0 = "#ccd0da";
+        let _base = "#eff1f5";
+        let _mantle = "#e6e9ef";
+        let _crust = "#dce0e8";
+        let regular = Black;
 
-        Theme {
-            default: style(255, 255, 255, Regular, Normal),
-            attribute: green,
-            comment,
-            constant: green,
-            constant_builtin_boolean: purple,
-            constant_character: purple,
-            constant_character_escape: purple,
-            constant_numeric_float: purple,
-            constant_numeric_integer: purple,
-            constructor: foreground,
-            function: pink,
-            function_macro: pink,
-            function_method: pink,
-            keyword: red,
-            keyword_control: red,
-            keyword_control_conditional: red,
-            keyword_control_import: red,
-            keyword_control_repeat: red,
-            keyword_control_return: red,
-            keyword_function: red,
-            keyword_operator: red,
-            keyword_special: red,
-            keyword_storage: red,
-            keyword_storage_modifier: red,
-            keyword_storage_modifier_mut: red,
-            keyword_storage_modifier_ref: red,
-            keyword_storage_type: red,
-            label: foreground,
-            namespace: foreground,
-            operator: foreground,
-            punctuation_bracket: yellow,
-            punctuation_delimiter: yellow,
-            special: yellow,
-            string: cyan,
-            r#type: cyan,
-            type_builtin: cyan,
-            type_enum_variant: cyan,
-            type_parameter: cyan,
-            variable: orange,
-            variable_builtin: orange,
-            variable_other_member: orange,
-            variable_parameter: orange,
+        Self {
+            default: style(text, regular, Normal),
+            attribute: style(yellow, regular, Normal),
+            comment: style(overlay2, regular, Italic),
+            constant: style(peach, regular, Normal),
+            constant_builtin_boolean: style(pink, regular, Normal),
+            constant_character: style(teal, regular, Normal),
+            constant_character_escape: style(pink, regular, Normal),
+            constant_numeric_float: style(pink, regular, Normal),
+            constant_numeric_integer: style(pink, regular, Normal),
+            constructor: style(sapphire, regular, Normal),
+            function: style(blue, regular, Normal),
+            function_macro: style(mauve, regular, Normal),
+            function_method: style(mauve, regular, Normal),
+            keyword: style(mauve, regular, Normal),
+            keyword_control: style(mauve, regular, Normal),
+            keyword_control_conditional: style(mauve, regular, Normal),
+            keyword_control_import: style(mauve, regular, Normal),
+            keyword_control_repeat: style(mauve, regular, Normal),
+            keyword_control_return: style(mauve, regular, Normal),
+            keyword_function: style(mauve, regular, Normal),
+            keyword_operator: style(mauve, regular, Normal),
+            keyword_special: style(mauve, regular, Normal),
+            keyword_storage: style(mauve, regular, Normal),
+            keyword_storage_modifier: style(mauve, regular, Normal),
+            keyword_storage_modifier_mut: style(mauve, regular, Normal),
+            keyword_storage_modifier_ref: style(mauve, regular, Normal),
+            keyword_storage_type: style(mauve, regular, Normal),
+            label: style(sapphire, regular, Normal),
+            namespace: style(yellow, regular, Normal),
+            operator: style(sky, regular, Normal),
+            punctuation_bracket: style(overlay2, regular, Normal),
+            punctuation_delimiter: style(sky, regular, Normal),
+            special: style(blue, regular, Normal),
+            string: style(green, regular, Normal),
+            r#type: style(yellow, regular, Normal),
+            type_builtin: style(yellow, regular, Normal),
+            type_enum_variant: style(teal, regular, Normal),
+            type_parameter: style(yellow, regular, Normal),
+            variable: style(text, regular, Normal),
+            variable_builtin: style(red, regular, Normal),
+            variable_other_member: style(teal, regular, Normal),
+            variable_parameter: style(maroon, regular, Normal),
         }
     }
 }

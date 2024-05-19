@@ -77,6 +77,13 @@ impl DocumentView {
 //                                            Renderer                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+// Catppuccin latte
+const SURFACE1: Rgb = Rgb {
+    r: 188,
+    g: 192,
+    b: 204,
+};
+
 fn pos(top: i32, left: i32) -> Position {
     Position { top, left }
 }
@@ -99,16 +106,16 @@ impl<'view, 'context, 'draw, 'graphics, 'document>
     Renderer<'view, 'context, 'draw, 'graphics, 'document>
 {
     const CARETS: [(i32, Rgba); 3] = [
-        (0, Rgb::WHITE.transparent(255)),
-        (1, Rgb::WHITE.transparent(255 / 8)),
-        (2, Rgb::WHITE.transparent(255 / 32)),
+        (0, SURFACE1.transparent(255)),
+        (1, SURFACE1.transparent(255 / 8)),
+        (2, SURFACE1.transparent(255 / 32)),
     ];
     const OUTLINES: [(i32, Rgba); 3] = [
-        (0, Rgb::WHITE.transparent(255 / 16)),
-        (1, Rgb::WHITE.transparent(255 / 32)),
-        (2, Rgb::WHITE.transparent(255 / 64)),
+        (0, SURFACE1.transparent(255 / 16)),
+        (1, SURFACE1.transparent(255 / 32)),
+        (2, SURFACE1.transparent(255 / 64)),
     ];
-    const SCROLLBAR: Rgb = Rgb::WHITE;
+    const SCROLLBAR: Rgb = SURFACE1;
 
     fn new(
         view: &'view mut DocumentView,
@@ -408,7 +415,7 @@ impl<'view, 'context, 'draw, 'graphics, 'document>
         const STYLES: Styles = Styles {
             weight: FontWeight::Regular,
             style: FontStyle::Normal,
-            foreground: Rgba::WHITE,
+            foreground: SURFACE1.transparent(255),
             background: Rgba::TRANSPARENT,
             underline: false,
             strike: false,

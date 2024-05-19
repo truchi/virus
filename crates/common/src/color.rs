@@ -5,7 +5,7 @@ use crate::muck;
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// An `RGB` color.
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
+#[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
 pub struct Rgb {
     pub r: u8,
     pub g: u8,
@@ -41,7 +41,7 @@ muck!(unsafe Rgba => Uint8x4);
 
 /// An `RGBA` color.
 #[repr(C)]
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
+#[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
 pub struct Rgba {
     pub r: u8,
     pub g: u8,
