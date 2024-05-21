@@ -30,7 +30,10 @@ impl ApplicationHandler for Handler {
 
         let window = event_loop
             .create_window(
-                Window::default_attributes().with_title(Virus::TITLE), // .with_fullscreen(Some(Fullscreen::Borderless(None))),
+                Window::default_attributes()
+                    .with_title(Virus::TITLE)
+                    // .with_fullscreen(Some(Fullscreen::Borderless(None)))
+                    .with_decorations(false),
             )
             .expect("Cannot create window");
         window.set_cursor_visible(false);
@@ -61,39 +64,6 @@ impl ApplicationHandler for Handler {
             Event::Close => virus.on_close(),
             Event::Closed => virus.on_closed(),
         }
-    }
-
-    fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: winit::event::StartCause) {
-        println!("vvvvvvvvvvvvvvvvvvvvvvvv");
-    }
-
-    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: ()) {
-        println!("user events");
-    }
-
-    fn device_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        device_id: winit::event::DeviceId,
-        event: winit::event::DeviceEvent,
-    ) {
-        println!("device events");
-    }
-
-    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        println!("^^^^^^^^^^^^^^^^^^^^^^^^");
-    }
-
-    fn suspended(&mut self, event_loop: &ActiveEventLoop) {
-        println!("suspended");
-    }
-
-    fn exiting(&mut self, event_loop: &ActiveEventLoop) {
-        println!("exiting");
-    }
-
-    fn memory_warning(&mut self, event_loop: &ActiveEventLoop) {
-        println!("memory warning");
     }
 }
 

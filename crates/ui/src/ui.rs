@@ -14,8 +14,8 @@ use winit::window::Window;
 const SCROLL_DURATION: Duration = Duration::from_millis(500);
 const SCROLL_TWEEN: Tween = Tween::ExpoOut;
 
-const FONT_SIZE: FontSize = 16;
-const LINE_HEIGHT: LineHeight = 20;
+const FONT_SIZE: FontSize = 24;
+const LINE_HEIGHT: LineHeight = 30;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                                 Ui                                             //
