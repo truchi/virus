@@ -129,7 +129,12 @@ impl<'view, 'context, 'draw, 'graphics, 'document>
             .get((view.family, FontWeight::Regular, FontStyle::Normal))
             .unwrap()
             .advance_for_size(view.font_size);
-        let line_numbers_width = advance * (rope_lines.ilog10() + 3) as Advance;
+        let line_numbers_width = advance
+            * if rope_lines == 0 {
+                1.0
+            } else {
+                (rope_lines.ilog10() + 3) as Advance
+            };
 
         Self {
             view,
