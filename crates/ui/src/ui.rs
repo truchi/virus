@@ -2,12 +2,9 @@ use crate::{
     tween::{Tween, Tweened},
     views::{DocumentView, FilesView},
 };
-use std::{sync::Arc, time::Duration};
-use virus_common::{Rectangle, Rgba};
-use virus_editor::{
-    document::{Document, Selection},
-    theme::Theme,
-};
+use std::{ops::Range, sync::Arc, time::Duration};
+use virus_common::{Cursor, Rectangle, Rgba};
+use virus_editor::{document::Document, theme::Theme};
 use virus_graphics::{
     text::{Context, Font, FontSize, FontStyle, FontWeight, Fonts, LineHeight},
     wgpu::Graphics,
@@ -83,10 +80,10 @@ impl Ui {
         }
     }
 
-    pub fn ensure_selection_is_visible(&mut self, selection: &Selection) {
+    pub fn ensure_visibility(&mut self, selection: Range<Cursor>) {
         let line_height = self.document_view.line_height();
         let screen_height_in_lines = self.screen_height_in_lines();
-        let line = selection.to_range().start.line as u32;
+        let line = selection.start.line as u32;
         let start = self.scroll_top.end() / line_height;
         let end = start + screen_height_in_lines;
 

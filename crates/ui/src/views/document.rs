@@ -1,11 +1,7 @@
 use ropey::Rope;
 use std::{borrow::Cow, ops::Range};
 use virus_common::{Cursor, Position, Rectangle, Rgb, Rgba};
-use virus_editor::{
-    document::{Document, Selection},
-    highlights::Highlight,
-    theme::Theme,
-};
+use virus_editor::{document::Document, highlights::Highlight, theme::Theme};
 use virus_graphics::{
     text::{
         Advance, Context, FontFamilyKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
@@ -154,8 +150,7 @@ impl<'view, 'context, 'draw, 'graphics, 'document>
         self.highlights();
         self.render_line_numbers();
         self.render_document();
-        self.render_selection(self.document.selection().to_range());
-        self.render_ast_helpers();
+        self.render_selection(self.document.selection());
         self.render_scrollbar();
     }
 }
@@ -403,80 +398,6 @@ impl<'view, 'context, 'draw, 'graphics, 'document>
                     (pos(bottom2 - i, 0), color),
                 ]);
             }
-        }
-    }
-
-    fn render_ast_helpers(&mut self) {
-        const UP_DOWN: &str = "↕";
-        const UP: &str = "↑";
-        const DOWN: &str = "↓";
-        const LEFT: &str = "←";
-        const RIGHT: &str = "→";
-        const STYLES: Styles = Styles {
-            weight: FontWeight::Regular,
-            style: FontStyle::Normal,
-            foreground: SURFACE1.transparent(255),
-            background: Rgba::TRANSPARENT,
-            underline: false,
-            strike: false,
-        };
-
-        let range = match self.document.selection().as_ast() {
-            Some(range) => range,
-            None => return,
-        };
-        let [up, down, left, right] = std::array::from_fn(|i| {
-            [
-                Selection::move_up,
-                Selection::move_down,
-                Selection::move_left,
-                Selection::move_right,
-            ][i](self.document.selection(), self.document)
-            .and_then(|selection| selection.as_ast())
-            .filter(|selection| *selection != range)
-            .map(|range| range.start)
-        });
-
-        fn draw(renderer: &mut Renderer, cursor: Cursor, str: &str) {
-            let line = {
-                let mut shaper = Line::shaper(renderer.context, renderer.view.font_size);
-                shaper.push(&str, renderer.view.family, STYLES);
-                shaper.line()
-            };
-            let top = renderer.row(cursor);
-            let left = renderer.column(cursor)
-                - (str == LEFT)
-                    .then(|| line.glyphs().first())
-                    .flatten()
-                    .map(|glyph| glyph.advance as i32)
-                    .unwrap_or_default();
-
-            renderer
-                .draw
-                .glyphs(renderer.context, Position { top, left }, &line, 0);
-        }
-
-        match (up, down) {
-            (Some(up), Some(down)) if up == down => {
-                draw(self, up, UP_DOWN);
-            }
-            _ => {
-                if let Some(cursor) = up {
-                    draw(self, cursor, UP);
-                }
-
-                if let Some(cursor) = down {
-                    draw(self, cursor, DOWN);
-                }
-            }
-        }
-
-        if let Some(cursor) = left {
-            draw(self, cursor, LEFT);
-        }
-
-        if let Some(cursor) = right {
-            draw(self, cursor, RIGHT);
         }
     }
 

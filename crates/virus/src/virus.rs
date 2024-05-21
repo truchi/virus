@@ -3,7 +3,7 @@
 use crate::events::{Event, Events, Key};
 use std::{sync::Arc, time::Instant};
 use virus_common::Cursor;
-use virus_editor::document::{Document, Selection};
+use virus_editor::document::Document;
 use virus_ui::ui::Ui;
 use winit::{
     application::ApplicationHandler,
@@ -14,7 +14,7 @@ use winit::{
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                             Handler                                            //
+//                                            Handler                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 enum Handler {
@@ -98,12 +98,18 @@ impl ApplicationHandler for Handler {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                              Virus                                             //
+//                                             Virus                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+enum Mode {
+    Normal,
+    Insert,
+}
 
 pub struct Virus {
     events: Events,
     document: Document,
+    mode: Mode,
     ui: Ui,
     last_render: Option<Instant>,
 }
@@ -129,12 +135,10 @@ impl Virus {
         let mut document = Document::open(&std::env::args().skip(1).next().unwrap()).unwrap();
         document.parse();
 
-        // TODO
-        *document.selection_mut() = Selection::ast(Cursor::default()..Cursor::default());
-
         Self {
             events,
             document,
+            mode: Mode::Normal,
             ui,
             last_render: None,
         }
@@ -144,28 +148,32 @@ impl Virus {
 /// Event handlers.
 impl Virus {
     fn on_key(&mut self, key: Key, event_loop: &ActiveEventLoop) {
-        match key {
-            Key::Str("i") if self.events.command() => {
-                self.document.move_up();
-                self.ui
-                    .ensure_selection_is_visible(self.document.selection());
-            }
-            Key::Str("k") if self.events.command() => {
-                self.document.move_down();
-                self.ui
-                    .ensure_selection_is_visible(self.document.selection());
-            }
-            Key::Str("j") if self.events.command() => self.document.move_left(),
-            Key::Str("l") if self.events.command() => self.document.move_right(),
-            Key::Str("I") if self.events.command() => self.ui.scroll_up(),
-            Key::Str("K") if self.events.command() => self.ui.scroll_down(),
-            // Key::Str("s") if self.events.command() => self.document.save().unwrap(),
-            Key::Str(str) => self.document.edit_char(str.chars().next().unwrap()), // TODO edit_str
-            Key::Tab => (),
-            Key::Space => self.document.edit_char(' '),
-            Key::Backspace => self.document.backspace().unwrap(),
-            Key::Enter => self.document.edit_char('\n'),
-            Key::Escape => event_loop.exit(),
+        match self.mode {
+            Mode::Normal => match key {
+                Key::Str("i") => {
+                    self.document.move_up();
+                    self.ui.ensure_visibility(self.document.selection());
+                }
+                Key::Str("k") => {
+                    self.document.move_down();
+                    self.ui.ensure_visibility(self.document.selection());
+                }
+                Key::Str("j") => self.document.move_left(),
+                Key::Str("l") => self.document.move_right(),
+                Key::Str("y") => self.ui.scroll_up(),
+                Key::Str("h") => self.ui.scroll_down(),
+                // Key::Str("s") if self.events.command() => self.document.save().unwrap(),
+                Key::Escape => event_loop.exit(),
+                _ => (),
+            },
+            Mode::Insert => match key {
+                Key::Str(str) => self.document.edit(str),
+                Key::Space => self.document.edit(" "),
+                Key::Backspace => self.document.backspace().unwrap(),
+                Key::Enter => self.document.edit("\n"),
+                Key::Escape => self.mode = Mode::Normal,
+                _ => (),
+            },
         }
 
         // TODO handle that better
