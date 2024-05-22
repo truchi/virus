@@ -103,6 +103,24 @@ impl Document {
         let cursor = self.rope.grapheme().after(self.selection.start);
         self.selection = cursor..cursor;
     }
+
+    pub fn move_prev_word(&mut self) {
+        // TODO start != end?
+        let cursor = self.rope.word().before(self.selection.start);
+        self.selection = cursor..cursor;
+    }
+
+    pub fn move_next_start_of_word(&mut self) {
+        // TODO start != end?
+        let cursor = self.rope.word().next_start(self.selection.start);
+        self.selection = cursor..cursor;
+    }
+
+    pub fn move_next_end_of_word(&mut self) {
+        // TODO start != end?
+        let cursor = self.rope.word().next_end(self.selection.start);
+        self.selection = cursor..cursor;
+    }
 }
 
 /// Edition.
