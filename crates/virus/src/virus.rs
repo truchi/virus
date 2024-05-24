@@ -1,5 +1,6 @@
 //! 🦠: a 😍 editor in 🦀 with ❤️
 // Hello! -- the-world - _ hello- _ ____world - the----w __ salut HTTPProxyOfTheDeath23MORE123
+// hello {((((world))))}, salut
 
 use crate::events::{Event, Events, Key};
 use std::{sync::Arc, time::Instant};
@@ -135,8 +136,8 @@ impl Virus {
                     self.document.move_next_start_of_word();
                     self.ui.ensure_visibility(self.document.selection());
                 }
-                Key::Str("e") => {
-                    self.document.move_next_end_of_word();
+                Key::Str("W") => {
+                    self.document.move_prev_start_of_word();
                     self.ui.ensure_visibility(self.document.selection());
                 }
                 Key::Str("y") => self.ui.scroll_up(),

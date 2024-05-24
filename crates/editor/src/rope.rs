@@ -180,44 +180,53 @@ impl<'rope> RopeExtGraphemeProxy<'rope> {
 pub struct RopeExtWordProxy<'rope>(&'rope Rope);
 
 impl<'rope> RopeExtWordProxy<'rope> {
-    pub fn before(&self, cursor: Cursor) -> Cursor {
-        todo!()
-    }
+    pub fn prev_start(&self, cursor: Cursor) -> Cursor {
+        let mut chars = self.chars_at_rtl(cursor.index).peekable();
 
-    pub fn next_start(&self, cursor: Cursor) -> Cursor {
-        self.next(cursor, false)
-    }
+        // while let Some((index, char)) = chars.next() {
+        //     // if Self::is_word(char) {
+        //     //     break;
+        //     // }
 
-    pub fn next_end(&self, cursor: Cursor) -> Cursor {
-        self.next(cursor, true)
-    }
+        //     // if Self::is_special(char) {
+        //     //     while let Some(_) = chars.next_if(|(_, char)| Self::is_special(*char)) {}
 
-    fn next(&self, cursor: Cursor, end: bool) -> Cursor {
-        let mut chars = self.chars_at(cursor.index).peekable();
+        //     //     if chars.peek().map(|(_, char)| Self::is_word(*char)) == Some(true) {
+        //     //         return self.0.cursor().index(index);
+        //     //     };
+        //     // } else if Self::is_word(char) {
+        //     //     return self.0.cursor().index(index);
+        //     // }
+        // }
+
+        while let Some(_) = chars.next_if(|(_, char)| !Self::is_word(*char)) {}
 
         while let Some(_) =
             chars.next_if(|(_, char)| Self::is_word(*char) || Self::is_special(*char))
         {}
 
-        // FIXME
-        if end {
-            if let Some((index, _)) = chars.next() {
-                if cursor.index != index {
-                    return self.0.cursor().index(index);
-                }
-            }
+        if let Some((index, _)) = chars.next() {
+            self.0.cursor().index(index)
+        } else {
+            self.0.cursor().start()
         }
+    }
+
+    pub fn next_start(&self, cursor: Cursor) -> Cursor {
+        let mut chars = self.chars_at_ltr(cursor.index).peekable();
+
+        while let Some(_) =
+            chars.next_if(|(_, char)| Self::is_word(*char) || Self::is_special(*char))
+        {}
 
         while let Some((index, char)) = chars.next() {
-            dbg!((index, char));
             if Self::is_special(char) {
                 while let Some(_) = chars.next_if(|(_, char)| Self::is_special(*char)) {}
 
                 if chars.peek().map(|(_, char)| Self::is_word(*char)) == Some(true) {
                     return self.0.cursor().index(index);
-                };
+                }
             } else if Self::is_word(char) {
-                println!("Word");
                 return self.0.cursor().index(index);
             }
         }
@@ -225,167 +234,25 @@ impl<'rope> RopeExtWordProxy<'rope> {
         self.0.cursor().end()
     }
 
-    pub fn test_next(&self, cursor: Cursor) -> Cursor {
-        use Class::*;
+    fn chars_at_ltr(&self, index: usize) -> impl '_ + Iterator<Item = (usize, char)> {
+        self.0
+            .chars_at(self.0.byte_to_char(index))
+            .scan(index, |index, char| {
+                let i = *index;
+                *index += char.len_utf8();
 
-        #[derive(PartialEq)]
-        enum Class {
-            Whitespace,
-            Punctuation(char),
-            Numeric,
-            Lowercase,
-            Uppercase,
-        }
-
-        impl From<char> for Class {
-            fn from(char: char) -> Self {
-                if char.is_whitespace() {
-                    Self::Whitespace
-                } else if char.is_ascii_punctuation() {
-                    Self::Punctuation(char)
-                } else if char.is_numeric() {
-                    Self::Numeric
-                } else if char.is_uppercase() {
-                    Self::Uppercase
-                } else {
-                    Self::Lowercase
-                }
-            }
-        }
-
-        let mut chars = self
-            .chars_at(cursor.index)
-            .map(|(i, char)| (i, Class::from(char)))
-            .peekable();
-        let mut initial = if let Some((_, char)) = chars.next() {
-            Class::from(char)
-        } else {
-            return cursor;
-        };
-
-        // Cursor before an uppercase is a special case
-        if initial == Uppercase {
-            match chars.peek() {
-                // Followed by uppercases then lowercase,
-                // return the index before the last uppercase
-                Some((_, Uppercase)) => {
-                    let prev = std::iter::from_fn(|| chars.next_if(|(_, class)| *class == initial))
-                        .last()
-                        .expect("Just peeked it")
-                        .0;
-
-                    if matches!(chars.peek(), Some((_, Lowercase))) {
-                        return self.0.cursor().index(prev);
-                    }
-                }
-                // Followed by a lowercase, pretend it was lowercase
-                Some((_, Lowercase)) => initial = Lowercase,
-                _ => {}
-            }
-        }
-
-        // Remove chars until another class
-        while let Some(_) = chars.next_if(|(_, class)| *class == initial) {}
-
-        // Return that index, or end
-        if let Some((index, _)) = chars.next() {
-            self.0.cursor().index(index)
-        } else {
-            self.0.cursor().end()
-        }
+                Some((i, char))
+            })
     }
 
-    pub fn test_prev(&self, cursor: Cursor) -> Cursor {
-        use Class::*;
+    fn chars_at_rtl(&self, index: usize) -> impl '_ + Iterator<Item = (usize, char)> {
+        self.0
+            .chars_at(self.0.byte_to_char(index))
+            .reversed()
+            .scan(index, |index, char| {
+                *index -= char.len_utf8();
 
-        #[derive(PartialEq)]
-        enum Class {
-            Whitespace,
-            Punctuation(char),
-            Numeric,
-            Lowercase,
-            Uppercase,
-        }
-
-        impl From<char> for Class {
-            fn from(char: char) -> Self {
-                if char.is_whitespace() {
-                    Self::Whitespace
-                } else if char.is_ascii_punctuation() {
-                    Self::Punctuation(char)
-                } else if char.is_numeric() {
-                    Self::Numeric
-                } else if char.is_uppercase() {
-                    Self::Uppercase
-                } else {
-                    Self::Lowercase
-                }
-            }
-        }
-
-        let mut chars = self
-            .chars_at(cursor.index)
-            .map(|(i, char)| (i, Class::from(char)))
-            .peekable();
-        let mut initial = if let Some((_, char)) = chars.next() {
-            Class::from(char)
-        } else {
-            return cursor;
-        };
-
-        // Cursor before an uppercase is a special case
-        if initial == Uppercase {
-            match chars.peek() {
-                // Followed by uppercases then lowercase,
-                // return the index before the last uppercase
-                Some((_, Uppercase)) => {
-                    let prev = std::iter::from_fn(|| chars.next_if(|(_, class)| *class == initial))
-                        .last()
-                        .expect("Just peeked it")
-                        .0;
-
-                    if matches!(chars.peek(), Some((_, Lowercase))) {
-                        return self.0.cursor().index(prev);
-                    }
-                }
-                // Followed by a lowercase, pretend it was lowercase
-                Some((_, Lowercase)) => initial = Lowercase,
-                _ => {}
-            }
-        }
-
-        // Remove chars until another class
-        while let Some(_) = chars.next_if(|(_, class)| *class == initial) {}
-
-        // Return that index, or end
-        if let Some((index, _)) = chars.next() {
-            self.0.cursor().index(index)
-        } else {
-            self.0.cursor().end()
-        }
-    }
-
-    fn chars_at(&self, index: usize) -> impl '_ + Iterator<Item = (usize, char)> {
-        let (chunks, first_chunk_index, ..) = self.0.chunks_at_byte(index);
-        chunks
-            .into_iter()
-            .enumerate()
-            .map(move |(i, chunk)| {
-                if i == 0 {
-                    &chunk[index - first_chunk_index..]
-                } else {
-                    chunk
-                }
-            })
-            .scan(index, |next_chunk_index, chunk| {
-                let chunk_index = *next_chunk_index;
-                *next_chunk_index += chunk.len();
-                Some((chunk_index, chunk))
-            })
-            .flat_map(|(chunk_index, chunk)| {
-                chunk
-                    .char_indices()
-                    .map(move |(i, char)| (chunk_index + i, char))
+                Some((*index, char))
             })
     }
 
