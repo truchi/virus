@@ -130,8 +130,16 @@ impl Virus {
                     self.document.move_down();
                     self.ui.ensure_visibility(self.document.selection());
                 }
-                Key::Str("j") => self.document.move_left(),
-                Key::Str("l") => self.document.move_right(),
+                Key::Str("j") => self.document.move_prev_grapheme(),
+                Key::Str("l") => self.document.move_next_grapheme(),
+                Key::Str("e") => {
+                    self.document.move_next_end_of_word();
+                    self.ui.ensure_visibility(self.document.selection());
+                }
+                Key::Str("E") => {
+                    self.document.move_prev_end_of_word();
+                    self.ui.ensure_visibility(self.document.selection());
+                }
                 Key::Str("w") => {
                     self.document.move_next_start_of_word();
                     self.ui.ensure_visibility(self.document.selection());

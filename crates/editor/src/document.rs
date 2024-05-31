@@ -1,4 +1,4 @@
-use crate::{highlights::Highlights, rope::RopeExt};
+use crate::{highlights::Highlights, rope3::RopeExt};
 use ropey::Rope;
 use std::{fs::File, io::BufReader, ops::Range, usize};
 use tree_sitter::{Parser, Query, Tree};
@@ -92,15 +92,15 @@ impl Document {
         self.selection = cursor..cursor;
     }
 
-    pub fn move_left(&mut self) {
+    pub fn move_prev_grapheme(&mut self) {
         // TODO start != end?
-        let cursor = self.rope.grapheme().before(self.selection.start);
+        let cursor = self.rope.grapheme().prev(self.selection.start);
         self.selection = cursor..cursor;
     }
 
-    pub fn move_right(&mut self) {
+    pub fn move_next_grapheme(&mut self) {
         // TODO start != end?
-        let cursor = self.rope.grapheme().after(self.selection.start);
+        let cursor = self.rope.grapheme().next(self.selection.start);
         self.selection = cursor..cursor;
     }
 
@@ -110,9 +110,21 @@ impl Document {
         self.selection = cursor..cursor;
     }
 
+    pub fn move_prev_end_of_word(&mut self) {
+        // TODO start != end?
+        let cursor = self.rope.word().prev_end(self.selection.start);
+        self.selection = cursor..cursor;
+    }
+
     pub fn move_next_start_of_word(&mut self) {
         // TODO start != end?
         let cursor = self.rope.word().next_start(self.selection.start);
+        self.selection = cursor..cursor;
+    }
+
+    pub fn move_next_end_of_word(&mut self) {
+        // TODO start != end?
+        let cursor = self.rope.word().next_end(self.selection.start);
         self.selection = cursor..cursor;
     }
 }
@@ -138,7 +150,7 @@ impl Document {
             return Err(());
         }
 
-        let start = self.rope.grapheme().before(end);
+        let start = self.rope.grapheme().prev(end);
 
         if start != end {
             self.rope
