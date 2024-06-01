@@ -266,127 +266,76 @@ mod tests {
     fn grapheme_below() {}
 
     #[test]
-    fn word_prev_start() {}
+    fn word() {
+        let data: &[(&str, &[&str], &[&str])] = &[
+            (
+                "hello -world_ || HELLOWorld12;",
+                &[
+                    "hello ", "-", "world", "_ ", "|| ", "HELLO", "World", "12", ";",
+                ],
+                &[
+                    "hello", " -", "world", "_", " ||", " HELLO", "World", "12", ";",
+                ],
+            ),
+            (
+                "pub fn foo_bar(&mut self, baz2: Baz2) {}",
+                &[
+                    "pub ", "fn ", "foo", "_", "bar", "(", "&", "mut ", "self", ", ", "baz", "2",
+                    ": ", "Baz", "2", ") ", "{", "}",
+                ],
+                &[
+                    "pub", " fn", " foo", "_", "bar", "(", "&", "mut", " self", ",", " baz", "2",
+                    ":", " Baz", "2", ")", " {", "}",
+                ],
+            ),
+            (
+                "a\nb\nc\n",
+                &["a\n", "b\n", "c\n"],
+                &["a", "\nb", "\nc", "\n"],
+            ),
+            (
+                "\n\nb\nc\n",
+                &["\n\n", "b\n", "c\n"],
+                &["\n\nb", "\nc", "\n"],
+            ),
+        ];
 
-    // TODO
-    #[test]
-    fn word_prev_end() {
-        fn cursor(index: usize) -> Cursor {
-            Cursor {
-                index,
-                line: 0,
-                column: index,
-            }
-        }
+        for &(str, starts, ends) in data {
+            fn the_loop(words: &[&str], f: impl Fn(usize, &str, Range<usize>)) {
+                let mut offset = 0;
 
-        let str = "hello -world_ && HELLOWorld;";
-        let rope = Rope::from(str);
+                for word in words {
+                    for char in word
+                        .char_indices()
+                        .map(|(i, char)| (offset + i, char.len_utf8()))
+                        .map(|(i, len)| i..i + len)
+                    {
+                        f(offset, word, char);
+                    }
 
-        for i in 0..=str.len() {
-            let cursor = rope.word().prev_end(cursor(i));
-
-            println!(
-                "{}|{} -> {}|{}",
-                &str[..i],
-                &str[i..],
-                &str[..cursor.index],
-                &str[cursor.index..],
-            );
-        }
-    }
-
-    // #[test]
-    // fn word_prev_end() {
-    //     fn cursor(index: usize) -> Cursor {
-    //         Cursor {
-    //             index,
-    //             line: 0,
-    //             column: index,
-    //         }
-    //     }
-
-    //     let str = "hello -world_ || HELLOWorld;";
-    //     let words = ["hello", " -", "world", "_", " ||", " HELLO", "World", ";"];
-    //     assert!(str == words.into_iter().collect::<String>());
-
-    //     let rope = Rope::from(str);
-
-    //     let mut offset = 0;
-    //     for word in words {
-    //         for (i, char) in word.char_indices() {
-    //             dbg!((
-    //                 offset,
-    //                 word,
-    //                 i,
-    //                 rope.word()
-    //                     .prev_end(cursor(offset + i + char.len_utf8()))
-    //                     .index,
-    //                 cursor(offset).index,
-    //             ));
-    //             assert!(
-    //                 rope.word().prev_end(cursor(offset + i + char.len_utf8())) == cursor(offset)
-    //             );
-    //         }
-
-    //         offset += word.len();
-    //     }
-
-    //     assert!(rope.word().prev_end(cursor(0)) == cursor(0));
-    // }
-
-    #[test]
-    fn word_next_start() {
-        fn cursor(index: usize) -> Cursor {
-            Cursor {
-                index,
-                line: 0,
-                column: index,
-            }
-        }
-
-        let str = "hello -world_ || HELLOWorld;";
-        let words = ["hello ", "-", "world", "_ ", "|| ", "HELLO", "World", ";"];
-        assert!(str == words.into_iter().collect::<String>());
-
-        let rope = Rope::from(str);
-
-        let mut offset = 0;
-        for word in words {
-            for (i, _) in word.char_indices() {
-                assert!(rope.word().next_start(cursor(offset + i)) == cursor(offset + word.len()));
+                    offset += word.len();
+                }
             }
 
-            offset += word.len();
+            assert!(str == starts.iter().copied().collect::<String>());
+            assert!(str == ends.iter().copied().collect::<String>());
+
+            let rope = Rope::from(str);
+            let cursor = |index| rope.cursor().index(index);
+
+            assert!(rope.word().prev_start(cursor(0)) == cursor(0));
+            assert!(rope.word().prev_end(cursor(0)) == cursor(0));
+            assert!(rope.word().next_start(cursor(str.len())) == cursor(str.len()));
+            assert!(rope.word().next_end(cursor(str.len())) == cursor(str.len()));
+
+            the_loop(starts, |offset, word, char| {
+                assert!(rope.word().prev_start(cursor(char.end)) == cursor(offset));
+                assert!(rope.word().next_start(cursor(char.start)) == cursor(offset + word.len()));
+            });
+            the_loop(ends, |offset, word, char| {
+                assert!(rope.word().prev_end(cursor(char.end)) == cursor(offset));
+                assert!(rope.word().next_end(cursor(char.start)) == cursor(offset + word.len()));
+            });
         }
-
-        assert!(rope.word().next_start(cursor(str.len())) == cursor(str.len()));
-    }
-
-    #[test]
-    fn word_next_end() {
-        fn cursor(index: usize) -> Cursor {
-            Cursor {
-                index,
-                line: 0,
-                column: index,
-            }
-        }
-
-        let str = "hello -world_ || HELLOWorld;";
-        let words = ["hello", " -", "world", "_", " ||", " HELLO", "World", ";"];
-        assert!(str == words.into_iter().collect::<String>());
-
-        let rope = Rope::from(str);
-
-        let mut offset = 0;
-        for word in words {
-            for (i, _) in word.char_indices() {
-                assert!(rope.word().next_end(cursor(offset + i)) == cursor(offset + word.len()));
-            }
-
-            offset += word.len();
-        }
-
-        assert!(rope.word().next_end(cursor(str.len())) == cursor(str.len()));
     }
 }
