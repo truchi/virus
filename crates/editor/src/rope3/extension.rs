@@ -116,7 +116,7 @@ impl<'rope> RopeExtGrapheme<'rope> {
     pub fn next(&self, cursor: Cursor) -> Cursor {
         GraphemeCursor::new(self.0.slice(..), cursor.index)
             .next()
-            .map(|(range, _)| self.0.cursor().index(range.start))
+            .map(|(range, _)| self.0.cursor().index(range.end))
             .unwrap_or(cursor)
     }
 
