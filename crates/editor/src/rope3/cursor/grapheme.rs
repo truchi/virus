@@ -277,8 +277,9 @@ mod tests {
     fn strings() -> Vec<String> {
         vec![
             "".to_string(),
+            "🦠🦀🦠🦀".to_string(),
             "Hello, world!".repeat(200),
-            "e".to_string() + &"\u{0300}".repeat(2000) + " e" + &"\u{0301}".repeat(2000),
+            "e".to_string() + &"\u{0300}".repeat(1000) + " e" + &"\u{0301}".repeat(1000),
         ]
     }
 
@@ -324,6 +325,9 @@ mod tests {
 
                 Some((range.start, grapheme))
             })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
             .collect()
         }
         fn collect_string(collected_indices: &[(usize, String)]) -> String {
@@ -334,33 +338,60 @@ mod tests {
         }
 
         for string in strings() {
-            let indices = string
-                .grapheme_indices(true)
-                .map(|(index, str)| (index, str.to_string()))
-                .collect::<Vec<_>>();
-
             let rope = Rope::from(string.as_str());
-            let mut cursor = GraphemeCursor::new(rope.slice(..), 0);
+            let slice = rope.slice(..);
 
-            // Next...
+            // Start to end to start
             {
+                let indices = string
+                    .grapheme_indices(true)
+                    .map(|(index, str)| (index, str.to_string()))
+                    .collect::<Vec<_>>();
+
+                let mut cursor = GraphemeCursor::new(rope.slice(..), 0);
+
+                // Next
                 let collected_indices = collect_indices_next(&mut cursor);
                 let collected_string = collect_string(&collected_indices);
-
-                assert!(collected_string == string);
                 assert!(collected_indices == indices);
+                assert!(collected_string == string);
+
+                // Prev
+                let collected_indices = collect_indices_prev(&mut cursor);
+                let collected_string = collect_string(&collected_indices);
+                assert!(collected_indices == indices);
+                assert!(collected_string == string);
             }
 
-            // ...Prev
-            {
-                let collected_indices = collect_indices_prev(&mut cursor)
-                    .into_iter()
-                    .rev()
-                    .collect::<Vec<_>>();
-                let collected_string = collect_string(&collected_indices);
+            // Prev/Next at
+            for index in (0..=string.len()).filter(|i| string.is_char_boundary(*i)) {
+                let prev = GraphemeCursor::new(slice, index)
+                    .prev()
+                    .map(|(range, chunks)| {
+                        (
+                            range.start,
+                            chunks.map(|(_, chunk)| chunk).collect::<String>(),
+                        )
+                    });
+                let next = GraphemeCursor::new(slice, index)
+                    .next()
+                    .map(|(range, chunks)| {
+                        (
+                            range.start,
+                            chunks.map(|(_, chunk)| chunk).collect::<String>(),
+                        )
+                    });
+                let expected_prev = string[..index]
+                    .grapheme_indices(true)
+                    .next_back()
+                    .map(|(i, str)| (i, str.to_string()));
+                let expected_next = string[index..]
+                    .grapheme_indices(true)
+                    .next()
+                    .map(|(i, str)| (index + i, str.to_string()));
 
-                assert!(collected_string == string);
-                assert!(collected_indices == indices);
+                assert!(prev == expected_prev);
+                assert!(next == expected_next);
             }
         }
     }

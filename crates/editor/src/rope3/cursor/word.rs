@@ -77,22 +77,9 @@ impl<'rope> WordCursor<'rope> {
     pub fn prev(&mut self) -> Option<(Range<usize>, WordClass)> {
         use CharClass::*;
 
-        let prev = |graphemes: &mut GraphemeCursor| {
-            graphemes.prev().map(|(grapheme, chunks)| {
-                (
-                    grapheme,
-                    CharClass::from(
-                        chunks
-                            .flat_map(|(_, chunk)| chunk.chars())
-                            .next()
-                            .expect("Empty grapheme"),
-                    ),
-                )
-            })
-        };
         let skip = |graphemes: &mut GraphemeCursor, initial: CharClass| loop {
             loop {
-                match prev(graphemes) {
+                match graphemes.prev().map(Self::map_to_char_class) {
                     Some((grapheme, class)) if class != initial => return Some((grapheme, class)),
                     Some(_) => {}
                     None => return None,
@@ -100,19 +87,24 @@ impl<'rope> WordCursor<'rope> {
             }
         };
 
-        let (mut grapheme, class) = prev(&mut self.graphemes)?;
-        grapheme.start = match (class, skip(&mut self.graphemes, class)) {
-            // Lowercases then uppercase (`Hello`)
-            (Lowercase, Some((prev, Uppercase))) => prev.start,
+        let (mut grapheme, class) = self.graphemes.prev().map(Self::map_to_char_class)?;
 
-            // Lowercases (`hello`)
-            (Lowercase, Some((prev, _))) => {
-                self.graphemes.set_index(prev.end);
-                prev.end
+        // Uppercase with lowercase on the right (`HelloW|orld`)
+        if class == Uppercase {
+            let next = {
+                self.graphemes.next();
+                self.graphemes.next().map(Self::map_to_char_class)
+            };
+            self.graphemes.set_index(grapheme.start);
+
+            if let Some((_, Lowercase)) = next {
+                return Some((grapheme, class.into()));
             }
-            (Lowercase, _) => 0,
+        }
 
-            // FIXME if uppercase, we have to check if there is a lowercase on the right...
+        grapheme.start = match (class, skip(&mut self.graphemes, class)) {
+            // Lowercases then uppercase (`Hello|`)
+            (Lowercase, Some((prev, Uppercase))) => prev.start,
 
             // Other graphemes can be repeated to form a word
             (_, Some((prev, _))) => {
@@ -128,24 +120,11 @@ impl<'rope> WordCursor<'rope> {
     pub fn next(&mut self) -> Option<(Range<usize>, WordClass)> {
         use CharClass::*;
 
-        let next = |graphemes: &mut GraphemeCursor| {
-            graphemes.next().map(|(grapheme, chunks)| {
-                (
-                    grapheme,
-                    CharClass::from(
-                        chunks
-                            .flat_map(|(_, chunk)| chunk.chars())
-                            .next()
-                            .expect("Empty grapheme"),
-                    ),
-                )
-            })
-        };
         let skip = |graphemes: &mut GraphemeCursor, initial: CharClass| loop {
             let mut prev = None;
 
             loop {
-                match next(graphemes) {
+                match graphemes.next().map(Self::map_to_char_class) {
                     Some((grapheme, class)) if class != initial => {
                         return (prev, Some((grapheme, class)))
                     }
@@ -156,9 +135,9 @@ impl<'rope> WordCursor<'rope> {
         };
 
         let len = self.graphemes.slice().len_bytes();
-        let (mut grapheme, class) = next(&mut self.graphemes)?;
+        let (mut grapheme, class) = self.graphemes.next().map(Self::map_to_char_class)?;
         grapheme.end = match (class, skip(&mut self.graphemes, class)) {
-            // Uppercase then lowercase (`Hello`)
+            // Uppercase then lowercase (`|Hello`)
             (Uppercase, (None, Some((_, Lowercase)))) => {
                 match skip(&mut self.graphemes, Lowercase).1 {
                     Some((next, _)) => {
@@ -169,18 +148,11 @@ impl<'rope> WordCursor<'rope> {
                 }
             }
 
-            // Uppercases then lowercase (`HELLOWorld`)
+            // Uppercases then lowercase (`|HELLOWorld`)
             (Uppercase, (Some(prev), Some((_, Lowercase)))) => {
                 self.graphemes.set_index(prev.start);
                 prev.start
             }
-
-            // Uppercases (`HELLO`)
-            (Uppercase, (_, Some((next, _)))) => {
-                self.graphemes.set_index(next.start);
-                next.start
-            }
-            (Uppercase, _) => len,
 
             // Other graphemes can be repeated to form a word
             (_, (_, Some((next, _)))) => {
@@ -191,6 +163,23 @@ impl<'rope> WordCursor<'rope> {
         };
 
         Some((grapheme, class.into()))
+    }
+}
+
+/// Private.
+impl<'rope> WordCursor<'rope> {
+    fn map_to_char_class<'a>(
+        (grapheme, chunks): (Range<usize>, impl Iterator<Item = (usize, &'a str)>),
+    ) -> (Range<usize>, CharClass) {
+        (
+            grapheme,
+            CharClass::from(
+                chunks
+                    .flat_map(|(_, chunk)| chunk.chars())
+                    .next()
+                    .expect("Empty grapheme"),
+            ),
+        )
     }
 }
 
@@ -283,74 +272,53 @@ mod tests {
 
         for (str, words) in data {
             let rope = Rope::from(str);
+            let slice = rope.slice(..);
 
-            // With `index == 0`
-            {
-                // Prev
-                let mut collected = vec![];
-                let mut classes = WordCursor::new(rope.slice(..), str.len());
-                while let Some((range, class)) = classes.prev() {
-                    assert!(classes.graphemes.index() == range.start);
-                    collected.push((&str[range], class));
-                }
+            // Before start
+            assert!(WordCursor::new(slice, 0).prev().is_none());
 
-                assert!(collected == words.iter().copied().rev().collect::<Vec<_>>());
+            // After end
+            assert!(WordCursor::new(slice, str.len()).next().is_none());
 
-                // Next
-                let mut collected = vec![];
-                let mut classes = WordCursor::new(rope.slice(..), 0);
-                while let Some((range, class)) = classes.next() {
-                    assert!(classes.graphemes.index() == range.end);
-                    collected.push((&str[range], class));
-                }
-
-                assert!(collected == words);
+            // Start to end
+            let mut collected = vec![];
+            let mut classes = WordCursor::new(slice, 0);
+            while let Some((range, class)) = classes.next() {
+                assert!(classes.graphemes.index() == range.end);
+                collected.push((&str[range], class));
             }
 
-            // With index (simplified with flatmap by chars)
-            {
-                // Prev
-                let mut chars = words
-                    .iter()
-                    .flat_map(|(str, class)| str.chars().map(|char| (char, *class)))
-                    .rev()
-                    .collect::<Vec<_>>();
+            assert!(collected == words);
 
-                for (i, char) in str.char_indices().rev() {
-                    let mut collected = vec![];
-                    let mut classes = WordCursor::new(rope.slice(..), i + char.len_utf8());
-                    while let Some((range, class)) = classes.prev() {
-                        for char in str[range].chars().rev() {
-                            collected.push((char, class));
-                        }
-                    }
+            // End to start
+            let mut collected = vec![];
+            let mut classes = WordCursor::new(slice, str.len());
+            while let Some((range, class)) = classes.prev() {
+                assert!(classes.graphemes.index() == range.start);
+                collected.push((&str[range], class));
+            }
 
-                    assert!(collected == chars);
-                    chars.remove(0);
+            assert!(collected == words.iter().copied().rev().collect::<Vec<_>>());
+
+            let mut offset = 0;
+            for &(word, expected) in &words {
+                for (i, char) in word.char_indices() {
+                    // Next at
+                    let (range, class) = WordCursor::new(slice, offset + i).next().unwrap();
+
+                    assert!(&str[range] == &word[i..]);
+                    assert!(class == expected);
+
+                    // Prev at
+                    let (range, class) = WordCursor::new(slice, offset + i + char.len_utf8())
+                        .prev()
+                        .unwrap();
+
+                    assert!(&str[range] == &word[..i + char.len_utf8()]);
+                    assert!(class == expected);
                 }
 
-                assert!(WordCursor::new(rope.slice(..), 0).prev().is_none());
-
-                // Next
-                let mut chars = words
-                    .iter()
-                    .flat_map(|(str, class)| str.chars().map(|char| (char, *class)))
-                    .collect::<Vec<_>>();
-
-                for (i, _) in str.char_indices() {
-                    let mut collected_next = vec![];
-                    let mut classes = WordCursor::new(rope.slice(..), i);
-                    while let Some((range, class)) = classes.next() {
-                        for char in str[range].chars() {
-                            collected_next.push((char, class));
-                        }
-                    }
-
-                    assert!(collected_next == chars);
-                    chars.remove(0);
-                }
-
-                assert!(WordCursor::new(rope.slice(..), str.len()).next().is_none());
+                offset += word.len();
             }
         }
     }
