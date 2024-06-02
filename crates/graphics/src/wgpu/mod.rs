@@ -153,11 +153,11 @@ impl Graphics {
         self.line.resize(&self.device, &self.config);
     }
 
-    /// Returns the `Draw`ing API.
-    pub fn draw(&mut self, layer: u32, region: Rectangle) -> Draw {
-        Draw {
+    /// Returns the `Layer`ing API.
+    pub fn layer(&mut self, layer: u16, region: Rectangle) -> Layer {
+        Layer {
             graphics: self,
-            layer,
+            layer: layer as u32 * u16::MAX as u32,
             region,
         }
     }
@@ -203,12 +203,54 @@ impl Graphics {
             timestamp_writes: None,
             occlusion_query_set: None,
         });
-        self.rectangle.render(0, &self.queue, &mut render_pass);
-        self.glyph.render(0, &self.queue, &mut render_pass);
-        self.line.render(0, &self.queue, &mut render_pass);
-        drop(render_pass);
+
+        enum ToRender {
+            Rectange(u32),
+            Glyph(u32),
+            Line(u32),
+        }
+
+        let layers = || {
+            let mut rectangle_layers = self.rectangle.layers().peekable();
+            let mut glyph_layers = self.glyph.layers().peekable();
+            let mut line_layers = self.line.layers().peekable();
+
+            std::iter::from_fn(move || {
+                let rectangle_layer = rectangle_layers.peek().copied();
+                let glyph_layer = glyph_layers.peek().copied();
+                let line_layer = line_layers.peek().copied();
+
+                let min = rectangle_layer
+                    .unwrap_or(u32::MAX)
+                    .min(glyph_layer.unwrap_or(u32::MAX))
+                    .min(line_layer.unwrap_or(u32::MAX));
+
+                if rectangle_layer == Some(min) {
+                    rectangle_layers.next();
+                    Some(ToRender::Rectange(min))
+                } else if glyph_layer == Some(min) {
+                    glyph_layers.next();
+                    Some(ToRender::Glyph(min))
+                } else if line_layer == Some(min) {
+                    line_layers.next();
+                    Some(ToRender::Line(min))
+                } else {
+                    None
+                }
+            })
+        };
+
+        for layer in layers() {
+            use ToRender::*;
+            match layer {
+                Rectange(layer) => self.rectangle.render(layer, &self.queue, &mut render_pass),
+                Glyph(layer) => self.glyph.render(layer, &self.queue, &mut render_pass),
+                Line(layer) => self.line.render(layer, &self.queue, &mut render_pass),
+            }
+        }
 
         // Flush
+        drop(render_pass);
         self.queue.submit([encoder.finish()]);
         output.present();
 
@@ -220,10 +262,35 @@ impl Graphics {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                             Layer                                              //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub struct Layer<'graphics> {
+    graphics: &'graphics mut Graphics,
+    layer: u32,
+    region: Rectangle,
+}
+
+impl<'graphics> Layer<'graphics> {
+    /// Returns the size.
+    pub fn size(&self) -> Size {
+        self.region.size()
+    }
+
+    /// Returns the `Draw`ing API.
+    pub fn draw(&mut self, sub_layer: u16) -> Draw {
+        Draw {
+            graphics: self.graphics,
+            layer: self.layer + sub_layer as u32,
+            region: self.region,
+        }
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Draw                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// A drawing API for [`Graphics`].
 pub struct Draw<'graphics> {
     graphics: &'graphics mut Graphics,
     layer: u32,
@@ -231,14 +298,9 @@ pub struct Draw<'graphics> {
 }
 
 impl<'graphics> Draw<'graphics> {
-    /// Returns the current region.
-    pub fn region(&self) -> Rectangle {
-        self.region
-    }
-
-    /// Returns the current layer.
-    pub fn layer(&self) -> u32 {
-        self.layer
+    /// Returns the size.
+    pub fn size(&self) -> Size {
+        self.region.size()
     }
 
     /// Draws a rectange.

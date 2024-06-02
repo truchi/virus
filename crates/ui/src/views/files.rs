@@ -5,7 +5,7 @@ use virus_graphics::{
     text::{
         Context, FontFamilyKey, FontKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
     },
-    wgpu::Draw,
+    wgpu::{Draw, Layer},
 };
 
 const MIN_WIDTH: f32 = 0.5;
@@ -48,10 +48,10 @@ impl FilesView {
         }
     }
 
-    pub fn render(&mut self, context: &mut Context, draw: &mut Draw) {
+    pub fn render(&mut self, context: &mut Context, layer: &mut Layer) {
         let mut renderer = Renderer::new(
             context,
-            draw,
+            layer,
             self.background,
             self.family,
             self.font_size,
@@ -68,9 +68,9 @@ impl FilesView {
 //                                            Renderer                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-struct Renderer<'context, 'draw, 'graphics> {
+struct Renderer<'context, 'layer, 'graphics> {
     context: &'context mut Context,
-    draw: &'draw mut Draw<'graphics>,
+    layer: &'layer mut Layer<'graphics>,
     background: Rgba,
     family: FontFamilyKey,
     font_size: FontSize,
@@ -82,10 +82,10 @@ struct Renderer<'context, 'draw, 'graphics> {
     columns: u32,
 }
 
-impl<'context, 'draw, 'graphics> Renderer<'context, 'draw, 'graphics> {
+impl<'context, 'layer, 'graphics> Renderer<'context, 'layer, 'graphics> {
     fn new(
         context: &'context mut Context,
-        draw: &'draw mut Draw<'graphics>,
+        layer: &'layer mut Layer<'graphics>,
         background: Rgba,
         family: FontFamilyKey,
         font_size: FontSize,
@@ -108,7 +108,7 @@ impl<'context, 'draw, 'graphics> Renderer<'context, 'draw, 'graphics> {
 
         Self {
             context,
-            draw,
+            layer,
             background,
             family,
             font_size,
@@ -122,7 +122,7 @@ impl<'context, 'draw, 'graphics> Renderer<'context, 'draw, 'graphics> {
     }
 
     fn render_background(&mut self) {
-        self.draw.rectangle(
+        self.layer.draw(0).rectangle(
             Rectangle {
                 top: self.top as i32,
                 left: self.left as i32,

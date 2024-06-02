@@ -108,13 +108,13 @@ impl Ui {
 
         self.document_view.render(
             &mut self.context,
-            &mut self.graphics.draw(0, region),
+            &mut self.graphics.layer(0, region),
             document,
             self.scroll_top.current(),
             self.scrollbar_alpha.current(),
         );
-        self.files_view
-            .render(&mut self.context, &mut self.graphics.draw(1, region));
+        // self.files_view
+        //     .render(&mut self.context, &mut self.graphics.layer(1, region));
 
         self.graphics.render();
     }

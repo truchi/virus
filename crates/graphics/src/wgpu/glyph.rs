@@ -269,6 +269,11 @@ impl Pipeline {
         }
     }
 
+    /// Returns a sorted iterator of layers.
+    pub fn layers(&self) -> impl '_ + Iterator<Item = u32> {
+        self.layers.keys().copied()
+    }
+
     /// Resizes the `Pipeline`.
     pub fn resize(&mut self, device: &Device, config: &SurfaceConfiguration) {
         let max_texture_dimension = device.limits().max_texture_dimension_2d;
