@@ -114,6 +114,7 @@ impl<'rope> WordCursor<'rope> {
             _ => 0,
         };
 
+        debug_assert!(self.graphemes.index() == grapheme.start);
         Some((grapheme, class.into()))
     }
 
@@ -162,6 +163,7 @@ impl<'rope> WordCursor<'rope> {
             _ => len,
         };
 
+        debug_assert!(self.graphemes.index() == grapheme.end);
         Some((grapheme, class.into()))
     }
 }
@@ -300,6 +302,7 @@ mod tests {
 
             assert!(collected == words.iter().copied().rev().collect::<Vec<_>>());
 
+            // Next/Prev at
             let mut offset = 0;
             for &(word, expected) in &words {
                 for (i, char) in word.char_indices() {

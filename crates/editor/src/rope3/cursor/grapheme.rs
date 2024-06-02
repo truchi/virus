@@ -112,6 +112,7 @@ impl<'rope> GraphemeCursor<'rope> {
         };
         let in_chunk = grapheme.start >= chunk_start;
 
+        debug_assert!(self.graphemes.cur_cursor() == grapheme.start);
         self.goto_index();
         Some((
             grapheme.start..grapheme.end,
@@ -154,6 +155,7 @@ impl<'rope> GraphemeCursor<'rope> {
         };
         let in_chunk = grapheme.end <= chunk_start + chunk.len();
 
+        debug_assert!(self.graphemes.cur_cursor() == grapheme.end);
         self.goto_index();
         Some((
             grapheme.start..grapheme.end,
@@ -288,7 +290,7 @@ mod tests {
         for string in strings() {
             let rope = Rope::from(string.as_str());
 
-            for (index, _) in string.char_indices().chain([(string.len(), ' ')]) {
+            for index in (0..=string.len()).filter(|index| string.is_char_boundary(*index)) {
                 assert!(
                     GraphemeCursor::new(rope.slice(..), index).is_boundary()
                         == unicode_segmentation::GraphemeCursor::new(index, string.len(), true)
@@ -301,42 +303,6 @@ mod tests {
 
     #[test]
     fn next_and_prev() {
-        fn collect_indices_next(cursor: &mut GraphemeCursor) -> Vec<(usize, String)> {
-            std::iter::from_fn(|| {
-                let (range, chunks) = cursor.next()?;
-                let grapheme = chunks.map(|(_, chunk)| chunk).collect::<String>();
-
-                assert!(cursor.is_boundary());
-                assert!(cursor.index() == range.end);
-                assert!(range.len() == grapheme.len());
-
-                Some((range.start, grapheme))
-            })
-            .collect()
-        }
-        fn collect_indices_prev(cursor: &mut GraphemeCursor) -> Vec<(usize, String)> {
-            std::iter::from_fn(|| {
-                let (range, chunks) = cursor.prev()?;
-                let grapheme = chunks.map(|(_, chunk)| chunk).collect::<String>();
-
-                assert!(cursor.is_boundary());
-                assert!(cursor.index() == range.start);
-                assert!(range.len() == grapheme.len());
-
-                Some((range.start, grapheme))
-            })
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .collect()
-        }
-        fn collect_string(collected_indices: &[(usize, String)]) -> String {
-            collected_indices
-                .iter()
-                .map(|(_, string)| string.as_str())
-                .collect()
-        }
-
         for string in strings() {
             let rope = Rope::from(string.as_str());
             let slice = rope.slice(..);
@@ -351,14 +317,45 @@ mod tests {
                 let mut cursor = GraphemeCursor::new(rope.slice(..), 0);
 
                 // Next
-                let collected_indices = collect_indices_next(&mut cursor);
-                let collected_string = collect_string(&collected_indices);
+                let collected_indices = std::iter::from_fn(|| {
+                    let (range, chunks) = cursor.next()?;
+                    let grapheme = chunks.map(|(_, chunk)| chunk).collect::<String>();
+
+                    assert!(cursor.is_boundary());
+                    assert!(cursor.index() == range.end);
+                    assert!(range.len() == grapheme.len());
+
+                    Some((range.start, grapheme))
+                })
+                .collect::<Vec<_>>();
+                let collected_string = collected_indices
+                    .iter()
+                    .map(|(_, string)| string.as_str())
+                    .collect::<String>();
+
                 assert!(collected_indices == indices);
                 assert!(collected_string == string);
 
                 // Prev
-                let collected_indices = collect_indices_prev(&mut cursor);
-                let collected_string = collect_string(&collected_indices);
+                let collected_indices = std::iter::from_fn(|| {
+                    let (range, chunks) = cursor.prev()?;
+                    let grapheme = chunks.map(|(_, chunk)| chunk).collect::<String>();
+
+                    assert!(cursor.is_boundary());
+                    assert!(cursor.index() == range.start);
+                    assert!(range.len() == grapheme.len());
+
+                    Some((range.start, grapheme))
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>();
+                let collected_string = collected_indices
+                    .iter()
+                    .map(|(_, string)| string.as_str())
+                    .collect::<String>();
+
                 assert!(collected_indices == indices);
                 assert!(collected_string == string);
             }
