@@ -101,15 +101,15 @@ struct Renderer<'view, 'context, 'layer, 'graphics, 'document> {
 impl<'view, 'context, 'layer, 'graphics, 'document>
     Renderer<'view, 'context, 'layer, 'graphics, 'document>
 {
-    const CARETS: [(i32, Rgba); 3] = [
-        (0, SURFACE1.transparent(255)),
-        (1, SURFACE1.transparent(255 / 8)),
-        (2, SURFACE1.transparent(255 / 32)),
+    const CARETS: [(i32, Rgba); 2] = [
+        (0, SURFACE1.transparent(255 / 1)),
+        (1, SURFACE1.transparent(255 / 1)),
     ];
-    const OUTLINES: [(i32, Rgba); 3] = [
-        (0, SURFACE1.transparent(255 / 16)),
-        (1, SURFACE1.transparent(255 / 32)),
-        (2, SURFACE1.transparent(255 / 64)),
+    const OUTLINES: [(i32, Rgba); 4] = [
+        (0, SURFACE1.transparent(255 / 4)),
+        (1, SURFACE1.transparent(255 / 6)),
+        (2, SURFACE1.transparent(255 / 8)),
+        (3, SURFACE1.transparent(255 / 10)),
     ];
     const SCROLLBAR: Rgb = SURFACE1;
 
