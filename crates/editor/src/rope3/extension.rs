@@ -1,7 +1,7 @@
 use crate::rope3::{GraphemeCursor, WordClass, WordCursor};
 use ropey::Rope;
-use std::{cmp::Ordering::*, ops::Range};
-use unicode_width::UnicodeWidthChar;
+use std::{cmp::Ordering, ops::Range};
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 use virus_common::Cursor;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -152,39 +152,37 @@ fn width(rope: &Rope, cursor: Cursor) -> usize {
 }
 
 fn find_width(rope: &Rope, line: usize, width: usize) -> Cursor {
-    debug_assert!(line < rope.len_lines() - 1);
-
-    // Get this line
     let start = rope.line_to_byte(line);
     let end = rope.line_to_byte(line + 1);
     let slice = rope.byte_slice(start..end);
 
-    // Find the cursor at that width on the line (falling back left)
-    let mut w = 0;
-    let mut cursor = Cursor::new(start, line, 0);
+    let mut graphemes = GraphemeCursor::new(slice, 0);
+    let mut current_width = 0;
+    let mut column = 0;
 
-    for char in slice.chars() {
-        let prev = cursor;
-        cursor.column += char.len_utf8();
-        cursor.index += char.len_utf8();
-        w += char.width().unwrap_or_default();
+    while let Some((range, chunks)) = graphemes.next() {
+        let grapheme_width = chunks.map(|(_, str)| str.width()).sum::<usize>();
 
-        match w.cmp(&width) {
-            Less => continue,
-            Equal => break,
-            Greater => {
-                cursor = prev;
+        if grapheme_width == 0 {
+            continue;
+        }
+
+        current_width += grapheme_width;
+
+        match current_width.cmp(&width) {
+            Ordering::Less => {
+                column = range.end;
+                continue;
+            }
+            Ordering::Equal => {
+                column = range.end;
                 break;
             }
+            Ordering::Greater => break,
         }
     }
 
-    // Ensure grapheme boundary
-    if rope.grapheme().is_boundary(cursor) {
-        cursor
-    } else {
-        rope.grapheme().prev(cursor)
-    }
+    Cursor::new(start + column, line, column)
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -260,10 +258,121 @@ mod tests {
     use super::*;
 
     #[test]
-    fn grapheme_above() {}
+    fn cursor() {
+        let data: &[(&str, &[(usize, usize)])] = &[
+            ("", &[(0, 0)]),
+            ("\n", &[(0, 0), (1, 0)]),
+            ("\n\n", &[(0, 0), (1, 0), (2, 0)]),
+            ("\n\na", &[(0, 0), (1, 0), (2, 0), (2, 1)]),
+            ("\n\nab", &[(0, 0), (1, 0), (2, 0), (2, 1), (2, 2)]),
+            ("a", &[(0, 0), (0, 1)]),
+            ("ab", &[(0, 0), (0, 1), (0, 2)]),
+            ("a\r", &[(0, 0), (0, 1), (1, 0)]),
+            ("a\n", &[(0, 0), (0, 1), (1, 0)]),
+            ("a\r\n", &[(0, 0), (0, 1), (0, 2), (1, 0)]),
+            ("a\r\na", &[(0, 0), (0, 1), (0, 2), (1, 0), (1, 1)]),
+            (
+                "a\r\na\n",
+                &[(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (2, 0)],
+            ),
+        ];
+
+        for &(str, data) in data {
+            let rope = Rope::from(str);
+
+            assert!(data.len() == str.len() + 1, "Wrong test data");
+            assert!(rope.cursor().start() == Cursor::new(0, 0, 0));
+
+            for index in 0..=str.len() {
+                let (line, column) = data[index];
+                let cursor = Cursor::new(index, line, column);
+
+                assert!(rope.cursor().index(index) == cursor);
+
+                if index == str.len() {
+                    assert!(rope.cursor().end() == cursor);
+                }
+            }
+        }
+    }
 
     #[test]
-    fn grapheme_below() {}
+    fn grapheme_prev() {
+        // TODO
+    }
+
+    #[test]
+    fn grapheme_next() {
+        // TODO
+    }
+
+    #[test]
+    fn grapheme_above() {
+        // Single line
+        assert!(Rope::from("").grapheme().above(Cursor::new(0, 0, 0)) == Cursor::new(0, 0, 0));
+        assert!(Rope::from("ab").grapheme().above(Cursor::new(0, 0, 0)) == Cursor::new(0, 0, 0));
+        assert!(Rope::from("ab").grapheme().above(Cursor::new(1, 0, 1)) == Cursor::new(1, 0, 1));
+        assert!(Rope::from("ab").grapheme().above(Cursor::new(2, 0, 2)) == Cursor::new(2, 0, 2));
+
+        // 🦀 is 1 char, 4 bytes
+        let data: &[((&str, &str), &[usize])] = &[
+            (("\n", "ab"), &[0, 0, 0]),
+            (("ab\n", "ab"), &[0, 1, 2]),
+            (("\0a\0b\0\n", "ab"), &[0, 2, 4]),
+            (("a🦀d\n", "abcd"), &[0, 1, 1, 5, 6]),
+        ];
+
+        for &((top, bottom), belows) in data {
+            assert!(top.ends_with('\n'));
+
+            let rope = Rope::from(top.to_string() + bottom);
+            let mut columns = belows.iter();
+
+            for index in (0..=bottom.len()).filter(|index| bottom.is_char_boundary(*index)) {
+                let column = *columns.next().unwrap();
+                let cursor = Cursor::new(top.len() + index, 1, index);
+                let above = Cursor::new(column, 0, column);
+
+                assert!(rope.grapheme().above(cursor) == above);
+            }
+
+            assert!(columns.next().is_none());
+        }
+    }
+
+    #[test]
+    fn grapheme_below() {
+        // Single line
+        assert!(Rope::from("").grapheme().below(Cursor::new(0, 0, 0)) == Cursor::new(0, 0, 0));
+        assert!(Rope::from("ab").grapheme().below(Cursor::new(0, 0, 0)) == Cursor::new(0, 0, 0));
+        assert!(Rope::from("ab").grapheme().below(Cursor::new(1, 0, 1)) == Cursor::new(1, 0, 1));
+        assert!(Rope::from("ab").grapheme().below(Cursor::new(2, 0, 2)) == Cursor::new(2, 0, 2));
+
+        // 🦀 is 1 char, 4 bytes
+        let data: &[((&str, &str), &[usize])] = &[
+            (("ab", "\n"), &[0, 0, 0]),
+            (("ab", "\nab"), &[0, 1, 2]),
+            (("ab", "\n\0a\0b\0"), &[0, 2, 4]),
+            (("abcd", "\na🦀d"), &[0, 1, 1, 5, 6]),
+        ];
+
+        for &((top, bottom), belows) in data {
+            assert!(bottom.starts_with('\n'));
+
+            let rope = Rope::from(top.to_string() + bottom);
+            let mut columns = belows.iter();
+
+            for index in (0..=top.len()).filter(|index| top.is_char_boundary(*index)) {
+                let column = *columns.next().unwrap();
+                let cursor = Cursor::new(index, 0, index);
+                let below = Cursor::new(top.len() + 1 + column, 1, column);
+
+                assert!(rope.grapheme().below(cursor) == below);
+            }
+
+            assert!(columns.next().is_none());
+        }
+    }
 
     #[test]
     fn word() {
@@ -301,6 +410,23 @@ mod tests {
         ];
 
         for &(str, starts, ends) in data {
+            assert!(
+                str == starts.iter().copied().collect::<String>(),
+                "Wrong test data",
+            );
+            assert!(
+                str == ends.iter().copied().collect::<String>(),
+                "Wrong test data",
+            );
+
+            let rope = Rope::from(str);
+            let cursor = |index| rope.cursor().index(index);
+
+            assert!(rope.word().prev_start(cursor(0)) == cursor(0));
+            assert!(rope.word().prev_end(cursor(0)) == cursor(0));
+            assert!(rope.word().next_start(cursor(str.len())) == cursor(str.len()));
+            assert!(rope.word().next_end(cursor(str.len())) == cursor(str.len()));
+
             fn the_loop(words: &[&str], f: impl Fn(usize, &str, Range<usize>)) {
                 let mut offset = 0;
 
@@ -316,17 +442,6 @@ mod tests {
                     offset += word.len();
                 }
             }
-
-            assert!(str == starts.iter().copied().collect::<String>());
-            assert!(str == ends.iter().copied().collect::<String>());
-
-            let rope = Rope::from(str);
-            let cursor = |index| rope.cursor().index(index);
-
-            assert!(rope.word().prev_start(cursor(0)) == cursor(0));
-            assert!(rope.word().prev_end(cursor(0)) == cursor(0));
-            assert!(rope.word().next_start(cursor(str.len())) == cursor(str.len()));
-            assert!(rope.word().next_end(cursor(str.len())) == cursor(str.len()));
 
             the_loop(starts, |offset, word, char| {
                 assert!(rope.word().prev_start(cursor(char.end)) == cursor(offset));
