@@ -219,7 +219,7 @@ impl<'a> Init<'a> {
 #[derive(Debug)]
 pub struct Pipeline {
     constants: Constants,
-    layers: BTreeMap<u32, Vec<Instance>>,
+    layers: BTreeMap<u32, (Vec<Instance>, Range<BufferAddress>)>,
     buffer: Buffer,
     mask: Atlas<GlyphKey, Placement>,
     color: Atlas<GlyphKey, Placement>,
@@ -357,7 +357,7 @@ impl Pipeline {
         };
 
         // TODO crop to region
-        self.layers.entry(layer).or_default().push(Instance {
+        self.layers.entry(layer).or_default().0.push(Instance {
             ty,
             position: region.position()
                 + position
@@ -375,6 +375,18 @@ impl Pipeline {
         });
     }
 
+    /// Writes buffer.
+    pub fn pre_render(&mut self, queue: &Queue) {
+        let mut offset = 0;
+
+        for (_, (instances, range)) in &mut self.layers {
+            let instances = bytemuck::cast_slice(instances);
+            queue.write_buffer(&self.buffer, offset, instances);
+            *range = offset..offset + instances.len() as BufferAddress;
+            offset = range.end;
+        }
+    }
+
     /// Renders `layer`.
     pub fn render<'pass>(
         &'pass self,
@@ -382,28 +394,24 @@ impl Pipeline {
         queue: &Queue,
         render_pass: &mut RenderPass<'pass>,
     ) {
-        let instances = self
-            .layers
-            .get(&layer)
-            .map(Vec::as_slice)
-            .unwrap_or_default();
+        let constants = self.constants.as_array();
+        let (instances, range) = match self.layers.get(&layer) {
+            Some((instances, range)) if !instances.is_empty() => (instances, range.clone()),
+            _ => return,
+        };
 
-        if !instances.is_empty() {
-            let constants = self.constants.as_array();
-
-            queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(instances));
-            render_pass.set_pipeline(&self.pipeline);
-            render_pass.set_bind_group(0, &self.bind_group, &[]);
-            render_pass.set_push_constants(Constants::STAGES, 0, bytemuck::cast_slice(&constants));
-            render_pass.set_vertex_buffer(0, self.buffer.slice(..));
-            render_pass.draw(0..6, 0..instances.len() as u32);
-        }
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_push_constants(Constants::STAGES, 0, bytemuck::cast_slice(&constants));
+        render_pass.set_vertex_buffer(0, self.buffer.slice(range));
+        render_pass.draw(0..6, 0..instances.len() as u32);
     }
 
     /// Clears layers.
-    pub fn clear(&mut self) {
-        for layer in self.layers.values_mut() {
-            layer.clear();
+    pub fn post_render(&mut self) {
+        for (instances, range) in self.layers.values_mut() {
+            instances.clear();
+            *range = Default::default();
         }
     }
 }

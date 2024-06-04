@@ -210,10 +210,14 @@ impl Graphics {
             Line(u32),
         }
 
-        let layers = || {
-            let mut rectangle_layers = self.rectangle.layers().peekable();
-            let mut glyph_layers = self.glyph.layers().peekable();
-            let mut line_layers = self.line.layers().peekable();
+        fn layers(
+            rectangle_layers: impl Iterator<Item = u32>,
+            glyph_layers: impl Iterator<Item = u32>,
+            line_layers: impl Iterator<Item = u32>,
+        ) -> impl Iterator<Item = ToRender> {
+            let mut rectangle_layers = rectangle_layers.peekable();
+            let mut glyph_layers = glyph_layers.peekable();
+            let mut line_layers = line_layers.peekable();
 
             std::iter::from_fn(move || {
                 let rectangle_layer = rectangle_layers.peek().copied();
@@ -240,7 +244,17 @@ impl Graphics {
             })
         };
 
-        for layer in layers() {
+        // Pre render
+        self.rectangle.pre_render(&self.queue);
+        self.glyph.pre_render(&self.queue);
+        self.line.pre_render(&self.queue);
+
+        // Render layers
+        for layer in layers(
+            self.rectangle.layers(),
+            self.glyph.layers(),
+            self.line.layers(),
+        ) {
             use ToRender::*;
             match layer {
                 Rectange(layer) => self.rectangle.render(layer, &self.queue, &mut render_pass),
@@ -254,10 +268,10 @@ impl Graphics {
         self.queue.submit([encoder.finish()]);
         output.present();
 
-        // Clear pipelines
-        self.rectangle.clear();
-        self.glyph.clear();
-        self.line.clear();
+        // Post render
+        self.rectangle.post_render();
+        self.glyph.post_render();
+        self.line.post_render();
     }
 }
 
