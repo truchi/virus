@@ -1,4 +1,4 @@
-use crate::rope3::{GraphemeCursor, WordClass, WordCursor};
+use crate::rope::{GraphemeCursor, WordClass, WordCursor};
 use ropey::Rope;
 use std::{cmp::Ordering, ops::Range};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
@@ -252,7 +252,6 @@ impl<'rope> RopeExtWord<'rope> {
 //                                             Tests                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-// TODO
 #[cfg(test)]
 mod tests {
     use super::*;

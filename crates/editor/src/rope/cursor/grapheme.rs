@@ -1,4 +1,4 @@
-use crate::rope3::ChunkCursor;
+use crate::rope::ChunkCursor;
 use ropey::RopeSlice;
 use std::ops::{
     Bound::{self, *},

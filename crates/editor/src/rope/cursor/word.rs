@@ -1,4 +1,4 @@
-use crate::rope3::GraphemeCursor;
+use crate::rope::GraphemeCursor;
 use ropey::RopeSlice;
 use std::ops::Range;
 
