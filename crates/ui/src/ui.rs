@@ -2,9 +2,13 @@ use crate::{
     tween::{Tween, Tweened},
     views::{DocumentView, FilesView},
 };
-use std::{ops::Range, sync::Arc, time::Duration};
-use virus_common::{Cursor, Rectangle, Rgba};
-use virus_editor::{document::Document, theme::Theme};
+use std::{sync::Arc, time::Duration};
+use virus_common::{Rectangle, Rgba};
+use virus_editor::{
+    document::{Document, Selection},
+    mode::SelectMode,
+    theme::Theme,
+};
 use virus_graphics::{
     text::{Context, Font, FontSize, FontStyle, FontWeight, Fonts, LineHeight},
     wgpu::Graphics,
@@ -28,7 +32,7 @@ pub struct Ui {
     document_view: DocumentView,
     scroll_top: Tweened<u32>,
     scrollbar_alpha: Tweened<u8>,
-    files_view: FilesView,
+    _files_view: FilesView,
 }
 
 impl Ui {
@@ -43,7 +47,7 @@ impl Ui {
             FONT_SIZE,
             LINE_HEIGHT,
         );
-        let files_view = FilesView::new(family.key(), FONT_SIZE, LINE_HEIGHT, Rgba::BLACK);
+        let _files_view = FilesView::new(family.key(), FONT_SIZE, LINE_HEIGHT, Rgba::BLACK);
 
         Self {
             window,
@@ -52,7 +56,7 @@ impl Ui {
             document_view,
             scroll_top: Tweened::new(0),
             scrollbar_alpha: Tweened::new(0),
-            files_view,
+            _files_view,
         }
     }
 
@@ -80,10 +84,10 @@ impl Ui {
         }
     }
 
-    pub fn ensure_visibility(&mut self, selection: Range<Cursor>) {
+    pub fn ensure_visibility(&mut self, selection: Selection) {
         let line_height = self.document_view.line_height();
         let screen_height_in_lines = self.screen_height_in_lines();
-        let line = selection.start.line as u32;
+        let line = selection.range().start.line as u32;
         let start = self.scroll_top.end() / line_height;
         let end = start + screen_height_in_lines;
 
@@ -103,13 +107,14 @@ impl Ui {
         self.scrollbar_alpha.step(delta);
     }
 
-    pub fn render(&mut self, document: &Document) {
+    pub fn render(&mut self, document: &Document, select_mode: Option<SelectMode>) {
         let region = self.region();
 
         self.document_view.render(
             &mut self.context,
             &mut self.graphics.layer(0, region),
             document,
+            select_mode,
             self.scroll_top.current(),
             self.scrollbar_alpha.current(),
         );

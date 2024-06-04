@@ -1,7 +1,7 @@
 use ropey::Rope;
 use std::{borrow::Cow, ops::Range};
 use virus_common::{Cursor, Position, Rectangle, Rgb, Rgba};
-use virus_editor::{document::Document, highlights::Highlight, theme::Theme};
+use virus_editor::{document::Document, highlights::Highlight, mode::SelectMode, theme::Theme};
 use virus_graphics::{
     text::{
         Advance, Context, FontFamilyKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
@@ -62,10 +62,20 @@ impl DocumentView {
         context: &mut Context,
         layer: &mut Layer,
         document: &Document,
+        select_mode: Option<SelectMode>,
         scroll_top: u32,
         scrollbar_alpha: u8,
     ) {
-        Renderer::new(self, context, layer, document, scroll_top, scrollbar_alpha).render();
+        Renderer::new(
+            self,
+            context,
+            layer,
+            document,
+            select_mode,
+            scroll_top,
+            scrollbar_alpha,
+        )
+        .render();
     }
 }
 
@@ -89,6 +99,7 @@ struct Renderer<'view, 'context, 'layer, 'graphics, 'document> {
     context: &'context mut Context,
     layer: &'layer mut Layer<'graphics>,
     document: &'document Document,
+    select_mode: Option<SelectMode>,
     scroll_top: u32,
     scrollbar_alpha: u8,
     start: usize,
@@ -101,23 +112,23 @@ struct Renderer<'view, 'context, 'layer, 'graphics, 'document> {
 impl<'view, 'context, 'layer, 'graphics, 'document>
     Renderer<'view, 'context, 'layer, 'graphics, 'document>
 {
-    const CARETS: [(i32, Rgba); 2] = [
-        (0, SURFACE1.transparent(255 / 1)),
-        (1, SURFACE1.transparent(255 / 1)),
+    const SELECTION_COLOR: Rgba = SURFACE1.transparent(255 / 2);
+    const CARET_COLOR: Rgba = SURFACE1.transparent(255);
+    const CARET_WIDTH: u32 = 4;
+    const OUTLINE_COLORS: [Rgba; 4] = [
+        SURFACE1.transparent(255 / 4),
+        SURFACE1.transparent(255 / 6),
+        SURFACE1.transparent(255 / 8),
+        SURFACE1.transparent(255 / 10),
     ];
-    const OUTLINES: [(i32, Rgba); 4] = [
-        (0, SURFACE1.transparent(255 / 4)),
-        (1, SURFACE1.transparent(255 / 6)),
-        (2, SURFACE1.transparent(255 / 8)),
-        (3, SURFACE1.transparent(255 / 10)),
-    ];
-    const SCROLLBAR: Rgb = SURFACE1;
+    const SCROLLBAR_COLOR: Rgb = SURFACE1;
 
     fn new(
         view: &'view mut DocumentView,
         context: &'context mut Context,
         layer: &'layer mut Layer<'graphics>,
         document: &'document Document,
+        select_mode: Option<SelectMode>,
         scroll_top: u32,
         scrollbar_alpha: u8,
     ) -> Self {
@@ -141,6 +152,7 @@ impl<'view, 'context, 'layer, 'graphics, 'document>
             context,
             layer,
             document,
+            select_mode,
             scroll_top,
             scrollbar_alpha,
             start,
@@ -155,14 +167,10 @@ impl<'view, 'context, 'layer, 'graphics, 'document>
         self.highlights();
         self.render_line_numbers();
         self.render_document();
-        self.render_selection(self.document.selection());
+        self.render_selection();
         self.render_scrollbar();
     }
-}
 
-impl<'view, 'context, 'draw, 'graphics, 'document>
-    Renderer<'view, 'context, 'draw, 'graphics, 'document>
-{
     fn row(&self, cursor: Cursor) -> i32 {
         1 + cursor.line as i32 * self.view.line_height as i32 - self.scroll_top as i32
     }
@@ -295,115 +303,121 @@ impl<'view, 'context, 'draw, 'graphics, 'document>
         }
     }
 
-    fn render_selection(&mut self, selection: Range<Cursor>) {
-        fn render_outline(
-            renderer: &mut Renderer,
-            top: Option<i32>,
-            bottom: Option<i32>,
-            left: i32,
-            right: i32,
-        ) {
-            for (i, color) in Renderer::OUTLINES {
+    fn render_selection(&mut self) {
+        let layer = 1;
+        let is_forward = self.document.selection().is_forward();
+        let range = self.document.selection().range();
+        let width = self.layer.size().width as i32;
+        let height = self.view.line_height as i32;
+        let top = self.row(range.start);
+        let bottom = self.row(range.end);
+        let start = self.column(range.start);
+        let end = self.column(range.end);
+
+        let render_outline = |renderer: &mut Renderer, top, bottom, left, right| {
+            for (i, color) in Renderer::OUTLINE_COLORS.into_iter().enumerate() {
+                let i = i as i32;
+
                 if let Some(top) = top {
+                    let i = i + 1; // TODO Why?!
                     renderer
                         .layer
-                        .draw(0)
+                        .draw(layer)
                         .polyline([(pos(top + i, left), color), (pos(top + i, right), color)]);
                 }
 
                 if let Some(bottom) = bottom {
-                    renderer.layer.draw(0).polyline([
+                    renderer.layer.draw(layer).polyline([
                         (pos(bottom - i, left), color),
                         (pos(bottom - i, right), color),
                     ]);
                 }
             }
-        }
-
-        let width = self.layer.size().width as i32;
-        let height = self.view.line_height as i32;
-        let top = self.row(selection.start);
-        let bottom = self.row(selection.end);
-        let start = self.column(selection.start);
-        let end = self.column(selection.end);
+        };
+        let render_selection = |renderer: &mut Renderer, top, left, width, height| {
+            renderer.layer.draw(layer).rectangle(
+                Rectangle {
+                    top,
+                    left,
+                    width: width as u32,
+                    height: height as u32,
+                },
+                Self::SELECTION_COLOR,
+            );
+        };
+        let render_caret = |renderer: &mut Renderer, top, left| {
+            renderer.layer.draw(layer).rectangle(
+                Rectangle {
+                    top,
+                    left: left - Self::CARET_WIDTH as i32 / 2,
+                    width: Self::CARET_WIDTH,
+                    height: height as u32,
+                },
+                Self::CARET_COLOR,
+            );
+        };
 
         // Caret
-        if selection.start.index == selection.end.index {
+        if range.start.index == range.end.index {
             let bottom = top + height;
 
-            render_outline(self, Some(top), Some(bottom), 0, width);
-
-            for (i, color) in Self::CARETS {
-                self.layer.draw(0).polyline([
-                    (pos(top, start - i), color),
-                    (pos(bottom, start - i), color),
-                ]);
-                self.layer.draw(0).polyline([
-                    (pos(top, start + i), color),
-                    (pos(bottom, start + i), color),
-                ]);
+            if self.select_mode == Some(SelectMode::Line) {
+                render_selection(self, top, 0, width, height);
+            } else {
+                render_outline(self, Some(top), Some(bottom), 0, width);
             }
+            render_caret(self, top, start);
         }
         // Single line
-        else if selection.start.line == selection.end.line {
+        else if range.start.line == range.end.line {
             let bottom = top + height;
 
-            render_outline(self, Some(top), Some(bottom), 0, start);
-            render_outline(self, Some(top), Some(bottom), end, width);
-
-            for (i, color) in Self::CARETS {
-                self.layer.draw(0).polygon([
-                    (pos(top + i, start + i), color),
-                    (pos(top + i, end - i), color),
-                    (pos(bottom - i, end - i), color),
-                    (pos(bottom - i, start + i), color),
-                ]);
+            if self.select_mode == Some(SelectMode::Line) {
+                render_selection(self, top, 0, width, height);
+            } else {
+                render_outline(self, Some(top), Some(bottom), 0, start);
+                render_outline(self, Some(top), Some(bottom), end, width);
+                render_selection(self, top, start, end - start, height);
             }
+            render_caret(self, top, if is_forward { end } else { start });
         }
         // Two non-overlapping lines
-        else if selection.start.line + 1 == selection.end.line && start > end {
+        else if range.start.line + 1 == range.end.line && start > end {
             let middle = top + height;
             let bottom = middle + height;
 
-            render_outline(self, Some(top), None, 0, start);
-            render_outline(self, None, Some(bottom), end, width);
-
-            for (i, color) in Self::CARETS {
-                self.layer.draw(0).polyline([
-                    (pos(top + i, width), color),
-                    (pos(top + i, start + i), color),
-                    (pos(middle - i, start + i), color),
-                    (pos(middle - i, width), color),
-                ]);
-                self.layer.draw(0).polyline([
-                    (pos(middle + i, 0), color),
-                    (pos(middle + i, end - i), color),
-                    (pos(bottom - i, end - i), color),
-                    (pos(bottom - i, 0), color),
-                ]);
+            if self.select_mode == Some(SelectMode::Line) {
+                render_selection(self, top, 0, width, 2 * height);
+            } else {
+                render_outline(self, Some(top), None, 0, start);
+                render_outline(self, None, Some(bottom), end, width);
+                render_selection(self, top, start, width - start, height);
+                render_selection(self, middle, 0, end, height);
             }
+            render_caret(
+                self,
+                if is_forward { middle } else { top },
+                if is_forward { end } else { start },
+            );
         }
         // Two lines or more
         else {
-            let (top1, top2, bottom1, bottom2) = (top, top + height, bottom, bottom + height);
+            let (top2, bottom2) = (top + height, bottom + height);
 
-            render_outline(self, Some(top1), None, 0, start);
-            render_outline(self, None, Some(bottom2), end, width);
-
-            for (i, color) in Self::CARETS {
-                self.layer.draw(0).polyline([
-                    (pos(top2 + i, 0), color),
-                    (pos(top2 + i, start + i), color),
-                    (pos(top1 + i, start + i), color),
-                    (pos(top1 + i, width), color),
-                ]);
-                self.layer.draw(0).polyline([
-                    (pos(bottom1 - i, width), color),
-                    (pos(bottom1 - i, end - i), color),
-                    (pos(bottom2 - i, end - i), color),
-                    (pos(bottom2 - i, 0), color),
-                ]);
+            if self.select_mode == Some(SelectMode::Line) {
+                render_selection(self, top, 0, width, bottom2 - top);
+            } else {
+                render_outline(self, Some(top), None, 0, start);
+                render_outline(self, None, Some(bottom2), end, width);
+                render_selection(self, top, start, width - start, height);
+                render_selection(self, top2, 0, width, bottom - top2);
+                render_selection(self, bottom, 0, end, height);
             }
+            render_caret(
+                self,
+                if is_forward { bottom } else { top },
+                if is_forward { end } else { start },
+            );
         }
     }
 
@@ -424,8 +438,9 @@ impl<'view, 'context, 'draw, 'graphics, 'document>
             width: (self.advance / 4.0).round() as u32,
         };
 
-        self.layer
-            .draw(0)
-            .rectangle(rectangle, Self::SCROLLBAR.transparent(self.scrollbar_alpha));
+        self.layer.draw(0).rectangle(
+            rectangle,
+            Self::SCROLLBAR_COLOR.transparent(self.scrollbar_alpha),
+        );
     }
 }

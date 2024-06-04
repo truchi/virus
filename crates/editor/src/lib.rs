@@ -1,5 +1,6 @@
 pub mod document;
 pub mod highlights;
+pub mod mode;
 pub mod rope {
     pub use cursor::chunk::*;
     pub use cursor::grapheme::*;

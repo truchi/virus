@@ -5,12 +5,74 @@ use tree_sitter::{Parser, Query, Tree};
 use virus_common::Cursor;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                           Selection                                            //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+#[derive(Copy, Clone, Default, Debug)]
+pub struct Selection {
+    anchor: Cursor,
+    head: Cursor,
+}
+
+impl From<Cursor> for Selection {
+    fn from(cursor: Cursor) -> Self {
+        Self::cursor(cursor)
+    }
+}
+
+impl Selection {
+    pub fn new(anchor: Cursor, head: Cursor) -> Self {
+        Self { anchor, head }
+    }
+
+    pub fn cursor(cursor: Cursor) -> Self {
+        Self::new(cursor, cursor)
+    }
+
+    pub fn is_forward(&self) -> bool {
+        if self.anchor <= self.head {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn range(&self) -> Range<Cursor> {
+        if self.is_forward() {
+            self.anchor..self.head
+        } else {
+            self.head..self.anchor
+        }
+    }
+
+    pub fn flip(&self) -> Self {
+        Self::new(self.head, self.anchor)
+    }
+
+    pub fn flip_mut(&mut self) {
+        *self = Self::new(self.head, self.anchor);
+    }
+
+    pub fn move_to(&self, cursor: Cursor, selection: bool) -> Self {
+        if selection {
+            Self::new(self.anchor, cursor)
+        } else {
+            Self::cursor(cursor)
+        }
+    }
+
+    pub fn move_to_mut(&mut self, cursor: Cursor, selection: bool) {
+        *self = self.move_to(cursor, selection);
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            Document                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct Document {
     rope: Rope,
-    selection: Range<Cursor>,
+    selection: Selection,
     highlights: Query,
     parser: Parser,
     tree: Tree,
@@ -61,12 +123,8 @@ impl Document {
         &self.rope
     }
 
-    pub fn selection(&self) -> Range<Cursor> {
-        self.selection.clone()
-    }
-
-    pub fn selection_mut(&mut self) -> &mut Range<Cursor> {
-        &mut self.selection
+    pub fn selection(&self) -> Selection {
+        self.selection
     }
 
     pub fn highlights(&self, lines: Range<usize>) -> Highlights {
@@ -80,52 +138,48 @@ impl Document {
 
 /// Movements.
 impl Document {
-    pub fn move_up(&mut self) {
-        // TODO start != end?
-        let cursor = self.rope.grapheme().above(self.selection.start);
-        self.selection = cursor..cursor;
+    pub fn move_anchor_to_head(&mut self) {
+        self.selection = self.selection.head.into();
     }
 
-    pub fn move_down(&mut self) {
-        // TODO start != end?
-        let cursor = self.rope.grapheme().below(self.selection.start);
-        self.selection = cursor..cursor;
+    pub fn move_up(&mut self, selection: bool) {
+        self.selection
+            .move_to_mut(self.rope.grapheme().above(self.selection.head), selection);
     }
 
-    pub fn move_prev_grapheme(&mut self) {
-        // TODO start != end?
-        let cursor = self.rope.grapheme().prev(self.selection.start);
-        self.selection = cursor..cursor;
+    pub fn move_down(&mut self, selection: bool) {
+        self.selection
+            .move_to_mut(self.rope.grapheme().below(self.selection.head), selection);
     }
 
-    pub fn move_next_grapheme(&mut self) {
-        // TODO start != end?
-        let cursor = self.rope.grapheme().next(self.selection.start);
-        self.selection = cursor..cursor;
+    pub fn move_prev_grapheme(&mut self, selection: bool) {
+        self.selection
+            .move_to_mut(self.rope.grapheme().prev(self.selection.head), selection);
     }
 
-    pub fn move_prev_start_of_word(&mut self) {
-        // TODO start != end?
-        let cursor = self.rope.word().prev_start(self.selection.start);
-        self.selection = cursor..cursor;
+    pub fn move_next_grapheme(&mut self, selection: bool) {
+        self.selection
+            .move_to_mut(self.rope.grapheme().next(self.selection.head), selection);
     }
 
-    pub fn move_prev_end_of_word(&mut self) {
-        // TODO start != end?
-        let cursor = self.rope.word().prev_end(self.selection.start);
-        self.selection = cursor..cursor;
+    pub fn move_prev_start_of_word(&mut self, selection: bool) {
+        self.selection
+            .move_to_mut(self.rope.word().prev_start(self.selection.head), selection);
     }
 
-    pub fn move_next_start_of_word(&mut self) {
-        // TODO start != end?
-        let cursor = self.rope.word().next_start(self.selection.start);
-        self.selection = cursor..cursor;
+    pub fn move_prev_end_of_word(&mut self, selection: bool) {
+        self.selection
+            .move_to_mut(self.rope.word().prev_end(self.selection.head), selection);
     }
 
-    pub fn move_next_end_of_word(&mut self) {
-        // TODO start != end?
-        let cursor = self.rope.word().next_end(self.selection.start);
-        self.selection = cursor..cursor;
+    pub fn move_next_start_of_word(&mut self, selection: bool) {
+        self.selection
+            .move_to_mut(self.rope.word().next_start(self.selection.head), selection);
+    }
+
+    pub fn move_next_end_of_word(&mut self, selection: bool) {
+        self.selection
+            .move_to_mut(self.rope.word().next_end(self.selection.head), selection);
     }
 }
 
@@ -134,16 +188,16 @@ impl Document {
     pub fn edit(&mut self, str: &str) {
         // TODO edit cursors and tree
 
-        let Range { start, end } = self.selection;
+        let Range { start, end } = self.selection.range();
         self.rope.replace(start..end, str);
 
         let cursor = self.rope.cursor().index(start.index + str.len());
         self.edit_tree(start, end, cursor);
-        self.selection = cursor..cursor;
+        self.selection = cursor.into();
     }
 
     pub fn backspace(&mut self) -> Result<(), ()> {
-        let Range { start, end } = self.selection;
+        let Range { start, end } = self.selection.range();
 
         if start != end {
             // TODO What to do here?
@@ -157,7 +211,7 @@ impl Document {
                 .remove(self.rope.byte_to_char(start.index)..self.rope.byte_to_char(end.index));
 
             self.edit_tree(start, end, start);
-            self.selection = start..start;
+            self.selection = start.into();
         }
 
         Ok(())

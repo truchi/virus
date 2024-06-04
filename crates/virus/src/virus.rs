@@ -5,7 +5,10 @@
 use crate::events::{Event, Events, Key};
 use std::{sync::Arc, time::Instant};
 use virus_common::Cursor;
-use virus_editor::document::Document;
+use virus_editor::{
+    document::Document,
+    mode::{Mode, SelectMode},
+};
 use virus_ui::ui::Ui;
 use winit::{
     application::ApplicationHandler,
@@ -73,11 +76,6 @@ impl ApplicationHandler for Handler {
 //                                             Virus                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-enum Mode {
-    Normal,
-    Insert,
-}
-
 pub struct Virus {
     events: Events,
     document: Document,
@@ -110,7 +108,7 @@ impl Virus {
         Self {
             events,
             document,
-            mode: Mode::Normal,
+            mode: Mode::default(),
             ui,
             last_render: None,
         }
@@ -120,36 +118,45 @@ impl Virus {
 /// Event handlers.
 impl Virus {
     fn on_key(&mut self, key: Key, event_loop: &ActiveEventLoop) {
-        match self.mode {
-            Mode::Normal => match key {
+        match &mut self.mode {
+            Mode::Normal { select_mode } => match key {
                 Key::Str("i") => {
-                    self.document.move_up();
+                    self.document.move_up(select_mode.is_some());
                     self.ui.ensure_visibility(self.document.selection());
                 }
                 Key::Str("k") => {
-                    self.document.move_down();
+                    self.document.move_down(select_mode.is_some());
                     self.ui.ensure_visibility(self.document.selection());
                 }
-                Key::Str("j") => self.document.move_prev_grapheme(),
-                Key::Str("l") => self.document.move_next_grapheme(),
+                Key::Str("j") => self.document.move_prev_grapheme(select_mode.is_some()),
+                Key::Str("l") => self.document.move_next_grapheme(select_mode.is_some()),
                 Key::Str("e") => {
-                    self.document.move_next_end_of_word();
+                    self.document.move_next_end_of_word(select_mode.is_some());
                     self.ui.ensure_visibility(self.document.selection());
                 }
                 Key::Str("E") => {
-                    self.document.move_prev_end_of_word();
+                    self.document.move_prev_end_of_word(select_mode.is_some());
                     self.ui.ensure_visibility(self.document.selection());
                 }
                 Key::Str("w") => {
-                    self.document.move_next_start_of_word();
+                    self.document.move_next_start_of_word(select_mode.is_some());
                     self.ui.ensure_visibility(self.document.selection());
                 }
                 Key::Str("W") => {
-                    self.document.move_prev_start_of_word();
+                    self.document.move_prev_start_of_word(select_mode.is_some());
                     self.ui.ensure_visibility(self.document.selection());
                 }
                 Key::Str("y") => self.ui.scroll_up(),
                 Key::Str("h") => self.ui.scroll_down(),
+                Key::Str("v") => match select_mode {
+                    Some(SelectMode::Range) => *select_mode = Some(SelectMode::Line),
+                    Some(SelectMode::Line) => *select_mode = Some(SelectMode::Range),
+                    None => *select_mode = Some(SelectMode::Range),
+                },
+                Key::Str("V") => {
+                    *select_mode = None;
+                    self.document.move_anchor_to_head();
+                }
                 // Key::Str("s") if self.events.command() => self.document.save().unwrap(),
                 Key::Escape => event_loop.exit(),
                 _ => (),
@@ -159,7 +166,7 @@ impl Virus {
                 Key::Space => self.document.edit(" "),
                 Key::Backspace => self.document.backspace().unwrap(),
                 Key::Enter => self.document.edit("\n"),
-                Key::Escape => self.mode = Mode::Normal,
+                Key::Escape => self.mode = Mode::default(),
                 _ => (),
             },
         }
@@ -192,7 +199,7 @@ impl Virus {
 
         self.last_render = Some(now);
         self.ui.update(delta);
-        self.ui.render(&self.document);
+        self.ui.render(&self.document, self.mode.select_mode());
 
         if self.ui.is_animating() {
             self.ui.window().request_redraw();

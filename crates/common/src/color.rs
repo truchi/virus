@@ -74,9 +74,3 @@ impl Rgba {
         self.a != 0
     }
 }
-
-impl From<Rgba> for [u8; 4] {
-    fn from(color: Rgba) -> Self {
-        [color.r, color.g, color.b, color.a]
-    }
-}
