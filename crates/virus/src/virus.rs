@@ -150,7 +150,10 @@ impl Virus {
                 Key::Str("h") => self.ui.scroll_down(),
                 Key::Str("v") => match select_mode {
                     Some(SelectMode::Range) => *select_mode = Some(SelectMode::Line),
-                    Some(SelectMode::Line) => *select_mode = Some(SelectMode::Range),
+                    Some(SelectMode::Line) => {
+                        self.document.flip_anchor_and_head();
+                        *select_mode = Some(SelectMode::Range);
+                    }
                     None => *select_mode = Some(SelectMode::Range),
                 },
                 Key::Str("V") => {

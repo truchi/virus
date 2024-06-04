@@ -142,6 +142,10 @@ impl Document {
         self.selection = self.selection.head.into();
     }
 
+    pub fn flip_anchor_and_head(&mut self) {
+        self.selection.flip_mut();
+    }
+
     pub fn move_up(&mut self, selection: bool) {
         self.selection
             .move_to_mut(self.rope.grapheme().above(self.selection.head), selection);
