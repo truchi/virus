@@ -7,7 +7,7 @@ use virus_common::{Rectangle, Rgba};
 use virus_editor::{
     document::{Document, Selection},
     mode::SelectMode,
-    theme::Theme,
+    syntax::Theme,
 };
 use virus_graphics::{
     text::{Context, Font, FontSize, FontStyle, FontWeight, Fonts, LineHeight},
@@ -41,12 +41,8 @@ impl Ui {
         let context = Context::new(fonts());
         let family = context.fonts().get("Victor").unwrap();
 
-        let document_view = DocumentView::new(
-            family.key(),
-            Theme::catppuccin_latte(),
-            FONT_SIZE,
-            LINE_HEIGHT,
-        );
+        let document_view =
+            DocumentView::new(family.key(), Theme::catppuccin(), FONT_SIZE, LINE_HEIGHT);
         let _files_view = FilesView::new(family.key(), FONT_SIZE, LINE_HEIGHT, Rgba::BLACK);
 
         Self {

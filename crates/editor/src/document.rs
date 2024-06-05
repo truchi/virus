@@ -1,4 +1,4 @@
-use crate::{highlights::Highlights, rope::RopeExt};
+use crate::{rope::RopeExt, syntax::Highlights};
 use ropey::Rope;
 use std::{fs::File, io::BufReader, ops::Range, usize};
 use tree_sitter::{Parser, Query, Tree};

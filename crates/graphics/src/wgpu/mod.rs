@@ -181,20 +181,13 @@ impl Graphics {
                 resolve_target: None,
                 ops: Operations {
                     load: LoadOp::Clear({
-                        // Catppuccin latte
-                        let base = Color {
-                            r: 0.937,
-                            g: 0.945,
-                            b: 0.960,
-                            a: 1.0,
-                        };
-                        let crust = Color {
-                            r: 0.862,
-                            g: 0.878,
-                            b: 0.909,
-                            a: 1.0,
-                        };
-                        crust
+                        let color = virus_common::Catppuccin::default().crust;
+                        Color {
+                            r: color.r as f64 / 255.0,
+                            g: color.g as f64 / 255.0,
+                            b: color.b as f64 / 255.0,
+                            a: color.a as f64 / 255.0,
+                        }
                     }),
                     store: StoreOp::Store,
                 },

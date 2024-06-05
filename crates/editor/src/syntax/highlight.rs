@@ -1,4 +1,4 @@
-use crate::theme::ThemeKey;
+use crate::syntax::ThemeKey;
 use ropey::Rope;
 use std::ops::Range;
 use tree_sitter::{Node, Query, QueryCursor};

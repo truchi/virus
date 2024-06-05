@@ -3,7 +3,7 @@ use virus_common::Rgba;
 use virus_graphics::text::Styles;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                             ThemeKey                                           //
+//                                            ThemeKey                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
@@ -103,7 +103,7 @@ impl ThemeKey {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                              Theme                                             //
+//                                             Theme                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -158,100 +158,68 @@ impl Theme {
     }
 
     /// https://github.com/catppuccin/helix/blob/main/themes/default/catppuccin_latte.toml
-    pub fn catppuccin_latte() -> Self {
+    pub fn catppuccin() -> Self {
         use virus_graphics::text::{
             FontStyle::{self, *},
             FontWeight::{self, *},
         };
 
-        fn style(color: &str, weight: FontWeight, style: FontStyle) -> Styles {
-            let (r, g, b) = (
-                u8::from_str_radix(&color[1..3], 16).unwrap(),
-                u8::from_str_radix(&color[3..5], 16).unwrap(),
-                u8::from_str_radix(&color[5..7], 16).unwrap(),
-            );
-
+        fn style(foreground: Rgba, weight: FontWeight, style: FontStyle) -> Styles {
             Styles {
                 weight,
                 style,
                 underline: Default::default(),
                 strike: Default::default(),
-                foreground: Rgba::new(r, g, b, u8::MAX),
+                foreground,
                 background: Default::default(),
             }
         }
 
-        let _rosewater = "#dc8a78";
-        let _flamingo = "#dd7878";
-        let pink = "#ea76cb";
-        let mauve = "#8839ef";
-        let red = "#d20f39";
-        let maroon = "#e64553";
-        let peach = "#fe640b";
-        let yellow = "#df8e1d";
-        let green = "#40a02b";
-        let teal = "#179299";
-        let sky = "#04a5e5";
-        let sapphire = "#209fb5";
-        let blue = "#1e66f5";
-        let _lavender = "#7287fd";
-        let text = "#4c4f69";
-        let _subtext1 = "#5c5f77";
-        let _subtext0 = "#6c6f85";
-        let overlay2 = "#7c7f93";
-        let _overlay1 = "#8c8fa1";
-        let _overlay0 = "#9ca0b0";
-        let _surface2 = "#acb0be";
-        let _surface1 = "#bcc0cc";
-        let _surface0 = "#ccd0da";
-        let _base = "#eff1f5";
-        let _mantle = "#e6e9ef";
-        let _crust = "#dce0e8";
-        let regular = Black;
+        let catppuccin = virus_common::Catppuccin::default();
 
         Self {
-            default: style(text, regular, Normal),
-            attribute: style(yellow, regular, Normal),
-            comment: style(overlay2, regular, Italic),
-            constant: style(peach, regular, Normal),
-            constant_builtin_boolean: style(pink, regular, Normal),
-            constant_character: style(teal, regular, Normal),
-            constant_character_escape: style(pink, regular, Normal),
-            constant_numeric_float: style(pink, regular, Normal),
-            constant_numeric_integer: style(pink, regular, Normal),
-            constructor: style(sapphire, regular, Normal),
-            function: style(blue, regular, Normal),
-            function_macro: style(mauve, regular, Normal),
-            function_method: style(mauve, regular, Normal),
-            keyword: style(mauve, regular, Normal),
-            keyword_control: style(mauve, regular, Normal),
-            keyword_control_conditional: style(mauve, regular, Normal),
-            keyword_control_import: style(mauve, regular, Normal),
-            keyword_control_repeat: style(mauve, regular, Normal),
-            keyword_control_return: style(mauve, regular, Normal),
-            keyword_function: style(mauve, regular, Normal),
-            keyword_operator: style(mauve, regular, Normal),
-            keyword_special: style(mauve, regular, Normal),
-            keyword_storage: style(mauve, regular, Normal),
-            keyword_storage_modifier: style(mauve, regular, Normal),
-            keyword_storage_modifier_mut: style(mauve, regular, Normal),
-            keyword_storage_modifier_ref: style(mauve, regular, Normal),
-            keyword_storage_type: style(mauve, regular, Normal),
-            label: style(sapphire, regular, Normal),
-            namespace: style(yellow, regular, Normal),
-            operator: style(sky, regular, Normal),
-            punctuation_bracket: style(overlay2, regular, Normal),
-            punctuation_delimiter: style(sky, regular, Normal),
-            special: style(blue, regular, Normal),
-            string: style(green, regular, Normal),
-            r#type: style(yellow, regular, Normal),
-            type_builtin: style(yellow, regular, Normal),
-            type_enum_variant: style(teal, regular, Normal),
-            type_parameter: style(yellow, regular, Normal),
-            variable: style(text, regular, Normal),
-            variable_builtin: style(red, regular, Normal),
-            variable_other_member: style(teal, regular, Normal),
-            variable_parameter: style(maroon, regular, Normal),
+            default: style(catppuccin.text, Black, Normal),
+            attribute: style(catppuccin.yellow, Black, Normal),
+            comment: style(catppuccin.overlay2, Black, Italic),
+            constant: style(catppuccin.peach, Black, Normal),
+            constant_builtin_boolean: style(catppuccin.pink, Black, Normal),
+            constant_character: style(catppuccin.teal, Black, Normal),
+            constant_character_escape: style(catppuccin.pink, Black, Normal),
+            constant_numeric_float: style(catppuccin.pink, Black, Normal),
+            constant_numeric_integer: style(catppuccin.pink, Black, Normal),
+            constructor: style(catppuccin.sapphire, Black, Normal),
+            function: style(catppuccin.blue, Black, Normal),
+            function_macro: style(catppuccin.mauve, Black, Normal),
+            function_method: style(catppuccin.mauve, Black, Normal),
+            keyword: style(catppuccin.mauve, Black, Normal),
+            keyword_control: style(catppuccin.mauve, Black, Normal),
+            keyword_control_conditional: style(catppuccin.mauve, Black, Normal),
+            keyword_control_import: style(catppuccin.mauve, Black, Normal),
+            keyword_control_repeat: style(catppuccin.mauve, Black, Normal),
+            keyword_control_return: style(catppuccin.mauve, Black, Normal),
+            keyword_function: style(catppuccin.mauve, Black, Normal),
+            keyword_operator: style(catppuccin.mauve, Black, Normal),
+            keyword_special: style(catppuccin.mauve, Black, Normal),
+            keyword_storage: style(catppuccin.mauve, Black, Normal),
+            keyword_storage_modifier: style(catppuccin.mauve, Black, Normal),
+            keyword_storage_modifier_mut: style(catppuccin.mauve, Black, Normal),
+            keyword_storage_modifier_ref: style(catppuccin.mauve, Black, Normal),
+            keyword_storage_type: style(catppuccin.mauve, Black, Normal),
+            label: style(catppuccin.sapphire, Black, Normal),
+            namespace: style(catppuccin.yellow, Black, Normal),
+            operator: style(catppuccin.sky, Black, Normal),
+            punctuation_bracket: style(catppuccin.overlay2, Black, Normal),
+            punctuation_delimiter: style(catppuccin.sky, Black, Normal),
+            special: style(catppuccin.blue, Black, Normal),
+            string: style(catppuccin.green, Black, Normal),
+            r#type: style(catppuccin.yellow, Black, Normal),
+            type_builtin: style(catppuccin.yellow, Black, Normal),
+            type_enum_variant: style(catppuccin.teal, Black, Normal),
+            type_parameter: style(catppuccin.yellow, Black, Normal),
+            variable: style(catppuccin.text, Black, Normal),
+            variable_builtin: style(catppuccin.red, Black, Normal),
+            variable_other_member: style(catppuccin.teal, Black, Normal),
+            variable_parameter: style(catppuccin.maroon, Black, Normal),
         }
     }
 }

@@ -1,7 +1,11 @@
 use ropey::Rope;
 use std::{borrow::Cow, ops::Range};
 use virus_common::{Cursor, Position, Rectangle, Rgb, Rgba};
-use virus_editor::{document::Document, highlights::Highlight, mode::SelectMode, theme::Theme};
+use virus_editor::{
+    document::Document,
+    mode::SelectMode,
+    syntax::{Highlight, Theme},
+};
 use virus_graphics::{
     text::{
         Advance, Context, FontFamilyKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
