@@ -3,7 +3,6 @@ use std::{borrow::Cow, ops::Range};
 use virus_common::{Cursor, Position, Rectangle, Rgb, Rgba};
 use virus_editor::{
     document::Document,
-    mode::SelectMode,
     syntax::{Highlight, Theme},
 };
 use virus_graphics::{
@@ -66,7 +65,7 @@ impl DocumentView {
         context: &mut Context,
         layer: &mut Layer,
         document: &Document,
-        select_mode: Option<SelectMode>,
+        show_selection_as_lines: bool,
         scroll_top: u32,
         scrollbar_alpha: u8,
     ) {
@@ -75,7 +74,7 @@ impl DocumentView {
             context,
             layer,
             document,
-            select_mode,
+            show_selection_as_lines,
             scroll_top,
             scrollbar_alpha,
         )
@@ -103,7 +102,7 @@ struct Renderer<'view, 'context, 'layer, 'graphics, 'document> {
     context: &'context mut Context,
     layer: &'layer mut Layer<'graphics>,
     document: &'document Document,
-    select_mode: Option<SelectMode>,
+    show_selection_as_lines: bool,
     scroll_top: u32,
     scrollbar_alpha: u8,
     start: usize,
@@ -132,7 +131,7 @@ impl<'view, 'context, 'layer, 'graphics, 'document>
         context: &'context mut Context,
         layer: &'layer mut Layer<'graphics>,
         document: &'document Document,
-        select_mode: Option<SelectMode>,
+        show_selection_as_lines: bool,
         scroll_top: u32,
         scrollbar_alpha: u8,
     ) -> Self {
@@ -156,7 +155,7 @@ impl<'view, 'context, 'layer, 'graphics, 'document>
             context,
             layer,
             document,
-            select_mode,
+            show_selection_as_lines,
             scroll_top,
             scrollbar_alpha,
             start,
@@ -365,7 +364,7 @@ impl<'view, 'context, 'layer, 'graphics, 'document>
         if range.start.index == range.end.index {
             let bottom = top + height;
 
-            if self.select_mode == Some(SelectMode::Line) {
+            if self.show_selection_as_lines {
                 render_selection(self, top, 0, width, height);
             } else {
                 render_outline(self, Some(top), Some(bottom), 0, width);
@@ -376,7 +375,7 @@ impl<'view, 'context, 'layer, 'graphics, 'document>
         else if range.start.line == range.end.line {
             let bottom = top + height;
 
-            if self.select_mode == Some(SelectMode::Line) {
+            if self.show_selection_as_lines {
                 render_selection(self, top, 0, width, height);
             } else {
                 render_outline(self, Some(top), Some(bottom), 0, start);
@@ -390,7 +389,7 @@ impl<'view, 'context, 'layer, 'graphics, 'document>
             let middle = top + height;
             let bottom = middle + height;
 
-            if self.select_mode == Some(SelectMode::Line) {
+            if self.show_selection_as_lines {
                 render_selection(self, top, 0, width, 2 * height);
             } else {
                 render_outline(self, Some(top), None, 0, start);
@@ -408,7 +407,7 @@ impl<'view, 'context, 'layer, 'graphics, 'document>
         else {
             let (top2, bottom2) = (top + height, bottom + height);
 
-            if self.select_mode == Some(SelectMode::Line) {
+            if self.show_selection_as_lines {
                 render_selection(self, top, 0, width, bottom2 - top);
             } else {
                 render_outline(self, Some(top), None, 0, start);

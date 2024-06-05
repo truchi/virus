@@ -1,5 +1,4 @@
 pub mod document;
-pub mod mode;
 pub mod rope {
     pub use cursor::chunk::*;
     pub use cursor::grapheme::*;

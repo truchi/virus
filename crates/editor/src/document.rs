@@ -72,7 +72,7 @@ impl Selection {
 
 pub struct Document {
     rope: Rope,
-    selection: Selection,
+    selection: Selection, // TODO Should we really have this here?
     highlights: Query,
     parser: Parser,
     tree: Tree,

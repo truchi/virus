@@ -6,7 +6,6 @@ use std::{sync::Arc, time::Duration};
 use virus_common::{Rectangle, Rgba};
 use virus_editor::{
     document::{Document, Selection},
-    mode::SelectMode,
     syntax::Theme,
 };
 use virus_graphics::{
@@ -103,14 +102,14 @@ impl Ui {
         self.scrollbar_alpha.step(delta);
     }
 
-    pub fn render(&mut self, document: &Document, select_mode: Option<SelectMode>) {
+    pub fn render(&mut self, document: &Document, show_selection_as_lines: bool) {
         let region = self.region();
 
         self.document_view.render(
             &mut self.context,
             &mut self.graphics.layer(0, region),
             document,
-            select_mode,
+            show_selection_as_lines,
             self.scroll_top.current(),
             self.scrollbar_alpha.current(),
         );

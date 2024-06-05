@@ -5,10 +5,7 @@
 use crate::events::{Event, Events, Key};
 use std::{sync::Arc, time::Instant};
 use virus_common::Cursor;
-use virus_editor::{
-    document::Document,
-    mode::{Mode, SelectMode},
-};
+use virus_editor::document::Document;
 use virus_ui::ui::Ui;
 use winit::{
     application::ApplicationHandler,
@@ -75,6 +72,30 @@ impl ApplicationHandler for Handler {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Virus                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum SelectMode {
+    Range,
+    Line,
+}
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum Mode {
+    Normal { select_mode: Option<SelectMode> },
+    Insert,
+}
+
+impl Default for Mode {
+    fn default() -> Self {
+        Self::Normal {
+            select_mode: Default::default(),
+        }
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
 
 pub struct Virus {
     events: Events,
@@ -202,7 +223,15 @@ impl Virus {
 
         self.last_render = Some(now);
         self.ui.update(delta);
-        self.ui.render(&self.document, self.mode.select_mode());
+        self.ui.render(
+            &self.document,
+            matches!(
+                self.mode,
+                Mode::Normal {
+                    select_mode: Some(SelectMode::Line)
+                },
+            ),
+        );
 
         if self.ui.is_animating() {
             self.ui.window().request_redraw();
