@@ -1,8 +1,7 @@
-use crate::syntax::ThemeKey;
+use crate::{cursor::Cursor, syntax::ThemeKey};
 use ropey::Rope;
 use std::ops::Range;
 use tree_sitter::{Node, Query, QueryCursor};
-use virus_common::Cursor;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           Highlight                                            //

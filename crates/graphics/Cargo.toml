@@ -9,6 +9,5 @@ bytemuck.workspace = true
 image.workspace = true
 pollster.workspace = true
 swash.workspace = true
-virus-common.workspace = true
 wgpu.workspace = true
 winit.workspace = true

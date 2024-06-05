@@ -5,7 +5,11 @@ mod glyph;
 mod line;
 mod rectangle;
 
-use crate::text::{Context, FontSize, Glyph, GlyphKey, Line, LineHeight, LineScaler};
+use crate::{
+    muck::WithAttributes,
+    text::{Context, FontSize, Glyph, GlyphKey, Line, LineHeight, LineScaler},
+    types::{Position, Rectangle, Rgba, Size},
+};
 use atlas::{Atlas, AtlasError};
 use glyph::Pipeline as GlyphPipeline;
 use line::Pipeline as LinePipeline;
@@ -21,7 +25,6 @@ use swash::{
     scale::image::{Content, Image},
     zeno::Placement,
 };
-use virus_common::{muck, Position, Rectangle, Rgba, Size, WithAttributes};
 use wgpu::{
     include_wgsl, vertex_attr_array, BindGroup, BindGroupDescriptor, BindGroupEntry,
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
@@ -181,7 +184,7 @@ impl Graphics {
                 resolve_target: None,
                 ops: Operations {
                     load: LoadOp::Clear({
-                        let color = virus_common::Catppuccin::default().crust;
+                        let color = crate::Catppuccin::default().crust;
                         Color {
                             r: color.r as f64 / 255.0,
                             g: color.g as f64 / 255.0,

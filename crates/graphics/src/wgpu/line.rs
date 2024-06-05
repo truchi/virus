@@ -10,7 +10,7 @@ macro_rules! label {
 //                                             Vertex                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-muck!(unsafe Vertex => Vertex: [Position, Rgba]);
+crate::muck!(unsafe Vertex => Vertex: [Position, Rgba]);
 
 /// Vertex.
 #[repr(C)]

@@ -4,10 +4,10 @@ use crate::{
     views::{DocumentView, FilesView},
 };
 use std::{sync::Arc, time::Duration};
-use virus_common::{Rectangle, Rgba};
 use virus_editor::document::{Document, Selection};
 use virus_graphics::{
     text::{Context, Font, FontStyle, FontWeight, Fonts},
+    types::{Rectangle, Rgba},
     wgpu::Graphics,
 };
 use winit::window::Window;

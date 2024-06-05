@@ -306,15 +306,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "common"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "tree-sitter",
- "wgpu",
-]
-
-[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -435,7 +426,6 @@ checksum = "f25c0e292a7ca6d6498557ff1df68f32c99850012b6ea401cf8daf771f22ff53"
 name = "editor"
 version = "0.1.0"
 dependencies = [
- "common",
  "graphics",
  "ropey",
  "tree-sitter",
@@ -616,7 +606,6 @@ name = "graphics"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
- "common",
  "image",
  "pollster",
  "swash",
@@ -1612,7 +1601,6 @@ checksum = "90aba0c5c9d07e12084c38dcbf0f4b16f74801b588650ad633f9d7e9a0143952"
 name = "ui"
 version = "0.1.0"
 dependencies = [
- "common",
  "editor",
  "graphics",
  "ropey",
@@ -1655,7 +1643,6 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 name = "virus"
 version = "0.1.0"
 dependencies = [
- "common",
  "editor",
  "ui",
  "winit",

@@ -15,7 +15,7 @@ const COLOR_ATLAS_SURFACE_FACTOR: u32 = 2;
 //                                              Type                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-muck!(unsafe Type => Uint32);
+crate::muck!(unsafe Type => Uint32);
 
 /// Type: [`Type::MASK`]/[`Type::COLOR`].
 #[repr(C)]
@@ -31,7 +31,7 @@ impl Type {
 //                                            Instance                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-muck!(unsafe Instance => Instance: [Type, Position, Size, Position, Rgba]);
+crate::muck!(unsafe Instance => Instance: [Type, Position, Size, Position, Rgba]);
 
 /// Instance.
 #[repr(C)]

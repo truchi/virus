@@ -1,8 +1,7 @@
-use crate::{rope::RopeExt, syntax::Highlights};
+use crate::{cursor::Cursor, rope::RopeExt, syntax::Highlights};
 use ropey::Rope;
 use std::{fs::File, io::BufReader, ops::Range, usize};
 use tree_sitter::{Parser, Query, Tree};
-use virus_common::Cursor;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           Selection                                            //

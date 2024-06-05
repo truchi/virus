@@ -28,9 +28,9 @@ macro_rules! muck {
         unsafe impl ::bytemuck::Pod for $Type {}
         unsafe impl ::bytemuck::Zeroable for $Type {}
 
-        impl $crate::Muck for $Type {}
+        impl $crate::muck::Muck for $Type {}
 
-        impl $crate::WithFormat for $Type {
+        impl $crate::muck::WithFormat for $Type {
             const FORMAT: ::wgpu::VertexFormat = ::wgpu::VertexFormat::$format;
         }
     };
@@ -38,9 +38,9 @@ macro_rules! muck {
         unsafe impl ::bytemuck::Pod for $Type {}
         unsafe impl ::bytemuck::Zeroable for $Type {}
 
-        impl $crate::Muck for $Type {}
+        impl $crate::muck::Muck for $Type {}
 
-        impl $crate::WithAttributes for $Type {
+        impl $crate::muck::WithAttributes for $Type {
             const STEP_MODE: ::wgpu::VertexStepMode = ::wgpu::VertexStepMode::$step_mode;
             const ATTRIBUTES: &'static [::wgpu::VertexAttribute] = $crate::muck!(attributes; $($WithFormat,)*);
         }
@@ -55,11 +55,11 @@ macro_rules! muck {
         $crate::muck!(
             attributes;
             [$($attribute,)* ::wgpu::VertexAttribute {
-                format: <$WithFormat as $crate::WithFormat>::FORMAT,
+                format: <$WithFormat as $crate::muck::WithFormat>::FORMAT,
                 offset: $offset,
                 shader_location: $location,
             },];
-            $offset + <$WithFormat as $crate::WithFormat>::FORMAT.size();
+            $offset + <$WithFormat as $crate::muck::WithFormat>::FORMAT.size();
             $location + 1;
             $($more,)*
         )

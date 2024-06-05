@@ -1,11 +1,10 @@
-use crate::muck;
 use std::ops::{Add, Neg, Sub};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            Position                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-muck!(unsafe Position => Sint32x2);
+crate::muck!(unsafe Position => Sint32x2);
 
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
@@ -51,7 +50,7 @@ impl Sub for Position {
 //                                               Size                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-muck!(unsafe Size => Uint32x2);
+crate::muck!(unsafe Size => Uint32x2);
 
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]

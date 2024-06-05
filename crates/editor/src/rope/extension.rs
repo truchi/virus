@@ -1,8 +1,10 @@
-use crate::rope::{GraphemeCursor, WordClass, WordCursor};
+use crate::{
+    cursor::Cursor,
+    rope::{GraphemeCursor, WordClass, WordCursor},
+};
 use ropey::Rope;
 use std::{cmp::Ordering, ops::Range};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
-use virus_common::Cursor;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            RopeExt                                             //

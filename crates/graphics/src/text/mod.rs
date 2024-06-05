@@ -6,13 +6,13 @@ mod line;
 pub use font::*;
 pub use line::*;
 
+use crate::types::Rgba;
 use swash::{
     scale::{ScaleContext, Source, StrikeWith},
     shape::ShapeContext,
     text::{cluster::SourceRange, Script},
     GlyphId,
 };
-use virus_common::Rgba;
 
 const SCRIPT: Script = Script::Unknown;
 const FEATURES: &'static [(&'static str, u16)] = &[("dlig", 1), ("calt", 1)];

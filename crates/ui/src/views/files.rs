@@ -1,10 +1,10 @@
 #![allow(unused)]
 
-use virus_common::{Rectangle, Rgb, Rgba};
 use virus_graphics::{
     text::{
         Context, FontFamilyKey, FontKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
     },
+    types::{Rectangle, Rgba},
     wgpu::{Draw, Layer},
 };
 

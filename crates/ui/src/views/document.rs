@@ -1,7 +1,7 @@
 use ropey::Rope;
 use std::{borrow::Cow, ops::Range};
-use virus_common::{Cursor, Position, Rectangle, Rgba};
 use virus_editor::{
+    cursor::Cursor,
     document::Document,
     syntax::{Highlight, Theme},
 };
@@ -9,6 +9,7 @@ use virus_graphics::{
     text::{
         Advance, Context, FontFamilyKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
     },
+    types::{Position, Rectangle, Rgba},
     wgpu::Layer,
 };
 

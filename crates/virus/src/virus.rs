@@ -7,7 +7,6 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use virus_common::{Catppuccin, Cursor};
 use virus_editor::document::Document;
 use virus_ui::{theme::Theme, tween::Tween, ui::Ui};
 use winit::{
@@ -126,7 +125,7 @@ impl Virus {
     fn new(window: Window) -> Self {
         let events = Events::new();
         let ui = Ui::new(Arc::new(window), {
-            let catppuccin = virus_common::Catppuccin::default();
+            let catppuccin = virus_ui::Catppuccin::default();
             let normal_mode = catppuccin.blue;
             let select_mode = catppuccin.pink;
             let insert_mode = catppuccin.green;

@@ -1,6 +1,5 @@
 use std::ops::Index;
-use virus_common::Rgba;
-use virus_graphics::text::Styles;
+use virus_graphics::{text::Styles, types::Rgba};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            ThemeKey                                            //
@@ -175,7 +174,7 @@ impl Theme {
             }
         }
 
-        let catppuccin = virus_common::Catppuccin::default();
+        let catppuccin = virus_graphics::Catppuccin::default();
 
         Self {
             default: style(catppuccin.text, Black, Normal),

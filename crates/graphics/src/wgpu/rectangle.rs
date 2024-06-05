@@ -10,7 +10,7 @@ macro_rules! label {
 //                                            Instance                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-muck!(unsafe Instance => Instance: [Position, Size, Rgba]);
+crate::muck!(unsafe Instance => Instance: [Position, Size, Rgba]);
 
 /// Instance.
 #[repr(C)]

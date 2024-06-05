@@ -1,3 +1,4 @@
+pub mod cursor;
 pub mod document;
 pub mod rope {
     pub use cursor::chunk::*;

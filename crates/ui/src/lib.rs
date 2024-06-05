@@ -8,3 +8,6 @@ pub mod views {
     pub use document::*;
     pub use files::*;
 }
+
+// For convenience.
+pub use virus_graphics::Catppuccin;
