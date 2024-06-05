@@ -11,3 +11,13 @@ pub mod views {
 
 // For convenience.
 pub use virus_graphics::Catppuccin;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                           LineColumn                                           //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
+pub struct LineColumn {
+    pub line: usize,
+    pub column: usize,
+}

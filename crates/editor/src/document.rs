@@ -9,8 +9,8 @@ use tree_sitter::{Parser, Query, Tree};
 
 #[derive(Copy, Clone, Default, Debug)]
 pub struct Selection {
-    anchor: Cursor,
-    head: Cursor,
+    pub anchor: Cursor,
+    pub head: Cursor,
 }
 
 impl From<Cursor> for Selection {
