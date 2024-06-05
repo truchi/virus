@@ -1,6 +1,6 @@
 use ropey::Rope;
 use std::{borrow::Cow, ops::Range};
-use virus_common::{Cursor, Position, Rectangle, Rgb, Rgba};
+use virus_common::{Cursor, Position, Rectangle, Rgba};
 use virus_editor::{
     document::Document,
     syntax::{Highlight, Theme},
@@ -65,18 +65,26 @@ impl DocumentView {
         context: &mut Context,
         layer: &mut Layer,
         document: &Document,
-        show_selection_as_lines: bool,
         scroll_top: u32,
-        scrollbar_alpha: u8,
+        show_selection_as_lines: bool,
+        scrollbar_color: Rgba,
+        outline_colors: &[Rgba],
+        caret_color: Rgba,
+        caret_width: u32,
+        selection_color: Rgba,
     ) {
         Renderer::new(
             self,
             context,
             layer,
             document,
-            show_selection_as_lines,
             scroll_top,
-            scrollbar_alpha,
+            show_selection_as_lines,
+            scrollbar_color,
+            outline_colors,
+            caret_color,
+            caret_width,
+            selection_color,
         )
         .render();
     }
@@ -86,25 +94,22 @@ impl DocumentView {
 //                                            Renderer                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-// Catppuccin latte
-const SURFACE1: Rgb = Rgb {
-    r: 188,
-    g: 192,
-    b: 204,
-};
-
 fn pos(top: i32, left: i32) -> Position {
     Position { top, left }
 }
 
-struct Renderer<'view, 'context, 'layer, 'graphics, 'document> {
+struct Renderer<'view, 'context, 'layer, 'graphics, 'document, 'outline_colors> {
     view: &'view mut DocumentView,
     context: &'context mut Context,
     layer: &'layer mut Layer<'graphics>,
     document: &'document Document,
-    show_selection_as_lines: bool,
     scroll_top: u32,
-    scrollbar_alpha: u8,
+    show_selection_as_lines: bool,
+    scrollbar_color: Rgba,
+    outline_colors: &'outline_colors [Rgba],
+    caret_color: Rgba,
+    caret_width: u32,
+    selection_color: Rgba,
     start: usize,
     end: usize,
     rope_lines: usize,
@@ -112,28 +117,21 @@ struct Renderer<'view, 'context, 'layer, 'graphics, 'document> {
     line_numbers_width: Advance,
 }
 
-impl<'view, 'context, 'layer, 'graphics, 'document>
-    Renderer<'view, 'context, 'layer, 'graphics, 'document>
+impl<'view, 'context, 'layer, 'graphics, 'document, 'outline_colors>
+    Renderer<'view, 'context, 'layer, 'graphics, 'document, 'outline_colors>
 {
-    const SELECTION_COLOR: Rgba = SURFACE1.transparent(255 / 2);
-    const CARET_COLOR: Rgba = SURFACE1.transparent(255);
-    const CARET_WIDTH: u32 = 4;
-    const OUTLINE_COLORS: [Rgba; 4] = [
-        SURFACE1.transparent(255 / 4),
-        SURFACE1.transparent(255 / 6),
-        SURFACE1.transparent(255 / 8),
-        SURFACE1.transparent(255 / 10),
-    ];
-    const SCROLLBAR_COLOR: Rgb = SURFACE1;
-
     fn new(
         view: &'view mut DocumentView,
         context: &'context mut Context,
         layer: &'layer mut Layer<'graphics>,
         document: &'document Document,
-        show_selection_as_lines: bool,
         scroll_top: u32,
-        scrollbar_alpha: u8,
+        show_selection_as_lines: bool,
+        scrollbar_color: Rgba,
+        outline_colors: &'outline_colors [Rgba],
+        caret_color: Rgba,
+        caret_width: u32,
+        selection_color: Rgba,
     ) -> Self {
         let start = (scroll_top as f32 / view.line_height as f32).floor() as usize;
         let end = start + (layer.size().height as f32 / view.line_height as f32).ceil() as usize;
@@ -155,9 +153,13 @@ impl<'view, 'context, 'layer, 'graphics, 'document>
             context,
             layer,
             document,
-            show_selection_as_lines,
             scroll_top,
-            scrollbar_alpha,
+            show_selection_as_lines,
+            scrollbar_color,
+            outline_colors,
+            caret_color,
+            caret_width,
+            selection_color,
             start,
             end,
             rope_lines,
@@ -318,7 +320,7 @@ impl<'view, 'context, 'layer, 'graphics, 'document>
         let end = self.column(range.end);
 
         let render_outline = |renderer: &mut Renderer, top, bottom, left, right| {
-            for (i, color) in Renderer::OUTLINE_COLORS.into_iter().enumerate() {
+            for (i, color) in renderer.outline_colors.iter().copied().enumerate() {
                 let i = i as i32;
 
                 if let Some(top) = top {
@@ -345,18 +347,18 @@ impl<'view, 'context, 'layer, 'graphics, 'document>
                     width: width as u32,
                     height: height as u32,
                 },
-                Self::SELECTION_COLOR,
+                renderer.selection_color,
             );
         };
         let render_caret = |renderer: &mut Renderer, top, left| {
             renderer.layer.draw(layer).rectangle(
                 Rectangle {
                     top,
-                    left: left - Self::CARET_WIDTH as i32 / 2,
-                    width: Self::CARET_WIDTH,
+                    left: left - renderer.caret_width as i32 / 2,
+                    width: renderer.caret_width,
                     height: height as u32,
                 },
-                Self::CARET_COLOR,
+                renderer.caret_color,
             );
         };
 
@@ -441,9 +443,8 @@ impl<'view, 'context, 'layer, 'graphics, 'document>
             width: (self.advance / 4.0).round() as u32,
         };
 
-        self.layer.draw(0).rectangle(
-            rectangle,
-            Self::SCROLLBAR_COLOR.transparent(self.scrollbar_alpha),
-        );
+        self.layer
+            .draw(0)
+            .rectangle(rectangle, self.scrollbar_color);
     }
 }

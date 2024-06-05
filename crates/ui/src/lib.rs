@@ -1,3 +1,6 @@
+pub mod theme;
+pub mod tween;
+pub mod ui;
 pub mod views {
     mod document;
     mod files;
@@ -5,5 +8,3 @@ pub mod views {
     pub use document::*;
     pub use files::*;
 }
-pub mod tween;
-pub mod ui;

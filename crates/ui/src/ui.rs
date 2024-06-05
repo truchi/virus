@@ -1,24 +1,16 @@
 use crate::{
-    tween::{Tween, Tweened},
+    theme::Theme,
+    tween::Tweened,
     views::{DocumentView, FilesView},
 };
 use std::{sync::Arc, time::Duration};
 use virus_common::{Rectangle, Rgba};
-use virus_editor::{
-    document::{Document, Selection},
-    syntax::Theme,
-};
+use virus_editor::document::{Document, Selection};
 use virus_graphics::{
-    text::{Context, Font, FontSize, FontStyle, FontWeight, Fonts, LineHeight},
+    text::{Context, Font, FontStyle, FontWeight, Fonts},
     wgpu::Graphics,
 };
 use winit::window::Window;
-
-const SCROLL_DURATION: Duration = Duration::from_millis(500);
-const SCROLL_TWEEN: Tween = Tween::ExpoOut;
-
-const FONT_SIZE: FontSize = 24;
-const LINE_HEIGHT: LineHeight = 30;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                                 Ui                                             //
@@ -28,6 +20,7 @@ pub struct Ui {
     window: Arc<Window>,
     graphics: Graphics,
     context: Context,
+    theme: Theme,
     document_view: DocumentView,
     scroll_top: Tweened<u32>,
     scrollbar_alpha: Tweened<u8>,
@@ -35,19 +28,29 @@ pub struct Ui {
 }
 
 impl Ui {
-    pub fn new(window: Arc<Window>) -> Self {
+    pub fn new(window: Arc<Window>, theme: Theme) -> Self {
         let graphics = Graphics::new(&window);
         let context = Context::new(fonts());
         let family = context.fonts().get("Victor").unwrap();
 
-        let document_view =
-            DocumentView::new(family.key(), Theme::catppuccin(), FONT_SIZE, LINE_HEIGHT);
-        let _files_view = FilesView::new(family.key(), FONT_SIZE, LINE_HEIGHT, Rgba::BLACK);
+        let document_view = DocumentView::new(
+            family.key(),
+            theme.syntax,
+            theme.font_size,
+            theme.line_height,
+        );
+        let _files_view = FilesView::new(
+            family.key(),
+            theme.font_size,
+            theme.line_height,
+            Rgba::BLACK,
+        );
 
         Self {
             window,
             graphics,
             context,
+            theme,
             document_view,
             scroll_top: Tweened::new(0),
             scrollbar_alpha: Tweened::new(0),
@@ -57,6 +60,10 @@ impl Ui {
 
     pub fn window(&self) -> &Window {
         &self.window
+    }
+
+    pub fn theme(&self) -> &Theme {
+        &self.theme
     }
 
     pub fn is_animating(&self) -> bool {
@@ -102,16 +109,30 @@ impl Ui {
         self.scrollbar_alpha.step(delta);
     }
 
-    pub fn render(&mut self, document: &Document, show_selection_as_lines: bool) {
+    pub fn render(
+        &mut self,
+        document: &Document,
+        show_selection_as_lines: bool,
+        outline_colors: &[Rgba],
+        caret_color: Rgba,
+        caret_width: u32,
+        selection_color: Rgba,
+    ) {
         let region = self.region();
 
         self.document_view.render(
             &mut self.context,
             &mut self.graphics.layer(0, region),
             document,
-            show_selection_as_lines,
             self.scroll_top.current(),
-            self.scrollbar_alpha.current(),
+            show_selection_as_lines,
+            self.theme
+                .scrollbar_color
+                .transparent(self.scrollbar_alpha.current()),
+            outline_colors,
+            caret_color,
+            caret_width,
+            selection_color,
         );
         // self.files_view
         //     .render(&mut self.context, &mut self.graphics.layer(1, region));
@@ -139,9 +160,13 @@ impl Ui {
     }
 
     fn scroll_to(&mut self, scroll_top: u32) {
-        self.scroll_top
-            .to(scroll_top, SCROLL_DURATION, SCROLL_TWEEN);
-        self.scrollbar_alpha = Tweened::with_animation(255, 0, SCROLL_DURATION, SCROLL_TWEEN);
+        self.scroll_top.to(
+            scroll_top,
+            self.theme.scroll_duration,
+            self.theme.scroll_tween,
+        );
+        self.scrollbar_alpha =
+            Tweened::with_animation(255, 0, self.theme.scroll_duration, self.theme.scroll_tween);
     }
 }
 
