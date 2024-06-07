@@ -1,4 +1,4 @@
-use crate::{cursor::Cursor, syntax::ThemeKey};
+use crate::{cursor::Cursor, rope::RopeExt, syntax::ThemeKey};
 use ropey::Rope;
 use std::ops::Range;
 use tree_sitter::{Node, Query, QueryCursor};
@@ -27,234 +27,98 @@ pub struct Highlight {
 /// Guaranties that `Highlight`s are in the requested line range, do not span multiple lines
 /// and are not empty.
 #[derive(Clone, Debug)]
-pub struct Highlights<'rope> {
-    rope: &'rope Rope,
-    start: Cursor,
-    end: Cursor,
+pub struct Highlights {
     captures: Vec<Capture>,
 }
 
-impl<'rope> Highlights<'rope> {
-    /// Creates a new [`Highlights`] for `rope` with `root`, clamped by `lines`, for `query`.
-    pub fn new(rope: &'rope Rope, root: Node, lines: Range<usize>, query: &Query) -> Self {
-        let Range { start, end } = Self::range(rope, lines);
+impl Highlights {
+    /// Creates a new [`Highlights`] for `rope` with `root`, clamped by `lines`, with `query`.
+    pub fn new(rope: &Rope, root: Node, lines: Range<usize>, query: &Query) -> Self {
+        debug_assert!(lines.start <= lines.end);
+        debug_assert!(lines.end <= rope.len_lines());
 
-        Self {
-            rope,
-            start,
-            end,
-            captures: Self::captures(rope, root, start, end, query),
-        }
-    }
-
-    fn range(rope: &Rope, Range { start, end }: Range<usize>) -> Range<Cursor> {
-        let lines = rope.len_lines();
-        let end = end.min(lines);
-        let start = start.min(end);
-
-        let start = Cursor::new(rope.line_to_byte(start), start, 0);
-        let end = if let Some(line) = end.checked_sub(1) {
-            let bytes = rope.len_bytes();
-            let start = rope.line_to_byte(line);
-
-            let col = {
-                let end = if line == lines - 1 {
-                    bytes
-                } else {
-                    rope.line_to_byte(line + 1) - /* \n */ 1
-                };
-                end - start
-            };
-
-            Cursor::new(start + col, line, col)
-        } else {
-            Cursor::ZERO
-        };
-
-        start..end
-    }
-
-    /// Use `tree-sitter` to get a sorted list of captures for `query`.
-    fn captures(
-        rope: &'rope Rope,
-        root: Node,
-        start: Cursor,
-        end: Cursor,
-        query: &Query,
-    ) -> Vec<Capture> {
-        let mut cursor = {
-            let mut cursor = QueryCursor::new();
-            cursor.set_point_range(start.into()..end.into());
-            cursor
-        };
+        let (start, end) = (
+            rope.cursor().line(lines.start),
+            rope.cursor().line(lines.end),
+        );
         let captures = Capture::collect(
-            cursor
-                .matches(query, root, |node: Node| {
-                    rope.byte_slice(node.byte_range())
-                        .chunks()
-                        .map(|chunk| chunk.as_bytes())
+            {
+                let mut cursor = QueryCursor::new();
+                cursor.set_point_range(start.into()..end.into());
+                cursor
+            }
+            .matches(query, root, |node: Node| {
+                rope.byte_slice(node.byte_range())
+                    .chunks()
+                    .map(|chunk| chunk.as_bytes())
+            })
+            .map(|captures| {
+                captures.captures.into_iter().map(move |capture| Capture {
+                    start: Cursor::new(
+                        capture.node.start_byte(),
+                        capture.node.start_position().row,
+                        capture.node.start_position().column,
+                    ),
+                    end: Cursor::new(
+                        capture.node.end_byte(),
+                        capture.node.end_position().row,
+                        capture.node.end_position().column,
+                    ),
+                    pattern: captures.pattern_index,
+                    key: ThemeKey::new(&query.capture_names()[capture.index as usize]),
                 })
-                .map(|captures| {
-                    captures.captures.into_iter().map(move |capture| Capture {
-                        start: Cursor::new(
-                            capture.node.start_byte(),
-                            capture.node.start_position().row,
-                            capture.node.start_position().column,
-                        ),
-                        end: Cursor::new(
-                            capture.node.end_byte(),
-                            capture.node.end_position().row,
-                            capture.node.end_position().column,
-                        ),
-                        pattern: captures.pattern_index,
-                        key: ThemeKey::new(&query.capture_names()[capture.index as usize]),
-                    })
-                })
-                .flatten(),
+            })
+            .flatten()
+            .filter(|capture| start < capture.end)
+            .filter(|capture| capture.start < end)
+            .map(|capture| Capture {
+                start: if start <= capture.start {
+                    capture.start
+                } else {
+                    start
+                },
+                end: if capture.end <= end { capture.end } else { end },
+                pattern: capture.pattern,
+                key: capture.key,
+            }),
         );
 
-        if captures.is_empty() {
-            vec![Capture {
-                start,
-                end,
-                pattern: usize::MAX, // Whatever now
-                key: ThemeKey::Default,
-            }]
-        } else {
-            captures
-        }
+        Self { captures }
     }
 
     /// Returns an iterator of [`Highlight`]s.
+    ///
+    /// Guaranties that highlights:
+    /// - do not overlap
+    /// - are sorted (in text order)
+    /// - are merged (different theme key if adjacent)
     pub fn highlights(&self) -> impl '_ + Iterator<Item = Highlight> {
-        let captures = self.captures.iter();
-        let highlights = Self::step1_ensure_line_range(captures, self.start, self.end);
-        let highlights = Self::step2_add_inbetweens(highlights, self.start, self.end);
-        let highlights = Self::step3_slice_at_line_boundaries(highlights, self.rope);
-
-        highlights.inspect(|highlight| {
-            // In the requested line range
-            debug_assert!((self.start.line..=self.end.line).contains(&highlight.start.line));
-            debug_assert!((self.start.line..=self.end.line).contains(&highlight.end.line));
-            // One-line
-            debug_assert!(highlight.start.line == highlight.end.line);
-            // Not empty
-            debug_assert!(highlight.start.index != highlight.end.index);
-            debug_assert!(highlight.end.column != 0);
-        })
-    }
-
-    /// Filter on line range and crop overlapping captures.
-    fn step1_ensure_line_range<'a>(
-        captures: impl 'a + Iterator<Item = &'a Capture>,
-        start: Cursor,
-        end: Cursor,
-    ) -> impl 'a + Iterator<Item = Highlight> {
-        captures
+        let mut highlights = self
+            .captures
+            .iter()
+            .filter(|capture| capture.start < capture.end)
             .map(|capture| Highlight {
                 start: capture.start,
                 end: capture.end,
                 key: capture.key,
-            })
-            .filter(move |highlight| start.index < highlight.end.index)
-            .filter(move |highlight| highlight.start.index < end.index)
-            .map(move |highlight| Highlight {
-                start: if start.index <= highlight.start.index {
-                    highlight.start
-                } else {
-                    start
-                },
-                end: if highlight.end.index <= end.index {
-                    highlight.end
-                } else {
-                    end
-                },
-                key: highlight.key,
-            })
-    }
-
-    /// Intersperse with in-between selections.
-    fn step2_add_inbetweens(
-        highlights: impl Iterator<Item = Highlight>,
-        start: Cursor,
-        end: Cursor,
-    ) -> impl Iterator<Item = Highlight> {
-        let mut highlights = highlights.peekable();
-        let mut prev = Highlight {
-            start,
-            end: start,
-            key: ThemeKey::default(),
-        };
-
-        let mut highlights = std::iter::from_fn(move || {
-            let next = highlights.peek()?;
-
-            prev = if prev.end.index == next.start.index {
-                highlights.next()?
-            } else {
-                Highlight {
-                    start: prev.end,
-                    end: next.start,
-                    key: ThemeKey::default(),
-                }
-            };
-
-            Some(prev)
-        });
-
-        // Add last highlight to end of text
-        let mut last = None;
-
-        std::iter::from_fn(move || {
-            if let Some(highlight) = highlights.next() {
-                last = Some(highlight.end);
-                Some(highlight)
-            } else {
-                Some(Highlight {
-                    start: last.take()?,
-                    end,
-                    key: ThemeKey::default(),
-                })
-            }
-        })
-    }
-
-    /// Slice highlights to line boundaries.
-    fn step3_slice_at_line_boundaries<'a>(
-        mut highlights: impl 'a + Iterator<Item = Highlight>,
-        rope: &'a Rope,
-    ) -> impl 'a + Iterator<Item = Highlight> {
+            });
         let mut next = highlights.next();
 
         std::iter::from_fn(move || {
-            let highlight = next?;
+            let current = next.as_mut()?;
 
-            if highlight.start.line == highlight.end.line {
-                next = highlights.next();
-                Some(highlight)
-            } else {
-                // NOTE: this does not take line breaks into account!
-                // It could be nice to remove the line break (if any) from the item,
-                // but this should not be a real issue.
-                let end = rope.line_to_byte(highlight.start.line + 1);
-
-                next = Some(Highlight {
-                    start: Cursor::new(end, highlight.start.line + 1, 0),
-                    end: highlight.end,
-                    key: highlight.key,
-                });
-                Some(Highlight {
-                    start: highlight.start,
-                    end: Cursor::new(
-                        end,
-                        highlight.start.line,
-                        highlight.start.column + (end - highlight.start.index),
-                    ),
-                    key: highlight.key,
-                })
+            loop {
+                match highlights.next() {
+                    Some(highlight)
+                        if current.end == highlight.start && current.key == highlight.key =>
+                    {
+                        current.end = highlight.end;
+                    }
+                    Some(highlight) => return next.replace(highlight),
+                    None => return next.take(),
+                }
             }
         })
-        .filter(|highlight| highlight.start.index != highlight.end.index)
     }
 }
 

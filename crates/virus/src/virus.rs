@@ -272,7 +272,7 @@ impl Virus {
         let outline_select_mode_colors = &self.ui.theme().outline_select_mode_colors.clone();
         let outline_insert_mode_colors = &self.ui.theme().outline_insert_mode_colors.clone();
         self.ui.render(
-            &self.document,
+            &mut self.document,
             matches!(
                 self.mode,
                 Mode::Normal {

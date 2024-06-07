@@ -77,7 +77,7 @@ impl Ui {
 
     pub fn scroll_down(&mut self) {
         let line_height = self.document_view.line_height();
-        let rope_lines = self.document_view.rope().len_lines() as u32 - 1;
+        let rope_lines = self.document_view.rope().len_lines() as u32;
         let screen_height_in_lines = self.screen_height_in_lines();
 
         if rope_lines > screen_height_in_lines {
@@ -111,7 +111,7 @@ impl Ui {
 
     pub fn render(
         &mut self,
-        document: &Document,
+        document: &mut Document,
         show_selection_as_lines: bool,
         outline_colors: &[Rgba],
         caret_color: Rgba,

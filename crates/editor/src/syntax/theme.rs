@@ -152,10 +152,6 @@ pub struct Theme {
 }
 
 impl Theme {
-    pub fn default(&self) -> &Styles {
-        &self.default
-    }
-
     /// https://github.com/catppuccin/helix/blob/main/themes/default/catppuccin_latte.toml
     pub fn catppuccin() -> Self {
         use virus_graphics::text::{

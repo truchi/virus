@@ -1,10 +1,6 @@
 use crate::LineColumn;
 use ropey::Rope;
-use std::borrow::Cow;
-use virus_editor::{
-    document::Document,
-    syntax::{Highlight, Theme},
-};
+use virus_editor::{document::Document, syntax::Theme};
 use virus_graphics::{
     text::{
         Advance, Context, FontFamilyKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
@@ -61,7 +57,7 @@ impl DocumentView {
         &mut self,
         context: &mut Context,
         layer: &mut Layer,
-        document: &Document,
+        document: &mut Document,
         scroll_top: u32,
         show_selection_as_lines: bool,
         scrollbar_color: Rgba,
@@ -72,54 +68,19 @@ impl DocumentView {
     ) {
         self.rope = document.rope().clone();
 
+        let rope_lines = document.rope().len_lines();
         let region_height_in_lines = layer.size().height as f32 / self.line_height as f32;
         let scroll_top_in_lines = scroll_top as f32 / self.line_height as f32;
 
         let (start_line, end_line) = {
-            (
-                scroll_top_in_lines.floor() as usize,
-                scroll_top_in_lines.ceil() as usize + region_height_in_lines.ceil() as usize,
-            )
+            let start = scroll_top_in_lines.floor() as usize;
+            let end = scroll_top_in_lines.ceil() as usize + region_height_in_lines.ceil() as usize;
+
+            let end = end.min(rope_lines);
+            let start = start.min(end);
+
+            (start, end)
         };
-
-        // Compute lines TODO margins and cache
-        let highlights = document.highlights(start_line..end_line);
-        let mut lines = vec![];
-        let mut shaper = Line::shaper(context, self.font_size);
-        let mut prev_line = None;
-
-        for Highlight { start, end, key } in highlights.highlights() {
-            debug_assert!(start.line == end.line);
-            debug_assert!((start_line..end_line).contains(&start.line));
-            let line = start.line;
-
-            // New line
-            if prev_line != Some(line) {
-                if prev_line.is_some() {
-                    lines.push(shaper.line());
-                }
-
-                shaper = Line::shaper(context, self.font_size);
-                prev_line = Some(line);
-            }
-
-            shaper.push(
-                // We cow to make sure ligatures are not split between rope chunks
-                &Cow::from(
-                    document
-                        .rope()
-                        .get_byte_slice(start.index..end.index)
-                        .unwrap(),
-                ),
-                self.family,
-                self.theme[key],
-            );
-        }
-
-        if prev_line.is_some() {
-            // Last line
-            lines.push(shaper.line());
-        }
 
         let advance = context
             .fonts()
@@ -127,13 +88,11 @@ impl DocumentView {
             .unwrap()
             .advance_for_size(self.font_size);
 
-        let rope_lines = document.rope().len_lines() - 1;
-
         let scrollbar_rectangle = if rope_lines <= region_height_in_lines as usize {
             Rectangle::default()
         } else {
             let top = scroll_top_in_lines / rope_lines as f32;
-            let height = region_height_in_lines as f32 / rope_lines as f32;
+            let height = region_height_in_lines / rope_lines as f32;
             let region_height = layer.size().height as f32;
 
             Rectangle {
@@ -144,30 +103,33 @@ impl DocumentView {
             }
         };
 
+        let anchor = LineColumn {
+            line: document.selection().anchor.line,
+            column: document.selection().anchor.column,
+        };
+        let head = LineColumn {
+            line: document.selection().head.line,
+            column: document.selection().head.column,
+        };
+
+        let lines = document.shape(
+            context,
+            start_line..end_line,
+            self.family,
+            self.theme,
+            self.font_size,
+        );
+
         Renderer {
             context,
             layer,
             family: self.family,
             font_size: self.font_size,
             line_height: self.line_height,
-            anchor: LineColumn {
-                line: document.selection().anchor.line,
-                column: document.selection().anchor.column,
-            },
-            head: LineColumn {
-                line: document.selection().head.line,
-                column: document.selection().head.column,
-            },
+            anchor,
+            head,
             start_line,
-            line_numbers_width: {
-                let digits = if rope_lines == 0 {
-                    1
-                } else {
-                    rope_lines.ilog10() + 3
-                };
-
-                (advance * digits as Advance).round() as u32
-            },
+            line_numbers_width: (advance * (rope_lines.ilog10() + 3) as Advance).round() as u32,
             line_numbers_color: self.theme.comment.foreground,
             lines: &lines[..],
             scroll_top,

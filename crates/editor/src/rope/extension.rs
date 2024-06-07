@@ -79,6 +79,12 @@ impl<'rope> RopeExtCursor<'rope> {
         }
     }
 
+    /// Returns a cursor at line `line`.
+    pub fn line(&self, line: usize) -> Cursor {
+        // TODO better, and test
+        self.0.cursor().index(self.0.line_to_byte(line))
+    }
+
     /// Returns a cursor at the end of the text.
     pub fn end(&self) -> Cursor {
         let index = self.0.len_bytes();

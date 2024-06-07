@@ -1,7 +1,12 @@
-use crate::{cursor::Cursor, rope::RopeExt, syntax::Highlights};
+use crate::{
+    cursor::Cursor,
+    rope::RopeExt,
+    syntax::{Highlights, Theme},
+};
 use ropey::Rope;
-use std::{fs::File, io::BufReader, ops::Range, usize};
-use tree_sitter::{Parser, Query, Tree};
+use std::{borrow::Cow, fs::File, io::BufReader, ops::Range};
+use tree_sitter::{Node, Parser, Query, Tree};
+use virus_graphics::text::{Context, FontFamilyKey, FontSize, Line, LineShaper, Styles};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           Selection                                            //
@@ -75,6 +80,7 @@ pub struct Document {
     highlights: Query,
     parser: Parser,
     tree: Tree,
+    cached_shaping: Option<CachedShaping>,
 }
 
 impl Document {
@@ -104,6 +110,7 @@ impl Document {
             highlights,
             parser,
             tree,
+            cached_shaping: None,
         })
     }
 
@@ -197,6 +204,8 @@ impl Document {
         let cursor = self.rope.cursor().index(start.index + str.len());
         self.edit_tree(start, end, cursor);
         self.selection = cursor.into();
+
+        self.cached_shaping = None; // TODO review this
     }
 
     pub fn backspace(&mut self) -> Result<(), ()> {
@@ -215,9 +224,49 @@ impl Document {
 
             self.edit_tree(start, end, start);
             self.selection = start.into();
+            self.cached_shaping = None;
         }
 
         Ok(())
+    }
+}
+
+///
+impl Document {
+    pub fn shape(
+        &mut self,
+        context: &mut Context,
+        lines: Range<usize>,
+        family: FontFamilyKey,
+        theme: Theme,
+        font_size: FontSize,
+    ) -> &[Line] {
+        debug_assert!(lines.start <= lines.end);
+        debug_assert!(lines.end <= self.rope.len_lines());
+
+        if self.cached_shaping.is_none() {
+            self.cached_shaping = Some(CachedShaping::new(
+                context,
+                &self.rope,
+                self.tree.root_node(),
+                &self.highlights,
+                lines.clone(),
+                family,
+                theme,
+                font_size,
+            ));
+        }
+
+        self.cached_shaping.as_mut().expect("Just created it").get(
+            context,
+            &self.rope,
+            self.tree.root_node(),
+            &self.highlights,
+            lines,
+            family,
+            theme,
+            font_size,
+        )
     }
 }
 
@@ -238,5 +287,212 @@ impl Document {
     fn edit_tree(&mut self, start: Cursor, old_end: Cursor, new_end: Cursor) {
         self.tree
             .edit(&Cursor::into_input_edit(start, old_end, new_end));
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
+struct CachedShaping {
+    family: FontFamilyKey,
+    theme: Theme,
+    font_size: FontSize,
+    line_range: Range<usize>,
+    lines: Vec<Line>,
+}
+
+impl CachedShaping {
+    fn new(
+        context: &mut Context,
+        rope: &Rope,
+        root: Node,
+        query: &Query,
+        line_range: Range<usize>,
+        family: FontFamilyKey,
+        theme: Theme,
+        font_size: FontSize,
+    ) -> Self {
+        let line_range = {
+            let margin = line_range.len() / 2;
+            let start = line_range.start.saturating_sub(margin);
+            let end = (line_range.end + margin).min(rope.len_lines());
+            start..end
+        };
+        let lines = Self::shape(
+            context,
+            rope,
+            root,
+            query,
+            line_range.clone(),
+            family,
+            theme,
+            font_size,
+        );
+
+        Self {
+            family,
+            theme,
+            font_size,
+            line_range,
+            lines,
+        }
+    }
+
+    fn get(
+        &mut self,
+        context: &mut Context,
+        rope: &Rope,
+        root: Node,
+        query: &Query,
+        line_range: Range<usize>,
+        family: FontFamilyKey,
+        theme: Theme,
+        font_size: FontSize,
+    ) -> &[Line] {
+        let in_cache = self.family == family
+            && self.theme == theme
+            && self.font_size == font_size
+            && self.line_range.start <= line_range.start
+            && line_range.end <= self.line_range.end;
+
+        if !in_cache {
+            *self = Self::new(
+                context,
+                rope,
+                root,
+                query,
+                line_range.clone(),
+                family,
+                theme,
+                font_size,
+            );
+        }
+
+        let start = line_range.start - self.line_range.start;
+        let end = start + line_range.len();
+        &self.lines[start..end]
+    }
+
+    fn shape(
+        context: &mut Context,
+        rope: &Rope,
+        root: Node,
+        query: &Query,
+        line_range: Range<usize>,
+        family: FontFamilyKey,
+        theme: Theme,
+        font_size: FontSize,
+    ) -> Vec<Line> {
+        fn shape(
+            (shaper, rope): (&mut LineShaper, &Rope),
+            (start, end): (&mut usize, usize),
+            (family, styles): (FontFamilyKey, Styles),
+        ) {
+            if !(*start..end).is_empty() {
+                shaper.push(&Cow::from(rope.byte_slice(*start..end)), family, styles);
+                *start = end;
+            }
+        }
+
+        let highlights = Highlights::new(rope, root, line_range.clone(), query);
+        let mut highlights = highlights.highlights();
+        let mut next = highlights.next();
+
+        let mut line = line_range.start;
+        let mut index = rope.line_to_byte(line);
+        let mut start_of_line = index;
+
+        let mut shaper = Line::shaper(context, font_size);
+        let mut lines = vec![];
+
+        loop {
+            match next.as_mut() {
+                Some(highlight) => {
+                    debug_assert!(index <= highlight.start.index);
+
+                    if line == highlight.start.line {
+                        // To start of highlight
+                        shape(
+                            (&mut shaper, rope),
+                            (&mut index, highlight.start.index),
+                            (family, theme.default),
+                        );
+
+                        if line == highlight.end.line {
+                            // To end of highlight
+                            shape(
+                                (&mut shaper, rope),
+                                (&mut index, highlight.end.index),
+                                (family, theme[highlight.key]),
+                            );
+
+                            // Take next highlight
+                            next = highlights.next();
+                        } else {
+                            // To end of line
+                            shape(
+                                (&mut shaper, rope),
+                                (&mut index, start_of_line + rope.line(line).len_bytes()),
+                                (family, theme[highlight.key]),
+                            );
+                            line += 1;
+                            start_of_line = index;
+
+                            // Flush line
+                            lines.push(shaper.line());
+                            shaper = Line::shaper(context, font_size);
+
+                            // Crop highlight
+                            highlight.start = Cursor::new(index, line, 0);
+                            if highlight.start == highlight.end {
+                                next = highlights.next();
+                            }
+                        }
+                    } else {
+                        // To end of line
+                        shape(
+                            (&mut shaper, rope),
+                            (&mut index, start_of_line + rope.line(line).len_bytes()),
+                            (family, theme.default),
+                        );
+                        line += 1;
+                        start_of_line = index;
+
+                        // Flush line
+                        lines.push(shaper.line());
+                        shaper = Line::shaper(context, font_size);
+
+                        // Keep highlight as is (it is below)
+                    }
+                }
+                None => {
+                    // We may just have flushed
+                    if line == line_range.end {
+                        break;
+                    }
+
+                    // To end of line
+                    shape(
+                        (&mut shaper, rope),
+                        (&mut index, start_of_line + rope.line(line).len_bytes()),
+                        (family, theme.default),
+                    );
+
+                    // Flush line
+                    lines.push(shaper.line());
+
+                    // Flush last lines
+                    for line in line + 1..line_range.end {
+                        shaper = Line::shaper(context, font_size);
+                        shaper.push(&Cow::from(rope.line(line)), family, theme.default);
+                        lines.push(shaper.line());
+                    }
+
+                    break;
+                }
+            }
+        }
+
+        debug_assert!(lines.len() == line_range.len());
+        lines
     }
 }
