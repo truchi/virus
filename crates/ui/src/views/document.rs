@@ -193,7 +193,7 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
 
         for number in self.start_line..self.start_line + self.lines.len() {
             let line = {
-                let mut shaper = Line::shaper(self.context, self.font_size);
+                let mut shaper = Line::shaper(self.context, self.font_size, None, None);
                 shaper.push(&format!("{} ", number + 1), self.family, styles);
                 shaper.line()
             };

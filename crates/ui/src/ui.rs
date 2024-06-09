@@ -176,11 +176,10 @@ fn fonts() -> Fonts {
     const EMOJI: &str = "/System/Library/Fonts/Apple Color Emoji.ttc";
     const FOLDER: &str = "/Users/romain/Library/Fonts/";
     const FONTS: &[(&str, &[(&str, FontWeight, FontStyle)])] = &[
-        //
         (
             "Victor",
             &[
-                //
+                // Normal
                 ("VictorMono-Thin.ttf", Thin, Normal),
                 ("VictorMono-ExtraLight.ttf", ExtraLight, Normal),
                 ("VictorMono-Light.ttf", Light, Normal),
@@ -188,7 +187,7 @@ fn fonts() -> Fonts {
                 ("VictorMono-Medium.ttf", Medium, Normal),
                 ("VictorMono-SemiBold.ttf", SemiBold, Normal),
                 ("VictorMono-Bold.ttf", Bold, Normal),
-                //
+                // Italic
                 ("VictorMono-ThinItalic.ttf", Thin, Italic),
                 ("VictorMono-ExtraLightItalic.ttf", ExtraLight, Italic),
                 ("VictorMono-LightItalic.ttf", Light, Italic),
@@ -196,7 +195,7 @@ fn fonts() -> Fonts {
                 ("VictorMono-MediumItalic.ttf", Medium, Italic),
                 ("VictorMono-SemiBoldItalic.ttf", SemiBold, Italic),
                 ("VictorMono-BoldItalic.ttf", Bold, Italic),
-                //
+                // Oblique
                 ("VictorMono-ThinOblique.ttf", Thin, Oblique),
                 ("VictorMono-ExtraLightOblique.ttf", ExtraLight, Oblique),
                 ("VictorMono-LightOblique.ttf", Light, Oblique),
@@ -204,6 +203,37 @@ fn fonts() -> Fonts {
                 ("VictorMono-MediumOblique.ttf", Medium, Oblique),
                 ("VictorMono-SemiBoldOblique.ttf", SemiBold, Oblique),
                 ("VictorMono-BoldOblique.ttf", Bold, Oblique),
+            ],
+        ),
+        (
+            "JetBrains",
+            &[
+                // Normal
+                ("JetBrainsMonoNerdFont-Thin.ttf", Thin, Normal),
+                ("JetBrainsMonoNerdFont-ExtraLight.ttf", ExtraLight, Normal),
+                ("JetBrainsMonoNerdFont-Light.ttf", Light, Normal),
+                ("JetBrainsMonoNerdFont-Regular.ttf", Regular, Normal),
+                ("JetBrainsMonoNerdFont-Medium.ttf", Medium, Normal),
+                ("JetBrainsMonoNerdFont-SemiBold.ttf", SemiBold, Normal),
+                ("JetBrainsMonoNerdFont-Bold.ttf", Bold, Normal),
+                ("JetBrainsMonoNerdFont-ExtraBold.ttf", ExtraBold, Normal),
+                //
+                ("JetBrainsMonoNerdFont-ThinItalic.ttf", Thin, Italic),
+                (
+                    "JetBrainsMonoNerdFont-ExtraLightItalic.ttf",
+                    ExtraLight,
+                    Italic,
+                ),
+                ("JetBrainsMonoNerdFont-LightItalic.ttf", Light, Italic),
+                ("JetBrainsMonoNerdFont-Italic.ttf", Regular, Italic),
+                ("JetBrainsMonoNerdFont-MediumItalic.ttf", Medium, Italic),
+                ("JetBrainsMonoNerdFont-SemiBoldItalic.ttf", SemiBold, Italic),
+                ("JetBrainsMonoNerdFont-BoldItalic.ttf", Bold, Italic),
+                (
+                    "JetBrainsMonoNerdFont-ExtraBoldItalic.ttf",
+                    ExtraBold,
+                    Italic,
+                ),
             ],
         ),
     ];

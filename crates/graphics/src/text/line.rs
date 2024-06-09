@@ -1,5 +1,5 @@
 use crate::text::*;
-use std::ops::Range;
+use std::ops::{Range, RangeInclusive};
 use swash::{
     scale::{image::Image, Render},
     shape::{ShapeContext, Shaper},
@@ -24,8 +24,13 @@ pub struct Line {
 
 impl Line {
     /// Returns a `LineShaper` at `font_size`.
-    pub fn shaper<'a>(context: &'a mut Context, font_size: FontSize) -> LineShaper<'a> {
-        LineShaper::new(context, font_size)
+    pub fn shaper<'a>(
+        context: &'a mut Context,
+        font_size: FontSize,
+        unligature1: Option<RangeInclusive<usize>>,
+        unligature2: Option<RangeInclusive<usize>>,
+    ) -> LineShaper<'a> {
+        LineShaper::new(context, font_size, unligature1, unligature2)
     }
 
     /// Returns a `LineScaler` for this `Line`.
@@ -136,17 +141,26 @@ enum FontOrEmoji {
     Emoji,
 }
 
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
 /// A [`Line`] shaper.
 pub struct LineShaper<'a> {
     fonts: &'a Fonts,
     shape: &'a mut ShapeContext,
     line: Line,
     bytes: u32,
+    unligature1: Option<RangeInclusive<usize>>,
+    unligature2: Option<RangeInclusive<usize>>,
 }
 
 impl<'a> LineShaper<'a> {
     /// Creates a new `LineShaper` at `size` with `context`.
-    pub fn new(context: &'a mut Context, font_size: FontSize) -> Self {
+    pub fn new(
+        context: &'a mut Context,
+        font_size: FontSize,
+        unligature1: Option<RangeInclusive<usize>>,
+        unligature2: Option<RangeInclusive<usize>>,
+    ) -> Self {
         let (fonts, shape, _) = context.as_muts();
 
         Self {
@@ -158,6 +172,8 @@ impl<'a> LineShaper<'a> {
                 advance: 0.,
             },
             bytes: 0,
+            unligature1,
+            unligature2,
         }
     }
 
@@ -203,8 +219,42 @@ impl<'a> LineShaper<'a> {
                 }
             };
 
+            let range = cluster.range().to_range();
+            debug_assert!(range.start < range.end);
+            let (flush_before_1, flush_after_1) =
+                Self::flush_to_unligature(range.clone(), self.unligature1.clone());
+            let (flush_before_2, flush_after_2) =
+                Self::flush_to_unligature(range.clone(), self.unligature2.clone());
+
+            if flush_before_1 || flush_before_2 {
+                match font_or_emoji {
+                    FontOrEmoji::Font => {
+                        Self::flush(line, shaper, font_key, font_size, styles);
+                        shaper = Self::build(self.shape, font, font_size);
+                    }
+                    FontOrEmoji::Emoji => {
+                        Self::flush(line, shaper, emoji_key, emoji_size, styles);
+                        shaper = Self::build(self.shape, emoji, emoji_size);
+                    }
+                }
+            }
+
             shaper.add_cluster(&cluster);
-            self.bytes += cluster.range().to_range().len() as u32;
+
+            if flush_after_1 || flush_after_2 {
+                match font_or_emoji {
+                    FontOrEmoji::Font => {
+                        Self::flush(line, shaper, font_key, font_size, styles);
+                        shaper = Self::build(self.shape, font, font_size);
+                    }
+                    FontOrEmoji::Emoji => {
+                        Self::flush(line, shaper, emoji_key, emoji_size, styles);
+                        shaper = Self::build(self.shape, emoji, emoji_size);
+                    }
+                }
+            }
+
+            self.bytes += range.len() as u32;
         }
 
         match font_or_emoji {
@@ -255,6 +305,44 @@ impl<'a> LineShaper<'a> {
                 Status::Complete => FontOrEmoji::Emoji,
             },
             Status::Complete => FontOrEmoji::Font,
+        }
+    }
+
+    fn flush_to_unligature(
+        cluster: Range<usize>,
+        unligature: Option<RangeInclusive<usize>>,
+    ) -> (bool, bool) {
+        let Some(unligature) = unligature else {
+            return (false, false);
+        };
+        let start = *unligature.start();
+        let end = *unligature.end();
+
+        // We want to flush before all clusters in the range and after the last one
+        if start == end {
+            if cluster.start <= start && start < cluster.end {
+                (true, true)
+            } else {
+                (false, false)
+            }
+        } else {
+            if cluster.start < start {
+                if cluster.end <= start {
+                    (false, false)
+                } else if cluster.end < end {
+                    (true, false)
+                } else {
+                    (true, true)
+                }
+            } else if start <= cluster.start && cluster.start < end {
+                if cluster.end < end {
+                    (true, false)
+                } else {
+                    (true, true)
+                }
+            } else {
+                (false, false)
+            }
         }
     }
 

@@ -401,7 +401,9 @@ impl CachedShaping {
         let mut index = rope.line_to_byte(line);
         let mut start_of_line = index;
 
-        let mut shaper = Line::shaper(context, font_size);
+        let unligature1 = None;
+        let unligature2 = None;
+        let mut shaper = Line::shaper(context, font_size, unligature1.clone(), unligature2.clone());
         let mut lines = vec![];
 
         loop {
@@ -439,7 +441,12 @@ impl CachedShaping {
 
                             // Flush line
                             lines.push(shaper.line());
-                            shaper = Line::shaper(context, font_size);
+                            shaper = Line::shaper(
+                                context,
+                                font_size,
+                                unligature1.clone(),
+                                unligature2.clone(),
+                            );
 
                             // Crop highlight
                             highlight.start = Cursor::new(index, line, 0);
@@ -459,7 +466,12 @@ impl CachedShaping {
 
                         // Flush line
                         lines.push(shaper.line());
-                        shaper = Line::shaper(context, font_size);
+                        shaper = Line::shaper(
+                            context,
+                            font_size,
+                            unligature1.clone(),
+                            unligature2.clone(),
+                        );
 
                         // Keep highlight as is (it is below)
                     }
@@ -482,7 +494,12 @@ impl CachedShaping {
 
                     // Flush last lines
                     for line in line + 1..line_range.end {
-                        shaper = Line::shaper(context, font_size);
+                        shaper = Line::shaper(
+                            context,
+                            font_size,
+                            unligature1.clone(),
+                            unligature2.clone(),
+                        );
                         shaper.push(&Cow::from(rope.line(line)), family, theme.default);
                         lines.push(shaper.line());
                     }
