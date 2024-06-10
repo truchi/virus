@@ -14,6 +14,8 @@ use swash::{
     GlyphId,
 };
 
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
 const SCRIPT: Script = Script::Unknown;
 const FEATURES: &'static [(&'static str, u16)] = &[("dlig", 1), ("calt", 1)];
 const HINT: bool = true;

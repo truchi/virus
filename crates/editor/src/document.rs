@@ -1,12 +1,12 @@
 use crate::{
     cursor::Cursor,
     rope::RopeExt,
-    syntax::{Highlights, Theme},
+    syntax::{Capture, Theme},
 };
 use ropey::Rope;
 use std::{borrow::Cow, fs::File, io::BufReader, ops::Range};
 use tree_sitter::{Node, Parser, Query, Tree};
-use virus_graphics::text::{Context, FontFamilyKey, FontSize, Line, LineShaper, Styles};
+use virus_graphics::text::{Cluster, Context, FontFamilyKey, FontSize, Line};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           Selection                                            //
@@ -131,10 +131,6 @@ impl Document {
 
     pub fn selection(&self) -> Selection {
         self.selection
-    }
-
-    pub fn highlights(&self, lines: Range<usize>) -> Highlights {
-        Highlights::new(&self.rope, self.tree.root_node(), lines, &self.highlights)
     }
 
     pub fn tree(&self) -> &Tree {
@@ -382,134 +378,69 @@ impl CachedShaping {
         theme: Theme,
         font_size: FontSize,
     ) -> Vec<Line> {
-        fn shape(
-            (shaper, rope): (&mut LineShaper, &Rope),
-            (start, end): (&mut usize, usize),
-            (family, styles): (FontFamilyKey, Styles),
-        ) {
-            if !(*start..end).is_empty() {
-                shaper.push(&Cow::from(rope.byte_slice(*start..end)), family, styles);
-                *start = end;
+        let mut lines = rope
+            .lines_at(line_range.start)
+            .take(line_range.len())
+            .map(|line| Line::shaper(&Cow::from(line), usize::MAX, theme.default))
+            .collect::<Vec<_>>();
+        let line_range = line_range.start..line_range.start + lines.len();
+
+        for capture in Capture::captures(rope, root, line_range.clone(), query) {
+            let find = |clusters: &[Cluster], column| {
+                clusters
+                    .iter()
+                    .position(|cluster| cluster.range().contains(&column))
+            };
+            let update = |clusters: &mut [Cluster]| {
+                for cluster in clusters {
+                    if capture.pattern < cluster.pattern() {
+                        *cluster.pattern_mut() = capture.pattern;
+                        *cluster.styles_mut() = theme[capture.key];
+                    }
+                }
+            };
+
+            let start_line = capture.start.line - line_range.start;
+            let end_line = capture.end.line - line_range.start;
+
+            if start_line == end_line {
+                let line = &mut lines[start_line];
+                let Some(start) = find(line.clusters(), capture.start.column) else {
+                    debug_assert!(false, "Cannot find highlight in line");
+                    continue;
+                };
+                let Some(end) = find(&line.clusters()[start..], capture.end.column) else {
+                    debug_assert!(false, "Cannot find highlight in line");
+                    continue;
+                };
+
+                update(&mut line.clusters_mut()[start..][..end]);
+            } else {
+                let line = &mut lines[start_line];
+                let Some(start) = find(line.clusters(), capture.start.column) else {
+                    debug_assert!(false, "Cannot find highlight in line");
+                    continue;
+                };
+
+                update(&mut line.clusters_mut()[start..]);
+
+                for line in &mut lines[start_line..end_line - 1] {
+                    update(line.clusters_mut());
+                }
+
+                let line = &mut lines[end_line];
+                let Some(end) = find(line.clusters(), capture.end.column) else {
+                    debug_assert!(false, "Cannot find highlight in line");
+                    continue;
+                };
+
+                update(&mut line.clusters_mut()[..end]);
             }
         }
 
-        let highlights = Highlights::new(rope, root, line_range.clone(), query);
-        let mut highlights = highlights.highlights();
-        let mut next = highlights.next();
-
-        let mut line = line_range.start;
-        let mut index = rope.line_to_byte(line);
-        let mut start_of_line = index;
-
-        let unligature1 = None;
-        let unligature2 = None;
-        let mut shaper = Line::shaper(context, font_size, unligature1.clone(), unligature2.clone());
-        let mut lines = vec![];
-
-        loop {
-            match next.as_mut() {
-                Some(highlight) => {
-                    debug_assert!(index <= highlight.start.index);
-
-                    if line == highlight.start.line {
-                        // To start of highlight
-                        shape(
-                            (&mut shaper, rope),
-                            (&mut index, highlight.start.index),
-                            (family, theme.default),
-                        );
-
-                        if line == highlight.end.line {
-                            // To end of highlight
-                            shape(
-                                (&mut shaper, rope),
-                                (&mut index, highlight.end.index),
-                                (family, theme[highlight.key]),
-                            );
-
-                            // Take next highlight
-                            next = highlights.next();
-                        } else {
-                            // To end of line
-                            shape(
-                                (&mut shaper, rope),
-                                (&mut index, start_of_line + rope.line(line).len_bytes()),
-                                (family, theme[highlight.key]),
-                            );
-                            line += 1;
-                            start_of_line = index;
-
-                            // Flush line
-                            lines.push(shaper.line());
-                            shaper = Line::shaper(
-                                context,
-                                font_size,
-                                unligature1.clone(),
-                                unligature2.clone(),
-                            );
-
-                            // Crop highlight
-                            highlight.start = Cursor::new(index, line, 0);
-                            if highlight.start == highlight.end {
-                                next = highlights.next();
-                            }
-                        }
-                    } else {
-                        // To end of line
-                        shape(
-                            (&mut shaper, rope),
-                            (&mut index, start_of_line + rope.line(line).len_bytes()),
-                            (family, theme.default),
-                        );
-                        line += 1;
-                        start_of_line = index;
-
-                        // Flush line
-                        lines.push(shaper.line());
-                        shaper = Line::shaper(
-                            context,
-                            font_size,
-                            unligature1.clone(),
-                            unligature2.clone(),
-                        );
-
-                        // Keep highlight as is (it is below)
-                    }
-                }
-                None => {
-                    // We may just have flushed
-                    if line == line_range.end {
-                        break;
-                    }
-
-                    // To end of line
-                    shape(
-                        (&mut shaper, rope),
-                        (&mut index, start_of_line + rope.line(line).len_bytes()),
-                        (family, theme.default),
-                    );
-
-                    // Flush line
-                    lines.push(shaper.line());
-
-                    // Flush last lines
-                    for line in line + 1..line_range.end {
-                        shaper = Line::shaper(
-                            context,
-                            font_size,
-                            unligature1.clone(),
-                            unligature2.clone(),
-                        );
-                        shaper.push(&Cow::from(rope.line(line)), family, theme.default);
-                        lines.push(shaper.line());
-                    }
-
-                    break;
-                }
-            }
-        }
-
-        debug_assert!(lines.len() == line_range.len());
         lines
+            .into_iter()
+            .map(|line| line.shape(context, family, font_size, Some(6..=8), Some(13..=16)))
+            .collect()
     }
 }

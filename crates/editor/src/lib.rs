@@ -14,9 +14,9 @@ pub mod rope {
     mod extension;
 }
 pub mod syntax {
-    pub use highlight::*;
+    pub use capture::*;
     pub use theme::*;
 
-    mod highlight;
+    mod capture;
     mod theme;
 }

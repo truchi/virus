@@ -1,16 +1,23 @@
-use crate::text::*;
-use std::ops::{Range, RangeInclusive};
+use crate::text::{
+    Advance, Context, FontFamilyKey, FontKey, FontSize, Glyph, Styles, FEATURES, HINT, SCRIPT,
+    SOURCES,
+};
+use std::{
+    collections::HashMap,
+    ops::{Range, RangeInclusive},
+    usize,
+};
 use swash::{
     scale::{image::Image, Render},
-    shape::{ShapeContext, Shaper},
+    shape::Shaper,
     text::cluster::{CharCluster, Parser, Status, Token},
-    Charmap,
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Line                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+// TODO rename Glyphs?
 /// A line of shaped [`Glyph`]s.
 #[derive(Clone, Debug)]
 pub struct Line {
@@ -23,14 +30,9 @@ pub struct Line {
 }
 
 impl Line {
-    /// Returns a `LineShaper` at `font_size`.
-    pub fn shaper<'a>(
-        context: &'a mut Context,
-        font_size: FontSize,
-        unligature1: Option<RangeInclusive<usize>>,
-        unligature2: Option<RangeInclusive<usize>>,
-    ) -> LineShaper<'a> {
-        LineShaper::new(context, font_size, unligature1, unligature2)
+    /// Returns a `LineShaper` with default `pattern` and `styles`.
+    pub fn shaper(line: &str, pattern: usize, styles: Styles) -> LineShaper {
+        LineShaper::new(line, pattern, styles)
     }
 
     /// Returns a `LineScaler` for this `Line`.
@@ -136,231 +138,290 @@ where
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 #[derive(Copy, Clone)]
-enum FontOrEmoji {
-    Font,
-    Emoji,
+pub struct Cluster {
+    cluster: CharCluster,
+    pattern: usize,
+    styles: Styles,
+}
+
+impl Cluster {
+    pub fn range(&self) -> Range<usize> {
+        self.cluster.range().to_range()
+    }
+
+    pub fn pattern(&self) -> usize {
+        self.pattern
+    }
+
+    pub fn styles(&self) -> Styles {
+        self.styles
+    }
+
+    pub fn pattern_mut(&mut self) -> &mut usize {
+        &mut self.pattern
+    }
+
+    pub fn styles_mut(&mut self) -> &mut Styles {
+        &mut self.styles
+    }
+}
+
+impl std::fmt::Debug for Cluster {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        #[allow(unused)]
+        #[derive(Debug)]
+        struct Cluster<'a> {
+            chars: &'a [swash::text::cluster::Char],
+            pattern: usize,
+            styles: Styles,
+        }
+
+        std::fmt::Debug::fmt(
+            &Cluster {
+                chars: self.cluster.chars(),
+                pattern: self.pattern,
+                styles: self.styles,
+            },
+            f,
+        )
+    }
 }
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
-/// A [`Line`] shaper.
-pub struct LineShaper<'a> {
-    fonts: &'a Fonts,
-    shape: &'a mut ShapeContext,
-    line: Line,
-    bytes: u32,
-    unligature1: Option<RangeInclusive<usize>>,
-    unligature2: Option<RangeInclusive<usize>>,
+pub struct LineShaper {
+    clusters: Vec<Cluster>,
+    styles: Styles,
 }
 
-impl<'a> LineShaper<'a> {
-    /// Creates a new `LineShaper` at `size` with `context`.
-    pub fn new(
-        context: &'a mut Context,
+impl LineShaper {
+    /// Creates a new `LineShaper` with default `pattern` and `styles`.
+    pub fn new(line: &str, pattern: usize, styles: Styles) -> Self {
+        let mut clusters = Vec::new();
+        let mut cluster = CharCluster::default();
+        let mut parser = Parser::new(
+            SCRIPT,
+            line.char_indices().map(|(i, char)| Token {
+                ch: char,
+                offset: i as u32,
+                len: char.len_utf8() as u8,
+                info: char.into(),
+                data: Default::default(),
+            }),
+        );
+
+        while parser.next(&mut cluster) {
+            clusters.push(Cluster {
+                cluster,
+                pattern,
+                styles,
+            });
+        }
+
+        Self { clusters, styles }
+    }
+
+    pub fn clusters(&self) -> &[Cluster] {
+        &self.clusters
+    }
+
+    pub fn clusters_mut(&mut self) -> &mut [Cluster] {
+        &mut self.clusters
+    }
+
+    /// Shapes the text with `family` and `font_size`.
+    ///
+    /// No ligaturing will happen in `unligature1` and `unligature2`.
+    pub fn shape(
+        mut self,
+        context: &mut Context,
+        family: FontFamilyKey,
         font_size: FontSize,
         unligature1: Option<RangeInclusive<usize>>,
         unligature2: Option<RangeInclusive<usize>>,
-    ) -> Self {
-        let (fonts, shape, _) = context.as_muts();
-
-        Self {
-            fonts,
-            shape,
-            line: Line {
-                glyphs: Vec::new(),
-                font_size,
-                advance: 0.,
-            },
-            bytes: 0,
-            unligature1,
-            unligature2,
+    ) -> Line {
+        struct Prev<'context> {
+            shaper: Shaper<'context>,
+            font: FontKey,
+            size: FontSize,
         }
-    }
 
-    /// Feeds `str` to the `LineShaper` with `family` and `styles`.
-    pub fn push(&mut self, str: &str, family: FontFamilyKey, styles: Styles) {
-        let font = self
-            .fonts
-            .get((family, styles.weight, styles.style))
-            .expect("Font not found in font cache");
-        let emoji = self.fonts.emoji();
-        let font_key = font.key();
-        let emoji_key = emoji.key();
-        let font_size = self.line.font_size;
-        let emoji_size = self
-            .fonts
-            .emoji()
-            .size_for_advance(2.0 * font.advance_for_size(font_size));
-        let font_charmap = font.as_ref().charmap();
+        impl<'context> Prev<'context> {
+            fn flush(self, line: &mut Line, styles: Styles) {
+                self.shaper.shape_with(|cluster| {
+                    for glyph in cluster.glyphs {
+                        line.glyphs.push(Glyph {
+                            font: self.font,
+                            size: self.size,
+                            id: glyph.id,
+                            offset: line.advance,
+                            advance: glyph.advance,
+                            range: cluster.source,
+                            styles,
+                        });
+                        line.advance += glyph.advance;
+                    }
+                });
+            }
+        }
+
+        let (fonts, shape, _) = context.as_muts();
+        let emoji = fonts.emoji();
         let emoji_charmap = emoji.as_ref().charmap();
+        let (unligature1, unligature2) = match (unligature1, unligature2) {
+            (Some(unligature1), Some(unligature2)) if unligature1.end() == unligature2.start() => {
+                (Some(*unligature1.start()..=*unligature2.end()), None)
+            }
+            (Some(unligature1), Some(unligature2)) if unligature1.start() == unligature2.end() => {
+                (Some(*unligature2.start()..=*unligature1.end()), None)
+            }
+            (unligature1, unligature2) => (unligature1, unligature2),
+        };
 
-        let line = &mut self.line;
-        let mut font_or_emoji = FontOrEmoji::Font;
-        let mut cluster = CharCluster::default();
-        let mut shaper = Self::build(self.shape, font, font_size);
-        let mut parser = Parser::new(SCRIPT, str.char_indices().map(Self::token(self.bytes)));
+        let mut cache = HashMap::new();
+        let mut prev = Option::<Prev>::None;
+        let mut line = Line {
+            glyphs: Vec::new(),
+            font_size,
+            advance: 0.,
+        };
+        let clusters = {
+            fn overlap(unligature: Option<RangeInclusive<usize>>, cluster: Range<usize>) -> bool {
+                if let Some(unligature) = unligature {
+                    let unligature = *unligature.start()..*unligature.end();
 
-        while parser.next(&mut cluster) {
-            match (
-                font_or_emoji,
-                Self::select(&mut cluster, font_charmap, emoji_charmap),
-            ) {
-                (FontOrEmoji::Font, FontOrEmoji::Font) => {}
-                (FontOrEmoji::Emoji, FontOrEmoji::Emoji) => {}
-                (FontOrEmoji::Emoji, FontOrEmoji::Font) => {
-                    Self::flush(line, shaper, emoji_key, emoji_size, styles);
-                    shaper = Self::build(self.shape, font, font_size);
-                    font_or_emoji = FontOrEmoji::Font;
+                    if unligature.start == unligature.end {
+                        cluster.contains(&unligature.start)
+                    } else if cluster.start < unligature.start {
+                        unligature.start < cluster.end
+                    } else {
+                        unligature.contains(&cluster.start)
+                    }
+                } else {
+                    false
                 }
-                (FontOrEmoji::Font, FontOrEmoji::Emoji) => {
-                    Self::flush(line, shaper, font_key, font_size, styles);
-                    shaper = Self::build(self.shape, emoji, emoji_size);
-                    font_or_emoji = FontOrEmoji::Emoji;
+            }
+
+            let mut clusters = self.clusters.iter_mut();
+            let mut prev_force_flush = false;
+
+            // We want to force flush before all clusters in the range and after the last one
+            std::iter::from_fn(move || {
+                let cluster = clusters.next()?;
+                let overlap1 = overlap(unligature1.clone(), cluster.range());
+                let overlap2 = overlap(unligature2.clone(), cluster.range());
+
+                // Carry prev_force_flush to force flush
+                // after the last cluster in the unligature ranges
+                let force_flush = prev_force_flush || overlap1 || overlap2;
+
+                prev_force_flush = overlap1 || overlap2;
+                Some((cluster, force_flush))
+            })
+        };
+
+        // Shape the clusters reusing the shaper as long as the font is the same
+        // (or forcing new shaper to unligature)
+        for (cluster, force_flush) in clusters {
+            let font = fonts
+                .get((family, cluster.styles.weight, cluster.styles.style))
+                .expect("Font not found in font cache");
+            let (font_charmap, emoji_size) = *cache.entry(font.key()).or_insert_with(|| {
+                (
+                    font.as_ref().charmap(),
+                    emoji.size_for_advance(2.0 * font.advance_for_size(font_size)),
+                )
+            });
+            let selected = match cluster.cluster.map(|char| font_charmap.map(char)) {
+                Status::Discard => {
+                    cluster.cluster.map(|char| emoji_charmap.map(char));
+                    emoji.key()
                 }
+                Status::Keep => match cluster.cluster.map(|char| emoji_charmap.map(char)) {
+                    Status::Discard => {
+                        cluster.cluster.map(|char| font_charmap.map(char));
+                        font.key()
+                    }
+                    Status::Keep => emoji.key(),
+                    Status::Complete => emoji.key(),
+                },
+                Status::Complete => font.key(),
             };
 
-            let range = cluster.range().to_range();
-            debug_assert!(range.start < range.end);
-            let (flush_before_1, flush_after_1) =
-                Self::flush_to_unligature(range.clone(), self.unligature1.clone());
-            let (flush_before_2, flush_after_2) =
-                Self::flush_to_unligature(range.clone(), self.unligature2.clone());
+            prev = Some(Prev {
+                shaper: {
+                    let shaper = prev.take().and_then(|prev| {
+                        if !force_flush && prev.font == selected {
+                            Some(prev.shaper)
+                        } else {
+                            prev.flush(&mut line, self.styles);
+                            None
+                        }
+                    });
+                    let mut shaper = if let Some(shaper) = shaper {
+                        shaper
+                    } else {
+                        let (font, size) = match () {
+                            _ if selected == font.key() => (font, font_size),
+                            _ if selected == emoji.key() => (emoji, emoji_size),
+                            _ => unreachable!(),
+                        };
 
-            if flush_before_1 || flush_before_2 {
-                match font_or_emoji {
-                    FontOrEmoji::Font => {
-                        Self::flush(line, shaper, font_key, font_size, styles);
-                        shaper = Self::build(self.shape, font, font_size);
-                    }
-                    FontOrEmoji::Emoji => {
-                        Self::flush(line, shaper, emoji_key, emoji_size, styles);
-                        shaper = Self::build(self.shape, emoji, emoji_size);
-                    }
-                }
-            }
+                        shape
+                            .builder(font.as_ref())
+                            .script(SCRIPT)
+                            .size(size as f32)
+                            .features(FEATURES)
+                            .build()
+                    };
 
-            shaper.add_cluster(&cluster);
-
-            if flush_after_1 || flush_after_2 {
-                match font_or_emoji {
-                    FontOrEmoji::Font => {
-                        Self::flush(line, shaper, font_key, font_size, styles);
-                        shaper = Self::build(self.shape, font, font_size);
-                    }
-                    FontOrEmoji::Emoji => {
-                        Self::flush(line, shaper, emoji_key, emoji_size, styles);
-                        shaper = Self::build(self.shape, emoji, emoji_size);
-                    }
-                }
-            }
-
-            self.bytes += range.len() as u32;
+                    shaper.add_cluster(&cluster.cluster);
+                    shaper
+                },
+                font: selected,
+                size: match () {
+                    _ if selected == font.key() => font_size,
+                    _ if selected == emoji.key() => emoji_size,
+                    _ => unreachable!(),
+                },
+            });
         }
 
-        match font_or_emoji {
-            FontOrEmoji::Font => Self::flush(line, shaper, font_key, font_size, styles),
-            FontOrEmoji::Emoji => Self::flush(line, shaper, emoji_key, emoji_size, styles),
+        // Flush last shaper
+        if let Some(prev) = prev {
+            prev.flush(&mut line, self.styles);
         }
-    }
 
-    /// Returns the shaped `Line`.
-    pub fn line(self) -> Line {
-        self.line
-    }
-}
+        // Please tell me those ranges are monotonic
+        debug_assert!(self
+            .clusters
+            .windows(2)
+            .all(|clusters| clusters[0].range().start <= clusters[1].range().start));
+        debug_assert!(line
+            .glyphs
+            .windows(2)
+            .all(|glyphs| glyphs[0].range.start <= glyphs[1].range.start));
 
-/// Private.
-impl<'a> LineShaper<'a> {
-    fn token(offset: u32) -> impl Clone + Fn((usize, char)) -> Token {
-        move |(i, ch)| Token {
-            ch,
-            offset: offset + i as u32,
-            len: ch.len_utf8() as u8,
-            info: ch.into(),
-            data: 0,
-        }
-    }
+        // Transfer styles from clusters to glyphs
+        let mut glyphs = line.glyphs.iter_mut().peekable();
 
-    fn build<'b>(shape: &'b mut ShapeContext, font: &'b Font, size: FontSize) -> Shaper<'b> {
-        shape
-            .builder(font.as_ref())
-            .script(SCRIPT)
-            .size(size as f32)
-            .features(FEATURES)
-            .build()
-    }
-
-    fn select(cluster: &mut CharCluster, font: Charmap, emoji: Charmap) -> FontOrEmoji {
-        match cluster.map(|char| font.map(char)) {
-            Status::Discard => {
-                cluster.map(|char| emoji.map(char));
-                FontOrEmoji::Emoji
-            }
-            Status::Keep => match cluster.map(|char| emoji.map(char)) {
-                Status::Discard => {
-                    cluster.map(|char| font.map(char));
-                    FontOrEmoji::Font
-                }
-                Status::Keep => FontOrEmoji::Emoji,
-                Status::Complete => FontOrEmoji::Emoji,
-            },
-            Status::Complete => FontOrEmoji::Font,
-        }
-    }
-
-    fn flush_to_unligature(
-        cluster: Range<usize>,
-        unligature: Option<RangeInclusive<usize>>,
-    ) -> (bool, bool) {
-        let Some(unligature) = unligature else {
-            return (false, false);
-        };
-        let start = *unligature.start();
-        let end = *unligature.end();
-
-        // We want to flush before all clusters in the range and after the last one
-        if start == end {
-            if cluster.start <= start && start < cluster.end {
-                (true, true)
-            } else {
-                (false, false)
-            }
-        } else {
-            if cluster.start < start {
-                if cluster.end <= start {
-                    (false, false)
-                } else if cluster.end < end {
-                    (true, false)
-                } else {
-                    (true, true)
-                }
-            } else if start <= cluster.start && cluster.start < end {
-                if cluster.end < end {
-                    (true, false)
-                } else {
-                    (true, true)
-                }
-            } else {
-                (false, false)
+        for cluster in &self.clusters {
+            // Clusters transfer their styles from the end of the previous one to their own end
+            while let Some(glyph) =
+                glyphs.next_if(|glyph| (glyph.range.start as usize) < cluster.range().end)
+            {
+                glyph.styles = cluster.styles;
             }
         }
-    }
 
-    fn flush(line: &mut Line, shaper: Shaper, font: FontKey, size: FontSize, styles: Styles) {
-        shaper.shape_with(|cluster| {
-            for glyph in cluster.glyphs {
-                line.glyphs.push(Glyph {
-                    font,
-                    size,
-                    id: glyph.id,
-                    offset: line.advance,
-                    advance: glyph.advance,
-                    range: cluster.source,
-                    styles,
-                });
-                line.advance += glyph.advance;
+        // Last cluster transfers styles until the end
+        if let Some(cluster) = self.clusters.last() {
+            for glyph in glyphs {
+                glyph.styles = cluster.styles;
             }
-        });
+        }
+
+        line
     }
 }
 

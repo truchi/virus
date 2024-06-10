@@ -7,7 +7,7 @@ mod rectangle;
 
 use crate::{
     muck::WithAttributes,
-    text::{Context, FontSize, Glyph, GlyphKey, Line, LineHeight, LineScaler},
+    text::{Context, FontSize, Glyph, GlyphKey, Line, LineHeight, LineScaler, Styles},
     types::{Position, Rectangle, Rgba, Size},
 };
 use atlas::{Atlas, AtlasError};

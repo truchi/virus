@@ -192,12 +192,13 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
         };
 
         for number in self.start_line..self.start_line + self.lines.len() {
-            let line = {
-                let mut shaper = Line::shaper(self.context, self.font_size, None, None);
-                shaper.push(&format!("{} ", number + 1), self.family, styles);
-                shaper.line()
-            };
-
+            let line = Line::shaper(&format!("{} ", number + 1), 0, styles).shape(
+                self.context,
+                self.family,
+                self.font_size,
+                None,
+                None,
+            );
             let top = number as i32 * self.line_height as i32 - self.scroll_top as i32;
             let left = (self.line_numbers_width as Advance - line.advance()).round() as i32;
 
