@@ -1,6 +1,6 @@
 use crate::{
     cursor::Cursor,
-    rope::RopeExt,
+    rope::{RopeExt, WordClass, WordCursor},
     syntax::{Capture, Theme},
 };
 use ropey::Rope;
@@ -12,7 +12,7 @@ use virus_graphics::text::{Cluster, Context, FontFamilyKey, FontSize, Line};
 //                                           Selection                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
 pub struct Selection {
     pub anchor: Cursor,
     pub head: Cursor,
@@ -247,6 +247,7 @@ impl Document {
                 self.tree.root_node(),
                 &self.highlights,
                 lines.clone(),
+                self.selection,
                 family,
                 theme,
                 font_size,
@@ -259,6 +260,7 @@ impl Document {
             self.tree.root_node(),
             &self.highlights,
             lines,
+            self.selection,
             family,
             theme,
             font_size,
@@ -289,6 +291,7 @@ impl Document {
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
 struct CachedShaping {
+    selection: Selection,
     family: FontFamilyKey,
     theme: Theme,
     font_size: FontSize,
@@ -303,6 +306,7 @@ impl CachedShaping {
         root: Node,
         query: &Query,
         line_range: Range<usize>,
+        selection: Selection,
         family: FontFamilyKey,
         theme: Theme,
         font_size: FontSize,
@@ -319,12 +323,14 @@ impl CachedShaping {
             root,
             query,
             line_range.clone(),
+            selection,
             family,
             theme,
             font_size,
         );
 
         Self {
+            selection,
             family,
             theme,
             font_size,
@@ -340,6 +346,7 @@ impl CachedShaping {
         root: Node,
         query: &Query,
         line_range: Range<usize>,
+        selection: Selection,
         family: FontFamilyKey,
         theme: Theme,
         font_size: FontSize,
@@ -357,10 +364,40 @@ impl CachedShaping {
                 root,
                 query,
                 line_range.clone(),
+                selection,
                 family,
                 theme,
                 font_size,
             );
+        } else if self.selection != selection {
+            let mut lines = vec![
+                self.selection.anchor.line,
+                self.selection.head.line,
+                selection.anchor.line,
+                selection.head.line,
+            ];
+            lines.sort();
+            lines.dedup();
+
+            for line in lines {
+                if self.line_range.contains(&line) {
+                    let lines = Self::shape(
+                        context,
+                        rope,
+                        root,
+                        query,
+                        line..line + 1,
+                        selection,
+                        family,
+                        theme,
+                        font_size,
+                    );
+
+                    self.lines[line - self.line_range.start] = lines.into_iter().next().unwrap();
+                }
+            }
+
+            self.selection = selection;
         }
 
         let start = line_range.start - self.line_range.start;
@@ -374,6 +411,7 @@ impl CachedShaping {
         root: Node,
         query: &Query,
         line_range: Range<usize>,
+        selection: Selection,
         family: FontFamilyKey,
         theme: Theme,
         font_size: FontSize,
@@ -381,9 +419,15 @@ impl CachedShaping {
         let mut lines = rope
             .lines_at(line_range.start)
             .take(line_range.len())
-            .map(|line| Line::shaper(&Cow::from(line), usize::MAX, theme.default))
+            .map(|slice| {
+                (
+                    slice,
+                    Line::shaper(&Cow::from(slice), usize::MAX, theme.default),
+                )
+            })
             .collect::<Vec<_>>();
-        let line_range = line_range.start..line_range.start + lines.len();
+
+        debug_assert!(lines.len() == line_range.len());
 
         for capture in Capture::captures(rope, root, line_range.clone(), query) {
             let find = |clusters: &[Cluster], column| {
@@ -404,7 +448,7 @@ impl CachedShaping {
             let end_line = capture.end.line - line_range.start;
 
             if start_line == end_line {
-                let line = &mut lines[start_line];
+                let (_, line) = &mut lines[start_line];
                 let Some(start) = find(line.clusters(), capture.start.column) else {
                     debug_assert!(false, "Cannot find highlight in line");
                     continue;
@@ -416,7 +460,7 @@ impl CachedShaping {
 
                 update(&mut line.clusters_mut()[start..][..end]);
             } else {
-                let line = &mut lines[start_line];
+                let (_, line) = &mut lines[start_line];
                 let Some(start) = find(line.clusters(), capture.start.column) else {
                     debug_assert!(false, "Cannot find highlight in line");
                     continue;
@@ -424,23 +468,54 @@ impl CachedShaping {
 
                 update(&mut line.clusters_mut()[start..]);
 
-                for line in &mut lines[start_line..end_line - 1] {
+                for (_, line) in &mut lines[start_line..end_line - 1] {
                     update(line.clusters_mut());
                 }
 
-                let line = &mut lines[end_line];
-                let Some(end) = find(line.clusters(), capture.end.column) else {
-                    debug_assert!(false, "Cannot find highlight in line");
-                    continue;
-                };
+                if let Some((_, line)) = lines.get_mut(end_line) {
+                    let Some(end) = find(line.clusters(), capture.end.column) else {
+                        debug_assert!(false, "Cannot find highlight in line");
+                        continue;
+                    };
 
-                update(&mut line.clusters_mut()[..end]);
+                    update(&mut line.clusters_mut()[..end]);
+                } else {
+                    debug_assert!(capture.end.column == 0);
+                }
             }
         }
 
         lines
             .into_iter()
-            .map(|line| line.shape(context, family, font_size, Some(6..=8), Some(13..=16)))
+            .enumerate()
+            .map(|(i, (slice, line))| {
+                let i = line_range.start + i;
+                let word = |index| {
+                    let mut cursor = WordCursor::new(slice, index);
+                    let mut start = index;
+                    let mut end = index;
+
+                    while let Some((range, WordClass::Punctuation(_))) = cursor.prev() {
+                        start = range.start;
+                    }
+
+                    cursor.set_index(index);
+
+                    while let Some((range, WordClass::Punctuation(_))) = cursor.next() {
+                        end = range.end;
+                    }
+
+                    start..=end
+                };
+
+                line.shape(
+                    context,
+                    family,
+                    font_size,
+                    (i == selection.anchor.line).then(|| word(selection.anchor.column)),
+                    (i == selection.head.line).then(|| word(selection.head.column)),
+                )
+            })
             .collect()
     }
 }

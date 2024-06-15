@@ -231,14 +231,14 @@ impl LineShaper {
 
     /// Shapes the text with `family` and `font_size`.
     ///
-    /// No ligaturing will happen in `unligature1` and `unligature2`.
+    /// No ligaturing will happen in `unligature_1` and `unligature_2`.
     pub fn shape(
         mut self,
         context: &mut Context,
         family: FontFamilyKey,
         font_size: FontSize,
-        unligature1: Option<RangeInclusive<usize>>,
-        unligature2: Option<RangeInclusive<usize>>,
+        unligature_1: Option<RangeInclusive<usize>>,
+        unligature_2: Option<RangeInclusive<usize>>,
     ) -> Line {
         struct Prev<'context> {
             shaper: Shaper<'context>,
@@ -268,14 +268,27 @@ impl LineShaper {
         let (fonts, shape, _) = context.as_muts();
         let emoji = fonts.emoji();
         let emoji_charmap = emoji.as_ref().charmap();
-        let (unligature1, unligature2) = match (unligature1, unligature2) {
-            (Some(unligature1), Some(unligature2)) if unligature1.end() == unligature2.start() => {
-                (Some(*unligature1.start()..=*unligature2.end()), None)
+        let (unligature_1, unligature_2) = if let Some((unligature_1, unligature_2)) =
+            unligature_1.clone().zip(unligature_2.clone())
+        {
+            let first_contains_second_start = unligature_1.contains(unligature_2.start());
+            let first_contains_second_end = unligature_1.contains(unligature_2.end());
+            let second_contains_first_start = unligature_2.contains(unligature_1.start());
+            let second_contains_first_end = unligature_2.contains(unligature_1.end());
+
+            if first_contains_second_start && first_contains_second_end {
+                (Some(unligature_1), None)
+            } else if second_contains_first_start && second_contains_first_end {
+                (Some(unligature_2), None)
+            } else if first_contains_second_start {
+                (Some(*unligature_1.start()..=*unligature_2.end()), None)
+            } else if second_contains_first_start {
+                (Some(*unligature_2.start()..=*unligature_1.end()), None)
+            } else {
+                (Some(unligature_1), Some(unligature_2))
             }
-            (Some(unligature1), Some(unligature2)) if unligature1.start() == unligature2.end() => {
-                (Some(*unligature2.start()..=*unligature1.end()), None)
-            }
-            (unligature1, unligature2) => (unligature1, unligature2),
+        } else {
+            (unligature_1, unligature_2)
         };
 
         let mut cache = HashMap::new();
@@ -285,44 +298,10 @@ impl LineShaper {
             font_size,
             advance: 0.,
         };
-        let clusters = {
-            fn overlap(unligature: Option<RangeInclusive<usize>>, cluster: Range<usize>) -> bool {
-                if let Some(unligature) = unligature {
-                    let unligature = *unligature.start()..*unligature.end();
-
-                    if unligature.start == unligature.end {
-                        cluster.contains(&unligature.start)
-                    } else if cluster.start < unligature.start {
-                        unligature.start < cluster.end
-                    } else {
-                        unligature.contains(&cluster.start)
-                    }
-                } else {
-                    false
-                }
-            }
-
-            let mut clusters = self.clusters.iter_mut();
-            let mut prev_force_flush = false;
-
-            // We want to force flush before all clusters in the range and after the last one
-            std::iter::from_fn(move || {
-                let cluster = clusters.next()?;
-                let overlap1 = overlap(unligature1.clone(), cluster.range());
-                let overlap2 = overlap(unligature2.clone(), cluster.range());
-
-                // Carry prev_force_flush to force flush
-                // after the last cluster in the unligature ranges
-                let force_flush = prev_force_flush || overlap1 || overlap2;
-
-                prev_force_flush = overlap1 || overlap2;
-                Some((cluster, force_flush))
-            })
-        };
 
         // Shape the clusters reusing the shaper as long as the font is the same
         // (or forcing new shaper to unligature)
-        for (cluster, force_flush) in clusters {
+        for cluster in &mut self.clusters {
             let font = fonts
                 .get((family, cluster.styles.weight, cluster.styles.style))
                 .expect("Font not found in font cache");
@@ -346,6 +325,25 @@ impl LineShaper {
                     Status::Complete => emoji.key(),
                 },
                 Status::Complete => font.key(),
+            };
+            let force_flush = {
+                // Assuming clusters align "nicely" with unligature ranges
+                let force_push_1 = {
+                    if let Some(unligature) = unligature_1.clone() {
+                        unligature.contains(&cluster.range().start)
+                    } else {
+                        false
+                    }
+                };
+                let force_push_2 = {
+                    if let Some(unligature) = unligature_2.clone() {
+                        unligature.contains(&cluster.range().start)
+                    } else {
+                        false
+                    }
+                };
+
+                force_push_1 || force_push_2
             };
 
             prev = Some(Prev {

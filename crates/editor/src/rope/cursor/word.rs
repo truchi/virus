@@ -74,6 +74,10 @@ impl<'rope> WordCursor<'rope> {
         self.graphemes.index()
     }
 
+    pub fn set_index(&mut self, index: usize) {
+        self.graphemes.set_index(index);
+    }
+
     pub fn prev(&mut self) -> Option<(Range<usize>, WordClass)> {
         use CharClass::*;
 
@@ -95,7 +99,7 @@ impl<'rope> WordCursor<'rope> {
                 self.graphemes.next();
                 self.graphemes.next().map(Self::map_to_char_class)
             };
-            self.graphemes.set_index(grapheme.start);
+            self.set_index(grapheme.start);
 
             if let Some((_, Lowercase)) = next {
                 return Some((grapheme, class.into()));
@@ -108,7 +112,7 @@ impl<'rope> WordCursor<'rope> {
 
             // Other graphemes can be repeated to form a word
             (_, Some((prev, _))) => {
-                self.graphemes.set_index(prev.end);
+                self.set_index(prev.end);
                 prev.end
             }
             _ => 0,
@@ -142,7 +146,7 @@ impl<'rope> WordCursor<'rope> {
             (Uppercase, (None, Some((_, Lowercase)))) => {
                 match skip(&mut self.graphemes, Lowercase).1 {
                     Some((next, _)) => {
-                        self.graphemes.set_index(next.start);
+                        self.set_index(next.start);
                         next.start
                     }
                     _ => len,
@@ -151,13 +155,13 @@ impl<'rope> WordCursor<'rope> {
 
             // Uppercases then lowercase (`|HELLOWorld`)
             (Uppercase, (Some(prev), Some((_, Lowercase)))) => {
-                self.graphemes.set_index(prev.start);
+                self.set_index(prev.start);
                 prev.start
             }
 
             // Other graphemes can be repeated to form a word
             (_, (_, Some((next, _)))) => {
-                self.graphemes.set_index(next.start);
+                self.set_index(next.start);
                 next.start
             }
             _ => len,
