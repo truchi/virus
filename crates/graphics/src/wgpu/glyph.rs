@@ -309,10 +309,15 @@ impl Pipeline {
         color: Rgba,
         image: F,
     ) {
-        if !color.is_visible() {
+        // Early return for invisible glyphs
+        if !color.is_visible()
+            || matches!(u32::try_from(position.top), Ok(top) if region.size().height <= top)
+            || matches!(u32::try_from(position.left), Ok(left) if region.size().width <= left)
+        {
             return;
         }
 
+        // Get or insert glyph in atlas
         let (ty, uv, placement) = if let Some((ty, uv, placement)) = {
             let in_mask = || {
                 self.mask
@@ -347,8 +352,8 @@ impl Pipeline {
                 &image.data,
             ) {
                 Ok((uv, placement)) => (ty, uv, placement),
-                Err(AtlasError::KeyExists) => unreachable!(),
-                Err(AtlasError::OutOfSpace) => todo!(),
+                Err(AtlasError::KeyExists) => unreachable!("Just checked this"),
+                Err(AtlasError::OutOfSpace) => todo!("Atlas full"),
                 Err(AtlasError::WontFit) => {
                     debug_assert!(false, "Glyph does not fit the atlas");
                     return;
@@ -356,20 +361,21 @@ impl Pipeline {
             }
         };
 
-        // TODO crop to region
+        // Crop to region
+        let rectangle = Rectangle::from((font_size, *placement)) + position;
+        let uv = uv
+            - Position {
+                top: rectangle.position().top.min(0),
+                left: rectangle.position().left.min(0),
+            };
+        let Some(rectangle) = rectangle.region(region) else {
+            return;
+        };
+
         self.layers.entry(layer).or_default().0.push(Instance {
             ty,
-            position: region.position()
-                + position
-                + Position {
-                    // Swash image placement has vertical up, from baseline
-                    top: font_size as i32 - placement.top,
-                    left: placement.left,
-                },
-            size: Size {
-                width: placement.width,
-                height: placement.height,
-            },
+            position: rectangle.position(),
+            size: rectangle.size(),
             uv,
             color,
         });

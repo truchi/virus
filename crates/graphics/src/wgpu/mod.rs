@@ -390,13 +390,13 @@ impl<'graphics> Draw<'graphics> {
     pub fn polyline<T: IntoIterator<Item = (Position, Rgba)>>(&mut self, points: T) {
         self.graphics
             .line
-            .points(self.layer, self.region, points, false);
+            .push(self.layer, self.region, points, false);
     }
 
     /// Draws a polygon.
     pub fn polygon<T: IntoIterator<Item = (Position, Rgba)>>(&mut self, points: T) {
         self.graphics
             .line
-            .points(self.layer, self.region, points, true);
+            .push(self.layer, self.region, points, true);
     }
 }

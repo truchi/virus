@@ -1,4 +1,6 @@
+use crate::text::FontSize;
 use std::ops::{Add, Neg, Sub};
+use swash::zeno::Placement;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            Position                                            //
@@ -168,6 +170,22 @@ impl From<(Position, Size)> for Rectangle {
             width: size.width,
             height: size.height,
         }
+    }
+}
+
+impl From<(FontSize, Placement)> for Rectangle {
+    fn from((font_size, placement): (FontSize, Placement)) -> Self {
+        Self::from((
+            // Swash image placement has vertical upward from baseline
+            Position {
+                top: font_size as i32 - placement.top,
+                left: placement.left,
+            },
+            Size {
+                width: placement.width,
+                height: placement.height,
+            },
+        ))
     }
 }
 

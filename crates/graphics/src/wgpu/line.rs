@@ -10,12 +10,16 @@ macro_rules! label {
 //                                             Vertex                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-crate::muck!(unsafe Vertex => Vertex: [Position, Rgba]);
+crate::muck!(unsafe Vertex => Vertex: [Position, Size, Position, Rgba]);
 
 /// Vertex.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct Vertex {
+    /// Region position.
+    region_position: Position,
+    /// Region size.
+    region_size: Size,
     /// Point position.
     position: Position,
     /// Point color.
@@ -152,17 +156,17 @@ impl Pipeline {
     }
 
     /// Pushes `points` to be rendered for `layer` in `region`.
-    pub fn points<T: IntoIterator<Item = (Position, Rgba)>>(
+    pub fn push<T: IntoIterator<Item = (Position, Rgba)>>(
         &mut self,
         layer: u32,
         region: Rectangle,
         points: T,
         closed: bool,
     ) {
-        // TODO crop to region: this is very challenging so should be done in shader...
-
         let mut points = points.into_iter().map(|(position, color)| Vertex {
-            position: position + region.position(),
+            region_position: region.position(),
+            region_size: region.size(),
+            position,
             color,
         });
 

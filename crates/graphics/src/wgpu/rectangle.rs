@@ -155,13 +155,13 @@ impl Pipeline {
 
     /// Pushes a `rectangle` to be rendered for `layer` in `region` with `color`.
     pub fn push(&mut self, layer: u32, region: Rectangle, rectangle: Rectangle, color: Rgba) {
-        let Some(rectangle) = rectangle.region(region) else {
-            return;
-        };
-
         if !color.is_visible() {
             return;
         }
+
+        let Some(rectangle) = rectangle.region(region) else {
+            return;
+        };
 
         self.layers.entry(layer).or_default().0.push(Instance {
             position: rectangle.position(),
