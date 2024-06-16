@@ -81,6 +81,7 @@ pub struct Document {
     parser: Parser,
     tree: Tree,
     cached_shaping: Option<CachedShaping>,
+    is_tree_dirty: bool,
 }
 
 impl Document {
@@ -111,6 +112,7 @@ impl Document {
             parser,
             tree,
             cached_shaping: None,
+            is_tree_dirty: false,
         })
     }
 
@@ -118,8 +120,10 @@ impl Document {
     ///
     /// Call this function after your edits to the document to update the AST.
     pub fn parse(&mut self) {
-        // TODO We could skip this if document is not "dirty"
-        Self::parse_with(&self.rope, &mut self.parser, Some(&self.tree));
+        if self.is_tree_dirty {
+            self.tree = Self::parse_with(&self.rope, &mut self.parser, Some(&self.tree));
+            self.is_tree_dirty = false;
+        }
     }
 }
 
@@ -192,16 +196,12 @@ impl Document {
 /// Edition.
 impl Document {
     pub fn edit(&mut self, str: &str) {
-        // TODO edit cursors and tree
-
         let Range { start, end } = self.selection.range();
         self.rope.replace(start..end, str);
 
         let cursor = self.rope.cursor().index(start.index + str.len());
         self.edit_tree(start, end, cursor);
         self.selection = cursor.into();
-
-        self.cached_shaping = None; // TODO review this
     }
 
     pub fn backspace(&mut self) -> Result<(), ()> {
@@ -220,7 +220,6 @@ impl Document {
 
             self.edit_tree(start, end, start);
             self.selection = start.into();
-            self.cached_shaping = None;
         }
 
         Ok(())
@@ -271,6 +270,7 @@ impl Document {
 /// Private.
 impl Document {
     fn parse_with(rope: &Rope, parser: &mut Parser, tree: Option<&Tree>) -> Tree {
+        println!("PARSE");
         parser
             .parse_with(
                 &mut |index, _| {
@@ -285,6 +285,8 @@ impl Document {
     fn edit_tree(&mut self, start: Cursor, old_end: Cursor, new_end: Cursor) {
         self.tree
             .edit(&Cursor::into_input_edit(start, old_end, new_end));
+        self.is_tree_dirty = true;
+        self.cached_shaping = None;
     }
 }
 
