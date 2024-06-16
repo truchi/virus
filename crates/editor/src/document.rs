@@ -270,7 +270,6 @@ impl Document {
 /// Private.
 impl Document {
     fn parse_with(rope: &Rope, parser: &mut Parser, tree: Option<&Tree>) -> Tree {
-        println!("PARSE");
         parser
             .parse_with(
                 &mut |index, _| {
