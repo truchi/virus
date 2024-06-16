@@ -234,7 +234,13 @@ impl Virus {
                 Key::Space => self.document.edit(" "),
                 Key::Backspace => self.document.backspace().unwrap(),
                 Key::Enter => self.document.edit("\n"),
-                Key::Escape => self.mode = Mode::default(),
+                Key::Escape => {
+                    self.mode = Mode::Normal {
+                        select_mode: (!self.document.selection().range().is_empty())
+                            .then_some(SelectMode::Range),
+                    }
+                }
+
                 _ => (),
             },
         }
