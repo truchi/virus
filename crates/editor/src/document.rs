@@ -152,14 +152,18 @@ impl Document {
         self.selection.flip_mut();
     }
 
-    pub fn move_up(&mut self, selection: bool) {
-        self.selection
-            .move_to_mut(self.rope.grapheme().above(self.selection.head), selection);
+    pub fn move_up(&mut self, selection: bool, lines: usize) {
+        self.selection.move_to_mut(
+            self.rope.grapheme().above(self.selection.head, lines),
+            selection,
+        );
     }
 
-    pub fn move_down(&mut self, selection: bool) {
-        self.selection
-            .move_to_mut(self.rope.grapheme().below(self.selection.head), selection);
+    pub fn move_down(&mut self, selection: bool, lines: usize) {
+        self.selection.move_to_mut(
+            self.rope.grapheme().below(self.selection.head, lines),
+            selection,
+        );
     }
 
     pub fn move_prev_grapheme(&mut self, selection: bool) {

@@ -129,20 +129,20 @@ impl<'rope> RopeExtGrapheme<'rope> {
     }
 
     /// Finds the grapheme visually above `cursor`.
-    pub fn above(&self, cursor: Cursor) -> Cursor {
-        if cursor.line == 0 {
-            cursor
+    pub fn above(&self, cursor: Cursor, lines: usize) -> Cursor {
+        if lines <= cursor.line {
+            find_width(self.0, cursor.line - lines, width(self.0, cursor))
         } else {
-            find_width(self.0, cursor.line - 1, width(self.0, cursor))
+            cursor
         }
     }
 
     /// Finds the grapheme visually below `cursor`.
-    pub fn below(&self, cursor: Cursor) -> Cursor {
-        if cursor.line == self.0.len_lines() - 1 {
-            cursor
+    pub fn below(&self, cursor: Cursor, lines: usize) -> Cursor {
+        if cursor.line + lines < self.0.len_lines() {
+            find_width(self.0, cursor.line + lines, width(self.0, cursor))
         } else {
-            find_width(self.0, cursor.line + 1, width(self.0, cursor))
+            cursor
         }
     }
 }
@@ -316,10 +316,10 @@ mod tests {
     #[test]
     fn grapheme_above() {
         // Single line
-        assert!(Rope::from("").grapheme().above(Cursor::new(0, 0, 0)) == Cursor::new(0, 0, 0));
-        assert!(Rope::from("ab").grapheme().above(Cursor::new(0, 0, 0)) == Cursor::new(0, 0, 0));
-        assert!(Rope::from("ab").grapheme().above(Cursor::new(1, 0, 1)) == Cursor::new(1, 0, 1));
-        assert!(Rope::from("ab").grapheme().above(Cursor::new(2, 0, 2)) == Cursor::new(2, 0, 2));
+        assert!(Rope::from("").grapheme().above(Cursor::new(0, 0, 0), 1) == Cursor::new(0, 0, 0));
+        assert!(Rope::from("ab").grapheme().above(Cursor::new(0, 0, 0), 1) == Cursor::new(0, 0, 0));
+        assert!(Rope::from("ab").grapheme().above(Cursor::new(1, 0, 1), 1) == Cursor::new(1, 0, 1));
+        assert!(Rope::from("ab").grapheme().above(Cursor::new(2, 0, 2), 1) == Cursor::new(2, 0, 2));
 
         // 🦀 is 1 char, 4 bytes
         let data: &[((&str, &str), &[usize])] = &[
@@ -340,7 +340,7 @@ mod tests {
                 let cursor = Cursor::new(top.len() + index, 1, index);
                 let above = Cursor::new(column, 0, column);
 
-                assert!(rope.grapheme().above(cursor) == above);
+                assert!(rope.grapheme().above(cursor, 1) == above);
             }
 
             assert!(columns.next().is_none());
@@ -350,10 +350,10 @@ mod tests {
     #[test]
     fn grapheme_below() {
         // Single line
-        assert!(Rope::from("").grapheme().below(Cursor::new(0, 0, 0)) == Cursor::new(0, 0, 0));
-        assert!(Rope::from("ab").grapheme().below(Cursor::new(0, 0, 0)) == Cursor::new(0, 0, 0));
-        assert!(Rope::from("ab").grapheme().below(Cursor::new(1, 0, 1)) == Cursor::new(1, 0, 1));
-        assert!(Rope::from("ab").grapheme().below(Cursor::new(2, 0, 2)) == Cursor::new(2, 0, 2));
+        assert!(Rope::from("").grapheme().below(Cursor::new(0, 0, 0), 1) == Cursor::new(0, 0, 0));
+        assert!(Rope::from("ab").grapheme().below(Cursor::new(0, 0, 0), 1) == Cursor::new(0, 0, 0));
+        assert!(Rope::from("ab").grapheme().below(Cursor::new(1, 0, 1), 1) == Cursor::new(1, 0, 1));
+        assert!(Rope::from("ab").grapheme().below(Cursor::new(2, 0, 2), 1) == Cursor::new(2, 0, 2));
 
         // 🦀 is 1 char, 4 bytes
         let data: &[((&str, &str), &[usize])] = &[
@@ -374,7 +374,7 @@ mod tests {
                 let cursor = Cursor::new(index, 0, index);
                 let below = Cursor::new(top.len() + 1 + column, 1, column);
 
-                assert!(rope.grapheme().below(cursor) == below);
+                assert!(rope.grapheme().below(cursor, 1) == below);
             }
 
             assert!(columns.next().is_none());

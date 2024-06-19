@@ -185,11 +185,11 @@ impl Virus {
             Mode::Normal { select_mode } => match key {
                 Key::Str("@") if self.events.command() => event_loop.exit(),
                 Key::Str("i") => {
-                    self.document.move_up(select_mode.is_some());
+                    self.document.move_up(select_mode.is_some(), 1);
                     self.ui.ensure_visibility(self.document.selection());
                 }
                 Key::Str("k") => {
-                    self.document.move_down(select_mode.is_some());
+                    self.document.move_down(select_mode.is_some(), 1);
                     self.ui.ensure_visibility(self.document.selection());
                 }
                 Key::Str("j") => self.document.move_prev_grapheme(select_mode.is_some()),
@@ -210,8 +210,14 @@ impl Virus {
                     self.document.move_prev_start_of_word(select_mode.is_some());
                     self.ui.ensure_visibility(self.document.selection());
                 }
-                Key::Str("y") => self.ui.scroll_up(),
-                Key::Str("h") => self.ui.scroll_down(),
+                Key::Str("y") => {
+                    self.document.move_up(select_mode.is_some(), 10);
+                    self.ui.ensure_visibility(self.document.selection());
+                }
+                Key::Str("h") => {
+                    self.document.move_down(select_mode.is_some(), 10);
+                    self.ui.ensure_visibility(self.document.selection());
+                }
                 Key::Str("v") => match select_mode {
                     Some(SelectMode::Range) => *select_mode = Some(SelectMode::Line),
                     Some(SelectMode::Line) => {
