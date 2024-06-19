@@ -11,5 +11,3 @@ tree-sitter.workspace = true
 unicode-segmentation.workspace = true
 unicode-width.workspace = true
 virus-graphics.workspace = true
-
-nucleo = "0.5.0"
