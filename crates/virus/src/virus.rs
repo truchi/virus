@@ -230,7 +230,7 @@ impl Virus {
                     *select_mode = None;
                     self.document.move_anchor_to_head();
                 }
-                // Key::Str("s") if self.events.command() => self.document.save().unwrap(),
+                Key::Str("s") if self.events.command() => self.document.save().unwrap(),
                 Key::Escape => self.mode = Mode::Insert,
                 _ => (),
             },

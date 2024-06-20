@@ -4,7 +4,13 @@ use crate::{
     syntax::{Capture, Theme},
 };
 use ropey::Rope;
-use std::{borrow::Cow, fs::File, io::BufReader, ops::Range};
+use std::{
+    borrow::Cow,
+    fs::{File, OpenOptions},
+    io::{BufReader, BufWriter, Write},
+    ops::Range,
+    path::PathBuf,
+};
 use tree_sitter::{Node, Parser, Query, Tree};
 use virus_graphics::text::{Cluster, Context, FontFamilyKey, FontSize, Line};
 
@@ -75,6 +81,7 @@ impl Selection {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct Document {
+    path: PathBuf,
     rope: Rope,
     selection: Selection, // TODO Should we really have this here?
     highlights: Query,
@@ -85,7 +92,7 @@ pub struct Document {
 }
 
 impl Document {
-    // NOTE
+    // NOTE:
     // This function is convenient for now.
     // We will need to deal with unsupported languages later.
     pub fn open(path: &str) -> std::io::Result<Self> {
@@ -106,6 +113,7 @@ impl Document {
         let tree = Self::parse_with(&rope, &mut parser, None);
 
         Ok(Self {
+            path: path.into(),
             rope,
             selection: Default::default(),
             highlights,
@@ -114,6 +122,23 @@ impl Document {
             cached_shaping: None,
             is_tree_dirty: false,
         })
+    }
+
+    // NOTE: good enough for now
+    pub fn save(&mut self) -> std::io::Result<()> {
+        let mut writer = BufWriter::new(
+            OpenOptions::new()
+                .write(true)
+                .truncate(true)
+                .open(&self.path)?,
+        );
+
+        for chunk in self.rope.chunks() {
+            writer.write(chunk.as_bytes())?;
+        }
+
+        writer.flush()?;
+        Ok(())
     }
 
     /// Reparses the AST.
