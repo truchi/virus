@@ -18,6 +18,18 @@ pub struct Config {
     pub space_as_separator_malus: isize,
 }
 
+impl Config {
+    pub const FILE_SEARCH: Self = Self {
+        hits_bonus: 10,
+        accumulated_hits_bonus: 1,
+        accumulated_hits_bonus_limit: 10,
+        needle_start_bonus: 1,
+        haystack_start_bonus: 1,
+        uppercase_bonus: 1,
+        space_as_separator_malus: 1,
+    };
+}
+
 /// Private.
 impl Config {
     fn score(&self, needle_bytes: &[NeedleByte], ranges: &mut Vec<Range<usize>>) -> isize {
@@ -98,6 +110,10 @@ impl Fuzzy {
         }
     }
 
+    pub fn new_file_search(needle: &str) -> Self {
+        Self::new(Config::FILE_SEARCH, needle)
+    }
+
     pub fn score(&mut self, haystack: &str) -> Option<(isize, &[Range<usize>])> {
         self.haystack_bytes.clear();
 
@@ -130,6 +146,22 @@ impl Fuzzy {
         );
 
         best_score.map(|score| (score, self.best_ranges.as_slice()))
+    }
+
+    pub fn scores<'a>(
+        &mut self,
+        haystacks: impl IntoIterator<Item = &'a str>,
+    ) -> Vec<(String, isize, Vec<Range<usize>>)> {
+        let mut scores = Vec::new();
+
+        for haystack in haystacks {
+            if let Some((score, indices)) = self.score(haystack) {
+                scores.push((haystack.to_owned(), score, indices.to_owned()));
+            }
+        }
+
+        scores.sort_by_key(|(_, score, _)| -score);
+        scores
     }
 }
 

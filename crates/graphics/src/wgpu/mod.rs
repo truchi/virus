@@ -157,11 +157,11 @@ impl Graphics {
     }
 
     /// Returns the `Layer`ing API.
-    pub fn layer(&mut self, layer: u16, region: Rectangle) -> Layer {
+    pub fn layer(&mut self, region: Rectangle, layer: u16) -> Layer {
         Layer {
             graphics: self,
-            layer: layer as u32 * u16::MAX as u32,
             region,
+            layer: layer as u32 * u16::MAX as u32,
         }
     }
 
@@ -277,8 +277,8 @@ impl Graphics {
 
 pub struct Layer<'graphics> {
     graphics: &'graphics mut Graphics,
-    layer: u32,
     region: Rectangle,
+    layer: u32,
 }
 
 impl<'graphics> Layer<'graphics> {
@@ -288,11 +288,16 @@ impl<'graphics> Layer<'graphics> {
     }
 
     /// Returns the `Draw`ing API.
-    pub fn draw(&mut self, sub_layer: u16) -> Draw {
+    pub fn draw(&mut self, region: impl Into<Option<Rectangle>>, layer: u16) -> Draw {
+        let region = region
+            .into()
+            .map(|rectangle| rectangle.region(self.region).unwrap_or_default())
+            .unwrap_or(self.region);
+
         Draw {
             graphics: self.graphics,
-            layer: self.layer + sub_layer as u32,
-            region: self.region,
+            layer: self.layer + layer as u32,
+            region,
         }
     }
 }
@@ -303,8 +308,8 @@ impl<'graphics> Layer<'graphics> {
 
 pub struct Draw<'graphics> {
     graphics: &'graphics mut Graphics,
-    layer: u32,
     region: Rectangle,
+    layer: u32,
 }
 
 impl<'graphics> Draw<'graphics> {
@@ -314,7 +319,11 @@ impl<'graphics> Draw<'graphics> {
     }
 
     /// Draws a rectange.
-    pub fn rectangle(&mut self, rectangle: Rectangle, color: Rgba) {
+    pub fn rectangle(&mut self, rectangle: impl Into<Option<Rectangle>>, color: Rgba) {
+        let rectangle = rectangle
+            .into()
+            .unwrap_or_else(|| Rectangle::from((Position::default(), self.size())));
+
         self.graphics
             .rectangle
             .push(self.layer, self.region, rectangle, color);

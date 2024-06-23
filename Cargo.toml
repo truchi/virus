@@ -13,6 +13,7 @@ virus-graphics = { path = "crates/graphics", package = "graphics" }
 virus-ui = { path = "crates/ui", package = "ui" }
 
 bytemuck = "1.16"
+ignore = "0.4.22"
 image = { version = "0.25", default-features = false, features = ["png"] }
 pollster = "0.3"
 ropey = "1.6"

@@ -3,7 +3,7 @@ use crate::{
     tween::Tweened,
     views::{DocumentView, FilesView},
 };
-use std::{sync::Arc, time::Duration};
+use std::{ops::Range, sync::Arc, time::Duration};
 use virus_editor::document::{Document, Selection};
 use virus_graphics::{
     text::{Context, Font, FontStyle, FontWeight, Fonts},
@@ -24,7 +24,7 @@ pub struct Ui {
     document_view: DocumentView,
     scroll_top: Tweened<u32>,
     scrollbar_alpha: Tweened<u8>,
-    _files_view: FilesView,
+    files_view: FilesView,
 }
 
 impl Ui {
@@ -39,11 +39,11 @@ impl Ui {
             theme.font_size,
             theme.line_height,
         );
-        let _files_view = FilesView::new(
+        let files_view = FilesView::new(
             family.key(),
             theme.font_size,
             theme.line_height,
-            Rgba::BLACK,
+            Rgba::WHITE,
         );
 
         Self {
@@ -54,7 +54,7 @@ impl Ui {
             document_view,
             scroll_top: Tweened::new(0),
             scrollbar_alpha: Tweened::new(0),
-            _files_view,
+            files_view,
         }
     }
 
@@ -109,7 +109,7 @@ impl Ui {
         self.scrollbar_alpha.step(delta);
     }
 
-    pub fn render(
+    pub fn render<'a>(
         &mut self,
         document: &mut Document,
         show_selection_as_lines: bool,
@@ -117,12 +117,13 @@ impl Ui {
         caret_color: Rgba,
         caret_width: u32,
         selection_color: Rgba,
+        search: Option<(&'a str, &'a [(String, isize, Vec<Range<usize>>)], usize)>,
     ) {
         let region = self.region();
 
         self.document_view.render(
             &mut self.context,
-            &mut self.graphics.layer(0, region),
+            &mut self.graphics.layer(region, 0),
             document,
             self.scroll_top.current(),
             show_selection_as_lines,
@@ -134,9 +135,16 @@ impl Ui {
             caret_width,
             selection_color,
         );
-        // self.files_view
-        //     .render(&mut self.context, &mut self.graphics.layer(1, region));
 
+        if let Some((needle, haystack, selected)) = search {
+            self.files_view.render(
+                &mut self.context,
+                self.graphics.layer(region, 1),
+                needle,
+                haystack,
+                selected,
+            );
+        }
         self.graphics.render();
     }
 }

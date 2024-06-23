@@ -66,6 +66,8 @@ impl DocumentView {
         caret_width: u32,
         selection_color: Rgba,
     ) {
+        // NOTE: I'd like this the be done outside this file (or even better outside this crate)
+
         self.rope = document.rope().clone();
 
         let rope_lines = document.rope().len_lines();
@@ -202,7 +204,7 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
             let top = number as i32 * self.line_height as i32 - self.scroll_top as i32;
             let left = (self.line_numbers_width as Advance - line.advance()).round() as i32;
 
-            self.layer.draw(0).glyphs(
+            self.layer.draw(None, 0).glyphs(
                 self.context,
                 Position { top, left },
                 &line,
@@ -218,7 +220,7 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
             let top =
                 (self.start_line + index) as i32 * self.line_height as i32 - self.scroll_top as i32;
 
-            self.layer.draw(0).glyphs(
+            self.layer.draw(None, 0).glyphs(
                 self.context,
                 Position { top, left },
                 &line,
@@ -270,12 +272,12 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
                     let i = i + 1; // TODO Why?!
                     renderer
                         .layer
-                        .draw(layer)
+                        .draw(None, layer)
                         .polyline([(pos(top + i, left), color), (pos(top + i, right), color)]);
                 }
 
                 if let Some(bottom) = bottom {
-                    renderer.layer.draw(layer).polyline([
+                    renderer.layer.draw(None, layer).polyline([
                         (pos(bottom - i, left), color),
                         (pos(bottom - i, right), color),
                     ]);
@@ -283,7 +285,7 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
             }
         };
         let render_selection = |renderer: &mut Renderer, top, left, width, height| {
-            renderer.layer.draw(layer).rectangle(
+            renderer.layer.draw(None, layer).rectangle(
                 Rectangle {
                     top,
                     left,
@@ -294,7 +296,7 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
             );
         };
         let render_caret = |renderer: &mut Renderer, top, left| {
-            renderer.layer.draw(layer).rectangle(
+            renderer.layer.draw(None, layer).rectangle(
                 Rectangle {
                     top,
                     left: left - renderer.caret_width as i32 / 2,
@@ -352,7 +354,7 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
 
     fn render_scrollbar(&mut self) {
         self.layer
-            .draw(0)
+            .draw(None, 0)
             .rectangle(self.scrollbar_rectangle, self.scrollbar_color);
     }
 }

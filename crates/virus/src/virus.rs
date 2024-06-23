@@ -4,10 +4,12 @@
 
 use crate::events::{Event, Events, Key};
 use std::{
+    ops::Range,
+    path::PathBuf,
     sync::Arc,
     time::{Duration, Instant},
 };
-use virus_editor::document::Document;
+use virus_editor::{document::Document, editor::Editor, fuzzy::Fuzzy};
 use virus_ui::{theme::Theme, tween::Tween, ui::Ui};
 use winit::{
     application::ApplicationHandler,
@@ -101,10 +103,16 @@ impl Default for Mode {
 
 pub struct Virus {
     events: Events,
-    document: Document,
+    editor: Editor,
     mode: Mode,
     ui: Ui,
     last_render: Option<Instant>,
+    search: Option<(
+        String,
+        Vec<String>,
+        Vec<(String, isize, Vec<Range<usize>>)>,
+        usize,
+    )>,
 }
 
 impl Virus {
@@ -165,15 +173,18 @@ impl Virus {
                 selection_insert_mode_color: insert_mode.solid().transparent(255 / 2),
             }
         });
-        let mut document = Document::open(&std::env::args().skip(1).next().unwrap()).unwrap();
-        document.parse();
+        let mut editor = Editor::new(std::env::current_dir().unwrap());
+        editor
+            .open(std::env::args().skip(1).next().unwrap().into())
+            .unwrap();
 
         Self {
             events,
-            document,
+            editor,
             mode: Mode::default(),
             ui,
             last_render: None,
+            search: None,
         }
     }
 }
@@ -181,78 +192,181 @@ impl Virus {
 /// Event handlers.
 impl Virus {
     fn on_key(&mut self, key: Key, event_loop: &ActiveEventLoop) {
-        match &mut self.mode {
-            Mode::Normal { select_mode } => match key {
-                Key::Str("@") if self.events.command() => event_loop.exit(),
-                Key::Str("i") => {
-                    self.document.move_up(select_mode.is_some(), 1);
-                    self.ui.ensure_visibility(self.document.selection());
-                }
-                Key::Str("k") => {
-                    self.document.move_down(select_mode.is_some(), 1);
-                    self.ui.ensure_visibility(self.document.selection());
-                }
-                Key::Str("j") => self.document.move_prev_grapheme(select_mode.is_some()),
-                Key::Str("l") => self.document.move_next_grapheme(select_mode.is_some()),
-                Key::Str("e") => {
-                    self.document.move_next_end_of_word(select_mode.is_some());
-                    self.ui.ensure_visibility(self.document.selection());
-                }
-                Key::Str("E") => {
-                    self.document.move_prev_end_of_word(select_mode.is_some());
-                    self.ui.ensure_visibility(self.document.selection());
-                }
-                Key::Str("w") => {
-                    self.document.move_next_start_of_word(select_mode.is_some());
-                    self.ui.ensure_visibility(self.document.selection());
-                }
-                Key::Str("W") => {
-                    self.document.move_prev_start_of_word(select_mode.is_some());
-                    self.ui.ensure_visibility(self.document.selection());
-                }
-                Key::Str("y") => {
-                    self.document.move_up(select_mode.is_some(), 10);
-                    self.ui.ensure_visibility(self.document.selection());
-                }
-                Key::Str("h") => {
-                    self.document.move_down(select_mode.is_some(), 10);
-                    self.ui.ensure_visibility(self.document.selection());
-                }
-                Key::Str("v") => match select_mode {
-                    Some(SelectMode::Range) => *select_mode = Some(SelectMode::Line),
-                    Some(SelectMode::Line) => {
-                        self.document.flip_anchor_and_head();
-                        *select_mode = Some(SelectMode::Range);
+        if let Some((needle, files, haystacks, selected)) = &mut self.search {
+            match key {
+                Key::Str("i") if self.events.command() => {
+                    if *selected == 0 {
+                        *selected = haystacks.len().saturating_sub(1);
+                    } else {
+                        *selected = *selected - 1;
                     }
-                    None => *select_mode = Some(SelectMode::Range),
-                },
-                Key::Str("V") => {
-                    *select_mode = None;
-                    self.document.move_anchor_to_head();
                 }
-                Key::Str("s") if self.events.command() => self.document.save().unwrap(),
-                Key::Escape => self.mode = Mode::Insert,
-                _ => (),
-            },
-            Mode::Insert => match key {
-                Key::Str("@") if self.events.command() => event_loop.exit(),
-                Key::Str(str) => self.document.edit(str),
-                Key::Space => self.document.edit(" "),
-                Key::Backspace => self.document.backspace().unwrap(),
-                Key::Enter => self.document.edit("\n"),
+                Key::Str("k") if self.events.command() => {
+                    if *selected == haystacks.len().saturating_sub(1) {
+                        *selected = 0;
+                    } else {
+                        *selected = *selected + 1;
+                    }
+                }
+                Key::Str(str) => {
+                    needle.push_str(str);
+                    *selected = 0;
+                    *haystacks = Fuzzy::new_file_search(needle)
+                        .scores(files.iter().map(|file| file.as_str()));
+                }
+                Key::Tab => {}
+                Key::Space => {
+                    needle.push(' ');
+                    *selected = 0;
+                    *haystacks = Fuzzy::new_file_search(needle)
+                        .scores(files.iter().map(|file| file.as_str()));
+                }
+                Key::Backspace => {
+                    needle.pop();
+                    *selected = 0;
+                    if needle.is_empty() {
+                        *haystacks = files
+                            .iter()
+                            .map(|file| (file.to_owned(), 0, Vec::new()))
+                            .collect();
+                    } else {
+                        *haystacks = Fuzzy::new_file_search(needle)
+                            .scores(files.iter().map(|file| file.as_str()));
+                    }
+                }
+                Key::Enter => {
+                    // TODO
+                    self.search = None;
+                }
                 Key::Escape => {
-                    self.mode = Mode::Normal {
-                        select_mode: (!self.document.selection().range().is_empty())
-                            .then_some(SelectMode::Range),
-                    }
+                    self.search = None;
                 }
+            }
+        } else {
+            match &mut self.mode {
+                Mode::Normal { select_mode } => match key {
+                    Key::Str("@") if self.events.command() => event_loop.exit(),
+                    Key::Str("i") => {
+                        self.editor
+                            .active_document_mut()
+                            .move_up(select_mode.is_some(), 1);
+                        self.ui
+                            .ensure_visibility(self.editor.active_document().selection());
+                    }
+                    Key::Str("k") => {
+                        self.editor
+                            .active_document_mut()
+                            .move_down(select_mode.is_some(), 1);
+                        self.ui
+                            .ensure_visibility(self.editor.active_document().selection());
+                    }
+                    Key::Str("j") => self
+                        .editor
+                        .active_document_mut()
+                        .move_prev_grapheme(select_mode.is_some()),
+                    Key::Str("l") => self
+                        .editor
+                        .active_document_mut()
+                        .move_next_grapheme(select_mode.is_some()),
+                    Key::Str("e") => {
+                        self.editor
+                            .active_document_mut()
+                            .move_next_end_of_word(select_mode.is_some());
+                        self.ui
+                            .ensure_visibility(self.editor.active_document().selection());
+                    }
+                    Key::Str("E") => {
+                        self.editor
+                            .active_document_mut()
+                            .move_prev_end_of_word(select_mode.is_some());
+                        self.ui
+                            .ensure_visibility(self.editor.active_document().selection());
+                    }
+                    Key::Str("w") => {
+                        self.editor
+                            .active_document_mut()
+                            .move_next_start_of_word(select_mode.is_some());
+                        self.ui
+                            .ensure_visibility(self.editor.active_document().selection());
+                    }
+                    Key::Str("W") => {
+                        self.editor
+                            .active_document_mut()
+                            .move_prev_start_of_word(select_mode.is_some());
+                        self.ui
+                            .ensure_visibility(self.editor.active_document().selection());
+                    }
+                    Key::Str("y") => {
+                        self.editor
+                            .active_document_mut()
+                            .move_up(select_mode.is_some(), 10);
+                        self.ui
+                            .ensure_visibility(self.editor.active_document().selection());
+                    }
+                    Key::Str("h") => {
+                        self.editor
+                            .active_document_mut()
+                            .move_down(select_mode.is_some(), 10);
+                        self.ui
+                            .ensure_visibility(self.editor.active_document().selection());
+                    }
+                    Key::Str("v") => match select_mode {
+                        Some(SelectMode::Range) => *select_mode = Some(SelectMode::Line),
+                        Some(SelectMode::Line) => {
+                            self.editor.active_document_mut().flip_anchor_and_head();
+                            *select_mode = Some(SelectMode::Range);
+                        }
+                        None => *select_mode = Some(SelectMode::Range),
+                    },
+                    Key::Str("V") => {
+                        *select_mode = None;
+                        self.editor.active_document_mut().move_anchor_to_head();
+                    }
+                    Key::Str("s") if self.events.command() => {
+                        self.editor.active_document_mut().save().unwrap()
+                    }
+                    Key::Str("/") => {
+                        let files = self
+                            .editor
+                            .files(true, false)
+                            .filter_map(|file| {
+                                file.as_os_str().to_str().map(|file| file.to_owned())
+                            })
+                            .collect::<Vec<_>>();
+                        let haystacks = files
+                            .iter()
+                            .map(|file| (file.to_owned(), 0, Vec::new()))
+                            .collect();
+                        self.search = Some((String::new(), files, haystacks, 0));
+                    }
+                    Key::Escape => self.mode = Mode::Insert,
+                    _ => (),
+                },
+                Mode::Insert => match key {
+                    Key::Str("@") if self.events.command() => event_loop.exit(),
+                    Key::Str(str) => self.editor.active_document_mut().edit(str),
+                    Key::Space => self.editor.active_document_mut().edit(" "),
+                    Key::Backspace => self.editor.active_document_mut().backspace().unwrap(),
+                    Key::Enter => self.editor.active_document_mut().edit("\n"),
+                    Key::Escape => {
+                        self.mode = Mode::Normal {
+                            select_mode: (!self
+                                .editor
+                                .active_document()
+                                .selection()
+                                .range()
+                                .is_empty())
+                            .then_some(SelectMode::Range),
+                        }
+                    }
 
-                _ => (),
-            },
+                    _ => (),
+                },
+            }
         }
 
         // TODO handle that better
-        self.document.parse();
+        self.editor.active_document_mut().parse();
 
         // TODO handle that better
         self.ui.window().request_redraw();
@@ -284,7 +398,7 @@ impl Virus {
         let outline_select_mode_colors = &self.ui.theme().outline_select_mode_colors.clone();
         let outline_insert_mode_colors = &self.ui.theme().outline_insert_mode_colors.clone();
         self.ui.render(
-            &mut self.document,
+            self.editor.active_document_mut(),
             matches!(
                 self.mode,
                 Mode::Normal {
@@ -319,6 +433,11 @@ impl Virus {
                 Mode::Normal { select_mode: None } => self.ui.theme().selection_select_mode_color,
                 Mode::Insert => self.ui.theme().selection_insert_mode_color,
             },
+            self.search
+                .as_ref()
+                .map(|(needle, _, haystacks, selected)| {
+                    (needle.as_str(), haystacks.as_slice(), *selected)
+                }),
         );
 
         if self.ui.is_animating() {

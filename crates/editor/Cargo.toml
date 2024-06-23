@@ -5,6 +5,7 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
+ignore.workspace = true
 ropey.workspace = true
 tree-sitter-rust.workspace = true
 tree-sitter.workspace = true

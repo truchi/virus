@@ -95,15 +95,15 @@ impl Document {
     // NOTE:
     // This function is convenient for now.
     // We will need to deal with unsupported languages later.
-    pub fn open(path: &str) -> std::io::Result<Self> {
-        if !path.ends_with(".rs") {
+    pub fn open(path: PathBuf) -> std::io::Result<Self> {
+        if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
             panic!("File type not supported");
         }
 
         const HIGHLIGHTS_QUERY: &str = include_str!("../treesitter/rust/highlights.scm");
         let language = tree_sitter_rust::language();
 
-        let rope = Rope::from_reader(&mut BufReader::new(File::open(path)?))?;
+        let rope = Rope::from_reader(&mut BufReader::new(File::open(&path)?))?;
         let highlights =
             Query::new(&language, HIGHLIGHTS_QUERY).expect("Cannot create highlights query");
         let mut parser = Parser::new();
@@ -113,7 +113,7 @@ impl Document {
         let tree = Self::parse_with(&rope, &mut parser, None);
 
         Ok(Self {
-            path: path.into(),
+            path,
             rope,
             selection: Default::default(),
             highlights,
