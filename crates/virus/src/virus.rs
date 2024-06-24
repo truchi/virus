@@ -235,7 +235,8 @@ impl Virus {
                     }
                 }
                 Key::Enter => {
-                    // TODO
+                    let path = self.editor.root().join(&haystacks[*selected].0);
+                    self.editor.open(path).unwrap();
                     self.search = None;
                 }
                 Key::Escape => {

@@ -1,11 +1,12 @@
 use ignore::WalkBuilder;
 
 use crate::document::Document;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub struct Editor {
     root: PathBuf,
     documents: Vec<Document>,
+    active_document: usize,
 }
 
 impl Editor {
@@ -13,22 +14,36 @@ impl Editor {
         Self {
             root,
             documents: Default::default(),
+            active_document: 0,
         }
     }
 
+    pub fn root(&self) -> &Path {
+        self.root.as_path()
+    }
+
     pub fn active_document(&self) -> &Document {
-        &self.documents[0]
+        self.documents.get(self.active_document).unwrap()
     }
 
     pub fn active_document_mut(&mut self) -> &mut Document {
-        &mut self.documents[0]
+        self.documents.get_mut(self.active_document).unwrap()
     }
 
     pub fn open(&mut self, path: PathBuf) -> std::io::Result<()> {
-        let mut document = Document::open(path)?;
-        document.parse();
+        if let Some(active_document) = self
+            .documents
+            .iter()
+            .position(|document| document.path() == path)
+        {
+            self.active_document = active_document;
+        } else {
+            let mut document = Document::open(path)?;
+            document.parse();
 
-        self.documents.push(document);
+            self.active_document = self.documents.len();
+            self.documents.push(document);
+        }
 
         Ok(())
     }

@@ -9,7 +9,7 @@ use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Write},
     ops::Range,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 use tree_sitter::{Node, Parser, Query, Tree};
 use virus_graphics::text::{Cluster, Context, FontFamilyKey, FontSize, Line};
@@ -154,6 +154,10 @@ impl Document {
 
 /// Getters.
 impl Document {
+    pub fn path(&self) -> &Path {
+        self.path.as_path()
+    }
+
     pub fn rope(&self) -> &Rope {
         &self.rope
     }
