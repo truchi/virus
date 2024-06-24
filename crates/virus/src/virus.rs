@@ -140,8 +140,8 @@ impl Virus {
 
             Theme {
                 syntax: virus_editor::syntax::Theme::catppuccin(),
-                font_size: 24,
-                line_height: 30,
+                font_size: 20,
+                line_height: 25,
                 scrollbar_color: catppuccin.surface1.solid(),
                 scroll_duration: Duration::from_millis(500),
                 scroll_tween: Tween::ExpoOut,
