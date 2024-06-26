@@ -106,12 +106,12 @@ impl DocumentView {
         };
 
         let anchor = LineColumn {
-            line: document.selection().anchor.line,
-            column: document.selection().anchor.column,
+            line: document.anchor_line(),
+            column: document.anchor_column(),
         };
         let head = LineColumn {
-            line: document.selection().head.line,
-            column: document.selection().head.column,
+            line: document.head_line(),
+            column: document.head_column(),
         };
 
         let lines = document.shape(

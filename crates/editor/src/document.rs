@@ -11,14 +11,14 @@ use std::{
     ops::Range,
     path::{Path, PathBuf},
 };
-use tree_sitter::{Node, Parser, Query, Tree};
+use tree_sitter::{InputEdit, Node, Parser, Point, Query, Tree};
 use virus_graphics::text::{Cluster, Context, FontFamilyKey, FontSize, Line};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           Selection                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
+#[derive(Clone, Eq, PartialEq, Default, Debug)]
 pub struct Selection {
     pub anchor: Cursor,
     pub head: Cursor,
@@ -36,7 +36,11 @@ impl Selection {
     }
 
     pub fn cursor(cursor: Cursor) -> Self {
-        Self::new(cursor, cursor)
+        Self::new(cursor.clone(), cursor)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.anchor.index() == self.head.index()
     }
 
     pub fn is_forward(&self) -> bool {
@@ -47,25 +51,25 @@ impl Selection {
         }
     }
 
-    pub fn range(&self) -> Range<Cursor> {
+    pub fn range(&self) -> Range<&Cursor> {
         if self.is_forward() {
-            self.anchor..self.head
+            &self.anchor..&self.head
         } else {
-            self.head..self.anchor
+            &self.head..&self.anchor
         }
     }
 
     pub fn flip(&self) -> Self {
-        Self::new(self.head, self.anchor)
+        Self::new(self.head.clone(), self.anchor.clone())
     }
 
     pub fn flip_mut(&mut self) {
-        *self = Self::new(self.head, self.anchor);
+        *self = self.flip();
     }
 
     pub fn move_to(&self, cursor: Cursor, selection: bool) -> Self {
         if selection {
-            Self::new(self.anchor, cursor)
+            Self::new(self.anchor.clone(), cursor)
         } else {
             Self::cursor(cursor)
         }
@@ -162,8 +166,40 @@ impl Document {
         &self.rope
     }
 
-    pub fn selection(&self) -> Selection {
-        self.selection
+    pub fn anchor_index(&self) -> usize {
+        self.selection.anchor.index()
+    }
+
+    pub fn anchor_line(&self) -> usize {
+        self.selection.anchor.line(&self.rope)
+    }
+
+    pub fn anchor_column(&self) -> usize {
+        self.selection.anchor.column(&self.rope)
+    }
+
+    pub fn anchor_width(&self) -> usize {
+        self.selection.anchor.width(&self.rope)
+    }
+
+    pub fn head_index(&self) -> usize {
+        self.selection.head.index()
+    }
+
+    pub fn head_line(&self) -> usize {
+        self.selection.head.line(&self.rope)
+    }
+
+    pub fn head_column(&self) -> usize {
+        self.selection.head.column(&self.rope)
+    }
+
+    pub fn head_width(&self) -> usize {
+        self.selection.head.width(&self.rope)
+    }
+
+    pub fn selection(&self) -> &Selection {
+        &self.selection
     }
 
     pub fn tree(&self) -> &Tree {
@@ -174,7 +210,7 @@ impl Document {
 /// Movements.
 impl Document {
     pub fn move_anchor_to_head(&mut self) {
-        self.selection = self.selection.head.into();
+        self.selection = self.selection.head.clone().into();
     }
 
     pub fn flip_anchor_and_head(&mut self) {
@@ -182,80 +218,217 @@ impl Document {
     }
 
     pub fn move_up(&mut self, selection: bool, lines: usize) {
+        let line = self.selection.head.line(&self.rope);
+        let width = self.selection.head.width(&self.rope);
+
         self.selection.move_to_mut(
-            self.rope.grapheme().above(self.selection.head, lines),
+            line.checked_sub(lines)
+                .map(|line| self.rope.cursor().at_line_width(line, width))
+                .unwrap_or_else(|| self.rope().cursor().at_start()),
             selection,
         );
     }
 
     pub fn move_down(&mut self, selection: bool, lines: usize) {
+        let line = self.selection.head.line(&self.rope);
+        let width = self.selection.head.width(&self.rope);
+
         self.selection.move_to_mut(
-            self.rope.grapheme().below(self.selection.head, lines),
+            self.rope().cursor().at_line_width(
+                self.rope.len_lines().saturating_sub(1).min(line + lines),
+                width,
+            ),
             selection,
         );
     }
 
     pub fn move_prev_grapheme(&mut self, selection: bool) {
-        self.selection
-            .move_to_mut(self.rope.grapheme().prev(self.selection.head), selection);
+        self.selection.move_to_mut(
+            self.rope
+                .grapheme()
+                .prev(self.selection.head.index())
+                .unwrap_or_else(|| self.selection.head.clone()),
+            selection,
+        );
     }
 
     pub fn move_next_grapheme(&mut self, selection: bool) {
-        self.selection
-            .move_to_mut(self.rope.grapheme().next(self.selection.head), selection);
+        self.selection.move_to_mut(
+            self.rope
+                .grapheme()
+                .next(self.selection.head.index())
+                .unwrap_or_else(|| self.selection.head.clone()),
+            selection,
+        );
     }
 
     pub fn move_prev_start_of_word(&mut self, selection: bool) {
-        self.selection
-            .move_to_mut(self.rope.word().prev_start(self.selection.head), selection);
+        self.selection.move_to_mut(
+            self.rope
+                .word()
+                .prev_start(self.selection.head.index())
+                .unwrap_or_else(|| self.selection.head.clone()),
+            selection,
+        );
     }
 
     pub fn move_prev_end_of_word(&mut self, selection: bool) {
-        self.selection
-            .move_to_mut(self.rope.word().prev_end(self.selection.head), selection);
+        self.selection.move_to_mut(
+            self.rope
+                .word()
+                .prev_end(self.selection.head.index())
+                .unwrap_or_else(|| self.selection.head.clone()),
+            selection,
+        );
     }
 
     pub fn move_next_start_of_word(&mut self, selection: bool) {
-        self.selection
-            .move_to_mut(self.rope.word().next_start(self.selection.head), selection);
+        self.selection.move_to_mut(
+            self.rope
+                .word()
+                .next_start(self.selection.head.index())
+                .unwrap_or_else(|| self.selection.head.clone()),
+            selection,
+        );
     }
 
     pub fn move_next_end_of_word(&mut self, selection: bool) {
-        self.selection
-            .move_to_mut(self.rope.word().next_end(self.selection.head), selection);
+        self.selection.move_to_mut(
+            self.rope
+                .word()
+                .next_end(self.selection.head.index())
+                .unwrap_or_else(|| self.selection.head.clone()),
+            selection,
+        );
     }
 }
 
 /// Edition.
 impl Document {
     pub fn edit(&mut self, str: &str) {
-        let Range { start, end } = self.selection.range();
-        self.rope.replace(start..end, str);
+        let Range {
+            start,
+            end: old_end,
+        } = self.selection.range();
+        let start_index = start.index();
+        let old_end_index = old_end.index();
 
-        let cursor = self.rope.cursor().index(start.index + str.len());
-        self.edit_tree(start, end, cursor);
-        self.selection = cursor.into();
+        debug_assert!({
+            let index = self.rope.byte_to_char(start_index);
+            self.rope.char_to_byte(index) == start_index
+        });
+        debug_assert!({
+            let index = self.rope.byte_to_char(old_end_index);
+            self.rope.char_to_byte(index) == old_end_index
+        });
+
+        let remove = start_index != old_end_index;
+        let insert = !str.is_empty();
+
+        match (remove, insert) {
+            // Replace
+            (true, true) => {
+                let start_line = start.line(&self.rope);
+                let start_column = start.column(&self.rope);
+                let old_end_line = old_end.line(&self.rope);
+                let old_end_column = old_end.column(&self.rope);
+
+                {
+                    let start = self.rope.byte_to_char(start_index);
+                    let end = self.rope.byte_to_char(old_end_index);
+
+                    self.rope.remove(start..end);
+                    self.rope.insert(start, str);
+                }
+
+                let new_end = self.rope.cursor().at_index(start_index + str.len());
+                let new_end_index = new_end.index();
+                let new_end_line = new_end.line(&self.rope);
+                let new_end_column = new_end.column(&self.rope);
+
+                self.edit_tree(
+                    start_index,
+                    start_line,
+                    start_column,
+                    old_end_index,
+                    old_end_line,
+                    old_end_column,
+                    new_end_index,
+                    new_end_line,
+                    new_end_column,
+                );
+                self.selection = new_end.into();
+            }
+            // Remove
+            (true, false) => {
+                let start_line = start.line(&self.rope);
+                let start_column = start.column(&self.rope);
+                let old_end_line = old_end.line(&self.rope);
+                let old_end_column = old_end.column(&self.rope);
+
+                {
+                    let start = self.rope.byte_to_char(start_index);
+                    let end = self.rope.byte_to_char(old_end_index);
+
+                    self.rope.remove(start..end);
+                }
+
+                let new_end = start.clone();
+
+                self.edit_tree(
+                    start_index,
+                    start_line,
+                    start_column,
+                    old_end_index,
+                    old_end_line,
+                    old_end_column,
+                    start_index,
+                    start_line,
+                    start_column,
+                );
+                self.selection = new_end.into();
+            }
+            // Insert
+            (false, true) => {
+                let start_line = start.line(&self.rope);
+                let start_column = start.column(&self.rope);
+
+                {
+                    let start = self.rope.byte_to_char(start_index);
+
+                    self.rope.insert(start, str);
+                }
+
+                let new_end = self.rope.cursor().at_index(start_index + str.len());
+                let new_end_index = new_end.index();
+                let new_end_line = new_end.line(&self.rope);
+                let new_end_column = new_end.column(&self.rope);
+
+                self.edit_tree(
+                    start_index,
+                    start_line,
+                    start_column,
+                    start_index,
+                    start_line,
+                    start_column,
+                    new_end_index,
+                    new_end_line,
+                    new_end_column,
+                );
+                self.selection = new_end.into();
+            }
+            // Nothing
+            (false, false) => {}
+        }
     }
 
-    pub fn backspace(&mut self) -> Result<(), ()> {
-        let Range { start, end } = self.selection.range();
-
-        if start != end {
-            // TODO What to do here?
-            return Err(());
+    // TODO: convenient for now but does not feel good
+    pub fn backspace(&mut self) {
+        if self.selection.is_empty() {
+            self.move_prev_grapheme(true);
         }
 
-        let start = self.rope.grapheme().prev(end);
-
-        if start != end {
-            self.rope
-                .remove(self.rope.byte_to_char(start.index)..self.rope.byte_to_char(end.index));
-
-            self.edit_tree(start, end, start);
-            self.selection = start.into();
-        }
-
-        Ok(())
+        self.edit("");
     }
 }
 
@@ -279,7 +452,10 @@ impl Document {
                 self.tree.root_node(),
                 &self.highlights,
                 lines.clone(),
-                self.selection,
+                self.selection.anchor.line(&self.rope),
+                self.selection.anchor.column(&self.rope),
+                self.selection.head.line(&self.rope),
+                self.selection.head.column(&self.rope),
                 family,
                 theme,
                 font_size,
@@ -292,7 +468,10 @@ impl Document {
             self.tree.root_node(),
             &self.highlights,
             lines,
-            self.selection,
+            self.selection.anchor.line(&self.rope),
+            self.selection.anchor.column(&self.rope),
+            self.selection.head.line(&self.rope),
+            self.selection.head.column(&self.rope),
             family,
             theme,
             font_size,
@@ -314,9 +493,35 @@ impl Document {
             .expect("Cannot parse")
     }
 
-    fn edit_tree(&mut self, start: Cursor, old_end: Cursor, new_end: Cursor) {
-        self.tree
-            .edit(&Cursor::into_input_edit(start, old_end, new_end));
+    fn edit_tree(
+        &mut self,
+        start_index: usize,
+        start_line: usize,
+        start_column: usize,
+        old_end_index: usize,
+        old_end_line: usize,
+        old_end_column: usize,
+        new_end_index: usize,
+        new_end_line: usize,
+        new_end_column: usize,
+    ) {
+        self.tree.edit(&InputEdit {
+            start_byte: start_index,
+            old_end_byte: old_end_index,
+            new_end_byte: new_end_index,
+            start_position: Point {
+                row: start_line,
+                column: start_column,
+            },
+            old_end_position: Point {
+                row: old_end_line,
+                column: old_end_column,
+            },
+            new_end_position: Point {
+                row: new_end_line,
+                column: new_end_column,
+            },
+        });
         self.is_tree_dirty = true;
         self.cached_shaping = None;
     }
@@ -325,7 +530,10 @@ impl Document {
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
 struct CachedShaping {
-    selection: Selection,
+    anchor_line: usize,
+    anchor_column: usize,
+    head_line: usize,
+    head_column: usize,
     family: FontFamilyKey,
     theme: Theme,
     font_size: FontSize,
@@ -340,7 +548,10 @@ impl CachedShaping {
         root: Node,
         query: &Query,
         line_range: Range<usize>,
-        selection: Selection,
+        anchor_line: usize,
+        anchor_column: usize,
+        head_line: usize,
+        head_column: usize,
         family: FontFamilyKey,
         theme: Theme,
         font_size: FontSize,
@@ -357,14 +568,20 @@ impl CachedShaping {
             root,
             query,
             line_range.clone(),
-            selection,
+            anchor_line,
+            anchor_column,
+            head_line,
+            head_column,
             family,
             theme,
             font_size,
         );
 
         Self {
-            selection,
+            anchor_line,
+            anchor_column,
+            head_line,
+            head_column,
             family,
             theme,
             font_size,
@@ -380,7 +597,10 @@ impl CachedShaping {
         root: Node,
         query: &Query,
         line_range: Range<usize>,
-        selection: Selection,
+        anchor_line: usize,
+        anchor_column: usize,
+        head_line: usize,
+        head_column: usize,
         family: FontFamilyKey,
         theme: Theme,
         font_size: FontSize,
@@ -398,18 +618,22 @@ impl CachedShaping {
                 root,
                 query,
                 line_range.clone(),
-                selection,
+                anchor_line,
+                anchor_column,
+                head_line,
+                head_column,
                 family,
                 theme,
                 font_size,
             );
-        } else if self.selection != selection {
-            let mut lines = vec![
-                self.selection.anchor.line,
-                self.selection.head.line,
-                selection.anchor.line,
-                selection.head.line,
-            ];
+        } else if (
+            self.anchor_line,
+            self.anchor_column,
+            self.head_line,
+            self.head_column,
+        ) != (anchor_line, anchor_column, head_line, head_column)
+        {
+            let mut lines = vec![self.anchor_line, self.head_line, anchor_line, head_line];
             lines.sort();
             lines.dedup();
 
@@ -421,7 +645,10 @@ impl CachedShaping {
                         root,
                         query,
                         line..line + 1,
-                        selection,
+                        anchor_line,
+                        anchor_column,
+                        head_line,
+                        head_column,
                         family,
                         theme,
                         font_size,
@@ -431,7 +658,10 @@ impl CachedShaping {
                 }
             }
 
-            self.selection = selection;
+            self.anchor_line = anchor_line;
+            self.anchor_column = anchor_column;
+            self.head_line = head_line;
+            self.head_column = head_column;
         }
 
         let start = line_range.start - self.line_range.start;
@@ -445,7 +675,10 @@ impl CachedShaping {
         root: Node,
         query: &Query,
         line_range: Range<usize>,
-        selection: Selection,
+        anchor_line: usize,
+        anchor_column: usize,
+        head_line: usize,
+        head_column: usize,
         family: FontFamilyKey,
         theme: Theme,
         font_size: FontSize,
@@ -478,16 +711,16 @@ impl CachedShaping {
                 }
             };
 
-            let start_line = capture.start.line - line_range.start;
-            let end_line = capture.end.line - line_range.start;
+            let start_line = capture.start_line - line_range.start;
+            let end_line = capture.end_line - line_range.start;
 
             if start_line == end_line {
                 let (_, line) = &mut lines[start_line];
-                let Some(start) = find(line.clusters(), capture.start.column) else {
+                let Some(start) = find(line.clusters(), capture.start_column) else {
                     debug_assert!(false, "Cannot find highlight in line");
                     continue;
                 };
-                let Some(end) = find(&line.clusters()[start..], capture.end.column) else {
+                let Some(end) = find(&line.clusters()[start..], capture.end_column) else {
                     debug_assert!(false, "Cannot find highlight in line");
                     continue;
                 };
@@ -495,7 +728,7 @@ impl CachedShaping {
                 update(&mut line.clusters_mut()[start..][..end]);
             } else {
                 let (_, line) = &mut lines[start_line];
-                let Some(start) = find(line.clusters(), capture.start.column) else {
+                let Some(start) = find(line.clusters(), capture.start_column) else {
                     debug_assert!(false, "Cannot find highlight in line");
                     continue;
                 };
@@ -507,14 +740,14 @@ impl CachedShaping {
                 }
 
                 if let Some((_, line)) = lines.get_mut(end_line) {
-                    let Some(end) = find(line.clusters(), capture.end.column) else {
+                    let Some(end) = find(line.clusters(), capture.end_column) else {
                         debug_assert!(false, "Cannot find highlight in line");
                         continue;
                     };
 
                     update(&mut line.clusters_mut()[..end]);
                 } else {
-                    debug_assert!(capture.end.column == 0);
+                    debug_assert!(capture.end_column == 0);
                 }
             }
         }
@@ -546,8 +779,8 @@ impl CachedShaping {
                     context,
                     family,
                     font_size,
-                    (i == selection.anchor.line).then(|| word(selection.anchor.column)),
-                    (i == selection.head.line).then(|| word(selection.head.column)),
+                    (i == anchor_line).then(|| word(anchor_column)),
+                    (i == head_line).then(|| word(head_column)),
                 )
             })
             .collect()

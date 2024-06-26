@@ -4,7 +4,7 @@ use crate::{
     views::{DocumentView, FilesView},
 };
 use std::{ops::Range, sync::Arc, time::Duration};
-use virus_editor::document::{Document, Selection};
+use virus_editor::document::Document;
 use virus_graphics::{
     text::{Context, Font, FontStyle, FontWeight, Fonts},
     types::{Rectangle, Rgba},
@@ -86,10 +86,10 @@ impl Ui {
         }
     }
 
-    pub fn ensure_visibility(&mut self, selection: Selection) {
+    pub fn ensure_visibility(&mut self, line: usize) {
         let line_height = self.document_view.line_height();
         let screen_height_in_lines = self.screen_height_in_lines();
-        let line = selection.range().start.line as u32;
+        let line = line as u32;
         let start = self.scroll_top.end() / line_height;
         let end = start + screen_height_in_lines;
 

@@ -252,14 +252,14 @@ impl Virus {
                             .active_document_mut()
                             .move_up(select_mode.is_some(), 1);
                         self.ui
-                            .ensure_visibility(self.editor.active_document().selection());
+                            .ensure_visibility(self.editor.active_document().head_line());
                     }
                     Key::Str("k") => {
                         self.editor
                             .active_document_mut()
                             .move_down(select_mode.is_some(), 1);
                         self.ui
-                            .ensure_visibility(self.editor.active_document().selection());
+                            .ensure_visibility(self.editor.active_document().head_line());
                     }
                     Key::Str("j") => self
                         .editor
@@ -274,42 +274,42 @@ impl Virus {
                             .active_document_mut()
                             .move_next_end_of_word(select_mode.is_some());
                         self.ui
-                            .ensure_visibility(self.editor.active_document().selection());
+                            .ensure_visibility(self.editor.active_document().head_line());
                     }
                     Key::Str("E") => {
                         self.editor
                             .active_document_mut()
                             .move_prev_end_of_word(select_mode.is_some());
                         self.ui
-                            .ensure_visibility(self.editor.active_document().selection());
+                            .ensure_visibility(self.editor.active_document().head_line());
                     }
                     Key::Str("w") => {
                         self.editor
                             .active_document_mut()
                             .move_next_start_of_word(select_mode.is_some());
                         self.ui
-                            .ensure_visibility(self.editor.active_document().selection());
+                            .ensure_visibility(self.editor.active_document().head_line());
                     }
                     Key::Str("W") => {
                         self.editor
                             .active_document_mut()
                             .move_prev_start_of_word(select_mode.is_some());
                         self.ui
-                            .ensure_visibility(self.editor.active_document().selection());
+                            .ensure_visibility(self.editor.active_document().head_line());
                     }
                     Key::Str("y") => {
                         self.editor
                             .active_document_mut()
                             .move_up(select_mode.is_some(), 10);
                         self.ui
-                            .ensure_visibility(self.editor.active_document().selection());
+                            .ensure_visibility(self.editor.active_document().head_line());
                     }
                     Key::Str("h") => {
                         self.editor
                             .active_document_mut()
                             .move_down(select_mode.is_some(), 10);
                         self.ui
-                            .ensure_visibility(self.editor.active_document().selection());
+                            .ensure_visibility(self.editor.active_document().head_line());
                     }
                     Key::Str("v") => match select_mode {
                         Some(SelectMode::Range) => *select_mode = Some(SelectMode::Line),
@@ -347,7 +347,7 @@ impl Virus {
                     Key::Str("@") if self.events.command() => event_loop.exit(),
                     Key::Str(str) => self.editor.active_document_mut().edit(str),
                     Key::Space => self.editor.active_document_mut().edit(" "),
-                    Key::Backspace => self.editor.active_document_mut().backspace().unwrap(),
+                    Key::Backspace => self.editor.active_document_mut().backspace(),
                     Key::Enter => self.editor.active_document_mut().edit("\n"),
                     Key::Escape => {
                         self.mode = Mode::Normal {
