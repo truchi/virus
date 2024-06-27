@@ -1,0 +1,10 @@
+[package]
+name = "lsp"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+url.workspace = true
