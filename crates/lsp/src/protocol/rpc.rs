@@ -5,11 +5,20 @@ use serde::{Deserialize, Serialize};
 //                                               Id                                               //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Hash, Debug)]
 #[serde(untagged)]
 pub enum Id {
     Integer(Integer),
     String(String),
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                             Object                                             //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub enum Message<T> {
+    Request(Request<T>),
+    Response(Response<T>),
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -62,7 +71,7 @@ impl<T> Request<T> {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Response<T> {
     /// `JSON-RPC` protocol version (must be exactly `"2.0"`).
-    pub jsonrpc: &'static str,
+    pub jsonrpc: String,
 
     /// The request id.
     #[serde(default)]
