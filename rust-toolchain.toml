@@ -1,2 +1,2 @@
 [toolchain]
-channel = "stable"
+channel = "nightly" # For rustfmt to work through rust-analyzer...

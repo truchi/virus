@@ -1,93 +1,135 @@
 use crate::{
-    protocol::{
-        lsp::Message,
-        rpc::{Id, Request, Response},
-    },
-    types::{Any, Integer},
+    transport::{Id, Message, Notification, Request, Response},
+    types::Integer,
 };
 use futures::Future;
 use serde::{de::DeserializeOwned, Serialize};
+use serde_json::Value;
 use std::{
+    borrow::Cow,
     collections::HashMap,
-    process::Stdio,
+    io,
     sync::{Arc, Mutex},
     task::{Poll, Waker},
 };
 use tokio::{
-    io::{AsyncBufRead, AsyncReadExt, AsyncWrite},
-    process::{Child, ChildStdin, ChildStdout, Command},
-    sync::mpsc::Sender,
+    io::{AsyncBufRead, AsyncWrite},
+    sync::mpsc::{channel, Receiver, Sender},
 };
 
-type Requests = HashMap<Id, (Option<Response<Any>>, Option<Waker>)>;
+pub type RequestOrNotification = futures::future::Either<Request<Value>, Notification<Value>>;
+
+type Requests = HashMap<Id, (Option<Response<Value, Value>>, Option<Waker>)>;
 
 pub struct Client<W: AsyncWrite + Unpin> {
     id: Integer,
     writer: W,
     requests: Arc<Mutex<Requests>>,
+    _sender: Sender<RequestOrNotification>,
 }
 
 impl<W: AsyncWrite + Unpin> Client<W> {
     pub fn new<R: 'static + AsyncBufRead + Send + Unpin>(
         mut reader: R,
         writer: W,
-        notifications: Sender<Request<Any>>,
-    ) -> std::io::Result<Self> {
+    ) -> (Self, Receiver<RequestOrNotification>) {
         let requests = Arc::new(Mutex::new(Requests::new()));
+        let (sender, receiver) = channel(64);
 
         tokio::spawn({
-            let mut requests = requests.clone();
+            let requests = requests.clone();
+            // Downgrade to allow the loop to return when self is dropped
+            let sender = sender.downgrade();
 
             async move {
                 loop {
-                    let message = Message::read(&mut reader).await.expect("Read message");
-                    let response =
-                        serde_json::from_slice::<Response<crate::types::Any>>(&message.content)
-                            .unwrap();
-
-                    if let Some(id) = response.id.clone() {
-                        let mut requests = requests.lock().unwrap();
-                        let (response_slot, waker) = requests.get_mut(&id).expect("Request state");
-
-                        debug_assert!(response_slot.is_none());
-                        *response_slot = Some(response);
-
-                        if let Some(waker) = waker.take() {
-                            waker.wake();
+                    let message = match Message::<Value, Value>::read(&mut reader).await {
+                        Ok(message) => message,
+                        Err(err) if err.kind() == io::ErrorKind::UnexpectedEof => {
+                            break;
                         }
-                    } else {
-                        // TODO: Send notification to caller
-                        // notifications.send(response)
+                        Err(err) => panic!("Cannot read message: {err:#?}"),
+                    };
+
+                    match message {
+                        Message::Request(request) => {
+                            if let Some(sender) = sender.upgrade() {
+                                if sender
+                                    .send(RequestOrNotification::Left(request))
+                                    .await
+                                    .is_err()
+                                {
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+                        Message::Notification(notification) => {
+                            if let Some(sender) = sender.upgrade() {
+                                if sender
+                                    .send(RequestOrNotification::Right(notification))
+                                    .await
+                                    .is_err()
+                                {
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+                        Message::Response(response) => {
+                            if let Some(id) = &response.id {
+                                let mut requests = requests.lock().unwrap();
+                                let (response_slot, waker) =
+                                    requests.get_mut(id).expect("Request state");
+
+                                debug_assert!(response_slot.is_none(), "Got two responses");
+                                *response_slot = Some(response);
+
+                                if let Some(waker) = waker.take() {
+                                    waker.wake();
+                                }
+                            } else {
+                                panic!("Got a response with no id");
+                            }
+                        }
                     }
                 }
             }
         });
 
-        Ok(Self {
-            id: 0,
-            writer,
-            requests,
-        })
+        (
+            Self {
+                id: 0,
+                writer,
+                requests,
+                // We keep this here so the spawned task above finished when self is dropped
+                _sender: sender,
+            },
+            receiver,
+        )
     }
 
-    pub async fn request<T: Serialize, U: DeserializeOwned>(
+    pub async fn request<T: DeserializeOwned, E: DeserializeOwned, P: Serialize>(
         &mut self,
-        method: String,
-        params: Option<T>,
-    ) -> std::io::Result<impl '_ + Future<Output = Response<U>>> {
-        let id = Id::Integer(self.id());
+        method: Cow<'static, str>,
+        params: Option<P>,
+    ) -> io::Result<impl '_ + Future<Output = Response<T, E>>> {
+        let id = Id::Integer({
+            let id = self.id;
+            self.id += 1;
+            id
+        });
 
         self.requests
             .lock()
             .unwrap()
             .insert(id.clone(), (None, None));
 
-        let request = Request::request(id.clone(), method, params);
-        let message = Message::new(serde_json::to_vec(&request).expect("Serialize request"));
-        message
+        Request::new(id.clone(), method, params)
             .write(&mut self.writer)
-            .await
-            .expect("Write message");
+            .await?;
 
         Ok(futures::future::poll_fn(move |cx| {
             let mut requests = self.requests.lock().unwrap();
@@ -99,14 +141,7 @@ impl<W: AsyncWrite + Unpin> Client<W> {
             if let Some(response) = response.take() {
                 requests.remove(&id);
 
-                Poll::Ready(Response {
-                    jsonrpc: response.jsonrpc,
-                    id: response.id,
-                    result: response
-                        .result
-                        .map(|result| serde_json::from_value(result).unwrap()),
-                    error: response.error,
-                })
+                Poll::Ready(response.deserialize().expect("Response deserialization"))
             } else {
                 if let Some(waker) = waker {
                     waker.clone_from(cx.waker());
@@ -119,46 +154,13 @@ impl<W: AsyncWrite + Unpin> Client<W> {
         }))
     }
 
-    fn id(&mut self) -> Integer {
-        let id = self.id;
-        self.id += 1;
-        id
+    pub async fn notification<P: Serialize>(
+        &mut self,
+        method: Cow<'static, str>,
+        params: Option<P>,
+    ) -> io::Result<()> {
+        Notification::new(method, params)
+            .write(&mut self.writer)
+            .await
     }
 }
-
-// ────────────────────────────────────────────────────────────────────────────────────────────── //
-
-// pub struct Client {
-//     child: Child,
-//     stdin: ChildStdin,
-// }
-
-// impl Client {
-//     pub fn new<'a>(mut command: Command) -> std::io::Result<Self> {
-//         let mut child = command
-//             .stdin(Stdio::piped())
-//             .stdout(Stdio::piped())
-//             .spawn()?;
-//         let stdin = child.stdin.take().unwrap();
-//         let mut stdout = child.stdout.take().unwrap();
-
-//         let (tx, mut rx) = channel::<String>(100);
-
-//         tokio::spawn(async move {
-//             let mut buffer = vec![0; 1024];
-
-//             loop {
-//                 match stdout.read_exact(&mut buffer).await {
-//                     Ok(_) => {
-//                         // if tx.send(buffer.clone()).await.is_err() {
-//                         //     unreachable!();
-//                         // }
-//                     }
-//                     Err(_) => break,
-//                 }
-//             }
-//         });
-
-//         Ok(Self { child, stdin })
-//     }
-// }
