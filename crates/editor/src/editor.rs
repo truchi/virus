@@ -81,4 +81,21 @@ impl Editor {
                     .ok()
             })
     }
+
+    pub fn find_git_root(path: PathBuf) -> Option<PathBuf> {
+        let mut current = match std::fs::canonicalize(path) {
+            Ok(path) => Some(path),
+            Err(_) => return None,
+        };
+
+        while let Some(path) = current {
+            if path.join(".git").is_dir() {
+                return Some(path);
+            }
+
+            current = path.parent().map(Into::into);
+        }
+
+        None
+    }
 }

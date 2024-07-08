@@ -15,7 +15,7 @@ use winit::{
     application::ApplicationHandler,
     dpi::{PhysicalPosition, PhysicalSize},
     event::WindowEvent,
-    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy},
     window::{Fullscreen, Window, WindowAttributes, WindowId},
 };
 
@@ -173,10 +173,15 @@ impl Virus {
                 selection_insert_mode_color: insert_mode.solid().transparent(255 / 2),
             }
         });
-        let mut editor = Editor::new(std::env::current_dir().unwrap());
-        editor
-            .open(std::env::args().skip(1).next().unwrap().into())
-            .unwrap();
+        let editor = {
+            let file = PathBuf::from(std::env::args().skip(1).next().expect("File argument"));
+            let root = Editor::find_git_root(file.clone())
+                .unwrap_or_else(|| std::env::current_dir().expect("Current dir").into());
+
+            let mut editor = Editor::new(root);
+            editor.open(file).unwrap();
+            editor
+        };
 
         Self {
             events,
