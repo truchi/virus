@@ -5,6 +5,7 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
+tokio.workspace = true
 virus-editor.workspace = true
 virus-ui.workspace = true
 winit.workspace = true

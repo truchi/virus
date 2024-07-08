@@ -1943,6 +1943,7 @@ name = "virus"
 version = "0.1.0"
 dependencies = [
  "editor",
+ "tokio",
  "ui",
  "winit",
 ]

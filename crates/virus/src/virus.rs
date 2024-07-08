@@ -120,7 +120,7 @@ impl Virus {
     pub fn run() {
         let event_loop = EventLoop::new().expect("Cannot create event loop");
         event_loop.set_control_flow(ControlFlow::Wait);
-        event_loop.run_app(&mut Handler::Uninitialized);
+        event_loop.run_app(&mut Handler::Uninitialized).unwrap();
     }
 }
 
