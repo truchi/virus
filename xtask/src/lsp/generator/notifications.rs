@@ -62,7 +62,7 @@ impl<'a> Quote<&'a Notification> {
                     pub enum #pascal_method {}
                 },
                 quote! {
-                    impl Notification for #pascal_method {
+                    impl NotificationTrait for #pascal_method {
                         const REGISTRATION_METHOD: Option<&'static str> = #registration_method;
                         const METHOD: &'static str = #method;
                         type RegistrationOptions = #registration_options;

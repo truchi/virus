@@ -28,7 +28,7 @@ async fn write<T: Serialize, W: AsyncWrite + Unpin>(writer: &mut W, value: &T) -
 //                                               Id                                               //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Hash, Debug)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Hash, Debug)]
 #[serde(untagged)]
 pub enum Id {
     Integer(Integer),
@@ -39,7 +39,7 @@ pub enum Id {
 //                                            Message                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 #[serde(untagged)]
 pub enum Message<T, E> {
     Request(Request<T>),
@@ -69,7 +69,7 @@ impl<T, E> Message<T, E> {
 //                                            Request                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 pub struct Request<T> {
     /// `JSON-RPC` protocol version (must be exactly `"2.0"`).
     pub jsonrpc: Cow<'static, str>,
@@ -110,11 +110,27 @@ impl<T> Request<T> {
     }
 }
 
+impl Request<Value> {
+    pub fn deserialize<T: DeserializeOwned>(self) -> io::Result<Request<T>> {
+        debug_assert!(self.jsonrpc == VERSION);
+
+        Ok(Request {
+            jsonrpc: VERSION.into(),
+            id: self.id,
+            method: self.method,
+            params: self
+                .params
+                .map(|params| serde_json::from_value(params))
+                .transpose()?,
+        })
+    }
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                          Notification                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 pub struct Notification<T> {
     /// `JSON-RPC` protocol version (must be exactly `"2.0"`).
     pub jsonrpc: Cow<'static, str>,
@@ -155,7 +171,7 @@ impl<T> Notification<T> {
 //                                            Response                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 pub struct Response<T, E> {
     /// `JSON-RPC` protocol version (must be exactly `"2.0"`).
     pub jsonrpc: Cow<'static, str>,
@@ -216,7 +232,7 @@ impl Response<Value, Value> {
         debug_assert!(self.jsonrpc == VERSION);
 
         Ok(Response {
-            jsonrpc: self.jsonrpc,
+            jsonrpc: VERSION.into(),
             id: self.id,
             result: self
                 .result
@@ -243,7 +259,7 @@ impl Response<Value, Value> {
 //                                             Error                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 pub struct Error<T> {
     /// A number indicating the error type that occurred.
     pub code: Code,

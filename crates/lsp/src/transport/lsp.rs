@@ -38,48 +38,55 @@ impl Message {
     }
 
     pub async fn read<T: AsyncBufRead + Unpin>(reader: &mut T) -> io::Result<Self> {
+        fn invalid_data(err: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> io::Error {
+            io::Error::new(io::ErrorKind::InvalidData, err)
+        }
+
         let lf = *SEPARATOR.as_bytes().last().expect("Separator last byte");
         let mut content = Vec::new();
 
         // Read content length
-        if reader.read_until(lf, &mut content).await? == 0 {
-            return Err(io::Error::from(io::ErrorKind::UnexpectedEof));
-        }
+        reader.read_until(lf, &mut content).await?;
 
-        debug_assert!(content.starts_with(CONTENT_LENGTH.as_bytes()));
-        debug_assert!(content.ends_with(SEPARATOR.as_bytes()));
+        if !content.starts_with(CONTENT_LENGTH.as_bytes())
+            || !content.ends_with(SEPARATOR.as_bytes())
+        {
+            return Err(invalid_data("Expecting content length header"));
+        }
 
         let content_length =
             str::from_utf8(&content[CONTENT_LENGTH.len()..content.len() - SEPARATOR.len()])
-                .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?
+                .map_err(invalid_data)?
                 .parse()
-                .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
+                .map_err(invalid_data)?;
 
         // Read optional content type
         content.clear();
-        if reader.read_until(lf, &mut content).await? == 0 {
-            return Err(io::Error::from(io::ErrorKind::UnexpectedEof));
-        }
+        reader.read_until(lf, &mut content).await?;
 
-        debug_assert!(content.ends_with(SEPARATOR.as_bytes()));
+        if !content.ends_with(SEPARATOR.as_bytes()) {
+            return Err(invalid_data("Expecting optional content type header"));
+        }
 
         let content_type = if content.len() == SEPARATOR.len() {
             None
         } else {
-            debug_assert!(content.starts_with(CONTENT_TYPE.as_bytes()));
+            if !content.starts_with(CONTENT_TYPE.as_bytes()) {
+                return Err(invalid_data("Expecting content type header"));
+            }
 
             let content_type =
                 str::from_utf8(&content[CONTENT_TYPE.len()..content.len() - SEPARATOR.len()])
-                    .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?
+                    .map_err(invalid_data)?
                     .to_owned();
 
             // Read separator
             content.clear();
-            if reader.read_until(lf, &mut content).await? == 0 {
-                return Err(io::Error::from(io::ErrorKind::UnexpectedEof));
-            }
+            reader.read_until(lf, &mut content).await?;
 
-            debug_assert!(content == SEPARATOR.as_bytes());
+            if content != SEPARATOR.as_bytes() {
+                return Err(invalid_data("Expecting header separator"));
+            }
 
             Some(content_type)
         };
@@ -166,6 +173,24 @@ mod tests {
         let mut reader = BufReader::new(writer.as_slice());
         for message in &messages {
             assert!(Message::read(&mut reader).await.expect("Read") == *message);
+        }
+    }
+
+    #[tokio::test]
+    async fn errors() {
+        let strings = [
+            String::from(""),
+            String::from("nonsense"),
+            format!("{CONTENT_LENGTH}{SEPARATOR}"),
+            format!("{CONTENT_LENGTH}{SEPARATOR}{SEPARATOR}"),
+        ];
+
+        for string in strings {
+            let mut writer = Vec::new();
+            writer.write(string.as_bytes()).await.unwrap();
+
+            let mut reader = BufReader::new(writer.as_slice());
+            assert!(Message::read(&mut reader).await.is_err());
         }
     }
 }

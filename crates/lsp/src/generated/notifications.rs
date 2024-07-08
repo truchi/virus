@@ -3,11 +3,11 @@
 use super::*;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                          Notification                                          //
+//                                       NotificationTrait                                        //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// A trait for notifications.
-pub trait Notification {
+pub trait NotificationTrait {
     const REGISTRATION_METHOD: Option<&'static str>;
     const METHOD: &'static str;
     type RegistrationOptions: 'static + Serialize + DeserializeOwned + Send + Sync;
@@ -23,7 +23,7 @@ pub trait Notification {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#cancelRequest (Documentation)
 pub enum CancelRequest {}
 
-impl Notification for CancelRequest {
+impl NotificationTrait for CancelRequest {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "$/cancelRequest";
     type RegistrationOptions = ();
@@ -39,7 +39,7 @@ impl Notification for CancelRequest {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#logTrace (Documentation)
 pub enum LogTrace {}
 
-impl Notification for LogTrace {
+impl NotificationTrait for LogTrace {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "$/logTrace";
     type RegistrationOptions = ();
@@ -55,7 +55,7 @@ impl Notification for LogTrace {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#progress (Documentation)
 pub enum Progress {}
 
-impl Notification for Progress {
+impl NotificationTrait for Progress {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "$/progress";
     type RegistrationOptions = ();
@@ -71,7 +71,7 @@ impl Notification for Progress {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#setTrace (Documentation)
 pub enum SetTrace {}
 
-impl Notification for SetTrace {
+impl NotificationTrait for SetTrace {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "$/setTrace";
     type RegistrationOptions = ();
@@ -88,7 +88,7 @@ impl Notification for SetTrace {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#exit (Documentation)
 pub enum Exit {}
 
-impl Notification for Exit {
+impl NotificationTrait for Exit {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "exit";
     type RegistrationOptions = ();
@@ -106,7 +106,7 @@ impl Notification for Exit {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#initialized (Documentation)
 pub enum Initialized {}
 
-impl Notification for Initialized {
+impl NotificationTrait for Initialized {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "initialized";
     type RegistrationOptions = ();
@@ -122,7 +122,7 @@ impl Notification for Initialized {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#notebookDocument_didChange (Documentation)
 pub enum NotebookDocumentDidChange {}
 
-impl Notification for NotebookDocumentDidChange {
+impl NotificationTrait for NotebookDocumentDidChange {
     const REGISTRATION_METHOD: Option<&'static str> = Some("notebookDocument/sync");
     const METHOD: &'static str = "notebookDocument/didChange";
     type RegistrationOptions = ();
@@ -140,7 +140,7 @@ impl Notification for NotebookDocumentDidChange {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#notebookDocument_didClose (Documentation)
 pub enum NotebookDocumentDidClose {}
 
-impl Notification for NotebookDocumentDidClose {
+impl NotificationTrait for NotebookDocumentDidClose {
     const REGISTRATION_METHOD: Option<&'static str> = Some("notebookDocument/sync");
     const METHOD: &'static str = "notebookDocument/didClose";
     type RegistrationOptions = ();
@@ -158,7 +158,7 @@ impl Notification for NotebookDocumentDidClose {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#notebookDocument_didOpen (Documentation)
 pub enum NotebookDocumentDidOpen {}
 
-impl Notification for NotebookDocumentDidOpen {
+impl NotificationTrait for NotebookDocumentDidOpen {
     const REGISTRATION_METHOD: Option<&'static str> = Some("notebookDocument/sync");
     const METHOD: &'static str = "notebookDocument/didOpen";
     type RegistrationOptions = ();
@@ -176,7 +176,7 @@ impl Notification for NotebookDocumentDidOpen {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#notebookDocument_didSave (Documentation)
 pub enum NotebookDocumentDidSave {}
 
-impl Notification for NotebookDocumentDidSave {
+impl NotificationTrait for NotebookDocumentDidSave {
     const REGISTRATION_METHOD: Option<&'static str> = Some("notebookDocument/sync");
     const METHOD: &'static str = "notebookDocument/didSave";
     type RegistrationOptions = ();
@@ -193,7 +193,7 @@ impl Notification for NotebookDocumentDidSave {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#telemetry_event (Documentation)
 pub enum TelemetryEvent {}
 
-impl Notification for TelemetryEvent {
+impl NotificationTrait for TelemetryEvent {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "telemetry/event";
     type RegistrationOptions = ();
@@ -210,7 +210,7 @@ impl Notification for TelemetryEvent {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didChange (Documentation)
 pub enum TextDocumentDidChange {}
 
-impl Notification for TextDocumentDidChange {
+impl NotificationTrait for TextDocumentDidChange {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/didChange";
     type RegistrationOptions = super::structures::TextDocumentChangeRegistrationOptions;
@@ -232,7 +232,7 @@ impl Notification for TextDocumentDidChange {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didClose (Documentation)
 pub enum TextDocumentDidClose {}
 
-impl Notification for TextDocumentDidClose {
+impl NotificationTrait for TextDocumentDidClose {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/didClose";
     type RegistrationOptions = super::structures::TextDocumentRegistrationOptions;
@@ -255,7 +255,7 @@ impl Notification for TextDocumentDidClose {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didOpen (Documentation)
 pub enum TextDocumentDidOpen {}
 
-impl Notification for TextDocumentDidOpen {
+impl NotificationTrait for TextDocumentDidOpen {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/didOpen";
     type RegistrationOptions = super::structures::TextDocumentRegistrationOptions;
@@ -272,7 +272,7 @@ impl Notification for TextDocumentDidOpen {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didSave (Documentation)
 pub enum TextDocumentDidSave {}
 
-impl Notification for TextDocumentDidSave {
+impl NotificationTrait for TextDocumentDidSave {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/didSave";
     type RegistrationOptions = super::structures::TextDocumentSaveRegistrationOptions;
@@ -289,7 +289,7 @@ impl Notification for TextDocumentDidSave {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics (Documentation)
 pub enum TextDocumentPublishDiagnostics {}
 
-impl Notification for TextDocumentPublishDiagnostics {
+impl NotificationTrait for TextDocumentPublishDiagnostics {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/publishDiagnostics";
     type RegistrationOptions = ();
@@ -306,7 +306,7 @@ impl Notification for TextDocumentPublishDiagnostics {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSave (Documentation)
 pub enum TextDocumentWillSave {}
 
-impl Notification for TextDocumentWillSave {
+impl NotificationTrait for TextDocumentWillSave {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/willSave";
     type RegistrationOptions = super::structures::TextDocumentRegistrationOptions;
@@ -323,7 +323,7 @@ impl Notification for TextDocumentWillSave {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_logMessage (Documentation)
 pub enum WindowLogMessage {}
 
-impl Notification for WindowLogMessage {
+impl NotificationTrait for WindowLogMessage {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "window/logMessage";
     type RegistrationOptions = ();
@@ -340,7 +340,7 @@ impl Notification for WindowLogMessage {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessage (Documentation)
 pub enum WindowShowMessage {}
 
-impl Notification for WindowShowMessage {
+impl NotificationTrait for WindowShowMessage {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "window/showMessage";
     type RegistrationOptions = ();
@@ -357,7 +357,7 @@ impl Notification for WindowShowMessage {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_workDoneProgress_cancel (Documentation)
 pub enum WindowWorkDoneProgressCancel {}
 
-impl Notification for WindowWorkDoneProgressCancel {
+impl NotificationTrait for WindowWorkDoneProgressCancel {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "window/workDoneProgress/cancel";
     type RegistrationOptions = ();
@@ -375,7 +375,7 @@ impl Notification for WindowWorkDoneProgressCancel {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeConfiguration (Documentation)
 pub enum WorkspaceDidChangeConfiguration {}
 
-impl Notification for WorkspaceDidChangeConfiguration {
+impl NotificationTrait for WorkspaceDidChangeConfiguration {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/didChangeConfiguration";
     type RegistrationOptions = super::structures::DidChangeConfigurationRegistrationOptions;
@@ -392,7 +392,7 @@ impl Notification for WorkspaceDidChangeConfiguration {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWatchedFiles (Documentation)
 pub enum WorkspaceDidChangeWatchedFiles {}
 
-impl Notification for WorkspaceDidChangeWatchedFiles {
+impl NotificationTrait for WorkspaceDidChangeWatchedFiles {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/didChangeWatchedFiles";
     type RegistrationOptions = super::structures::DidChangeWatchedFilesRegistrationOptions;
@@ -409,7 +409,7 @@ impl Notification for WorkspaceDidChangeWatchedFiles {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWorkspaceFolders (Documentation)
 pub enum WorkspaceDidChangeWorkspaceFolders {}
 
-impl Notification for WorkspaceDidChangeWorkspaceFolders {
+impl NotificationTrait for WorkspaceDidChangeWorkspaceFolders {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/didChangeWorkspaceFolders";
     type RegistrationOptions = ();
@@ -428,7 +428,7 @@ impl Notification for WorkspaceDidChangeWorkspaceFolders {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didCreateFiles (Documentation)
 pub enum WorkspaceDidCreateFiles {}
 
-impl Notification for WorkspaceDidCreateFiles {
+impl NotificationTrait for WorkspaceDidCreateFiles {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/didCreateFiles";
     type RegistrationOptions = super::structures::FileOperationRegistrationOptions;
@@ -447,7 +447,7 @@ impl Notification for WorkspaceDidCreateFiles {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didDeleteFiles (Documentation)
 pub enum WorkspaceDidDeleteFiles {}
 
-impl Notification for WorkspaceDidDeleteFiles {
+impl NotificationTrait for WorkspaceDidDeleteFiles {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/didDeleteFiles";
     type RegistrationOptions = super::structures::FileOperationRegistrationOptions;
@@ -466,7 +466,7 @@ impl Notification for WorkspaceDidDeleteFiles {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didRenameFiles (Documentation)
 pub enum WorkspaceDidRenameFiles {}
 
-impl Notification for WorkspaceDidRenameFiles {
+impl NotificationTrait for WorkspaceDidRenameFiles {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/didRenameFiles";
     type RegistrationOptions = super::structures::FileOperationRegistrationOptions;

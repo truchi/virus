@@ -3,11 +3,11 @@
 use super::*;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                            Request                                             //
+//                                          RequestTrait                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// A trait for requests.
-pub trait Request {
+pub trait RequestTrait {
     const REGISTRATION_METHOD: Option<&'static str>;
     const METHOD: &'static str;
     type RegistrationOptions: 'static + Serialize + DeserializeOwned + Send + Sync;
@@ -28,7 +28,7 @@ pub trait Request {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_incomingCalls (Documentation)
 pub enum CallHierarchyIncomingCalls {}
 
-impl Request for CallHierarchyIncomingCalls {
+impl RequestTrait for CallHierarchyIncomingCalls {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "callHierarchy/incomingCalls";
     type RegistrationOptions = ();
@@ -56,7 +56,7 @@ pub enum CallHierarchyIncomingCallsResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_outgoingCalls (Documentation)
 pub enum CallHierarchyOutgoingCalls {}
 
-impl Request for CallHierarchyOutgoingCalls {
+impl RequestTrait for CallHierarchyOutgoingCalls {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "callHierarchy/outgoingCalls";
     type RegistrationOptions = ();
@@ -83,7 +83,7 @@ pub enum CallHierarchyOutgoingCallsResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#client_registerCapability (Documentation)
 pub enum ClientRegisterCapability {}
 
-impl Request for ClientRegisterCapability {
+impl RequestTrait for ClientRegisterCapability {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "client/registerCapability";
     type RegistrationOptions = ();
@@ -103,7 +103,7 @@ impl Request for ClientRegisterCapability {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#client_unregisterCapability (Documentation)
 pub enum ClientUnregisterCapability {}
 
-impl Request for ClientUnregisterCapability {
+impl RequestTrait for ClientUnregisterCapability {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "client/unregisterCapability";
     type RegistrationOptions = ();
@@ -124,7 +124,7 @@ impl Request for ClientUnregisterCapability {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeAction_resolve (Documentation)
 pub enum CodeActionResolve {}
 
-impl Request for CodeActionResolve {
+impl RequestTrait for CodeActionResolve {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "codeAction/resolve";
     type RegistrationOptions = ();
@@ -143,7 +143,7 @@ impl Request for CodeActionResolve {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_resolve (Documentation)
 pub enum CodeLensResolve {}
 
-impl Request for CodeLensResolve {
+impl RequestTrait for CodeLensResolve {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "codeLens/resolve";
     type RegistrationOptions = ();
@@ -164,7 +164,7 @@ impl Request for CodeLensResolve {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve (Documentation)
 pub enum CompletionItemResolve {}
 
-impl Request for CompletionItemResolve {
+impl RequestTrait for CompletionItemResolve {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "completionItem/resolve";
     type RegistrationOptions = ();
@@ -185,7 +185,7 @@ impl Request for CompletionItemResolve {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#documentLink_resolve (Documentation)
 pub enum DocumentLinkResolve {}
 
-impl Request for DocumentLinkResolve {
+impl RequestTrait for DocumentLinkResolve {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "documentLink/resolve";
     type RegistrationOptions = ();
@@ -208,7 +208,7 @@ impl Request for DocumentLinkResolve {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#initialize (Documentation)
 pub enum Initialize {}
 
-impl Request for Initialize {
+impl RequestTrait for Initialize {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "initialize";
     type RegistrationOptions = ();
@@ -231,7 +231,7 @@ impl Request for Initialize {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#inlayHint_resolve (Documentation)
 pub enum InlayHintResolve {}
 
-impl Request for InlayHintResolve {
+impl RequestTrait for InlayHintResolve {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "inlayHint/resolve";
     type RegistrationOptions = ();
@@ -253,7 +253,7 @@ impl Request for InlayHintResolve {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#shutdown (Documentation)
 pub enum Shutdown {}
 
-impl Request for Shutdown {
+impl RequestTrait for Shutdown {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "shutdown";
     type RegistrationOptions = ();
@@ -272,7 +272,7 @@ impl Request for Shutdown {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeAction (Documentation)
 pub enum TextDocumentCodeAction {}
 
-impl Request for TextDocumentCodeAction {
+impl RequestTrait for TextDocumentCodeAction {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/codeAction";
     type RegistrationOptions = super::structures::CodeActionRegistrationOptions;
@@ -311,7 +311,7 @@ pub enum TextDocumentCodeActionResultCommandOrCodeAction {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeLens (Documentation)
 pub enum TextDocumentCodeLens {}
 
-impl Request for TextDocumentCodeLens {
+impl RequestTrait for TextDocumentCodeLens {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/codeLens";
     type RegistrationOptions = super::structures::CodeLensRegistrationOptions;
@@ -340,7 +340,7 @@ pub enum TextDocumentCodeLensResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_colorPresentation (Documentation)
 pub enum TextDocumentColorPresentation {}
 
-impl Request for TextDocumentColorPresentation {
+impl RequestTrait for TextDocumentColorPresentation {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/colorPresentation";
     type RegistrationOptions = TextDocumentColorPresentationRegistrationOptions;
@@ -375,7 +375,7 @@ pub struct TextDocumentColorPresentationRegistrationOptions {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion (Documentation)
 pub enum TextDocumentCompletion {}
 
-impl Request for TextDocumentCompletion {
+impl RequestTrait for TextDocumentCompletion {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/completion";
     type RegistrationOptions = super::structures::CompletionRegistrationOptions;
@@ -405,7 +405,7 @@ pub enum TextDocumentCompletionResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration (Documentation)
 pub enum TextDocumentDeclaration {}
 
-impl Request for TextDocumentDeclaration {
+impl RequestTrait for TextDocumentDeclaration {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/declaration";
     type RegistrationOptions = super::structures::DeclarationRegistrationOptions;
@@ -442,7 +442,7 @@ pub enum TextDocumentDeclarationResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_definition (Documentation)
 pub enum TextDocumentDefinition {}
 
-impl Request for TextDocumentDefinition {
+impl RequestTrait for TextDocumentDefinition {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/definition";
     type RegistrationOptions = super::structures::DefinitionRegistrationOptions;
@@ -478,7 +478,7 @@ pub enum TextDocumentDefinitionResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_diagnostic (Documentation)
 pub enum TextDocumentDiagnostic {}
 
-impl Request for TextDocumentDiagnostic {
+impl RequestTrait for TextDocumentDiagnostic {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/diagnostic";
     type RegistrationOptions = super::structures::DiagnosticRegistrationOptions;
@@ -500,7 +500,7 @@ impl Request for TextDocumentDiagnostic {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor (Documentation)
 pub enum TextDocumentDocumentColor {}
 
-impl Request for TextDocumentDocumentColor {
+impl RequestTrait for TextDocumentDocumentColor {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/documentColor";
     type RegistrationOptions = super::structures::DocumentColorRegistrationOptions;
@@ -522,7 +522,7 @@ impl Request for TextDocumentDocumentColor {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentHighlight (Documentation)
 pub enum TextDocumentDocumentHighlight {}
 
-impl Request for TextDocumentDocumentHighlight {
+impl RequestTrait for TextDocumentDocumentHighlight {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/documentHighlight";
     type RegistrationOptions = super::structures::DocumentHighlightRegistrationOptions;
@@ -548,7 +548,7 @@ pub enum TextDocumentDocumentHighlightResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentLink (Documentation)
 pub enum TextDocumentDocumentLink {}
 
-impl Request for TextDocumentDocumentLink {
+impl RequestTrait for TextDocumentDocumentLink {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/documentLink";
     type RegistrationOptions = super::structures::DocumentLinkRegistrationOptions;
@@ -577,7 +577,7 @@ pub enum TextDocumentDocumentLinkResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol (Documentation)
 pub enum TextDocumentDocumentSymbol {}
 
-impl Request for TextDocumentDocumentSymbol {
+impl RequestTrait for TextDocumentDocumentSymbol {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/documentSymbol";
     type RegistrationOptions = super::structures::DocumentSymbolRegistrationOptions;
@@ -614,7 +614,7 @@ pub enum TextDocumentDocumentSymbolResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange (Documentation)
 pub enum TextDocumentFoldingRange {}
 
-impl Request for TextDocumentFoldingRange {
+impl RequestTrait for TextDocumentFoldingRange {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/foldingRange";
     type RegistrationOptions = super::structures::FoldingRangeRegistrationOptions;
@@ -640,7 +640,7 @@ pub enum TextDocumentFoldingRangeResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_formatting (Documentation)
 pub enum TextDocumentFormatting {}
 
-impl Request for TextDocumentFormatting {
+impl RequestTrait for TextDocumentFormatting {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/formatting";
     type RegistrationOptions = super::structures::DocumentFormattingRegistrationOptions;
@@ -668,7 +668,7 @@ pub enum TextDocumentFormattingResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_hover (Documentation)
 pub enum TextDocumentHover {}
 
-impl Request for TextDocumentHover {
+impl RequestTrait for TextDocumentHover {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/hover";
     type RegistrationOptions = super::structures::HoverRegistrationOptions;
@@ -696,7 +696,7 @@ pub enum TextDocumentHoverResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation (Documentation)
 pub enum TextDocumentImplementation {}
 
-impl Request for TextDocumentImplementation {
+impl RequestTrait for TextDocumentImplementation {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/implementation";
     type RegistrationOptions = super::structures::ImplementationRegistrationOptions;
@@ -734,7 +734,7 @@ pub enum TextDocumentImplementationResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlayHint (Documentation)
 pub enum TextDocumentInlayHint {}
 
-impl Request for TextDocumentInlayHint {
+impl RequestTrait for TextDocumentInlayHint {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/inlayHint";
     type RegistrationOptions = super::structures::InlayHintRegistrationOptions;
@@ -764,7 +764,7 @@ pub enum TextDocumentInlayHintResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue (Documentation)
 pub enum TextDocumentInlineValue {}
 
-impl Request for TextDocumentInlineValue {
+impl RequestTrait for TextDocumentInlineValue {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/inlineValue";
     type RegistrationOptions = super::structures::InlineValueRegistrationOptions;
@@ -792,7 +792,7 @@ pub enum TextDocumentInlineValueResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_linkedEditingRange (Documentation)
 pub enum TextDocumentLinkedEditingRange {}
 
-impl Request for TextDocumentLinkedEditingRange {
+impl RequestTrait for TextDocumentLinkedEditingRange {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/linkedEditingRange";
     type RegistrationOptions = super::structures::LinkedEditingRangeRegistrationOptions;
@@ -820,7 +820,7 @@ pub enum TextDocumentLinkedEditingRangeResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_moniker (Documentation)
 pub enum TextDocumentMoniker {}
 
-impl Request for TextDocumentMoniker {
+impl RequestTrait for TextDocumentMoniker {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/moniker";
     type RegistrationOptions = super::structures::MonikerRegistrationOptions;
@@ -846,7 +846,7 @@ pub enum TextDocumentMonikerResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_onTypeFormatting (Documentation)
 pub enum TextDocumentOnTypeFormatting {}
 
-impl Request for TextDocumentOnTypeFormatting {
+impl RequestTrait for TextDocumentOnTypeFormatting {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/onTypeFormatting";
     type RegistrationOptions = super::structures::DocumentOnTypeFormattingRegistrationOptions;
@@ -875,7 +875,7 @@ pub enum TextDocumentOnTypeFormattingResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareCallHierarchy (Documentation)
 pub enum TextDocumentPrepareCallHierarchy {}
 
-impl Request for TextDocumentPrepareCallHierarchy {
+impl RequestTrait for TextDocumentPrepareCallHierarchy {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/prepareCallHierarchy";
     type RegistrationOptions = super::structures::CallHierarchyRegistrationOptions;
@@ -903,7 +903,7 @@ pub enum TextDocumentPrepareCallHierarchyResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareRename (Documentation)
 pub enum TextDocumentPrepareRename {}
 
-impl Request for TextDocumentPrepareRename {
+impl RequestTrait for TextDocumentPrepareRename {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/prepareRename";
     type RegistrationOptions = ();
@@ -932,7 +932,7 @@ pub enum TextDocumentPrepareRenameResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareTypeHierarchy (Documentation)
 pub enum TextDocumentPrepareTypeHierarchy {}
 
-impl Request for TextDocumentPrepareTypeHierarchy {
+impl RequestTrait for TextDocumentPrepareTypeHierarchy {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/prepareTypeHierarchy";
     type RegistrationOptions = super::structures::TypeHierarchyRegistrationOptions;
@@ -958,7 +958,7 @@ pub enum TextDocumentPrepareTypeHierarchyResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rangeFormatting (Documentation)
 pub enum TextDocumentRangeFormatting {}
 
-impl Request for TextDocumentRangeFormatting {
+impl RequestTrait for TextDocumentRangeFormatting {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/rangeFormatting";
     type RegistrationOptions = super::structures::DocumentRangeFormattingRegistrationOptions;
@@ -987,7 +987,7 @@ pub enum TextDocumentRangeFormattingResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references (Documentation)
 pub enum TextDocumentReferences {}
 
-impl Request for TextDocumentReferences {
+impl RequestTrait for TextDocumentReferences {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/references";
     type RegistrationOptions = super::structures::ReferenceRegistrationOptions;
@@ -1013,7 +1013,7 @@ pub enum TextDocumentReferencesResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rename (Documentation)
 pub enum TextDocumentRename {}
 
-impl Request for TextDocumentRename {
+impl RequestTrait for TextDocumentRename {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/rename";
     type RegistrationOptions = super::structures::RenameRegistrationOptions;
@@ -1042,7 +1042,7 @@ pub enum TextDocumentRenameResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_selectionRange (Documentation)
 pub enum TextDocumentSelectionRange {}
 
-impl Request for TextDocumentSelectionRange {
+impl RequestTrait for TextDocumentSelectionRange {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/selectionRange";
     type RegistrationOptions = super::structures::SelectionRangeRegistrationOptions;
@@ -1068,7 +1068,7 @@ pub enum TextDocumentSelectionRangeResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens_full (Documentation)
 pub enum TextDocumentSemanticTokensFull {}
 
-impl Request for TextDocumentSemanticTokensFull {
+impl RequestTrait for TextDocumentSemanticTokensFull {
     const REGISTRATION_METHOD: Option<&'static str> = Some("textDocument/semanticTokens");
     const METHOD: &'static str = "textDocument/semanticTokens/full";
     type RegistrationOptions = super::structures::SemanticTokensRegistrationOptions;
@@ -1094,7 +1094,7 @@ pub enum TextDocumentSemanticTokensFullResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens_full_delta (Documentation)
 pub enum TextDocumentSemanticTokensFullDelta {}
 
-impl Request for TextDocumentSemanticTokensFullDelta {
+impl RequestTrait for TextDocumentSemanticTokensFullDelta {
     const REGISTRATION_METHOD: Option<&'static str> = Some("textDocument/semanticTokens");
     const METHOD: &'static str = "textDocument/semanticTokens/full/delta";
     type RegistrationOptions = super::structures::SemanticTokensRegistrationOptions;
@@ -1128,7 +1128,7 @@ pub enum TextDocumentSemanticTokensFullDeltaResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens_range (Documentation)
 pub enum TextDocumentSemanticTokensRange {}
 
-impl Request for TextDocumentSemanticTokensRange {
+impl RequestTrait for TextDocumentSemanticTokensRange {
     const REGISTRATION_METHOD: Option<&'static str> = Some("textDocument/semanticTokens");
     const METHOD: &'static str = "textDocument/semanticTokens/range";
     type RegistrationOptions = ();
@@ -1154,7 +1154,7 @@ pub enum TextDocumentSemanticTokensRangeResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp (Documentation)
 pub enum TextDocumentSignatureHelp {}
 
-impl Request for TextDocumentSignatureHelp {
+impl RequestTrait for TextDocumentSignatureHelp {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/signatureHelp";
     type RegistrationOptions = super::structures::SignatureHelpRegistrationOptions;
@@ -1182,7 +1182,7 @@ pub enum TextDocumentSignatureHelpResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition (Documentation)
 pub enum TextDocumentTypeDefinition {}
 
-impl Request for TextDocumentTypeDefinition {
+impl RequestTrait for TextDocumentTypeDefinition {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/typeDefinition";
     type RegistrationOptions = super::structures::TypeDefinitionRegistrationOptions;
@@ -1221,7 +1221,7 @@ pub enum TextDocumentTypeDefinitionResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSaveWaitUntil (Documentation)
 pub enum TextDocumentWillSaveWaitUntil {}
 
-impl Request for TextDocumentWillSaveWaitUntil {
+impl RequestTrait for TextDocumentWillSaveWaitUntil {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "textDocument/willSaveWaitUntil";
     type RegistrationOptions = super::structures::TextDocumentRegistrationOptions;
@@ -1249,7 +1249,7 @@ pub enum TextDocumentWillSaveWaitUntilResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#typeHierarchy_subtypes (Documentation)
 pub enum TypeHierarchySubtypes {}
 
-impl Request for TypeHierarchySubtypes {
+impl RequestTrait for TypeHierarchySubtypes {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "typeHierarchy/subtypes";
     type RegistrationOptions = ();
@@ -1277,7 +1277,7 @@ pub enum TypeHierarchySubtypesResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#typeHierarchy_supertypes (Documentation)
 pub enum TypeHierarchySupertypes {}
 
-impl Request for TypeHierarchySupertypes {
+impl RequestTrait for TypeHierarchySupertypes {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "typeHierarchy/supertypes";
     type RegistrationOptions = ();
@@ -1308,7 +1308,7 @@ pub enum TypeHierarchySupertypesResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showDocument (Documentation)
 pub enum WindowShowDocument {}
 
-impl Request for WindowShowDocument {
+impl RequestTrait for WindowShowDocument {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "window/showDocument";
     type RegistrationOptions = ();
@@ -1328,7 +1328,7 @@ impl Request for WindowShowDocument {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessageRequest (Documentation)
 pub enum WindowShowMessageRequest {}
 
-impl Request for WindowShowMessageRequest {
+impl RequestTrait for WindowShowMessageRequest {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "window/showMessageRequest";
     type RegistrationOptions = ();
@@ -1355,7 +1355,7 @@ pub enum WindowShowMessageRequestResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_workDoneProgress_create (Documentation)
 pub enum WindowWorkDoneProgressCreate {}
 
-impl Request for WindowWorkDoneProgressCreate {
+impl RequestTrait for WindowWorkDoneProgressCreate {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "window/workDoneProgress/create";
     type RegistrationOptions = ();
@@ -1374,7 +1374,7 @@ impl Request for WindowWorkDoneProgressCreate {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_applyEdit (Documentation)
 pub enum WorkspaceApplyEdit {}
 
-impl Request for WorkspaceApplyEdit {
+impl RequestTrait for WorkspaceApplyEdit {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/applyEdit";
     type RegistrationOptions = ();
@@ -1395,7 +1395,7 @@ impl Request for WorkspaceApplyEdit {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_codeLens_refresh (Documentation)
 pub enum WorkspaceCodeLensRefresh {}
 
-impl Request for WorkspaceCodeLensRefresh {
+impl RequestTrait for WorkspaceCodeLensRefresh {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/codeLens/refresh";
     type RegistrationOptions = ();
@@ -1420,7 +1420,7 @@ impl Request for WorkspaceCodeLensRefresh {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_configuration (Documentation)
 pub enum WorkspaceConfiguration {}
 
-impl Request for WorkspaceConfiguration {
+impl RequestTrait for WorkspaceConfiguration {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/configuration";
     type RegistrationOptions = ();
@@ -1441,7 +1441,7 @@ impl Request for WorkspaceConfiguration {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic (Documentation)
 pub enum WorkspaceDiagnostic {}
 
-impl Request for WorkspaceDiagnostic {
+impl RequestTrait for WorkspaceDiagnostic {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/diagnostic";
     type RegistrationOptions = ();
@@ -1462,7 +1462,7 @@ impl Request for WorkspaceDiagnostic {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic_refresh (Documentation)
 pub enum WorkspaceDiagnosticRefresh {}
 
-impl Request for WorkspaceDiagnosticRefresh {
+impl RequestTrait for WorkspaceDiagnosticRefresh {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/diagnostic/refresh";
     type RegistrationOptions = ();
@@ -1482,7 +1482,7 @@ impl Request for WorkspaceDiagnosticRefresh {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_executeCommand (Documentation)
 pub enum WorkspaceExecuteCommand {}
 
-impl Request for WorkspaceExecuteCommand {
+impl RequestTrait for WorkspaceExecuteCommand {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/executeCommand";
     type RegistrationOptions = super::structures::ExecuteCommandRegistrationOptions;
@@ -1508,7 +1508,7 @@ pub enum WorkspaceExecuteCommandResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_inlayHint_refresh (Documentation)
 pub enum WorkspaceInlayHintRefresh {}
 
-impl Request for WorkspaceInlayHintRefresh {
+impl RequestTrait for WorkspaceInlayHintRefresh {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/inlayHint/refresh";
     type RegistrationOptions = ();
@@ -1527,7 +1527,7 @@ impl Request for WorkspaceInlayHintRefresh {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_inlineValue_refresh (Documentation)
 pub enum WorkspaceInlineValueRefresh {}
 
-impl Request for WorkspaceInlineValueRefresh {
+impl RequestTrait for WorkspaceInlineValueRefresh {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/inlineValue/refresh";
     type RegistrationOptions = ();
@@ -1546,7 +1546,7 @@ impl Request for WorkspaceInlineValueRefresh {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_semanticTokens_refresh (Documentation)
 pub enum WorkspaceSemanticTokensRefresh {}
 
-impl Request for WorkspaceSemanticTokensRefresh {
+impl RequestTrait for WorkspaceSemanticTokensRefresh {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/semanticTokens/refresh";
     type RegistrationOptions = ();
@@ -1573,7 +1573,7 @@ impl Request for WorkspaceSemanticTokensRefresh {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbol (Documentation)
 pub enum WorkspaceSymbol {}
 
-impl Request for WorkspaceSymbol {
+impl RequestTrait for WorkspaceSymbol {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/symbol";
     type RegistrationOptions = super::structures::WorkspaceSymbolRegistrationOptions;
@@ -1614,7 +1614,7 @@ pub enum WorkspaceSymbolResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willCreateFiles (Documentation)
 pub enum WorkspaceWillCreateFiles {}
 
-impl Request for WorkspaceWillCreateFiles {
+impl RequestTrait for WorkspaceWillCreateFiles {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/willCreateFiles";
     type RegistrationOptions = super::structures::FileOperationRegistrationOptions;
@@ -1643,7 +1643,7 @@ pub enum WorkspaceWillCreateFilesResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willDeleteFiles (Documentation)
 pub enum WorkspaceWillDeleteFiles {}
 
-impl Request for WorkspaceWillDeleteFiles {
+impl RequestTrait for WorkspaceWillDeleteFiles {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/willDeleteFiles";
     type RegistrationOptions = super::structures::FileOperationRegistrationOptions;
@@ -1672,7 +1672,7 @@ pub enum WorkspaceWillDeleteFilesResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willRenameFiles (Documentation)
 pub enum WorkspaceWillRenameFiles {}
 
-impl Request for WorkspaceWillRenameFiles {
+impl RequestTrait for WorkspaceWillRenameFiles {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/willRenameFiles";
     type RegistrationOptions = super::structures::FileOperationRegistrationOptions;
@@ -1698,7 +1698,7 @@ pub enum WorkspaceWillRenameFilesResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_workspaceFolders (Documentation)
 pub enum WorkspaceWorkspaceFolders {}
 
-impl Request for WorkspaceWorkspaceFolders {
+impl RequestTrait for WorkspaceWorkspaceFolders {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspace/workspaceFolders";
     type RegistrationOptions = ();
@@ -1727,7 +1727,7 @@ pub enum WorkspaceWorkspaceFoldersResult {
 /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspaceSymbol_resolve (Documentation)
 pub enum WorkspaceSymbolResolve {}
 
-impl Request for WorkspaceSymbolResolve {
+impl RequestTrait for WorkspaceSymbolResolve {
     const REGISTRATION_METHOD: Option<&'static str> = None;
     const METHOD: &'static str = "workspaceSymbol/resolve";
     type RegistrationOptions = ();

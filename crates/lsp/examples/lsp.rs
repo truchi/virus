@@ -1,25 +1,18 @@
 use lsp::{
-    client::{Client, RequestOrNotification},
+    client::{LspClient, ServerMessage},
     types::{
         enumerations::PositionEncodingKind,
-        notifications::{Exit, Initialized, Notification},
-        requests::{
-            Initialize, Request, Shutdown, TextDocumentDefinition, TextDocumentDefinitionResult,
-            TextDocumentRangeFormatting, TextDocumentRangeFormattingResult,
-        },
         structures::{
             ClientCapabilities, DefinitionParams, DocumentRangeFormattingParams, FormattingOptions,
-            GeneralClientCapabilities, InitializeError, InitializeParams,
-            InitializeParamsProcessId, InitializeParamsWorkspaceFolders, InitializeResult,
-            InitializedParams, PartialResultParams, Position, Range, TextDocumentIdentifier,
-            TextDocumentPositionParams, WindowClientCapabilities, WorkDoneProgressParams,
-            WorkspaceFolder,
+            GeneralClientCapabilities, InitializeParams, InitializeParamsProcessId,
+            InitializeParamsWorkspaceFolders, InitializedParams, PartialResultParams, Position,
+            Range, TextDocumentIdentifier, TextDocumentPositionParams, WindowClientCapabilities,
+            WorkDoneProgressParams, WorkspaceFolder,
         },
         type_aliases::{LspAny, ProgressToken},
-        Null,
     },
 };
-use std::{process::Stdio, time::Instant};
+use std::process::Stdio;
 use tokio::{io::BufReader, process::Command};
 
 #[tokio::main]
@@ -31,48 +24,17 @@ async fn main() {
         .unwrap();
 
     let (stdin, stdout) = (child.stdin.take().unwrap(), child.stdout.take().unwrap());
-    let (mut client, mut receiver) = Client::new(BufReader::new(stdout), stdin);
-    let handle = tokio::spawn(async move {
-        loop {
-            match receiver.recv().await {
-                Some(RequestOrNotification::Left(request)) => {
-                    println!(
-                        "{}: {:?}",
-                        request.method,
-                        request
-                            .params
-                            .as_ref()
-                            .and_then(|params| params.as_object())
-                            .and_then(|params| params.get("token"))
-                            .and_then(|params| params.as_str()),
-                    );
-                }
-                Some(RequestOrNotification::Right(notification)) => {
-                    println!(
-                        "{}: {:?} ({:?})",
-                        notification.method,
-                        notification
-                            .params
-                            .as_ref()
-                            .and_then(|params| params.as_object())
-                            .and_then(|params| params.get("token"))
-                            .and_then(|params| params.as_str()),
-                        notification
-                            .params
-                            .as_ref()
-                            .and_then(|params| params.as_object())
-                            .and_then(|params| params.get("value"))
-                            .and_then(|params| params.as_object())
-                            .and_then(|params| params.get("kind"))
-                            .and_then(|params| params.as_str()),
-                    );
-                }
-                None => {
-                    println!("Stream done");
-                    break;
-                }
-            }
+    let mut client = LspClient::new(BufReader::new(stdout), stdin, |message| match message {
+        Ok(ServerMessage::ServerNotification(notification)) => {
+            dbg!(notification);
         }
+        Ok(ServerMessage::ServerRequest(request)) => {
+            dbg!(request);
+        }
+        Ok(ServerMessage::ServerResponse(response)) => {
+            dbg!(response);
+        }
+        Err(error) => panic!("{error}"),
     });
 
     println!("Initialize");
@@ -84,53 +46,50 @@ async fn main() {
         },
     }))
     .unwrap();
-    let response = client
-        .request::<InitializeResult, InitializeError, _>(
-            Initialize::METHOD.into(),
-            Some(InitializeParams {
-                work_done_progress_params: WorkDoneProgressParams {
-                    work_done_token: Some(ProgressToken::String(String::from(
-                        "Initialize work done progress token",
-                    ))),
+    client
+        .request()
+        .initialize(InitializeParams {
+            work_done_progress_params: WorkDoneProgressParams {
+                work_done_token: Some(ProgressToken::String(String::from(
+                    "Initialize work done progress token",
+                ))),
+            },
+            process_id: InitializeParamsProcessId::Integer(std::process::id() as i32),
+            client_info: None,
+            locale: None,
+            capabilities: ClientCapabilities {
+                workspace: None,
+                text_document: None,
+                notebook_document: None,
+                window: Some(WindowClientCapabilities {
+                    work_done_progress: Some(true),
+                    show_message: None,
+                    show_document: None,
+                }),
+                general: Some(GeneralClientCapabilities {
+                    stale_request_support: None,
+                    regular_expressions: None,
+                    markdown: None,
+                    position_encodings: Some(vec![PositionEncodingKind::Utf8]),
+                }),
+                experimental: None,
+            },
+            initialization_options: Some(options.clone()),
+            trace: None,
+            workspace_folders: Some(InitializeParamsWorkspaceFolders::WorkspaceFolderList(vec![
+                WorkspaceFolder {
+                    uri: String::from("file:///Users/romain/perso/virus"),
+                    name: String::from("virus"),
                 },
-                process_id: InitializeParamsProcessId::Integer(std::process::id() as i32),
-                client_info: None,
-                locale: None,
-                capabilities: ClientCapabilities {
-                    workspace: None,
-                    text_document: None,
-                    notebook_document: None,
-                    window: Some(WindowClientCapabilities {
-                        work_done_progress: Some(true),
-                        show_message: None,
-                        show_document: None,
-                    }),
-                    general: Some(GeneralClientCapabilities {
-                        stale_request_support: None,
-                        regular_expressions: None,
-                        markdown: None,
-                        position_encodings: Some(vec![PositionEncodingKind::Utf8]),
-                    }),
-                    experimental: None,
-                },
-                initialization_options: Some(options.clone()),
-                trace: None,
-                workspace_folders: Some(InitializeParamsWorkspaceFolders::WorkspaceFolderList(
-                    vec![WorkspaceFolder {
-                        uri: String::from("file:///Users/romain/perso/virus"),
-                        name: String::from("virus"),
-                    }],
-                )),
-            }),
-        )
+            ])),
+        })
         .await
-        .unwrap()
-        .await;
-    dbg!(&response);
+        .unwrap();
 
     println!("Initialized");
     client
-        .notification(Initialized::METHOD.into(), Some(InitializedParams {}))
+        .notify()
+        .initialized(InitializedParams {})
         .await
         .unwrap();
 
@@ -138,95 +97,80 @@ async fn main() {
 
     for _ in 0..0 {
         println!("TextDocumentDefinition");
-        let response = client
-            .request::<TextDocumentDefinitionResult, (), _>(
-                TextDocumentDefinition::METHOD.into(),
-                Some(DefinitionParams {
-                    text_document_position_params: TextDocumentPositionParams {
-                        text_document: TextDocumentIdentifier {
-                            uri: String::from(
-                                "file:///Users/romain/perso/virus/crates/virus/src/main.rs",
-                            ),
-                        },
-                        position: Position {
-                            line: 8,
-                            character: 11,
-                        },
+        client
+            .request()
+            .text_document_definition(DefinitionParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier {
+                        uri: String::from(
+                            "file:///Users/romain/perso/virus/crates/virus/src/main.rs",
+                        ),
                     },
-                    work_done_progress_params: WorkDoneProgressParams {
-                        work_done_token: Some(ProgressToken::String(String::from(
-                            "Definition work done progress token",
-                        ))),
+                    position: Position {
+                        line: 8,
+                        character: 11,
                     },
-                    partial_result_params: PartialResultParams {
-                        partial_result_token: Some(ProgressToken::String(String::from(
-                            "Definition partial result progress token",
-                        ))),
-                    },
-                }),
-            )
+                },
+                work_done_progress_params: WorkDoneProgressParams {
+                    work_done_token: Some(ProgressToken::String(String::from(
+                        "Definition work done progress token",
+                    ))),
+                },
+                partial_result_params: PartialResultParams {
+                    partial_result_token: Some(ProgressToken::String(String::from(
+                        "Definition partial result progress token",
+                    ))),
+                },
+            })
             .await
-            .unwrap()
-            .await;
-        dbg!(&response);
+            .unwrap();
     }
 
     println!("TextDocumentFormatting");
-    let now = Instant::now();
-    let response = client
-        .request::<TextDocumentRangeFormattingResult, (), _>(
-            TextDocumentRangeFormatting::METHOD.into(),
-            Some(DocumentRangeFormattingParams {
-                work_done_progress_params: WorkDoneProgressParams {
-                    work_done_token: Some(ProgressToken::String(String::from(
-                        "Document formatting progress token",
-                    ))),
-                },
-                text_document: TextDocumentIdentifier {
-                    uri: String::from("file:///Users/romain/perso/virus/crates/virus/src/main.rs"),
-                },
-                range: Range {
-                    start: Position {
-                        line: 0,
-                        character: 0,
-                    },
-                    end: Position {
-                        line: 10,
-                        character: 0,
-                    },
-                },
-                options: FormattingOptions {
-                    tab_size: 4,
-                    insert_spaces: true,
-                    trim_trailing_whitespace: Some(true),
-                    insert_final_newline: Some(true),
-                    trim_final_newlines: Some(true),
-                },
-            }),
-        )
-        .await
-        .unwrap()
-        .await;
-    dbg!((&response, now.elapsed().as_millis()));
-
-    println!("Shutdown");
-    let response = client
-        .request::<Null, (), ()>(Shutdown::METHOD.into(), None)
-        .await
-        .unwrap()
-        .await;
-    dbg!(&response);
-
-    println!("Exit");
     client
-        .notification::<()>(Exit::METHOD.into(), None)
+        .request()
+        .text_document_range_formatting(DocumentRangeFormattingParams {
+            work_done_progress_params: WorkDoneProgressParams {
+                work_done_token: Some(ProgressToken::String(String::from(
+                    "Document formatting progress token",
+                ))),
+            },
+            text_document: TextDocumentIdentifier {
+                uri: String::from("file:///Users/romain/perso/virus/crates/virus/src/main.rs"),
+            },
+            range: Range {
+                start: Position {
+                    line: 0,
+                    character: 0,
+                },
+                end: Position {
+                    line: 10,
+                    character: 0,
+                },
+            },
+            options: FormattingOptions {
+                tab_size: 2,
+                insert_spaces: true,
+                trim_trailing_whitespace: Some(true),
+                insert_final_newline: Some(true),
+                trim_final_newlines: Some(true),
+            },
+        })
         .await
         .unwrap();
 
+    wait(3).await;
+
+    println!("Shutdown");
+    client.request().shutdown().await.unwrap();
+
+    wait(3).await;
+
+    println!("Exit");
+    client.notify().exit().await.unwrap();
+
     println!("Drop client");
     drop(client);
-    println!("Await handle");
-    handle.await.unwrap();
     println!("Kill child");
     child.kill().await.unwrap();
     println!("👋 Bye, have a good time!");

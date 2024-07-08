@@ -49,15 +49,23 @@ pub mod types {
     }
 }
 mod generated {
+    pub mod client;
     pub mod enumerations;
     pub mod notifications;
     pub mod requests;
+    pub mod server;
     pub mod structures;
     pub mod type_aliases;
 
-    use super::types::*;
+    use super::{
+        client::{LspClientNotify, LspClientRequest, LspClientRespond},
+        transport::*,
+        types::*,
+    };
     use serde::{de::DeserializeOwned, Deserialize, Serialize};
-    use std::collections::HashMap;
+    use serde_json::Value;
+    use std::{borrow::Cow, collections::HashMap};
+    use tokio::io::AsyncWrite;
 }
 mod transport {
     mod lsp;

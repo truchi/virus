@@ -68,7 +68,7 @@ impl<'a> Quote<&'a Request> {
                     pub enum #pascal_method {}
                 },
                 quote! {
-                    impl Request for #pascal_method {
+                    impl RequestTrait for #pascal_method {
                         const REGISTRATION_METHOD: Option<&'static str> = #registration_method;
                         const METHOD: &'static str = #method;
                         type RegistrationOptions = #registration_options;

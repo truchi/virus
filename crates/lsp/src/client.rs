@@ -1,45 +1,57 @@
 use crate::{
-    transport::{Id, Message, Notification, Request, Response},
+    generated::server::{ServerNotification, ServerRequest, ServerResponse},
+    transport::{Error, Id, Message, Notification, Request, Response},
     types::Integer,
 };
-use futures::Future;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::Serialize;
 use serde_json::Value;
 use std::{
     borrow::Cow,
     collections::HashMap,
     io,
     sync::{Arc, Mutex},
-    task::{Poll, Waker},
 };
 use tokio::{
     io::{AsyncBufRead, AsyncWrite},
-    sync::mpsc::{channel, Receiver, Sender},
+    task::JoinHandle,
 };
 
-pub type RequestOrNotification = futures::future::Either<Request<Value>, Notification<Value>>;
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                         ServerMessage                                          //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-type Requests = HashMap<Id, (Option<Response<Value, Value>>, Option<Waker>)>;
-
-pub struct Client<W: AsyncWrite + Unpin> {
-    id: Integer,
-    writer: W,
-    requests: Arc<Mutex<Requests>>,
-    _sender: Sender<RequestOrNotification>,
+#[derive(Clone, PartialEq, Debug)]
+pub enum ServerMessage {
+    ServerNotification(ServerNotification),
+    ServerRequest(ServerRequest),
+    ServerResponse(ServerResponse),
 }
 
-impl<W: AsyncWrite + Unpin> Client<W> {
-    pub fn new<R: 'static + AsyncBufRead + Send + Unpin>(
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                           LspClient                                            //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+type State = Arc<Mutex<HashMap<Id, Cow<'static, str>>>>; // NOTE nice to have user data here?
+
+pub struct LspClient<W: AsyncWrite + Unpin> {
+    id: Integer,
+    writer: W,
+    state: State,
+    handle: JoinHandle<()>,
+}
+
+impl<W: AsyncWrite + Unpin> LspClient<W> {
+    pub fn new<
+        R: 'static + AsyncBufRead + Send + Unpin,
+        F: FnMut(io::Result<ServerMessage>) + Send + 'static,
+    >(
         mut reader: R,
         writer: W,
-    ) -> (Self, Receiver<RequestOrNotification>) {
-        let requests = Arc::new(Mutex::new(Requests::new()));
-        let (sender, receiver) = channel(64);
-
-        tokio::spawn({
-            let requests = requests.clone();
-            // Downgrade to allow the loop to return when self is dropped
-            let sender = sender.downgrade();
+        mut f: F,
+    ) -> Self {
+        let state = State::default();
+        let handle = tokio::spawn({
+            let state = state.clone();
 
             async move {
                 loop {
@@ -53,108 +65,50 @@ impl<W: AsyncWrite + Unpin> Client<W> {
 
                     match message {
                         Message::Request(request) => {
-                            if let Some(sender) = sender.upgrade() {
-                                if sender
-                                    .send(RequestOrNotification::Left(request))
-                                    .await
-                                    .is_err()
-                                {
-                                    break;
-                                }
-                            } else {
-                                break;
-                            }
+                            f(ServerRequest::deserialize(request)
+                                .map(ServerMessage::ServerRequest));
                         }
                         Message::Notification(notification) => {
-                            if let Some(sender) = sender.upgrade() {
-                                if sender
-                                    .send(RequestOrNotification::Right(notification))
-                                    .await
-                                    .is_err()
-                                {
-                                    break;
-                                }
-                            } else {
-                                break;
-                            }
+                            f(ServerNotification::deserialize(notification)
+                                .map(ServerMessage::ServerNotification));
                         }
                         Message::Response(response) => {
-                            if let Some(id) = &response.id {
-                                let mut requests = requests.lock().unwrap();
-                                let (response_slot, waker) =
-                                    requests.get_mut(id).expect("Request state");
+                            let id = response.id.as_ref().expect("Response id");
+                            let mut state = state.lock().expect("State lock");
+                            let method = state.remove(id).expect("Request state");
 
-                                debug_assert!(response_slot.is_none(), "Got two responses");
-                                *response_slot = Some(response);
-
-                                if let Some(waker) = waker.take() {
-                                    waker.wake();
-                                }
-                            } else {
-                                panic!("Got a response with no id");
-                            }
+                            f(ServerResponse::deserialize(response, &method)
+                                .map(ServerMessage::ServerResponse));
                         }
                     }
                 }
             }
         });
 
-        (
-            Self {
-                id: 0,
-                writer,
-                requests,
-                // We keep this here so the spawned task above finished when self is dropped
-                _sender: sender,
-            },
-            receiver,
-        )
+        Self {
+            id: 0,
+            writer,
+            state,
+            handle,
+        }
     }
 
-    pub async fn request<T: DeserializeOwned, E: DeserializeOwned, P: Serialize>(
-        &mut self,
-        method: Cow<'static, str>,
-        params: Option<P>,
-    ) -> io::Result<impl '_ + Future<Output = Response<T, E>>> {
-        let id = Id::Integer({
-            let id = self.id;
-            self.id += 1;
-            id
-        });
-
-        self.requests
-            .lock()
-            .unwrap()
-            .insert(id.clone(), (None, None));
-
-        Request::new(id.clone(), method, params)
-            .write(&mut self.writer)
-            .await?;
-
-        Ok(futures::future::poll_fn(move |cx| {
-            let mut requests = self.requests.lock().unwrap();
-            let Some((response, waker)) = requests.get_mut(&id) else {
-                // Was polled to completion already...
-                return Poll::Pending;
-            };
-
-            if let Some(response) = response.take() {
-                requests.remove(&id);
-
-                Poll::Ready(response.deserialize().expect("Response deserialization"))
-            } else {
-                if let Some(waker) = waker {
-                    waker.clone_from(cx.waker());
-                } else {
-                    *waker = Some(cx.waker().clone());
-                }
-
-                Poll::Pending
-            }
-        }))
+    pub fn request(&mut self) -> LspClientRequest<W> {
+        LspClientRequest { client: self }
     }
 
-    pub async fn notification<P: Serialize>(
+    pub fn notify(&mut self) -> LspClientNotify<W> {
+        LspClientNotify { client: self }
+    }
+
+    pub fn respond(&mut self) -> LspClientRespond<W> {
+        LspClientRespond { client: self }
+    }
+}
+
+/// Private.
+impl<W: AsyncWrite + Unpin> LspClient<W> {
+    pub(crate) async fn send_notification<P: Serialize>(
         &mut self,
         method: Cow<'static, str>,
         params: Option<P>,
@@ -163,4 +117,70 @@ impl<W: AsyncWrite + Unpin> Client<W> {
             .write(&mut self.writer)
             .await
     }
+
+    pub(crate) async fn send_request<T: Serialize>(
+        &mut self,
+        method: Cow<'static, str>,
+        params: Option<T>,
+    ) -> io::Result<Id> {
+        let id = Id::Integer({
+            let id = self.id;
+            self.id += 1;
+            id
+        });
+
+        self.state
+            .lock()
+            .unwrap()
+            .insert(id.clone(), method.clone());
+
+        Request::new(id.clone(), method, params)
+            .write(&mut self.writer)
+            .await?;
+
+        Ok(id)
+    }
+
+    pub(crate) async fn send_response<T: Serialize, E: Serialize>(
+        &mut self,
+        id: Option<Id>,
+        data: Result<T, Error<E>>,
+    ) -> io::Result<()> {
+        match data {
+            Ok(result) => Response::with_result(id, result),
+            Err(error) => Response::with_error(id, error),
+        }
+        .write(&mut self.writer)
+        .await
+    }
+}
+
+impl<W: AsyncWrite + Unpin> Drop for LspClient<W> {
+    fn drop(&mut self) {
+        self.handle.abort();
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                        LspClientRequest                                        //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub struct LspClientRequest<'client, W: AsyncWrite + Unpin> {
+    pub(crate) client: &'client mut LspClient<W>,
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                        LspClientNotify                                         //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub struct LspClientNotify<'client, W: AsyncWrite + Unpin> {
+    pub(crate) client: &'client mut LspClient<W>,
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                        LspClientRespond                                        //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub struct LspClientRespond<'client, W: AsyncWrite + Unpin> {
+    pub(crate) client: &'client mut LspClient<W>,
 }
