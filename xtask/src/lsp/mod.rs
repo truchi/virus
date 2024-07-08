@@ -106,10 +106,15 @@ pub fn main() {
             .inspect(|s| assert!(!s.contains(SHIT)))
             .collect::<String>(),
     );
-    // TODO NotificationTrait & RequestTrait are useless now...
     generate(
         NOTIFICATIONS,
         comment_box("NotificationTrait")
+            + "\n"
+            + &pretty(quote! {
+                fn missing_params() -> std::io::Error {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing params")
+                }
+            })
             + "\n"
             + &pretty(quote! {
                 /// A trait for notifications.
@@ -118,6 +123,9 @@ pub fn main() {
                     const METHOD: &'static str;
                     type RegistrationOptions: #bounds;
                     type Params: #bounds;
+
+                    fn params(params: Self::Params) -> Option<Self::Params>;
+                    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params>;
                 }
             })
             + "\n"
@@ -138,6 +146,16 @@ pub fn main() {
         comment_box("RequestTrait")
             + "\n"
             + &pretty(quote! {
+                fn missing_params() -> std::io::Error {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing params")
+                }
+
+                fn missing_result() -> std::io::Error {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing result")
+                }
+            })
+            + "\n"
+            + &pretty(quote! {
                 /// A trait for requests.
                 pub trait RequestTrait {
                     const REGISTRATION_METHOD: Option<&'static str>;
@@ -147,6 +165,11 @@ pub fn main() {
                     type PartialResult: #bounds;
                     type Result: #bounds;
                     type Error: #bounds;
+
+                    fn params(params: Self::Params) -> Option<Self::Params>;
+                    fn error(error: Error<Self::Error>) -> Error<Self::Error>;
+                    fn deserialize_request(request: Request<Value>) -> std::io::Result<Self::Params>;
+                    fn deserialize_response(response: Response<Value, Value>) -> std::io::Result<Result<Self::Result, Error<Self::Error>>>;
                 }
             })
             + "\n"

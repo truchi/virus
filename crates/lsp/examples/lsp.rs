@@ -1,16 +1,14 @@
 use lsp::{
-    client::{LspClient, ServerMessage},
-    types::{
-        enumerations::PositionEncodingKind,
-        structures::{
-            ClientCapabilities, DefinitionParams, DocumentRangeFormattingParams, FormattingOptions,
-            GeneralClientCapabilities, InitializeParams, InitializeParamsProcessId,
-            InitializeParamsWorkspaceFolders, InitializedParams, PartialResultParams, Position,
-            Range, TextDocumentIdentifier, TextDocumentPositionParams, WindowClientCapabilities,
-            WorkDoneProgressParams, WorkspaceFolder,
-        },
-        type_aliases::{LspAny, ProgressToken},
+    enumerations::PositionEncodingKind,
+    structures::{
+        ClientCapabilities, DefinitionParams, DocumentRangeFormattingParams, FormattingOptions,
+        GeneralClientCapabilities, InitializeParams, InitializeParamsProcessId,
+        InitializeParamsWorkspaceFolders, InitializedParams, PartialResultParams, Position, Range,
+        TextDocumentIdentifier, TextDocumentPositionParams, WindowClientCapabilities,
+        WorkDoneProgressParams, WorkspaceFolder,
     },
+    type_aliases::{LspAny, ProgressToken},
+    LspClient, ServerMessage,
 };
 use std::process::Stdio;
 use tokio::{io::BufReader, process::Command};
@@ -31,9 +29,6 @@ async fn main() {
         Ok(ServerMessage::ServerRequest(request)) => {
             dbg!(request);
         }
-        Ok(ServerMessage::ServerResponse(response)) => {
-            dbg!(response);
-        }
         Err(error) => panic!("{error}"),
     });
 
@@ -46,7 +41,7 @@ async fn main() {
         },
     }))
     .unwrap();
-    client
+    let response = client
         .request()
         .initialize(InitializeParams {
             work_done_progress_params: WorkDoneProgressParams {
@@ -84,11 +79,15 @@ async fn main() {
             ])),
         })
         .await
+        .unwrap()
+        .await
+        .unwrap()
         .unwrap();
+    dbg!(response);
 
     println!("Initialized");
     client
-        .notify()
+        .notification()
         .initialized(InitializedParams {})
         .await
         .unwrap();
@@ -97,7 +96,7 @@ async fn main() {
 
     for _ in 0..0 {
         println!("TextDocumentDefinition");
-        client
+        let response = client
             .request()
             .text_document_definition(DefinitionParams {
                 text_document_position_params: TextDocumentPositionParams {
@@ -123,11 +122,15 @@ async fn main() {
                 },
             })
             .await
+            .unwrap()
+            .await
+            .unwrap()
             .unwrap();
+        dbg!(response);
     }
 
     println!("TextDocumentFormatting");
-    client
+    let response = client
         .request()
         .text_document_range_formatting(DocumentRangeFormattingParams {
             work_done_progress_params: WorkDoneProgressParams {
@@ -157,17 +160,29 @@ async fn main() {
             },
         })
         .await
+        .unwrap()
+        .await
+        .unwrap()
         .unwrap();
+    dbg!(response);
 
     wait(3).await;
 
     println!("Shutdown");
-    client.request().shutdown().await.unwrap();
+    let response = client
+        .request()
+        .shutdown()
+        .await
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+    dbg!(response);
 
     wait(3).await;
 
     println!("Exit");
-    client.notify().exit().await.unwrap();
+    client.notification().exit().await.unwrap();
 
     println!("Drop client");
     drop(client);

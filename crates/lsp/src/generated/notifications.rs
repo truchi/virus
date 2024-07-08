@@ -6,12 +6,18 @@ use super::*;
 //                                       NotificationTrait                                        //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+fn missing_params() -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing params")
+}
+
 /// A trait for notifications.
 pub trait NotificationTrait {
     const REGISTRATION_METHOD: Option<&'static str>;
     const METHOD: &'static str;
     type RegistrationOptions: 'static + Serialize + DeserializeOwned + Send + Sync;
     type Params: 'static + Serialize + DeserializeOwned + Send + Sync;
+    fn params(params: Self::Params) -> Option<Self::Params>;
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params>;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -28,6 +34,15 @@ impl NotificationTrait for CancelRequest {
     const METHOD: &'static str = "$/cancelRequest";
     type RegistrationOptions = ();
     type Params = super::structures::CancelParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "$/cancelRequest");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -44,6 +59,15 @@ impl NotificationTrait for LogTrace {
     const METHOD: &'static str = "$/logTrace";
     type RegistrationOptions = ();
     type Params = super::structures::LogTraceParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "$/logTrace");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -60,6 +84,15 @@ impl NotificationTrait for Progress {
     const METHOD: &'static str = "$/progress";
     type RegistrationOptions = ();
     type Params = super::structures::ProgressParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "$/progress");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -76,6 +109,15 @@ impl NotificationTrait for SetTrace {
     const METHOD: &'static str = "$/setTrace";
     type RegistrationOptions = ();
     type Params = super::structures::SetTraceParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "$/setTrace");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -93,6 +135,15 @@ impl NotificationTrait for Exit {
     const METHOD: &'static str = "exit";
     type RegistrationOptions = ();
     type Params = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        let _ = params;
+        None
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "exit");
+        debug_assert!(notification.params.is_none());
+        Ok(())
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -111,6 +162,15 @@ impl NotificationTrait for Initialized {
     const METHOD: &'static str = "initialized";
     type RegistrationOptions = ();
     type Params = super::structures::InitializedParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "initialized");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -127,6 +187,15 @@ impl NotificationTrait for NotebookDocumentDidChange {
     const METHOD: &'static str = "notebookDocument/didChange";
     type RegistrationOptions = ();
     type Params = super::structures::DidChangeNotebookDocumentParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "notebookDocument/didChange");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -145,6 +214,15 @@ impl NotificationTrait for NotebookDocumentDidClose {
     const METHOD: &'static str = "notebookDocument/didClose";
     type RegistrationOptions = ();
     type Params = super::structures::DidCloseNotebookDocumentParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "notebookDocument/didClose");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -163,6 +241,15 @@ impl NotificationTrait for NotebookDocumentDidOpen {
     const METHOD: &'static str = "notebookDocument/didOpen";
     type RegistrationOptions = ();
     type Params = super::structures::DidOpenNotebookDocumentParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "notebookDocument/didOpen");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -181,6 +268,15 @@ impl NotificationTrait for NotebookDocumentDidSave {
     const METHOD: &'static str = "notebookDocument/didSave";
     type RegistrationOptions = ();
     type Params = super::structures::DidSaveNotebookDocumentParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "notebookDocument/didSave");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -198,6 +294,15 @@ impl NotificationTrait for TelemetryEvent {
     const METHOD: &'static str = "telemetry/event";
     type RegistrationOptions = ();
     type Params = super::type_aliases::LspAny;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "telemetry/event");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -215,6 +320,15 @@ impl NotificationTrait for TextDocumentDidChange {
     const METHOD: &'static str = "textDocument/didChange";
     type RegistrationOptions = super::structures::TextDocumentChangeRegistrationOptions;
     type Params = super::structures::DidChangeTextDocumentParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "textDocument/didChange");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -237,6 +351,15 @@ impl NotificationTrait for TextDocumentDidClose {
     const METHOD: &'static str = "textDocument/didClose";
     type RegistrationOptions = super::structures::TextDocumentRegistrationOptions;
     type Params = super::structures::DidCloseTextDocumentParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "textDocument/didClose");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -260,6 +383,15 @@ impl NotificationTrait for TextDocumentDidOpen {
     const METHOD: &'static str = "textDocument/didOpen";
     type RegistrationOptions = super::structures::TextDocumentRegistrationOptions;
     type Params = super::structures::DidOpenTextDocumentParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "textDocument/didOpen");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -277,6 +409,15 @@ impl NotificationTrait for TextDocumentDidSave {
     const METHOD: &'static str = "textDocument/didSave";
     type RegistrationOptions = super::structures::TextDocumentSaveRegistrationOptions;
     type Params = super::structures::DidSaveTextDocumentParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "textDocument/didSave");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -294,6 +435,15 @@ impl NotificationTrait for TextDocumentPublishDiagnostics {
     const METHOD: &'static str = "textDocument/publishDiagnostics";
     type RegistrationOptions = ();
     type Params = super::structures::PublishDiagnosticsParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "textDocument/publishDiagnostics");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -311,6 +461,15 @@ impl NotificationTrait for TextDocumentWillSave {
     const METHOD: &'static str = "textDocument/willSave";
     type RegistrationOptions = super::structures::TextDocumentRegistrationOptions;
     type Params = super::structures::WillSaveTextDocumentParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "textDocument/willSave");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -328,6 +487,15 @@ impl NotificationTrait for WindowLogMessage {
     const METHOD: &'static str = "window/logMessage";
     type RegistrationOptions = ();
     type Params = super::structures::LogMessageParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "window/logMessage");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -345,6 +513,15 @@ impl NotificationTrait for WindowShowMessage {
     const METHOD: &'static str = "window/showMessage";
     type RegistrationOptions = ();
     type Params = super::structures::ShowMessageParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "window/showMessage");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -362,6 +539,15 @@ impl NotificationTrait for WindowWorkDoneProgressCancel {
     const METHOD: &'static str = "window/workDoneProgress/cancel";
     type RegistrationOptions = ();
     type Params = super::structures::WorkDoneProgressCancelParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "window/workDoneProgress/cancel");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -380,6 +566,15 @@ impl NotificationTrait for WorkspaceDidChangeConfiguration {
     const METHOD: &'static str = "workspace/didChangeConfiguration";
     type RegistrationOptions = super::structures::DidChangeConfigurationRegistrationOptions;
     type Params = super::structures::DidChangeConfigurationParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "workspace/didChangeConfiguration");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -397,6 +592,15 @@ impl NotificationTrait for WorkspaceDidChangeWatchedFiles {
     const METHOD: &'static str = "workspace/didChangeWatchedFiles";
     type RegistrationOptions = super::structures::DidChangeWatchedFilesRegistrationOptions;
     type Params = super::structures::DidChangeWatchedFilesParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "workspace/didChangeWatchedFiles");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -414,6 +618,15 @@ impl NotificationTrait for WorkspaceDidChangeWorkspaceFolders {
     const METHOD: &'static str = "workspace/didChangeWorkspaceFolders";
     type RegistrationOptions = ();
     type Params = super::structures::DidChangeWorkspaceFoldersParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "workspace/didChangeWorkspaceFolders");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -433,6 +646,15 @@ impl NotificationTrait for WorkspaceDidCreateFiles {
     const METHOD: &'static str = "workspace/didCreateFiles";
     type RegistrationOptions = super::structures::FileOperationRegistrationOptions;
     type Params = super::structures::CreateFilesParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "workspace/didCreateFiles");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -452,6 +674,15 @@ impl NotificationTrait for WorkspaceDidDeleteFiles {
     const METHOD: &'static str = "workspace/didDeleteFiles";
     type RegistrationOptions = super::structures::FileOperationRegistrationOptions;
     type Params = super::structures::DeleteFilesParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "workspace/didDeleteFiles");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -471,4 +702,13 @@ impl NotificationTrait for WorkspaceDidRenameFiles {
     const METHOD: &'static str = "workspace/didRenameFiles";
     type RegistrationOptions = super::structures::FileOperationRegistrationOptions;
     type Params = super::structures::RenameFilesParams;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(notification.method == "workspace/didRenameFiles");
+        Ok(serde_json::from_value(
+            notification.params.ok_or_else(missing_params)?,
+        )?)
+    }
 }

@@ -2,290 +2,188 @@
 
 use super::*;
 
+use super::notifications::*;
 use super::requests::*;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                        LspClientNotify                                         //
+//                                     LspClientNotification                                      //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-impl<'client, W: AsyncWrite + Unpin> LspClientNotify<'client, W> {
-    /// [📖][docs] ➡️ ⬅️
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#cancelRequest (Documentation)
+impl<'client, W: AsyncWrite + Unpin> super::LspClientNotification<'client, W> {
+    /// @see [`CancelRequest`](super::notifications::CancelRequest).
     pub async fn cancel_request(
         &mut self,
         params: super::structures::CancelParams,
     ) -> std::io::Result<()> {
-        self.client
-            .send_notification(Cow::Borrowed("$/cancelRequest"), Some(params))
-            .await
+        self.client.send_notification::<CancelRequest>(params).await
     }
-    /// [📖][docs] ➡️ ⬅️
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#progress (Documentation)
+    /// @see [`Progress`](super::notifications::Progress).
     pub async fn progress(
         &mut self,
         params: super::structures::ProgressParams,
     ) -> std::io::Result<()> {
-        self.client
-            .send_notification(Cow::Borrowed("$/progress"), Some(params))
-            .await
+        self.client.send_notification::<Progress>(params).await
     }
-    /// [📖][docs] ➡️
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#setTrace (Documentation)
+    /// @see [`SetTrace`](super::notifications::SetTrace).
     pub async fn set_trace(
         &mut self,
         params: super::structures::SetTraceParams,
     ) -> std::io::Result<()> {
-        self.client
-            .send_notification(Cow::Borrowed("$/setTrace"), Some(params))
-            .await
+        self.client.send_notification::<SetTrace>(params).await
     }
-    /// [📖][docs] ➡️ The exit event is sent from the client to the server to
-    /// ask the server to exit its process.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#exit (Documentation)
+    /// @see [`Exit`](super::notifications::Exit).
     pub async fn exit(&mut self) -> std::io::Result<()> {
-        self.client
-            .send_notification::<()>(Cow::Borrowed("exit"), None)
-            .await
+        self.client.send_notification::<Exit>(()).await
     }
-    /// [📖][docs] ➡️ The initialized notification is sent from the client to the
-    /// server after the client is fully initialized and the server
-    /// is allowed to send requests from the server to the client.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#initialized (Documentation)
+    /// @see [`Initialized`](super::notifications::Initialized).
     pub async fn initialized(
         &mut self,
         params: super::structures::InitializedParams,
     ) -> std::io::Result<()> {
-        self.client
-            .send_notification(Cow::Borrowed("initialized"), Some(params))
-            .await
+        self.client.send_notification::<Initialized>(params).await
     }
-    /// [📖][docs] ➡️
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#notebookDocument_didChange (Documentation)
+    /// @see [`NotebookDocumentDidChange`](super::notifications::NotebookDocumentDidChange).
     pub async fn notebook_document_did_change(
         &mut self,
         params: super::structures::DidChangeNotebookDocumentParams,
     ) -> std::io::Result<()> {
         self.client
-            .send_notification(Cow::Borrowed("notebookDocument/didChange"), Some(params))
+            .send_notification::<NotebookDocumentDidChange>(params)
             .await
     }
-    /// [📖][docs] ➡️ A notification sent when a notebook closes.
-    ///
-    /// @since 3.17.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#notebookDocument_didClose (Documentation)
+    /// @see [`NotebookDocumentDidClose`](super::notifications::NotebookDocumentDidClose).
     pub async fn notebook_document_did_close(
         &mut self,
         params: super::structures::DidCloseNotebookDocumentParams,
     ) -> std::io::Result<()> {
         self.client
-            .send_notification(Cow::Borrowed("notebookDocument/didClose"), Some(params))
+            .send_notification::<NotebookDocumentDidClose>(params)
             .await
     }
-    /// [📖][docs] ➡️ A notification sent when a notebook opens.
-    ///
-    /// @since 3.17.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#notebookDocument_didOpen (Documentation)
+    /// @see [`NotebookDocumentDidOpen`](super::notifications::NotebookDocumentDidOpen).
     pub async fn notebook_document_did_open(
         &mut self,
         params: super::structures::DidOpenNotebookDocumentParams,
     ) -> std::io::Result<()> {
         self.client
-            .send_notification(Cow::Borrowed("notebookDocument/didOpen"), Some(params))
+            .send_notification::<NotebookDocumentDidOpen>(params)
             .await
     }
-    /// [📖][docs] ➡️ A notification sent when a notebook document is saved.
-    ///
-    /// @since 3.17.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#notebookDocument_didSave (Documentation)
+    /// @see [`NotebookDocumentDidSave`](super::notifications::NotebookDocumentDidSave).
     pub async fn notebook_document_did_save(
         &mut self,
         params: super::structures::DidSaveNotebookDocumentParams,
     ) -> std::io::Result<()> {
         self.client
-            .send_notification(Cow::Borrowed("notebookDocument/didSave"), Some(params))
+            .send_notification::<NotebookDocumentDidSave>(params)
             .await
     }
-    /// [📖][docs] ➡️ The document change notification is sent from the client to the server to signal
-    /// changes to a text document.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didChange (Documentation)
+    /// @see [`TextDocumentDidChange`](super::notifications::TextDocumentDidChange).
     pub async fn text_document_did_change(
         &mut self,
         params: super::structures::DidChangeTextDocumentParams,
     ) -> std::io::Result<()> {
         self.client
-            .send_notification(Cow::Borrowed("textDocument/didChange"), Some(params))
+            .send_notification::<TextDocumentDidChange>(params)
             .await
     }
-    /// [📖][docs] ➡️ The document close notification is sent from the client to the server when
-    /// the document got closed in the client. The document's truth now exists where
-    /// the document's uri points to (e.g. if the document's uri is a file uri the
-    /// truth now exists on disk). As with the open notification the close notification
-    /// is about managing the document's content. Receiving a close notification
-    /// doesn't mean that the document was open in an editor before. A close
-    /// notification requires a previous open notification to be sent.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didClose (Documentation)
+    /// @see [`TextDocumentDidClose`](super::notifications::TextDocumentDidClose).
     pub async fn text_document_did_close(
         &mut self,
         params: super::structures::DidCloseTextDocumentParams,
     ) -> std::io::Result<()> {
         self.client
-            .send_notification(Cow::Borrowed("textDocument/didClose"), Some(params))
+            .send_notification::<TextDocumentDidClose>(params)
             .await
     }
-    /// [📖][docs] ➡️ The document open notification is sent from the client to the server to signal
-    /// newly opened text documents. The document's truth is now managed by the client
-    /// and the server must not try to read the document's truth using the document's
-    /// uri. Open in this sense means it is managed by the client. It doesn't necessarily
-    /// mean that its content is presented in an editor. An open notification must not
-    /// be sent more than once without a corresponding close notification send before.
-    /// This means open and close notification must be balanced and the max open count
-    /// is one.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didOpen (Documentation)
+    /// @see [`TextDocumentDidOpen`](super::notifications::TextDocumentDidOpen).
     pub async fn text_document_did_open(
         &mut self,
         params: super::structures::DidOpenTextDocumentParams,
     ) -> std::io::Result<()> {
         self.client
-            .send_notification(Cow::Borrowed("textDocument/didOpen"), Some(params))
+            .send_notification::<TextDocumentDidOpen>(params)
             .await
     }
-    /// [📖][docs] ➡️ The document save notification is sent from the client to the server when
-    /// the document got saved in the client.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didSave (Documentation)
+    /// @see [`TextDocumentDidSave`](super::notifications::TextDocumentDidSave).
     pub async fn text_document_did_save(
         &mut self,
         params: super::structures::DidSaveTextDocumentParams,
     ) -> std::io::Result<()> {
         self.client
-            .send_notification(Cow::Borrowed("textDocument/didSave"), Some(params))
+            .send_notification::<TextDocumentDidSave>(params)
             .await
     }
-    /// [📖][docs] ➡️ A document will save notification is sent from the client to the server before
-    /// the document is actually saved.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSave (Documentation)
+    /// @see [`TextDocumentWillSave`](super::notifications::TextDocumentWillSave).
     pub async fn text_document_will_save(
         &mut self,
         params: super::structures::WillSaveTextDocumentParams,
     ) -> std::io::Result<()> {
         self.client
-            .send_notification(Cow::Borrowed("textDocument/willSave"), Some(params))
+            .send_notification::<TextDocumentWillSave>(params)
             .await
     }
-    /// [📖][docs] ➡️ The `window/workDoneProgress/cancel` notification is sent from  the client to the server to cancel a progress
-    /// initiated on the server side.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_workDoneProgress_cancel (Documentation)
+    /// @see [`WindowWorkDoneProgressCancel`](super::notifications::WindowWorkDoneProgressCancel).
     pub async fn window_work_done_progress_cancel(
         &mut self,
         params: super::structures::WorkDoneProgressCancelParams,
     ) -> std::io::Result<()> {
         self.client
-            .send_notification(
-                Cow::Borrowed("window/workDoneProgress/cancel"),
-                Some(params),
-            )
+            .send_notification::<WindowWorkDoneProgressCancel>(params)
             .await
     }
-    /// [📖][docs] ➡️ The configuration change notification is sent from the client to the server
-    /// when the client's configuration has changed. The notification contains
-    /// the changed configuration as defined by the language client.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeConfiguration (Documentation)
+    /// @see [`WorkspaceDidChangeConfiguration`](super::notifications::WorkspaceDidChangeConfiguration).
     pub async fn workspace_did_change_configuration(
         &mut self,
         params: super::structures::DidChangeConfigurationParams,
     ) -> std::io::Result<()> {
         self.client
-            .send_notification(
-                Cow::Borrowed("workspace/didChangeConfiguration"),
-                Some(params),
-            )
+            .send_notification::<WorkspaceDidChangeConfiguration>(params)
             .await
     }
-    /// [📖][docs] ➡️ The watched files notification is sent from the client to the server when
-    /// the client detects changes to file watched by the language client.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWatchedFiles (Documentation)
+    /// @see [`WorkspaceDidChangeWatchedFiles`](super::notifications::WorkspaceDidChangeWatchedFiles).
     pub async fn workspace_did_change_watched_files(
         &mut self,
         params: super::structures::DidChangeWatchedFilesParams,
     ) -> std::io::Result<()> {
         self.client
-            .send_notification(
-                Cow::Borrowed("workspace/didChangeWatchedFiles"),
-                Some(params),
-            )
+            .send_notification::<WorkspaceDidChangeWatchedFiles>(params)
             .await
     }
-    /// [📖][docs] ➡️ The `workspace/didChangeWorkspaceFolders` notification is sent from the client to the server when the workspace
-    /// folder configuration changes.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWorkspaceFolders (Documentation)
+    /// @see [`WorkspaceDidChangeWorkspaceFolders`](super::notifications::WorkspaceDidChangeWorkspaceFolders).
     pub async fn workspace_did_change_workspace_folders(
         &mut self,
         params: super::structures::DidChangeWorkspaceFoldersParams,
     ) -> std::io::Result<()> {
         self.client
-            .send_notification(
-                Cow::Borrowed("workspace/didChangeWorkspaceFolders"),
-                Some(params),
-            )
+            .send_notification::<WorkspaceDidChangeWorkspaceFolders>(params)
             .await
     }
-    /// [📖][docs] ➡️ The did create files notification is sent from the client to the server when
-    /// files were created from within the client.
-    ///
-    /// @since 3.16.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didCreateFiles (Documentation)
+    /// @see [`WorkspaceDidCreateFiles`](super::notifications::WorkspaceDidCreateFiles).
     pub async fn workspace_did_create_files(
         &mut self,
         params: super::structures::CreateFilesParams,
     ) -> std::io::Result<()> {
         self.client
-            .send_notification(Cow::Borrowed("workspace/didCreateFiles"), Some(params))
+            .send_notification::<WorkspaceDidCreateFiles>(params)
             .await
     }
-    /// [📖][docs] ➡️ The will delete files request is sent from the client to the server before files are actually
-    /// deleted as long as the deletion is triggered from within the client.
-    ///
-    /// @since 3.16.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didDeleteFiles (Documentation)
+    /// @see [`WorkspaceDidDeleteFiles`](super::notifications::WorkspaceDidDeleteFiles).
     pub async fn workspace_did_delete_files(
         &mut self,
         params: super::structures::DeleteFilesParams,
     ) -> std::io::Result<()> {
         self.client
-            .send_notification(Cow::Borrowed("workspace/didDeleteFiles"), Some(params))
+            .send_notification::<WorkspaceDidDeleteFiles>(params)
             .await
     }
-    /// [📖][docs] ➡️ The did rename files notification is sent from the client to the server when
-    /// files were renamed from within the client.
-    ///
-    /// @since 3.16.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didRenameFiles (Documentation)
+    /// @see [`WorkspaceDidRenameFiles`](super::notifications::WorkspaceDidRenameFiles).
     pub async fn workspace_did_rename_files(
         &mut self,
         params: super::structures::RenameFilesParams,
     ) -> std::io::Result<()> {
         self.client
-            .send_notification(Cow::Borrowed("workspace/didRenameFiles"), Some(params))
+            .send_notification::<WorkspaceDidRenameFiles>(params)
             .await
     }
 }
@@ -294,866 +192,843 @@ impl<'client, W: AsyncWrite + Unpin> LspClientNotify<'client, W> {
 //                                        LspClientRequest                                        //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-impl<'client, W: AsyncWrite + Unpin> LspClientRequest<'client, W> {
-    /// [📖][docs] ↩️ A request to resolve the incoming calls for a given `CallHierarchyItem`.
-    ///
-    /// @since 3.16.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_incomingCalls (Documentation)
+impl<'client, W: AsyncWrite + Unpin> super::LspClientRequest<'client, W> {
+    /// @see [`CallHierarchyIncomingCalls`](super::requests::CallHierarchyIncomingCalls).
     pub async fn call_hierarchy_incoming_calls(
         &mut self,
         params: super::structures::CallHierarchyIncomingCallsParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<CallHierarchyIncomingCallsResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("callHierarchy/incomingCalls"), Some(params))
+            .send_request::<CallHierarchyIncomingCalls>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to resolve the outgoing calls for a given `CallHierarchyItem`.
-    ///
-    /// @since 3.16.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_outgoingCalls (Documentation)
+    /// @see [`CallHierarchyOutgoingCalls`](super::requests::CallHierarchyOutgoingCalls).
     pub async fn call_hierarchy_outgoing_calls(
         &mut self,
         params: super::structures::CallHierarchyOutgoingCallsParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<CallHierarchyOutgoingCallsResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("callHierarchy/outgoingCalls"), Some(params))
+            .send_request::<CallHierarchyOutgoingCalls>(params)
             .await
     }
-    /// [📖][docs] ↩️ Request to resolve additional information for a given code action.The request's
-    /// parameter is of type {@link CodeAction} the response
-    /// is of type {@link CodeAction} or a Thenable that resolves to such.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeAction_resolve (Documentation)
+    /// @see [`CodeActionResolve`](super::requests::CodeActionResolve).
     pub async fn code_action_resolve(
         &mut self,
         params: super::structures::CodeAction,
-    ) -> std::io::Result<Id> {
-        self.client
-            .send_request(Cow::Borrowed("codeAction/resolve"), Some(params))
-            .await
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<super::structures::CodeAction, Error<()>>>,
+            >,
+    > {
+        self.client.send_request::<CodeActionResolve>(params).await
     }
-    /// [📖][docs] ↩️ A request to resolve a command for a given code lens.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_resolve (Documentation)
+    /// @see [`CodeLensResolve`](super::requests::CodeLensResolve).
     pub async fn code_lens_resolve(
         &mut self,
         params: super::structures::CodeLens,
-    ) -> std::io::Result<Id> {
-        self.client
-            .send_request(Cow::Borrowed("codeLens/resolve"), Some(params))
-            .await
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<super::structures::CodeLens, Error<()>>>,
+            >,
+    > {
+        self.client.send_request::<CodeLensResolve>(params).await
     }
-    /// [📖][docs] ↩️ Request to resolve additional information for a given completion item.The request's
-    /// parameter is of type {@link CompletionItem} the response
-    /// is of type {@link CompletionItem} or a Thenable that resolves to such.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve (Documentation)
+    /// @see [`CompletionItemResolve`](super::requests::CompletionItemResolve).
     pub async fn completion_item_resolve(
         &mut self,
         params: super::structures::CompletionItem,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<super::structures::CompletionItem, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("completionItem/resolve"), Some(params))
+            .send_request::<CompletionItemResolve>(params)
             .await
     }
-    /// [📖][docs] ↩️ Request to resolve additional information for a given document link. The request's
-    /// parameter is of type {@link DocumentLink} the response
-    /// is of type {@link DocumentLink} or a Thenable that resolves to such.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#documentLink_resolve (Documentation)
+    /// @see [`DocumentLinkResolve`](super::requests::DocumentLinkResolve).
     pub async fn document_link_resolve(
         &mut self,
         params: super::structures::DocumentLink,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<super::structures::DocumentLink, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("documentLink/resolve"), Some(params))
+            .send_request::<DocumentLinkResolve>(params)
             .await
     }
-    /// [📖][docs] ↩️ The initialize request is sent from the client to the server.
-    /// It is sent once as the request after starting up the server.
-    /// The requests parameter is of type {@link InitializeParams}
-    /// the response if of type {@link InitializeResult} of a Thenable that
-    /// resolves to such.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#initialize (Documentation)
+    /// @see [`Initialize`](super::requests::Initialize).
     pub async fn initialize(
         &mut self,
         params: super::structures::InitializeParams,
-    ) -> std::io::Result<Id> {
-        self.client
-            .send_request(Cow::Borrowed("initialize"), Some(params))
-            .await
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<
+                    Result<
+                        super::structures::InitializeResult,
+                        Error<super::structures::InitializeError>,
+                    >,
+                >,
+            >,
+    > {
+        self.client.send_request::<Initialize>(params).await
     }
-    /// [📖][docs] ↩️ A request to resolve additional properties for an inlay hint.
-    /// The request's parameter is of type {@link InlayHint}, the response is
-    /// of type {@link InlayHint} or a Thenable that resolves to such.
-    ///
-    /// @since 3.17.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#inlayHint_resolve (Documentation)
+    /// @see [`InlayHintResolve`](super::requests::InlayHintResolve).
     pub async fn inlay_hint_resolve(
         &mut self,
         params: super::structures::InlayHint,
-    ) -> std::io::Result<Id> {
-        self.client
-            .send_request(Cow::Borrowed("inlayHint/resolve"), Some(params))
-            .await
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<super::structures::InlayHint, Error<()>>>,
+            >,
+    > {
+        self.client.send_request::<InlayHintResolve>(params).await
     }
-    /// [📖][docs] ↩️ A shutdown request is sent from the client to the server.
-    /// It is sent once when the client decides to shutdown the
-    /// server. The only notification that is sent after a shutdown request
-    /// is the exit event.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#shutdown (Documentation)
-    pub async fn shutdown(&mut self) -> std::io::Result<Id> {
-        self.client
-            .send_request::<()>(Cow::Borrowed("shutdown"), None)
-            .await
+    /// @see [`Shutdown`](super::requests::Shutdown).
+    pub async fn shutdown(
+        &mut self,
+    ) -> std::io::Result<impl '_ + futures::Future<Output = std::io::Result<Result<Null, Error<()>>>>>
+    {
+        self.client.send_request::<Shutdown>(()).await
     }
-    /// [📖][docs] ↩️ A request to provide commands for the given text document and range.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeAction (Documentation)
+    /// @see [`TextDocumentCodeAction`](super::requests::TextDocumentCodeAction).
     pub async fn text_document_code_action(
         &mut self,
         params: super::structures::CodeActionParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentCodeActionResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/codeAction"), Some(params))
+            .send_request::<TextDocumentCodeAction>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to provide code lens for the given text document.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeLens (Documentation)
+    /// @see [`TextDocumentCodeLens`](super::requests::TextDocumentCodeLens).
     pub async fn text_document_code_lens(
         &mut self,
         params: super::structures::CodeLensParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<Output = std::io::Result<Result<TextDocumentCodeLensResult, Error<()>>>>,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/codeLens"), Some(params))
+            .send_request::<TextDocumentCodeLens>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to list all presentation for a color. The request's
-    /// parameter is of type {@link ColorPresentationParams} the
-    /// response is of type {@link ColorInformation ColorInformation[]} or a Thenable
-    /// that resolves to such.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_colorPresentation (Documentation)
+    /// @see [`TextDocumentColorPresentation`](super::requests::TextDocumentColorPresentation).
     pub async fn text_document_color_presentation(
         &mut self,
         params: super::structures::ColorPresentationParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<
+                    Result<Vec<super::structures::ColorPresentation>, Error<()>>,
+                >,
+            >,
+    > {
         self.client
-            .send_request(
-                Cow::Borrowed("textDocument/colorPresentation"),
-                Some(params),
-            )
+            .send_request::<TextDocumentColorPresentation>(params)
             .await
     }
-    /// [📖][docs] ↩️ Request to request completion at a given text document position. The request's
-    /// parameter is of type {@link TextDocumentPosition} the response
-    /// is of type {@link CompletionItem CompletionItem[]} or {@link CompletionList}
-    /// or a Thenable that resolves to such.
-    ///
-    /// The request can delay the computation of the {@link CompletionItem.detail `detail`}
-    /// and {@link CompletionItem.documentation `documentation`} properties to the `completionItem/resolve`
-    /// request. However, properties that are needed for the initial sorting and filtering, like `sortText`,
-    /// `filterText`, `insertText`, and `textEdit`, must not be changed during resolve.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion (Documentation)
+    /// @see [`TextDocumentCompletion`](super::requests::TextDocumentCompletion).
     pub async fn text_document_completion(
         &mut self,
         params: super::structures::CompletionParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentCompletionResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/completion"), Some(params))
+            .send_request::<TextDocumentCompletion>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to resolve the type definition locations of a symbol at a given text
-    /// document position. The request's parameter is of type {@link TextDocumentPositionParams}
-    /// the response is of type {@link Declaration} or a typed array of {@link DeclarationLink}
-    /// or a Thenable that resolves to such.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration (Documentation)
+    /// @see [`TextDocumentDeclaration`](super::requests::TextDocumentDeclaration).
     pub async fn text_document_declaration(
         &mut self,
         params: super::structures::DeclarationParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentDeclarationResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/declaration"), Some(params))
+            .send_request::<TextDocumentDeclaration>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to resolve the definition location of a symbol at a given text
-    /// document position. The request's parameter is of type {@link TextDocumentPosition}
-    /// the response is of either type {@link Definition} or a typed array of
-    /// {@link DefinitionLink} or a Thenable that resolves to such.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_definition (Documentation)
+    /// @see [`TextDocumentDefinition`](super::requests::TextDocumentDefinition).
     pub async fn text_document_definition(
         &mut self,
         params: super::structures::DefinitionParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentDefinitionResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/definition"), Some(params))
+            .send_request::<TextDocumentDefinition>(params)
             .await
     }
-    /// [📖][docs] ↩️ The document diagnostic request definition.
-    ///
-    /// @since 3.17.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_diagnostic (Documentation)
+    /// @see [`TextDocumentDiagnostic`](super::requests::TextDocumentDiagnostic).
     pub async fn text_document_diagnostic(
         &mut self,
         params: super::structures::DocumentDiagnosticParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<
+                    Result<
+                        super::type_aliases::DocumentDiagnosticReport,
+                        Error<super::structures::DiagnosticServerCancellationData>,
+                    >,
+                >,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/diagnostic"), Some(params))
+            .send_request::<TextDocumentDiagnostic>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to list all color symbols found in a given text document. The request's
-    /// parameter is of type {@link DocumentColorParams} the
-    /// response is of type {@link ColorInformation ColorInformation[]} or a Thenable
-    /// that resolves to such.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor (Documentation)
+    /// @see [`TextDocumentDocumentColor`](super::requests::TextDocumentDocumentColor).
     pub async fn text_document_document_color(
         &mut self,
         params: super::structures::DocumentColorParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<
+                    Result<Vec<super::structures::ColorInformation>, Error<()>>,
+                >,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/documentColor"), Some(params))
+            .send_request::<TextDocumentDocumentColor>(params)
             .await
     }
-    /// [📖][docs] ↩️ Request to resolve a {@link DocumentHighlight} for a given
-    /// text document position. The request's parameter is of type {@link TextDocumentPosition}
-    /// the request response is an array of type {@link DocumentHighlight}
-    /// or a Thenable that resolves to such.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentHighlight (Documentation)
+    /// @see [`TextDocumentDocumentHighlight`](super::requests::TextDocumentDocumentHighlight).
     pub async fn text_document_document_highlight(
         &mut self,
         params: super::structures::DocumentHighlightParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentDocumentHighlightResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(
-                Cow::Borrowed("textDocument/documentHighlight"),
-                Some(params),
-            )
+            .send_request::<TextDocumentDocumentHighlight>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to provide document links
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentLink (Documentation)
+    /// @see [`TextDocumentDocumentLink`](super::requests::TextDocumentDocumentLink).
     pub async fn text_document_document_link(
         &mut self,
         params: super::structures::DocumentLinkParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentDocumentLinkResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/documentLink"), Some(params))
+            .send_request::<TextDocumentDocumentLink>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to list all symbols found in a given text document. The request's
-    /// parameter is of type {@link TextDocumentIdentifier} the
-    /// response is of type {@link SymbolInformation SymbolInformation[]} or a Thenable
-    /// that resolves to such.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol (Documentation)
+    /// @see [`TextDocumentDocumentSymbol`](super::requests::TextDocumentDocumentSymbol).
     pub async fn text_document_document_symbol(
         &mut self,
         params: super::structures::DocumentSymbolParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentDocumentSymbolResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/documentSymbol"), Some(params))
+            .send_request::<TextDocumentDocumentSymbol>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to provide folding ranges in a document. The request's
-    /// parameter is of type {@link FoldingRangeParams}, the
-    /// response is of type {@link FoldingRangeList} or a Thenable
-    /// that resolves to such.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange (Documentation)
+    /// @see [`TextDocumentFoldingRange`](super::requests::TextDocumentFoldingRange).
     pub async fn text_document_folding_range(
         &mut self,
         params: super::structures::FoldingRangeParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentFoldingRangeResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/foldingRange"), Some(params))
+            .send_request::<TextDocumentFoldingRange>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to format a whole document.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_formatting (Documentation)
+    /// @see [`TextDocumentFormatting`](super::requests::TextDocumentFormatting).
     pub async fn text_document_formatting(
         &mut self,
         params: super::structures::DocumentFormattingParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentFormattingResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/formatting"), Some(params))
+            .send_request::<TextDocumentFormatting>(params)
             .await
     }
-    /// [📖][docs] ↩️ Request to request hover information at a given text document position. The request's
-    /// parameter is of type {@link TextDocumentPosition} the response is of
-    /// type {@link Hover} or a Thenable that resolves to such.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_hover (Documentation)
+    /// @see [`TextDocumentHover`](super::requests::TextDocumentHover).
     pub async fn text_document_hover(
         &mut self,
         params: super::structures::HoverParams,
-    ) -> std::io::Result<Id> {
-        self.client
-            .send_request(Cow::Borrowed("textDocument/hover"), Some(params))
-            .await
+    ) -> std::io::Result<
+        impl '_ + futures::Future<Output = std::io::Result<Result<TextDocumentHoverResult, Error<()>>>>,
+    > {
+        self.client.send_request::<TextDocumentHover>(params).await
     }
-    /// [📖][docs] ↩️ A request to resolve the implementation locations of a symbol at a given text
-    /// document position. The request's parameter is of type {@link TextDocumentPositionParams}
-    /// the response is of type {@link Definition} or a Thenable that resolves to such.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation (Documentation)
+    /// @see [`TextDocumentImplementation`](super::requests::TextDocumentImplementation).
     pub async fn text_document_implementation(
         &mut self,
         params: super::structures::ImplementationParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentImplementationResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/implementation"), Some(params))
+            .send_request::<TextDocumentImplementation>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to provide inlay hints in a document. The request's parameter is of
-    /// type {@link InlayHintsParams}, the response is of type
-    /// {@link InlayHint InlayHint[]} or a Thenable that resolves to such.
-    ///
-    /// @since 3.17.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlayHint (Documentation)
+    /// @see [`TextDocumentInlayHint`](super::requests::TextDocumentInlayHint).
     pub async fn text_document_inlay_hint(
         &mut self,
         params: super::structures::InlayHintParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentInlayHintResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/inlayHint"), Some(params))
+            .send_request::<TextDocumentInlayHint>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to provide inline values in a document. The request's parameter is of
-    /// type {@link InlineValueParams}, the response is of type
-    /// {@link InlineValue InlineValue[]} or a Thenable that resolves to such.
-    ///
-    /// @since 3.17.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue (Documentation)
+    /// @see [`TextDocumentInlineValue`](super::requests::TextDocumentInlineValue).
     pub async fn text_document_inline_value(
         &mut self,
         params: super::structures::InlineValueParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentInlineValueResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/inlineValue"), Some(params))
+            .send_request::<TextDocumentInlineValue>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to provide ranges that can be edited together.
-    ///
-    /// @since 3.16.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_linkedEditingRange (Documentation)
+    /// @see [`TextDocumentLinkedEditingRange`](super::requests::TextDocumentLinkedEditingRange).
     pub async fn text_document_linked_editing_range(
         &mut self,
         params: super::structures::LinkedEditingRangeParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentLinkedEditingRangeResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(
-                Cow::Borrowed("textDocument/linkedEditingRange"),
-                Some(params),
-            )
+            .send_request::<TextDocumentLinkedEditingRange>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to get the moniker of a symbol at a given text document position.
-    /// The request parameter is of type {@link TextDocumentPositionParams}.
-    /// The response is of type {@link Moniker Moniker[]} or `null`.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_moniker (Documentation)
+    /// @see [`TextDocumentMoniker`](super::requests::TextDocumentMoniker).
     pub async fn text_document_moniker(
         &mut self,
         params: super::structures::MonikerParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<Output = std::io::Result<Result<TextDocumentMonikerResult, Error<()>>>>,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/moniker"), Some(params))
+            .send_request::<TextDocumentMoniker>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to format a document on type.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_onTypeFormatting (Documentation)
+    /// @see [`TextDocumentOnTypeFormatting`](super::requests::TextDocumentOnTypeFormatting).
     pub async fn text_document_on_type_formatting(
         &mut self,
         params: super::structures::DocumentOnTypeFormattingParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentOnTypeFormattingResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/onTypeFormatting"), Some(params))
+            .send_request::<TextDocumentOnTypeFormatting>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to result a `CallHierarchyItem` in a document at a given position.
-    /// Can be used as an input to an incoming or outgoing call hierarchy.
-    ///
-    /// @since 3.16.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareCallHierarchy (Documentation)
+    /// @see [`TextDocumentPrepareCallHierarchy`](super::requests::TextDocumentPrepareCallHierarchy).
     pub async fn text_document_prepare_call_hierarchy(
         &mut self,
         params: super::structures::CallHierarchyPrepareParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentPrepareCallHierarchyResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(
-                Cow::Borrowed("textDocument/prepareCallHierarchy"),
-                Some(params),
-            )
+            .send_request::<TextDocumentPrepareCallHierarchy>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to test and perform the setup necessary for a rename.
-    ///
-    /// @since 3.16 - support for default behavior
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareRename (Documentation)
+    /// @see [`TextDocumentPrepareRename`](super::requests::TextDocumentPrepareRename).
     pub async fn text_document_prepare_rename(
         &mut self,
         params: super::structures::PrepareRenameParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentPrepareRenameResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/prepareRename"), Some(params))
+            .send_request::<TextDocumentPrepareRename>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to result a `TypeHierarchyItem` in a document at a given position.
-    /// Can be used as an input to a subtypes or supertypes type hierarchy.
-    ///
-    /// @since 3.17.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareTypeHierarchy (Documentation)
+    /// @see [`TextDocumentPrepareTypeHierarchy`](super::requests::TextDocumentPrepareTypeHierarchy).
     pub async fn text_document_prepare_type_hierarchy(
         &mut self,
         params: super::structures::TypeHierarchyPrepareParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentPrepareTypeHierarchyResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(
-                Cow::Borrowed("textDocument/prepareTypeHierarchy"),
-                Some(params),
-            )
+            .send_request::<TextDocumentPrepareTypeHierarchy>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to format a range in a document.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rangeFormatting (Documentation)
+    /// @see [`TextDocumentRangeFormatting`](super::requests::TextDocumentRangeFormatting).
     pub async fn text_document_range_formatting(
         &mut self,
         params: super::structures::DocumentRangeFormattingParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentRangeFormattingResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/rangeFormatting"), Some(params))
+            .send_request::<TextDocumentRangeFormatting>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to resolve project-wide references for the symbol denoted
-    /// by the given text document position. The request's parameter is of
-    /// type {@link ReferenceParams} the response is of type
-    /// {@link Location Location[]} or a Thenable that resolves to such.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references (Documentation)
+    /// @see [`TextDocumentReferences`](super::requests::TextDocumentReferences).
     pub async fn text_document_references(
         &mut self,
         params: super::structures::ReferenceParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentReferencesResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/references"), Some(params))
+            .send_request::<TextDocumentReferences>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to rename a symbol.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rename (Documentation)
+    /// @see [`TextDocumentRename`](super::requests::TextDocumentRename).
     pub async fn text_document_rename(
         &mut self,
         params: super::structures::RenameParams,
-    ) -> std::io::Result<Id> {
-        self.client
-            .send_request(Cow::Borrowed("textDocument/rename"), Some(params))
-            .await
+    ) -> std::io::Result<
+        impl '_ + futures::Future<Output = std::io::Result<Result<TextDocumentRenameResult, Error<()>>>>,
+    > {
+        self.client.send_request::<TextDocumentRename>(params).await
     }
-    /// [📖][docs] ↩️ A request to provide selection ranges in a document. The request's
-    /// parameter is of type {@link SelectionRangeParams}, the
-    /// response is of type {@link SelectionRange SelectionRange[]} or a Thenable
-    /// that resolves to such.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_selectionRange (Documentation)
+    /// @see [`TextDocumentSelectionRange`](super::requests::TextDocumentSelectionRange).
     pub async fn text_document_selection_range(
         &mut self,
         params: super::structures::SelectionRangeParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentSelectionRangeResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/selectionRange"), Some(params))
+            .send_request::<TextDocumentSelectionRange>(params)
             .await
     }
-    /// [📖][docs] ↩️ @since 3.16.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens_full (Documentation)
+    /// @see [`TextDocumentSemanticTokensFull`](super::requests::TextDocumentSemanticTokensFull).
     pub async fn text_document_semantic_tokens_full(
         &mut self,
         params: super::structures::SemanticTokensParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentSemanticTokensFullResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(
-                Cow::Borrowed("textDocument/semanticTokens/full"),
-                Some(params),
-            )
+            .send_request::<TextDocumentSemanticTokensFull>(params)
             .await
     }
-    /// [📖][docs] ↩️ @since 3.16.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens_full_delta (Documentation)
+    /// @see [`TextDocumentSemanticTokensFullDelta`](super::requests::TextDocumentSemanticTokensFullDelta).
     pub async fn text_document_semantic_tokens_full_delta(
         &mut self,
         params: super::structures::SemanticTokensDeltaParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<
+                    Result<TextDocumentSemanticTokensFullDeltaResult, Error<()>>,
+                >,
+            >,
+    > {
         self.client
-            .send_request(
-                Cow::Borrowed("textDocument/semanticTokens/full/delta"),
-                Some(params),
-            )
+            .send_request::<TextDocumentSemanticTokensFullDelta>(params)
             .await
     }
-    /// [📖][docs] ↩️ @since 3.16.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens_range (Documentation)
+    /// @see [`TextDocumentSemanticTokensRange`](super::requests::TextDocumentSemanticTokensRange).
     pub async fn text_document_semantic_tokens_range(
         &mut self,
         params: super::structures::SemanticTokensRangeParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentSemanticTokensRangeResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(
-                Cow::Borrowed("textDocument/semanticTokens/range"),
-                Some(params),
-            )
+            .send_request::<TextDocumentSemanticTokensRange>(params)
             .await
     }
-    /// [📖][docs] ↩️
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp (Documentation)
+    /// @see [`TextDocumentSignatureHelp`](super::requests::TextDocumentSignatureHelp).
     pub async fn text_document_signature_help(
         &mut self,
         params: super::structures::SignatureHelpParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentSignatureHelpResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/signatureHelp"), Some(params))
+            .send_request::<TextDocumentSignatureHelp>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to resolve the type definition locations of a symbol at a given text
-    /// document position. The request's parameter is of type {@link TextDocumentPositionParams}
-    /// the response is of type {@link Definition} or a Thenable that resolves to such.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition (Documentation)
+    /// @see [`TextDocumentTypeDefinition`](super::requests::TextDocumentTypeDefinition).
     pub async fn text_document_type_definition(
         &mut self,
         params: super::structures::TypeDefinitionParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentTypeDefinitionResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("textDocument/typeDefinition"), Some(params))
+            .send_request::<TextDocumentTypeDefinition>(params)
             .await
     }
-    /// [📖][docs] ↩️ A document will save request is sent from the client to the server before
-    /// the document is actually saved. The request can return an array of TextEdits
-    /// which will be applied to the text document before it is saved. Please note that
-    /// clients might drop results if computing the text edits took too long or if a
-    /// server constantly fails on this request. This is done to keep the save fast and
-    /// reliable.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSaveWaitUntil (Documentation)
+    /// @see [`TextDocumentWillSaveWaitUntil`](super::requests::TextDocumentWillSaveWaitUntil).
     pub async fn text_document_will_save_wait_until(
         &mut self,
         params: super::structures::WillSaveTextDocumentParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TextDocumentWillSaveWaitUntilResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(
-                Cow::Borrowed("textDocument/willSaveWaitUntil"),
-                Some(params),
-            )
+            .send_request::<TextDocumentWillSaveWaitUntil>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to resolve the subtypes for a given `TypeHierarchyItem`.
-    ///
-    /// @since 3.17.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#typeHierarchy_subtypes (Documentation)
+    /// @see [`TypeHierarchySubtypes`](super::requests::TypeHierarchySubtypes).
     pub async fn type_hierarchy_subtypes(
         &mut self,
         params: super::structures::TypeHierarchySubtypesParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TypeHierarchySubtypesResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("typeHierarchy/subtypes"), Some(params))
+            .send_request::<TypeHierarchySubtypes>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to resolve the supertypes for a given `TypeHierarchyItem`.
-    ///
-    /// @since 3.17.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#typeHierarchy_supertypes (Documentation)
+    /// @see [`TypeHierarchySupertypes`](super::requests::TypeHierarchySupertypes).
     pub async fn type_hierarchy_supertypes(
         &mut self,
         params: super::structures::TypeHierarchySupertypesParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<TypeHierarchySupertypesResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("typeHierarchy/supertypes"), Some(params))
+            .send_request::<TypeHierarchySupertypes>(params)
             .await
     }
-    /// [📖][docs] ↩️ The workspace diagnostic request definition.
-    ///
-    /// @since 3.17.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic (Documentation)
+    /// @see [`WorkspaceDiagnostic`](super::requests::WorkspaceDiagnostic).
     pub async fn workspace_diagnostic(
         &mut self,
         params: super::structures::WorkspaceDiagnosticParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<
+                    Result<
+                        super::structures::WorkspaceDiagnosticReport,
+                        Error<super::structures::DiagnosticServerCancellationData>,
+                    >,
+                >,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("workspace/diagnostic"), Some(params))
+            .send_request::<WorkspaceDiagnostic>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request send from the client to the server to execute a command. The request might return
-    /// a workspace edit which the client will apply to the workspace.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_executeCommand (Documentation)
+    /// @see [`WorkspaceExecuteCommand`](super::requests::WorkspaceExecuteCommand).
     pub async fn workspace_execute_command(
         &mut self,
         params: super::structures::ExecuteCommandParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<WorkspaceExecuteCommandResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("workspace/executeCommand"), Some(params))
+            .send_request::<WorkspaceExecuteCommand>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to list project-wide symbols matching the query string given
-    /// by the {@link WorkspaceSymbolParams}. The response is
-    /// of type {@link SymbolInformation SymbolInformation[]} or a Thenable that
-    /// resolves to such.
-    ///
-    /// @since 3.17.0 - support for WorkspaceSymbol in the returned data. Clients
-    ///  need to advertise support for WorkspaceSymbols via the client capability
-    ///  `workspace.symbol.resolveSupport`.
-    ///
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbol (Documentation)
+    /// @see [`WorkspaceSymbol`](super::requests::WorkspaceSymbol).
     pub async fn workspace_symbol(
         &mut self,
         params: super::structures::WorkspaceSymbolParams,
-    ) -> std::io::Result<Id> {
-        self.client
-            .send_request(Cow::Borrowed("workspace/symbol"), Some(params))
-            .await
+    ) -> std::io::Result<
+        impl '_ + futures::Future<Output = std::io::Result<Result<WorkspaceSymbolResult, Error<()>>>>,
+    > {
+        self.client.send_request::<WorkspaceSymbol>(params).await
     }
-    /// [📖][docs] ↩️ The will create files request is sent from the client to the server before files are actually
-    /// created as long as the creation is triggered from within the client.
-    ///
-    /// The request can return a `WorkspaceEdit` which will be applied to workspace before the
-    /// files are created. Hence the `WorkspaceEdit` can not manipulate the content of the file
-    /// to be created.
-    ///
-    /// @since 3.16.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willCreateFiles (Documentation)
+    /// @see [`WorkspaceWillCreateFiles`](super::requests::WorkspaceWillCreateFiles).
     pub async fn workspace_will_create_files(
         &mut self,
         params: super::structures::CreateFilesParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<WorkspaceWillCreateFilesResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("workspace/willCreateFiles"), Some(params))
+            .send_request::<WorkspaceWillCreateFiles>(params)
             .await
     }
-    /// [📖][docs] ↩️ The did delete files notification is sent from the client to the server when
-    /// files were deleted from within the client.
-    ///
-    /// @since 3.16.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willDeleteFiles (Documentation)
+    /// @see [`WorkspaceWillDeleteFiles`](super::requests::WorkspaceWillDeleteFiles).
     pub async fn workspace_will_delete_files(
         &mut self,
         params: super::structures::DeleteFilesParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<WorkspaceWillDeleteFilesResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("workspace/willDeleteFiles"), Some(params))
+            .send_request::<WorkspaceWillDeleteFiles>(params)
             .await
     }
-    /// [📖][docs] ↩️ The will rename files request is sent from the client to the server before files are actually
-    /// renamed as long as the rename is triggered from within the client.
-    ///
-    /// @since 3.16.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willRenameFiles (Documentation)
+    /// @see [`WorkspaceWillRenameFiles`](super::requests::WorkspaceWillRenameFiles).
     pub async fn workspace_will_rename_files(
         &mut self,
         params: super::structures::RenameFilesParams,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<WorkspaceWillRenameFilesResult, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("workspace/willRenameFiles"), Some(params))
+            .send_request::<WorkspaceWillRenameFiles>(params)
             .await
     }
-    /// [📖][docs] ↩️ A request to resolve the range inside the workspace
-    /// symbol's location.
-    ///
-    /// @since 3.17.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspaceSymbol_resolve (Documentation)
+    /// @see [`WorkspaceSymbolResolve`](super::requests::WorkspaceSymbolResolve).
     pub async fn workspace_symbol_resolve(
         &mut self,
         params: super::structures::WorkspaceSymbol,
-    ) -> std::io::Result<Id> {
+    ) -> std::io::Result<
+        impl '_
+            + futures::Future<
+                Output = std::io::Result<Result<super::structures::WorkspaceSymbol, Error<()>>>,
+            >,
+    > {
         self.client
-            .send_request(Cow::Borrowed("workspaceSymbol/resolve"), Some(params))
+            .send_request::<WorkspaceSymbolResolve>(params)
             .await
     }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                        LspClientRespond                                        //
+//                                       LspClientResponse                                        //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-impl<'client, W: AsyncWrite + Unpin> LspClientRespond<'client, W> {
-    /// [📖][docs] ↪️ The `client/registerCapability` request is sent from the server to the client to register a new capability
-    /// handler on the client side.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#client_registerCapability (Documentation)
+impl<'client, W: AsyncWrite + Unpin> super::LspClientResponse<'client, W> {
+    /// @see [`ClientRegisterCapability`](super::requests::ClientRegisterCapability).
     pub async fn client_register_capability(
         &mut self,
         id: Option<Id>,
         data: Result<Null, Error<()>>,
     ) -> std::io::Result<()> {
-        self.client.send_response(id, data).await
+        self.client
+            .send_response::<ClientRegisterCapability>(id, data)
+            .await
     }
-    /// [📖][docs] ↪️ The `client/unregisterCapability` request is sent from the server to the client to unregister a previously registered capability
-    /// handler on the client side.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#client_unregisterCapability (Documentation)
+    /// @see [`ClientUnregisterCapability`](super::requests::ClientUnregisterCapability).
     pub async fn client_unregister_capability(
         &mut self,
         id: Option<Id>,
         data: Result<Null, Error<()>>,
     ) -> std::io::Result<()> {
-        self.client.send_response(id, data).await
+        self.client
+            .send_response::<ClientUnregisterCapability>(id, data)
+            .await
     }
-    /// [📖][docs] ↪️ A request to show a document. This request might open an
-    /// external program depending on the value of the URI to open.
-    /// For example a request to open `https://code.visualstudio.com/`
-    /// will very likely open the URI in a WEB browser.
-    ///
-    /// @since 3.16.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showDocument (Documentation)
+    /// @see [`WindowShowDocument`](super::requests::WindowShowDocument).
     pub async fn window_show_document(
         &mut self,
         id: Option<Id>,
         data: Result<super::structures::ShowDocumentResult, Error<()>>,
     ) -> std::io::Result<()> {
-        self.client.send_response(id, data).await
+        self.client
+            .send_response::<WindowShowDocument>(id, data)
+            .await
     }
-    /// [📖][docs] ↪️ The show message request is sent from the server to the client to show a message
-    /// and a set of options actions to the user.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessageRequest (Documentation)
+    /// @see [`WindowShowMessageRequest`](super::requests::WindowShowMessageRequest).
     pub async fn window_show_message_request(
         &mut self,
         id: Option<Id>,
         data: Result<WindowShowMessageRequestResult, Error<()>>,
     ) -> std::io::Result<()> {
-        self.client.send_response(id, data).await
+        self.client
+            .send_response::<WindowShowMessageRequest>(id, data)
+            .await
     }
-    /// [📖][docs] ↪️ The `window/workDoneProgress/create` request is sent from the server to the client to initiate progress
-    /// reporting from the server.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_workDoneProgress_create (Documentation)
+    /// @see [`WindowWorkDoneProgressCreate`](super::requests::WindowWorkDoneProgressCreate).
     pub async fn window_work_done_progress_create(
         &mut self,
         id: Option<Id>,
         data: Result<Null, Error<()>>,
     ) -> std::io::Result<()> {
-        self.client.send_response(id, data).await
+        self.client
+            .send_response::<WindowWorkDoneProgressCreate>(id, data)
+            .await
     }
-    /// [📖][docs] ↪️ A request sent from the server to the client to modified certain resources.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_applyEdit (Documentation)
+    /// @see [`WorkspaceApplyEdit`](super::requests::WorkspaceApplyEdit).
     pub async fn workspace_apply_edit(
         &mut self,
         id: Option<Id>,
         data: Result<super::structures::ApplyWorkspaceEditResult, Error<()>>,
     ) -> std::io::Result<()> {
-        self.client.send_response(id, data).await
+        self.client
+            .send_response::<WorkspaceApplyEdit>(id, data)
+            .await
     }
-    /// [📖][docs] ↪️ A request to refresh all code actions
-    ///
-    /// @since 3.16.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_codeLens_refresh (Documentation)
+    /// @see [`WorkspaceCodeLensRefresh`](super::requests::WorkspaceCodeLensRefresh).
     pub async fn workspace_code_lens_refresh(
         &mut self,
         id: Option<Id>,
         data: Result<Null, Error<()>>,
     ) -> std::io::Result<()> {
-        self.client.send_response(id, data).await
+        self.client
+            .send_response::<WorkspaceCodeLensRefresh>(id, data)
+            .await
     }
-    /// [📖][docs] ↪️ The 'workspace/configuration' request is sent from the server to the client to fetch a certain
-    /// configuration setting.
-    ///
-    /// This pull model replaces the old push model where the client signaled configuration change via an
-    /// event. If the server still needs to react to configuration changes (since the server caches the
-    /// result of `workspace/configuration` requests) the server should register for an empty configuration
-    /// change event and empty the cache if such an event is received.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_configuration (Documentation)
+    /// @see [`WorkspaceConfiguration`](super::requests::WorkspaceConfiguration).
     pub async fn workspace_configuration(
         &mut self,
         id: Option<Id>,
         data: Result<Vec<super::type_aliases::LspAny>, Error<()>>,
     ) -> std::io::Result<()> {
-        self.client.send_response(id, data).await
+        self.client
+            .send_response::<WorkspaceConfiguration>(id, data)
+            .await
     }
-    /// [📖][docs] ↪️ The diagnostic refresh request definition.
-    ///
-    /// @since 3.17.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic_refresh (Documentation)
+    /// @see [`WorkspaceDiagnosticRefresh`](super::requests::WorkspaceDiagnosticRefresh).
     pub async fn workspace_diagnostic_refresh(
         &mut self,
         id: Option<Id>,
         data: Result<Null, Error<()>>,
     ) -> std::io::Result<()> {
-        self.client.send_response(id, data).await
+        self.client
+            .send_response::<WorkspaceDiagnosticRefresh>(id, data)
+            .await
     }
-    /// [📖][docs] ↪️ @since 3.17.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_inlayHint_refresh (Documentation)
+    /// @see [`WorkspaceInlayHintRefresh`](super::requests::WorkspaceInlayHintRefresh).
     pub async fn workspace_inlay_hint_refresh(
         &mut self,
         id: Option<Id>,
         data: Result<Null, Error<()>>,
     ) -> std::io::Result<()> {
-        self.client.send_response(id, data).await
+        self.client
+            .send_response::<WorkspaceInlayHintRefresh>(id, data)
+            .await
     }
-    /// [📖][docs] ↪️ @since 3.17.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_inlineValue_refresh (Documentation)
+    /// @see [`WorkspaceInlineValueRefresh`](super::requests::WorkspaceInlineValueRefresh).
     pub async fn workspace_inline_value_refresh(
         &mut self,
         id: Option<Id>,
         data: Result<Null, Error<()>>,
     ) -> std::io::Result<()> {
-        self.client.send_response(id, data).await
+        self.client
+            .send_response::<WorkspaceInlineValueRefresh>(id, data)
+            .await
     }
-    /// [📖][docs] ↪️ @since 3.16.0
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_semanticTokens_refresh (Documentation)
+    /// @see [`WorkspaceSemanticTokensRefresh`](super::requests::WorkspaceSemanticTokensRefresh).
     pub async fn workspace_semantic_tokens_refresh(
         &mut self,
         id: Option<Id>,
         data: Result<Null, Error<()>>,
     ) -> std::io::Result<()> {
-        self.client.send_response(id, data).await
+        self.client
+            .send_response::<WorkspaceSemanticTokensRefresh>(id, data)
+            .await
     }
-    /// [📖][docs] ↪️ The `workspace/workspaceFolders` is sent from the server to the client to fetch the open workspace folders.
-    ///
-    /// [docs]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_workspaceFolders (Documentation)
+    /// @see [`WorkspaceWorkspaceFolders`](super::requests::WorkspaceWorkspaceFolders).
     pub async fn workspace_workspace_folders(
         &mut self,
         id: Option<Id>,
         data: Result<WorkspaceWorkspaceFoldersResult, Error<()>>,
     ) -> std::io::Result<()> {
-        self.client.send_response(id, data).await
+        self.client
+            .send_response::<WorkspaceWorkspaceFolders>(id, data)
+            .await
     }
 }

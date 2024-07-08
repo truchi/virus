@@ -1,16 +1,15 @@
 use crate::{
     generated::enumerations::{ErrorCodes, LspErrorCodes},
     transport::lsp,
-    types::Integer,
+    Integer,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::Value;
 use std::{borrow::Cow, io};
 use tokio::io::{AsyncBufRead, AsyncWrite};
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
-pub const VERSION: &'static str = "2.0";
+const VERSION: &'static str = "2.0";
 
 async fn read<T: DeserializeOwned, R: AsyncBufRead + Unpin>(reader: &mut R) -> io::Result<T> {
     Ok(serde_json::from_slice(
@@ -107,22 +106,6 @@ impl<T> Request<T> {
         T: Serialize,
     {
         write(writer, self).await
-    }
-}
-
-impl Request<Value> {
-    pub fn deserialize<T: DeserializeOwned>(self) -> io::Result<Request<T>> {
-        debug_assert!(self.jsonrpc == VERSION);
-
-        Ok(Request {
-            jsonrpc: VERSION.into(),
-            id: self.id,
-            method: self.method,
-            params: self
-                .params
-                .map(|params| serde_json::from_value(params))
-                .transpose()?,
-        })
     }
 }
 
@@ -225,36 +208,6 @@ impl<T, E> Response<T, E> {
     }
 }
 
-impl Response<Value, Value> {
-    pub fn deserialize<T: DeserializeOwned, E: DeserializeOwned>(
-        self,
-    ) -> io::Result<Response<T, E>> {
-        debug_assert!(self.jsonrpc == VERSION);
-
-        Ok(Response {
-            jsonrpc: VERSION.into(),
-            id: self.id,
-            result: self
-                .result
-                .map(|result| serde_json::from_value(result))
-                .transpose()?,
-            error: self
-                .error
-                .map(|error| {
-                    Ok::<_, io::Error>(Error {
-                        code: error.code,
-                        message: error.message,
-                        data: error
-                            .data
-                            .map(|data| serde_json::from_value(data))
-                            .transpose()?,
-                    })
-                })
-                .transpose()?,
-        })
-    }
-}
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Error                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -270,6 +223,16 @@ pub struct Error<T> {
     /// A primitive or structured value that contains additional information about the error.
     #[serde(default = "Option::default")]
     pub data: Option<T>,
+}
+
+impl<T> Error<T> {
+    pub fn new(code: Code, message: Cow<'static, str>, data: Option<T>) -> Self {
+        Self {
+            code,
+            message,
+            data,
+        }
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //

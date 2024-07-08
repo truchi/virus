@@ -1,7 +1,7 @@
 use super::super::{
     generated::schema::{MessageDirection, Notification, Request, Type},
     utils::{comment_box, docs, ident, pascal, pretty, snake},
-    Model, Quote, REQUESTS,
+    Model, Quote, NOTIFICATIONS, REQUESTS,
 };
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -31,9 +31,11 @@ pub fn quote(model: &Model) -> String {
                 assert!(params.subtype_1.is_none());
                 params.subtype_0.clone()
             });
-            let snake_method = snake(&request.method.trim_start_matches("$/").replace('/', "_"));
+            let method = request.method.trim_start_matches("$/").replace('/', "_");
+            let pascal_method = pascal(&method);
+            let snake_method = snake(&method);
 
-            (request, params, snake_method)
+            (request, params, pascal_method, snake_method)
         })
         .collect::<Vec<_>>();
     let notifications = model
@@ -52,22 +54,27 @@ pub fn quote(model: &Model) -> String {
                 assert!(params.subtype_1.is_none());
                 params.subtype_0.clone()
             });
-            let snake_method = snake(
-                &notification
-                    .method
-                    .trim_start_matches("$/")
-                    .replace('/', "_"),
-            );
+            let method = notification
+                .method
+                .trim_start_matches("$/")
+                .replace('/', "_");
+            let pascal_method = pascal(&method);
+            let snake_method = snake(&method);
 
-            (notification, params, snake_method)
+            (notification, params, pascal_method, snake_method)
         })
         .collect::<Vec<_>>();
-    let mod_name = ident(REQUESTS);
-    let helpers = quote! {
-        use super::#mod_name::*;
+    let uses = {
+        let notifications_mod_name = ident(NOTIFICATIONS);
+        let requests_mod_name = ident(REQUESTS);
+
+        quote! {
+            use super::#requests_mod_name::*;
+            use super::#notifications_mod_name::*;
+        }
     };
 
-    pretty(helpers)
+    pretty(uses)
         + "\n"
         + &notification(model, notifications)
         + "\n"
@@ -76,7 +83,7 @@ pub fn quote(model: &Model) -> String {
             requests
                 .clone()
                 .into_iter()
-                .filter(|(request, _, _)| {
+                .filter(|(request, _, _, _)| {
                     request.message_direction != MessageDirection::ServerToClient
                 })
                 .collect(),
@@ -87,7 +94,7 @@ pub fn quote(model: &Model) -> String {
             requests
                 .clone()
                 .into_iter()
-                .filter(|(request, _, _)| {
+                .filter(|(request, _, _, _)| {
                     request.message_direction != MessageDirection::ClientToServer
                 })
                 .collect(),
@@ -96,43 +103,38 @@ pub fn quote(model: &Model) -> String {
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
-fn notification(model: &Model, notifications: Vec<(Notification, Option<Type>, Ident)>) -> String {
-    let comment_box = comment_box("LspClientNotify");
+fn notification(
+    model: &Model,
+    notifications: Vec<(Notification, Option<Type>, Ident, Ident)>,
+) -> String {
+    let comment_box = comment_box("LspClientNotification");
     let methods = notifications
         .iter()
-        .map(|(notification, params, snake_method)| {
-            let method = &notification.method;
-            let documentation = docs(
-                Some(method.as_str()),
-                match notification.message_direction {
-                    MessageDirection::ClientToServer => "➡️ ",
-                    MessageDirection::ServerToClient => "⬅️ ",
-                    MessageDirection::Both => "➡️ ⬅️ ",
-                },
-                notification.documentation.as_deref(),
-            );
+        .map(|(_, params, pascal_method, snake_method)| {
+            let documentation =
+                format!(" @see [`{pascal_method}`](super::{NOTIFICATIONS}::{pascal_method}).");
 
             if let Some(params) = params {
                 assert!(matches!(params, Type::ReferenceType(_)));
                 let usage = usage(params, "", model);
 
                 quote! {
-                    #documentation
+                    #[doc = #documentation]
                     pub async fn #snake_method(&mut self, params: #usage) -> std::io::Result<()> {
-                        self.client.send_notification(Cow::Borrowed(#method), Some(params)).await
+                        self.client.send_notification::<#pascal_method>(params).await
                     }
                 }
             } else {
                 quote! {
-                    #documentation
+                    #[doc = #documentation]
                     pub async fn #snake_method(&mut self) -> std::io::Result<()> {
-                        self.client.send_notification::<()>(Cow::Borrowed(#method), None).await
+                        self.client.send_notification::<#pascal_method>(()).await
                     }
                 }
             }
         });
     let implementation = quote! {
-        impl<'client, W: AsyncWrite + Unpin> LspClientNotify<'client, W> {
+        impl<'client, W: AsyncWrite + Unpin> super::LspClientNotification<'client, W> {
             #(#methods)*
         }
     };
@@ -142,41 +144,45 @@ fn notification(model: &Model, notifications: Vec<(Notification, Option<Type>, I
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
-fn request(model: &Model, requests: Vec<(Request, Option<Type>, Ident)>) -> String {
+fn request(model: &Model, requests: Vec<(Request, Option<Type>, Ident, Ident)>) -> String {
     let comment_box = comment_box("LspClientRequest");
-    let methods = requests.iter().map(|(request, params, snake_method)| {
-        let method = &request.method;
-        let documentation = docs(
-            Some(method.as_str()),
-            match request.message_direction {
-                MessageDirection::ClientToServer => "↩️ ",
-                MessageDirection::ServerToClient => "↪️ ",
-                MessageDirection::Both => "↩️ ↪️ ",
-            },
-            request.documentation.as_deref(),
-        );
+    let methods = requests
+        .iter()
+        .map(|(request, params, pascal_method, snake_method)| {
+            let documentation =
+                format!(" @see [`{pascal_method}`](super::{REQUESTS}::{pascal_method}).");
+            let ok = usage(&request.result, &format!("{pascal_method}Result"), model);
+            let err = match &request.error_data {
+                Some(type_) => usage(type_, &format!("{pascal_method}Error"), model),
+                None => quote! { () },
+            };
+            let return_type = quote! {
+                std::io::Result<
+                    impl '_ + futures::Future<Output = std::io::Result<Result<#ok, Error<#err>>>>
+                >
+            };
 
-        if let Some(params) = params {
-            assert!(matches!(params, Type::ReferenceType(_)));
-            let usage = usage(params, "", model);
+            if let Some(params) = params {
+                assert!(matches!(params, Type::ReferenceType(_)));
+                let usage = usage(params, "", model);
 
-            quote! {
-                #documentation
-                pub async fn #snake_method(&mut self, params: #usage) -> std::io::Result<Id> {
-                    self.client.send_request(Cow::Borrowed(#method), Some(params)).await
+                quote! {
+                    #[doc = #documentation]
+                    pub async fn #snake_method(&mut self, params: #usage) -> #return_type {
+                        self.client.send_request::<#pascal_method>(params).await
+                    }
+                }
+            } else {
+                quote! {
+                    #[doc = #documentation]
+                    pub async fn #snake_method(&mut self) -> #return_type {
+                        self.client.send_request::<#pascal_method>(()).await
+                    }
                 }
             }
-        } else {
-            quote! {
-                #documentation
-                pub async fn #snake_method(&mut self) -> std::io::Result<Id> {
-                    self.client.send_request::<()>(Cow::Borrowed(#method), None).await
-                }
-            }
-        }
-    });
+        });
     let implementation = quote! {
-        impl<'client, W: AsyncWrite + Unpin> LspClientRequest<'client, W> {
+        impl<'client, W: AsyncWrite + Unpin> super::LspClientRequest<'client, W> {
             #(#methods)*
         }
     };
@@ -186,35 +192,32 @@ fn request(model: &Model, requests: Vec<(Request, Option<Type>, Ident)>) -> Stri
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
-fn response(model: &Model, requests: Vec<(Request, Option<Type>, Ident)>) -> String {
-    let comment_box = comment_box("LspClientRespond");
-    let methods = requests.iter().map(|(request, _, snake_method)| {
-        let method = &request.method;
-        let documentation = docs(
-            Some(method.as_str()),
-            match request.message_direction {
-                MessageDirection::ClientToServer => "↩️ ",
-                MessageDirection::ServerToClient => "↪️ ",
-                MessageDirection::Both => "↩️ ↪️ ",
-            },
-            request.documentation.as_deref(),
-        );
-        let pascal_method = pascal(&snake_method.to_string());
-        let ok = usage(&request.result, &format!("{pascal_method}Result"), model);
-        let err = match &request.error_data {
-            Some(type_) => usage(type_, &format!("{pascal_method}Error"), model),
-            None => quote! { () },
-        };
+fn response(model: &Model, requests: Vec<(Request, Option<Type>, Ident, Ident)>) -> String {
+    let comment_box = comment_box("LspClientResponse");
+    let methods = requests
+        .iter()
+        .map(|(request, _, pascal_method, snake_method)| {
+            let documentation =
+                format!(" @see [`{pascal_method}`](super::{REQUESTS}::{pascal_method}).");
+            let ok = usage(&request.result, &format!("{pascal_method}Result"), model);
+            let err = match &request.error_data {
+                Some(type_) => usage(type_, &format!("{pascal_method}Error"), model),
+                None => quote! { () },
+            };
 
-        quote! {
-            #documentation
-            pub async fn #snake_method(&mut self, id: Option<Id>, data: Result<#ok, Error<#err>>) -> std::io::Result<()> {
-                self.client.send_response(id, data).await
+            quote! {
+                #[doc = #documentation]
+                pub async fn #snake_method(
+                    &mut self,
+                    id: Option<Id>,
+                    data: Result<#ok, Error<#err>>,
+                ) -> std::io::Result<()> {
+                    self.client.send_response::<#pascal_method>(id, data).await
+                }
             }
-        }
-    });
+        });
     let implementation = quote! {
-        impl<'client, W: AsyncWrite + Unpin> LspClientRespond<'client, W> {
+        impl<'client, W: AsyncWrite + Unpin> super::LspClientResponse<'client, W> {
             #(#methods)*
         }
     };

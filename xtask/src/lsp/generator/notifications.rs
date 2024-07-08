@@ -55,6 +55,24 @@ impl<'a> Quote<&'a Notification> {
                 }),
                 "Params",
             );
+            let params_fn = if self.0.params.is_some() {
+                quote! { Some(params) }
+            } else {
+                quote! {
+                    let _ = params;
+                    None
+                }
+            };
+            let deserialize = if self.0.params.is_some() {
+                quote! {
+                    Ok(serde_json::from_value(notification.params.ok_or_else(missing_params)?)?)
+                }
+            } else {
+                quote! {
+                    debug_assert!(notification.params.is_none());
+                    Ok(())
+                }
+            };
 
             vec![
                 quote! {
@@ -67,6 +85,15 @@ impl<'a> Quote<&'a Notification> {
                         const METHOD: &'static str = #method;
                         type RegistrationOptions = #registration_options;
                         type Params = #params;
+
+                        fn params(params: Self::Params) -> Option<Self::Params> {
+                            #params_fn
+                        }
+
+                        fn deserialize(notification: Notification<Value>) -> std::io::Result<Self::Params> {
+                            debug_assert!(notification.method == #method);
+                            #deserialize
+                        }
                     }
                 },
                 registration_options_declarations,

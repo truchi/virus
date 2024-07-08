@@ -6,6 +6,13 @@ use super::*;
 //                                          RequestTrait                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+fn missing_params() -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing params")
+}
+fn missing_result() -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing result")
+}
+
 /// A trait for requests.
 pub trait RequestTrait {
     const REGISTRATION_METHOD: Option<&'static str>;
@@ -15,6 +22,12 @@ pub trait RequestTrait {
     type PartialResult: 'static + Serialize + DeserializeOwned + Send + Sync;
     type Result: 'static + Serialize + DeserializeOwned + Send + Sync;
     type Error: 'static + Serialize + DeserializeOwned + Send + Sync;
+    fn params(params: Self::Params) -> Option<Self::Params>;
+    fn error(error: Error<Self::Error>) -> Error<Self::Error>;
+    fn deserialize_request(request: Request<Value>) -> std::io::Result<Self::Params>;
+    fn deserialize_response(
+        response: Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>>;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -36,6 +49,36 @@ impl RequestTrait for CallHierarchyIncomingCalls {
     type PartialResult = Vec<super::structures::CallHierarchyIncomingCall>;
     type Result = CallHierarchyIncomingCallsResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "callHierarchy/incomingCalls");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(CallHierarchyIncomingCallsResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -64,6 +107,36 @@ impl RequestTrait for CallHierarchyOutgoingCalls {
     type PartialResult = Vec<super::structures::CallHierarchyOutgoingCall>;
     type Result = CallHierarchyOutgoingCallsResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "callHierarchy/outgoingCalls");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(CallHierarchyOutgoingCallsResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -91,6 +164,36 @@ impl RequestTrait for ClientRegisterCapability {
     type PartialResult = ();
     type Result = Null;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "client/registerCapability");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(Null))
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -111,6 +214,36 @@ impl RequestTrait for ClientUnregisterCapability {
     type PartialResult = ();
     type Result = Null;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "client/unregisterCapability");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(Null))
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -132,6 +265,34 @@ impl RequestTrait for CodeActionResolve {
     type PartialResult = ();
     type Result = super::structures::CodeAction;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "codeAction/resolve");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(serde_json::from_value(
+                response.result.ok_or_else(missing_result)?,
+            )?)
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -151,6 +312,34 @@ impl RequestTrait for CodeLensResolve {
     type PartialResult = ();
     type Result = super::structures::CodeLens;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "codeLens/resolve");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(serde_json::from_value(
+                response.result.ok_or_else(missing_result)?,
+            )?)
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -172,6 +361,34 @@ impl RequestTrait for CompletionItemResolve {
     type PartialResult = ();
     type Result = super::structures::CompletionItem;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "completionItem/resolve");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(serde_json::from_value(
+                response.result.ok_or_else(missing_result)?,
+            )?)
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -193,6 +410,34 @@ impl RequestTrait for DocumentLinkResolve {
     type PartialResult = ();
     type Result = super::structures::DocumentLink;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "documentLink/resolve");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(serde_json::from_value(
+                response.result.ok_or_else(missing_result)?,
+            )?)
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -216,6 +461,36 @@ impl RequestTrait for Initialize {
     type PartialResult = ();
     type Result = super::structures::InitializeResult;
     type Error = super::structures::InitializeError;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        error
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "initialize");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                Error::new(
+                    error.code,
+                    error.message,
+                    error.data.map(serde_json::from_value).transpose()?,
+                )
+            })
+        } else {
+            Ok(serde_json::from_value(
+                response.result.ok_or_else(missing_result)?,
+            )?)
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -239,6 +514,34 @@ impl RequestTrait for InlayHintResolve {
     type PartialResult = ();
     type Result = super::structures::InlayHint;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "inlayHint/resolve");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(serde_json::from_value(
+                response.result.ok_or_else(missing_result)?,
+            )?)
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -261,6 +564,36 @@ impl RequestTrait for Shutdown {
     type PartialResult = ();
     type Result = Null;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        let _ = params;
+        None
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "shutdown");
+        debug_assert!(request.params.is_none());
+        Ok(())
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(Null))
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -280,6 +613,36 @@ impl RequestTrait for TextDocumentCodeAction {
     type PartialResult = Vec<TextDocumentCodeActionPartialResult>;
     type Result = TextDocumentCodeActionResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/codeAction");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentCodeActionResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -319,6 +682,36 @@ impl RequestTrait for TextDocumentCodeLens {
     type PartialResult = Vec<super::structures::CodeLens>;
     type Result = TextDocumentCodeLensResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/codeLens");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentCodeLensResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -348,6 +741,34 @@ impl RequestTrait for TextDocumentColorPresentation {
     type PartialResult = Vec<super::structures::ColorPresentation>;
     type Result = Vec<super::structures::ColorPresentation>;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/colorPresentation");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(serde_json::from_value(
+                response.result.ok_or_else(missing_result)?,
+            )?)
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -383,6 +804,36 @@ impl RequestTrait for TextDocumentCompletion {
     type PartialResult = Vec<super::structures::CompletionItem>;
     type Result = TextDocumentCompletionResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/completion");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentCompletionResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -413,6 +864,36 @@ impl RequestTrait for TextDocumentDeclaration {
     type PartialResult = TextDocumentDeclarationPartialResult;
     type Result = TextDocumentDeclarationResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/declaration");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentDeclarationResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -450,6 +931,36 @@ impl RequestTrait for TextDocumentDefinition {
     type PartialResult = TextDocumentDefinitionPartialResult;
     type Result = TextDocumentDefinitionResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/definition");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentDefinitionResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -486,6 +997,36 @@ impl RequestTrait for TextDocumentDiagnostic {
     type PartialResult = super::structures::DocumentDiagnosticReportPartialResult;
     type Result = super::type_aliases::DocumentDiagnosticReport;
     type Error = super::structures::DiagnosticServerCancellationData;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        error
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/diagnostic");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                Error::new(
+                    error.code,
+                    error.message,
+                    error.data.map(serde_json::from_value).transpose()?,
+                )
+            })
+        } else {
+            Ok(serde_json::from_value(
+                response.result.ok_or_else(missing_result)?,
+            )?)
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -508,6 +1049,34 @@ impl RequestTrait for TextDocumentDocumentColor {
     type PartialResult = Vec<super::structures::ColorInformation>;
     type Result = Vec<super::structures::ColorInformation>;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/documentColor");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(serde_json::from_value(
+                response.result.ok_or_else(missing_result)?,
+            )?)
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -530,6 +1099,36 @@ impl RequestTrait for TextDocumentDocumentHighlight {
     type PartialResult = Vec<super::structures::DocumentHighlight>;
     type Result = TextDocumentDocumentHighlightResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/documentHighlight");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentDocumentHighlightResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -556,6 +1155,36 @@ impl RequestTrait for TextDocumentDocumentLink {
     type PartialResult = Vec<super::structures::DocumentLink>;
     type Result = TextDocumentDocumentLinkResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/documentLink");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentDocumentLinkResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -585,6 +1214,36 @@ impl RequestTrait for TextDocumentDocumentSymbol {
     type PartialResult = TextDocumentDocumentSymbolPartialResult;
     type Result = TextDocumentDocumentSymbolResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/documentSymbol");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentDocumentSymbolResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -622,6 +1281,36 @@ impl RequestTrait for TextDocumentFoldingRange {
     type PartialResult = Vec<super::structures::FoldingRange>;
     type Result = TextDocumentFoldingRangeResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/foldingRange");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentFoldingRangeResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -648,6 +1337,36 @@ impl RequestTrait for TextDocumentFormatting {
     type PartialResult = ();
     type Result = TextDocumentFormattingResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/formatting");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentFormattingResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -676,6 +1395,36 @@ impl RequestTrait for TextDocumentHover {
     type PartialResult = ();
     type Result = TextDocumentHoverResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/hover");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentHoverResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -704,6 +1453,36 @@ impl RequestTrait for TextDocumentImplementation {
     type PartialResult = TextDocumentImplementationPartialResult;
     type Result = TextDocumentImplementationResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/implementation");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentImplementationResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -742,6 +1521,36 @@ impl RequestTrait for TextDocumentInlayHint {
     type PartialResult = Vec<super::structures::InlayHint>;
     type Result = TextDocumentInlayHintResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/inlayHint");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentInlayHintResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -772,6 +1581,36 @@ impl RequestTrait for TextDocumentInlineValue {
     type PartialResult = Vec<super::type_aliases::InlineValue>;
     type Result = TextDocumentInlineValueResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/inlineValue");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentInlineValueResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -800,6 +1639,36 @@ impl RequestTrait for TextDocumentLinkedEditingRange {
     type PartialResult = ();
     type Result = TextDocumentLinkedEditingRangeResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/linkedEditingRange");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentLinkedEditingRangeResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -828,6 +1697,36 @@ impl RequestTrait for TextDocumentMoniker {
     type PartialResult = Vec<super::structures::Moniker>;
     type Result = TextDocumentMonikerResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/moniker");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentMonikerResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -854,6 +1753,36 @@ impl RequestTrait for TextDocumentOnTypeFormatting {
     type PartialResult = ();
     type Result = TextDocumentOnTypeFormattingResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/onTypeFormatting");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentOnTypeFormattingResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -883,6 +1812,36 @@ impl RequestTrait for TextDocumentPrepareCallHierarchy {
     type PartialResult = ();
     type Result = TextDocumentPrepareCallHierarchyResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/prepareCallHierarchy");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentPrepareCallHierarchyResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -911,6 +1870,36 @@ impl RequestTrait for TextDocumentPrepareRename {
     type PartialResult = ();
     type Result = TextDocumentPrepareRenameResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/prepareRename");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentPrepareRenameResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -940,6 +1929,36 @@ impl RequestTrait for TextDocumentPrepareTypeHierarchy {
     type PartialResult = ();
     type Result = TextDocumentPrepareTypeHierarchyResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/prepareTypeHierarchy");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentPrepareTypeHierarchyResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -966,6 +1985,36 @@ impl RequestTrait for TextDocumentRangeFormatting {
     type PartialResult = ();
     type Result = TextDocumentRangeFormattingResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/rangeFormatting");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentRangeFormattingResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -995,6 +2044,36 @@ impl RequestTrait for TextDocumentReferences {
     type PartialResult = Vec<super::structures::Location>;
     type Result = TextDocumentReferencesResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/references");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentReferencesResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1021,6 +2100,36 @@ impl RequestTrait for TextDocumentRename {
     type PartialResult = ();
     type Result = TextDocumentRenameResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/rename");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentRenameResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1050,6 +2159,36 @@ impl RequestTrait for TextDocumentSelectionRange {
     type PartialResult = Vec<super::structures::SelectionRange>;
     type Result = TextDocumentSelectionRangeResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/selectionRange");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentSelectionRangeResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1076,6 +2215,36 @@ impl RequestTrait for TextDocumentSemanticTokensFull {
     type PartialResult = super::structures::SemanticTokensPartialResult;
     type Result = TextDocumentSemanticTokensFullResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/semanticTokens/full");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentSemanticTokensFullResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1102,6 +2271,36 @@ impl RequestTrait for TextDocumentSemanticTokensFullDelta {
     type PartialResult = TextDocumentSemanticTokensFullDeltaPartialResult;
     type Result = TextDocumentSemanticTokensFullDeltaResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/semanticTokens/full/delta");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentSemanticTokensFullDeltaResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1136,6 +2335,36 @@ impl RequestTrait for TextDocumentSemanticTokensRange {
     type PartialResult = super::structures::SemanticTokensPartialResult;
     type Result = TextDocumentSemanticTokensRangeResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/semanticTokens/range");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentSemanticTokensRangeResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1162,6 +2391,36 @@ impl RequestTrait for TextDocumentSignatureHelp {
     type PartialResult = ();
     type Result = TextDocumentSignatureHelpResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/signatureHelp");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentSignatureHelpResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1190,6 +2449,36 @@ impl RequestTrait for TextDocumentTypeDefinition {
     type PartialResult = TextDocumentTypeDefinitionPartialResult;
     type Result = TextDocumentTypeDefinitionResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/typeDefinition");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentTypeDefinitionResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1229,6 +2518,36 @@ impl RequestTrait for TextDocumentWillSaveWaitUntil {
     type PartialResult = ();
     type Result = TextDocumentWillSaveWaitUntilResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "textDocument/willSaveWaitUntil");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TextDocumentWillSaveWaitUntilResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1257,6 +2576,36 @@ impl RequestTrait for TypeHierarchySubtypes {
     type PartialResult = Vec<super::structures::TypeHierarchyItem>;
     type Result = TypeHierarchySubtypesResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "typeHierarchy/subtypes");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TypeHierarchySubtypesResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1285,6 +2634,36 @@ impl RequestTrait for TypeHierarchySupertypes {
     type PartialResult = Vec<super::structures::TypeHierarchyItem>;
     type Result = TypeHierarchySupertypesResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "typeHierarchy/supertypes");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(TypeHierarchySupertypesResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1316,6 +2695,34 @@ impl RequestTrait for WindowShowDocument {
     type PartialResult = ();
     type Result = super::structures::ShowDocumentResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "window/showDocument");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(serde_json::from_value(
+                response.result.ok_or_else(missing_result)?,
+            )?)
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -1336,6 +2743,36 @@ impl RequestTrait for WindowShowMessageRequest {
     type PartialResult = ();
     type Result = WindowShowMessageRequestResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "window/showMessageRequest");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(WindowShowMessageRequestResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1363,6 +2800,36 @@ impl RequestTrait for WindowWorkDoneProgressCreate {
     type PartialResult = ();
     type Result = Null;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "window/workDoneProgress/create");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(Null))
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -1382,6 +2849,34 @@ impl RequestTrait for WorkspaceApplyEdit {
     type PartialResult = ();
     type Result = super::structures::ApplyWorkspaceEditResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "workspace/applyEdit");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(serde_json::from_value(
+                response.result.ok_or_else(missing_result)?,
+            )?)
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -1403,6 +2898,36 @@ impl RequestTrait for WorkspaceCodeLensRefresh {
     type PartialResult = ();
     type Result = Null;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        let _ = params;
+        None
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "workspace/codeLens/refresh");
+        debug_assert!(request.params.is_none());
+        Ok(())
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(Null))
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -1428,6 +2953,34 @@ impl RequestTrait for WorkspaceConfiguration {
     type PartialResult = ();
     type Result = Vec<super::type_aliases::LspAny>;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "workspace/configuration");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(serde_json::from_value(
+                response.result.ok_or_else(missing_result)?,
+            )?)
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -1449,6 +3002,36 @@ impl RequestTrait for WorkspaceDiagnostic {
     type PartialResult = super::structures::WorkspaceDiagnosticReportPartialResult;
     type Result = super::structures::WorkspaceDiagnosticReport;
     type Error = super::structures::DiagnosticServerCancellationData;
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        error
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "workspace/diagnostic");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                Error::new(
+                    error.code,
+                    error.message,
+                    error.data.map(serde_json::from_value).transpose()?,
+                )
+            })
+        } else {
+            Ok(serde_json::from_value(
+                response.result.ok_or_else(missing_result)?,
+            )?)
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -1470,6 +3053,36 @@ impl RequestTrait for WorkspaceDiagnosticRefresh {
     type PartialResult = ();
     type Result = Null;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        let _ = params;
+        None
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "workspace/diagnostic/refresh");
+        debug_assert!(request.params.is_none());
+        Ok(())
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(Null))
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -1490,6 +3103,36 @@ impl RequestTrait for WorkspaceExecuteCommand {
     type PartialResult = ();
     type Result = WorkspaceExecuteCommandResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "workspace/executeCommand");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(WorkspaceExecuteCommandResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1516,6 +3159,36 @@ impl RequestTrait for WorkspaceInlayHintRefresh {
     type PartialResult = ();
     type Result = Null;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        let _ = params;
+        None
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "workspace/inlayHint/refresh");
+        debug_assert!(request.params.is_none());
+        Ok(())
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(Null))
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -1535,6 +3208,36 @@ impl RequestTrait for WorkspaceInlineValueRefresh {
     type PartialResult = ();
     type Result = Null;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        let _ = params;
+        None
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "workspace/inlineValue/refresh");
+        debug_assert!(request.params.is_none());
+        Ok(())
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(Null))
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -1554,6 +3257,36 @@ impl RequestTrait for WorkspaceSemanticTokensRefresh {
     type PartialResult = ();
     type Result = Null;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        let _ = params;
+        None
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "workspace/semanticTokens/refresh");
+        debug_assert!(request.params.is_none());
+        Ok(())
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(Null))
+        })
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -1581,6 +3314,36 @@ impl RequestTrait for WorkspaceSymbol {
     type PartialResult = WorkspaceSymbolPartialResult;
     type Result = WorkspaceSymbolResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "workspace/symbol");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(WorkspaceSymbolResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1622,6 +3385,36 @@ impl RequestTrait for WorkspaceWillCreateFiles {
     type PartialResult = ();
     type Result = WorkspaceWillCreateFilesResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "workspace/willCreateFiles");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(WorkspaceWillCreateFilesResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1651,6 +3444,36 @@ impl RequestTrait for WorkspaceWillDeleteFiles {
     type PartialResult = ();
     type Result = WorkspaceWillDeleteFilesResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "workspace/willDeleteFiles");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(WorkspaceWillDeleteFilesResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1680,6 +3503,36 @@ impl RequestTrait for WorkspaceWillRenameFiles {
     type PartialResult = ();
     type Result = WorkspaceWillRenameFilesResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "workspace/willRenameFiles");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(WorkspaceWillRenameFilesResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1706,6 +3559,36 @@ impl RequestTrait for WorkspaceWorkspaceFolders {
     type PartialResult = ();
     type Result = WorkspaceWorkspaceFoldersResult;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        let _ = params;
+        None
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "workspace/workspaceFolders");
+        debug_assert!(request.params.is_none());
+        Ok(())
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(response
+                .result
+                .map(|result| serde_json::from_value(result))
+                .transpose()?
+                .unwrap_or(WorkspaceWorkspaceFoldersResult::Null(Null)))
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1735,4 +3618,32 @@ impl RequestTrait for WorkspaceSymbolResolve {
     type PartialResult = ();
     type Result = super::structures::WorkspaceSymbol;
     type Error = ();
+    fn params(params: Self::Params) -> Option<Self::Params> {
+        Some(params)
+    }
+    fn error(error: Error<Self::Error>) -> Error<Self::Error> {
+        debug_assert!(error.data.is_none());
+        Error::new(error.code, error.message, None)
+    }
+    fn deserialize_request(request: super::Request<Value>) -> std::io::Result<Self::Params> {
+        debug_assert!(request.method == "workspaceSymbol/resolve");
+        Ok(serde_json::from_value(
+            request.params.ok_or_else(missing_params)?,
+        )?)
+    }
+    fn deserialize_response(
+        response: super::Response<Value, Value>,
+    ) -> std::io::Result<Result<Self::Result, Error<Self::Error>>> {
+        Ok(if let Some(error) = response.error {
+            Err({
+                debug_assert!(response.result.is_none());
+                debug_assert!(error.data.is_none());
+                Error::new(error.code, error.message, None)
+            })
+        } else {
+            Ok(serde_json::from_value(
+                response.result.ok_or_else(missing_result)?,
+            )?)
+        })
+    }
 }
