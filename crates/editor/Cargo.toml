@@ -7,8 +7,10 @@ edition.workspace = true
 [dependencies]
 ignore.workspace = true
 ropey.workspace = true
+tokio.workspace = true
 tree-sitter-rust.workspace = true
 tree-sitter.workspace = true
 unicode-segmentation.workspace = true
 unicode-width.workspace = true
 virus-graphics.workspace = true
+virus-lsp.workspace = true

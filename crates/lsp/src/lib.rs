@@ -1,4 +1,5 @@
 mod client;
+mod clients;
 mod generated {
     pub mod client;
     pub mod enumerations;
@@ -26,6 +27,7 @@ mod transport {
 }
 
 pub use client::*;
+pub use clients::*;
 pub use generated::{enumerations, notifications, requests, server::*, structures, type_aliases};
 pub use transport::{Code, Error, Id};
 

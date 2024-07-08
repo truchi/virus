@@ -31,12 +31,12 @@ pub enum ServerMessage {
 //                                           LspClient                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-type State = Arc<Mutex<HashMap<Id, (Option<Response<Value, Value>>, Option<Waker>)>>>;
+type State = HashMap<Id, (Option<Response<Value, Value>>, Option<Waker>)>;
 
 pub struct LspClient<W: AsyncWrite + Unpin> {
     id: Integer,
     writer: W,
-    state: State,
+    state: Arc<Mutex<State>>,
     handle: JoinHandle<()>,
 }
 
@@ -49,7 +49,7 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
         writer: W,
         mut f: F,
     ) -> Self {
-        let state = State::default();
+        let state = Arc::new(Mutex::new(State::new()));
         let handle = tokio::spawn({
             let state = state.clone();
 
@@ -95,6 +95,17 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
             state,
             handle,
         }
+    }
+
+    pub async fn test_wait(&mut self, secs: u64) -> impl Future<Output = ()> {
+        println!("[LSP] Requesting (takes 200ms)");
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+        println!("[LSP] Waiting for response ({secs}s)");
+        futures::FutureExt::map(
+            tokio::time::sleep(std::time::Duration::from_secs(secs)),
+            move |_| println!("[LSP] Got response ({secs}s)"),
+        )
     }
 
     pub fn notification(&mut self) -> LspClientNotification<W> {

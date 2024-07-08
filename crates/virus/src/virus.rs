@@ -6,10 +6,26 @@ use crate::events::{Event, Events, Key};
 use std::{
     ops::Range,
     path::PathBuf,
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
-use virus_editor::{document::Document, editor::Editor, fuzzy::Fuzzy};
+use tokio::{process::Command, sync::mpsc::unbounded_channel};
+use virus_editor::{
+    async_actor::AsyncActor,
+    document::Document,
+    editor::{Editor, EventLoopMessage},
+    fuzzy::Fuzzy,
+};
+use virus_lsp::{
+    enumerations::PositionEncodingKind,
+    structures::{
+        ClientCapabilities, GeneralClientCapabilities, InitializeParams, InitializeParamsProcessId,
+        InitializeParamsWorkspaceFolders, WindowClientCapabilities, WorkDoneProgressParams,
+        WorkspaceFolder,
+    },
+    type_aliases::{LspAny, ProgressToken},
+    LspClients,
+};
 use virus_ui::{theme::Theme, tween::Tween, ui::Ui};
 use winit::{
     application::ApplicationHandler,
@@ -24,15 +40,16 @@ use winit::{
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 enum Handler {
-    Uninitialized,
-    Initialized(Virus),
+    Uninitialized { editor: Option<Arc<Mutex<Editor>>> },
+    Initialized { virus: Virus },
 }
 
-impl ApplicationHandler for Handler {
+impl ApplicationHandler<EventLoopMessage> for Handler {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if let Handler::Initialized(_) = self {
-            panic!("Already initialized");
-        }
+        let editor = match self {
+            Handler::Uninitialized { editor } => editor,
+            Handler::Initialized { virus } => panic!("Already initialized"),
+        };
 
         let window = event_loop
             .create_window(
@@ -44,7 +61,9 @@ impl ApplicationHandler for Handler {
             .expect("Cannot create window");
         window.set_cursor_visible(false);
 
-        *self = Handler::Initialized(Virus::new(window));
+        *self = Handler::Initialized {
+            virus: Virus::new(window, editor.take().unwrap()),
+        };
     }
 
     fn window_event(
@@ -54,8 +73,8 @@ impl ApplicationHandler for Handler {
         event: WindowEvent,
     ) {
         let virus = match self {
-            Handler::Uninitialized => panic!("Not initialized"),
-            Handler::Initialized(virus) => virus,
+            Handler::Uninitialized { .. } => panic!("Not initialized"),
+            Handler::Initialized { virus } => virus,
         };
 
         let event = match virus.events.update(&event) {
@@ -70,6 +89,10 @@ impl ApplicationHandler for Handler {
             Event::Close => virus.on_close(),
             Event::Closed => virus.on_closed(),
         }
+    }
+
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: EventLoopMessage) {
+        dbg!(event);
     }
 }
 
@@ -103,7 +126,7 @@ impl Default for Mode {
 
 pub struct Virus {
     events: Events,
-    editor: Editor,
+    editor: Arc<Mutex<Editor>>,
     mode: Mode,
     ui: Ui,
     last_render: Option<Instant>,
@@ -118,9 +141,91 @@ pub struct Virus {
 impl Virus {
     /// Runs `virus`.
     pub fn run() {
-        let event_loop = EventLoop::new().expect("Cannot create event loop");
+        let event_loop = EventLoop::<EventLoopMessage>::with_user_event()
+            .build()
+            .expect("Cannot create event loop");
+        let event_loop_proxy = event_loop.create_proxy();
+        let (lsp_actor_sender, lsp_actor_receiver) = unbounded_channel();
+        let editor = {
+            let file = PathBuf::from(std::env::args().skip(1).next().expect("File argument"));
+            let root = Editor::find_git_root(file.clone())
+                .unwrap_or_else(|| std::env::current_dir().expect("Current dir").into());
+
+            let mut editor = Editor::new(
+                root,
+                lsp_actor_sender,
+                Box::new(move |message| event_loop_proxy.send_event(message).unwrap()),
+            );
+            editor.open(file).unwrap();
+
+            Arc::new(Mutex::new(editor))
+        };
+        // let process_id = std::process::id();
+        // let initialize_params = move |options| InitializeParams {
+        //     work_done_progress_params: WorkDoneProgressParams {
+        //         work_done_token: Some(ProgressToken::String(String::from(
+        //             "Initialize work done progress token",
+        //         ))),
+        //     },
+        //     process_id: InitializeParamsProcessId::Integer(process_id as i32),
+        //     client_info: None,
+        //     locale: None,
+        //     capabilities: ClientCapabilities {
+        //         workspace: None,
+        //         text_document: None,
+        //         notebook_document: None,
+        //         window: Some(WindowClientCapabilities {
+        //             work_done_progress: Some(true),
+        //             show_message: None,
+        //             show_document: None,
+        //         }),
+        //         general: Some(GeneralClientCapabilities {
+        //             stale_request_support: None,
+        //             regular_expressions: None,
+        //             markdown: None,
+        //             position_encodings: Some(vec![PositionEncodingKind::Utf8]),
+        //         }),
+        //         experimental: None,
+        //     },
+        //     initialization_options: options,
+        //     trace: None,
+        //     workspace_folders: None,
+        // };
+        let async_actor = AsyncActor::new(
+            editor.clone(),
+            LspClients::new((
+                Command::new("rust-analyzer"),
+                // initialize_params(Some(
+                //     serde_json::from_value::<LspAny>(serde_json::json!({
+                //         "rustfmt": {
+                //             "rangeFormatting": {
+                //                 "enable": true, // Requires nightly...
+                //             },
+                //         },
+                //     }))
+                //     .unwrap(),
+                // )),
+                Box::new(|message| {}),
+            )),
+            lsp_actor_receiver,
+        );
+
+        std::thread::spawn(|| {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .expect("Tokio runtime")
+                .block_on(async {
+                    tokio::spawn(async_actor.run()).await.unwrap();
+                });
+        });
+
         event_loop.set_control_flow(ControlFlow::Wait);
-        event_loop.run_app(&mut Handler::Uninitialized).unwrap();
+        event_loop
+            .run_app(&mut Handler::Uninitialized {
+                editor: Some(editor),
+            })
+            .unwrap();
     }
 }
 
@@ -130,7 +235,7 @@ impl Virus {
     const FRAMES_PER_SECOND: u8 = 60;
     const MILLIS_PER_FRAME: u128 = 1000 / Virus::FRAMES_PER_SECOND as u128;
 
-    fn new(window: Window) -> Self {
+    fn new(window: Window, editor: Arc<Mutex<Editor>>) -> Self {
         let events = Events::new();
         let ui = Ui::new(Arc::new(window), {
             let catppuccin = virus_ui::Catppuccin::default();
@@ -173,15 +278,6 @@ impl Virus {
                 selection_insert_mode_color: insert_mode.solid().transparent(255 / 2),
             }
         });
-        let editor = {
-            let file = PathBuf::from(std::env::args().skip(1).next().expect("File argument"));
-            let root = Editor::find_git_root(file.clone())
-                .unwrap_or_else(|| std::env::current_dir().expect("Current dir").into());
-
-            let mut editor = Editor::new(root);
-            editor.open(file).unwrap();
-            editor
-        };
 
         Self {
             events,
@@ -197,6 +293,31 @@ impl Virus {
 /// Event handlers.
 impl Virus {
     fn on_key(&mut self, key: Key, event_loop: &ActiveEventLoop) {
+        println!(">>> Handling {key:?}");
+
+        match key {
+            Key::Str("1") => {
+                self.editor.lock().unwrap().test_async_actor_wait(1);
+            }
+            Key::Str("2") => {
+                self.editor.lock().unwrap().test_async_actor_wait(2);
+            }
+            Key::Str("3") => {
+                self.editor.lock().unwrap().test_async_actor_wait(3);
+            }
+            Key::Str(str) => {
+                self.editor.lock().unwrap().test_handle_input(str);
+            }
+            Key::Escape => event_loop.exit(),
+            _ => {}
+        }
+
+        println!("<<< Handled {key:?}");
+
+        return;
+
+        let editor = self.editor.lock().unwrap();
+
         if let Some((needle, files, haystacks, selected)) = &mut self.search {
             match key {
                 Key::Str("i") if self.events.command() => {
@@ -240,8 +361,8 @@ impl Virus {
                     }
                 }
                 Key::Enter => {
-                    let path = self.editor.root().join(&haystacks[*selected].0);
-                    self.editor.open(path).unwrap();
+                    let path = editor.root().join(&haystacks[*selected].0);
+                    editor.open(path).unwrap();
                     self.search = None;
                 }
                 Key::Escape => {
@@ -253,87 +374,84 @@ impl Virus {
                 Mode::Normal { select_mode } => match key {
                     Key::Str("@") if self.events.command() => event_loop.exit(),
                     Key::Str("i") => {
-                        self.editor
+                        editor
                             .active_document_mut()
                             .move_up(select_mode.is_some(), 1);
                         self.ui
-                            .ensure_visibility(self.editor.active_document().head_line());
+                            .ensure_visibility(editor.active_document().head_line());
                     }
                     Key::Str("k") => {
-                        self.editor
+                        editor
                             .active_document_mut()
                             .move_down(select_mode.is_some(), 1);
                         self.ui
-                            .ensure_visibility(self.editor.active_document().head_line());
+                            .ensure_visibility(editor.active_document().head_line());
                     }
-                    Key::Str("j") => self
-                        .editor
+                    Key::Str("j") => editor
                         .active_document_mut()
                         .move_prev_grapheme(select_mode.is_some()),
-                    Key::Str("l") => self
-                        .editor
+                    Key::Str("l") => editor
                         .active_document_mut()
                         .move_next_grapheme(select_mode.is_some()),
                     Key::Str("e") => {
-                        self.editor
+                        editor
                             .active_document_mut()
                             .move_next_end_of_word(select_mode.is_some());
                         self.ui
-                            .ensure_visibility(self.editor.active_document().head_line());
+                            .ensure_visibility(editor.active_document().head_line());
                     }
                     Key::Str("E") => {
-                        self.editor
+                        editor
                             .active_document_mut()
                             .move_prev_end_of_word(select_mode.is_some());
                         self.ui
-                            .ensure_visibility(self.editor.active_document().head_line());
+                            .ensure_visibility(editor.active_document().head_line());
                     }
                     Key::Str("w") => {
-                        self.editor
+                        editor
                             .active_document_mut()
                             .move_next_start_of_word(select_mode.is_some());
                         self.ui
-                            .ensure_visibility(self.editor.active_document().head_line());
+                            .ensure_visibility(editor.active_document().head_line());
                     }
                     Key::Str("W") => {
-                        self.editor
+                        editor
                             .active_document_mut()
                             .move_prev_start_of_word(select_mode.is_some());
                         self.ui
-                            .ensure_visibility(self.editor.active_document().head_line());
+                            .ensure_visibility(editor.active_document().head_line());
                     }
                     Key::Str("y") => {
-                        self.editor
+                        editor
                             .active_document_mut()
                             .move_up(select_mode.is_some(), 10);
                         self.ui
-                            .ensure_visibility(self.editor.active_document().head_line());
+                            .ensure_visibility(editor.active_document().head_line());
                     }
                     Key::Str("h") => {
-                        self.editor
+                        editor
                             .active_document_mut()
                             .move_down(select_mode.is_some(), 10);
                         self.ui
-                            .ensure_visibility(self.editor.active_document().head_line());
+                            .ensure_visibility(editor.active_document().head_line());
                     }
                     Key::Str("v") => match select_mode {
                         Some(SelectMode::Range) => *select_mode = Some(SelectMode::Line),
                         Some(SelectMode::Line) => {
-                            self.editor.active_document_mut().flip_anchor_and_head();
+                            editor.active_document_mut().flip_anchor_and_head();
                             *select_mode = Some(SelectMode::Range);
                         }
                         None => *select_mode = Some(SelectMode::Range),
                     },
                     Key::Str("V") => {
                         *select_mode = None;
-                        self.editor.active_document_mut().move_anchor_to_head();
+                        editor.active_document_mut().move_anchor_to_head();
                     }
                     Key::Str("s") if self.events.command() => {
-                        self.editor.active_document_mut().save().unwrap()
+                        editor.active_document_mut().save().unwrap()
                     }
                     Key::Str("/") => {
-                        let files = self
-                            .editor
+                        let files = editor
                             .files(true, false)
                             .filter_map(|file| {
                                 file.as_os_str().to_str().map(|file| file.to_owned())
@@ -350,19 +468,14 @@ impl Virus {
                 },
                 Mode::Insert => match key {
                     Key::Str("@") if self.events.command() => event_loop.exit(),
-                    Key::Str(str) => self.editor.active_document_mut().edit(str),
-                    Key::Space => self.editor.active_document_mut().edit(" "),
-                    Key::Backspace => self.editor.active_document_mut().backspace(),
-                    Key::Enter => self.editor.active_document_mut().edit("\n"),
+                    Key::Str(str) => editor.active_document_mut().edit(str),
+                    Key::Space => editor.active_document_mut().edit(" "),
+                    Key::Backspace => editor.active_document_mut().backspace(),
+                    Key::Enter => editor.active_document_mut().edit("\n"),
                     Key::Escape => {
                         self.mode = Mode::Normal {
-                            select_mode: (!self
-                                .editor
-                                .active_document()
-                                .selection()
-                                .range()
-                                .is_empty())
-                            .then_some(SelectMode::Range),
+                            select_mode: (!editor.active_document().selection().range().is_empty())
+                                .then_some(SelectMode::Range),
                         }
                     }
 
@@ -372,7 +485,7 @@ impl Virus {
         }
 
         // TODO handle that better
-        self.editor.active_document_mut().parse();
+        editor.active_document_mut().parse();
 
         // TODO handle that better
         self.ui.window().request_redraw();
@@ -403,8 +516,9 @@ impl Virus {
         let outline_normal_mode_colors = &self.ui.theme().outline_normal_mode_colors.clone();
         let outline_select_mode_colors = &self.ui.theme().outline_select_mode_colors.clone();
         let outline_insert_mode_colors = &self.ui.theme().outline_insert_mode_colors.clone();
+        let mut editor = self.editor.lock().unwrap();
         self.ui.render(
-            self.editor.active_document_mut(),
+            editor.active_document_mut(),
             matches!(
                 self.mode,
                 Mode::Normal {

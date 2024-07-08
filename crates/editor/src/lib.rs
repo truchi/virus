@@ -1,3 +1,4 @@
+pub mod async_actor;
 pub mod cursor;
 pub mod document;
 pub mod editor;
