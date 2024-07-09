@@ -1,19 +1,24 @@
 use crate::{
     notifications::NotificationTrait,
     requests::RequestTrait,
+    structures::ProgressParams,
     transport::{Message, Notification, Request, Response},
+    type_aliases::{LspAny, ProgressToken},
     Error, Id, Integer, ServerNotification, ServerRequest,
 };
 use futures::Future;
 use serde_json::Value;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io,
+    str::FromStr,
     sync::{Arc, Mutex},
     task::{Poll, Waker},
+    time::Duration,
 };
 use tokio::{
     io::{AsyncBufRead, AsyncWrite},
+    sync::watch::{channel, Receiver},
     task::JoinHandle,
 };
 
@@ -38,6 +43,7 @@ pub struct LspClient<W: AsyncWrite + Unpin> {
     writer: W,
     state: Arc<Mutex<State>>,
     handle: JoinHandle<()>,
+    progress_receiver: Receiver<Option<WorkDone>>,
 }
 
 impl<W: AsyncWrite + Unpin> LspClient<W> {
@@ -49,6 +55,7 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
         writer: W,
         mut f: F,
     ) -> Self {
+        let (progress_sender, progress_receiver) = channel(None);
         let state = Arc::new(Mutex::new(State::new()));
         let handle = tokio::spawn({
             let state = state.clone();
@@ -69,6 +76,14 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
                         }
                         Ok(Message::Notification(notification)) => {
                             f(ServerNotification::deserialize(notification)
+                                .inspect(|notification| {
+                                    match notification {
+                                        ServerNotification::Progress(progress) => Some(progress),
+                                        _ => None,
+                                    }
+                                    .and_then(|progress| WorkDone::try_from(progress).ok())
+                                    .map(|work_done| progress_sender.send(Some(work_done)).ok());
+                                })
                                 .map(ServerMessage::ServerNotification));
                         }
                         Ok(Message::Response(response)) => {
@@ -94,6 +109,35 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
             writer,
             state,
             handle,
+            progress_receiver,
+        }
+    }
+
+    pub async fn wait_for_work_done(&mut self) {
+        const DELAY_MS: u64 = 1000;
+
+        let mut tokens = HashSet::<Token>::new();
+
+        while let Ok(()) = self.progress_receiver.changed().await {
+            if let Some(work_done) = self.progress_receiver.borrow_and_update().as_ref() {
+                match work_done.kind {
+                    Kind::Begin | Kind::Report => {
+                        tokens.insert(work_done.token.clone());
+                    }
+                    Kind::End => {
+                        tokens.remove(&work_done.token);
+                    }
+                }
+            }
+
+            if tokens.is_empty() {
+                tokio::time::sleep(Duration::from_millis(DELAY_MS)).await;
+
+                match self.progress_receiver.has_changed() {
+                    Ok(true) => continue,
+                    _ => break,
+                }
+            }
         }
     }
 
@@ -213,4 +257,75 @@ pub struct LspClientRequest<'client, W: AsyncWrite + Unpin> {
 
 pub struct LspClientResponse<'client, W: AsyncWrite + Unpin> {
     pub(crate) client: &'client mut LspClient<W>,
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                            WorkDone                                            //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+// TODO It could be useful to have correctly deserialized progress backed in
+
+struct WorkDone {
+    token: Token,
+    kind: Kind,
+}
+
+impl WorkDone {
+    const KIND: &'static str = "kind";
+}
+
+impl TryFrom<&ProgressParams> for WorkDone {
+    type Error = ();
+
+    fn try_from(progress: &ProgressParams) -> Result<Self, Self::Error> {
+        let token = match &progress.token {
+            ProgressToken::Integer(integer) => Token::Integer(*integer),
+            ProgressToken::String(string) => Token::String(string.clone()),
+        };
+
+        match &progress.value {
+            LspAny::LspObject(value) => value.get(Self::KIND),
+            _ => None,
+        }
+        .and_then(|kind| match kind {
+            LspAny::String(kind) => Some(WorkDone {
+                token,
+                kind: kind.parse().ok()?,
+            }),
+            _ => None,
+        })
+        .ok_or(())
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+enum Token {
+    Integer(Integer),
+    String(String),
+}
+
+#[derive(PartialEq)]
+enum Kind {
+    Begin,
+    Report,
+    End,
+}
+
+impl Kind {
+    const BEGIN: &'static str = "begin";
+    const REPORT: &'static str = "report";
+    const END: &'static str = "end";
+}
+
+impl FromStr for Kind {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            Self::BEGIN => Ok(Self::Begin),
+            Self::REPORT => Ok(Self::Report),
+            Self::END => Ok(Self::End),
+            _ => Err(()),
+        }
+    }
 }

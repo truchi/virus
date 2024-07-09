@@ -92,7 +92,10 @@ async fn main() {
         .await
         .unwrap();
 
-    wait(10).await;
+    client.wait_for_work_done().await;
+
+    println!("DONE WAITING FOR WORK DONE, waiting some more to check");
+    wait(3).await;
 
     for _ in 0..0 {
         println!("TextDocumentDefinition");
