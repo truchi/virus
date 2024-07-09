@@ -1,54 +1,31 @@
-use crate::{async_actor::AsyncActorMessage, document::Document};
+use crate::{async_actor::AsyncActorSender, document::Document};
 use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
-use tokio::sync::mpsc::UnboundedSender;
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
 
 #[derive(Debug)]
-pub enum EventLoopMessage {
-    Test(u64),
-}
+pub enum EventLoopMessage {}
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
+pub type EventLoopSender = Box<dyn Fn(EventLoopMessage) + Send>;
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
 
 pub struct Editor {
     root: PathBuf,
     documents: Vec<Document>,
     active_document: usize,
-    async_actor_sender: UnboundedSender<AsyncActorMessage>,
-    event_loop_sender: Box<dyn Fn(EventLoopMessage) + Send>,
-}
-
-impl Editor {
-    pub fn test_handle_input(&self, str: &str) {
-        println!("Handling {str}");
-    }
-
-    pub fn test_async_actor_wait(&self, secs: u64) {
-        println!(">> Calling async actor");
-        self.async_actor_sender
-            .send(AsyncActorMessage {
-                f: Box::new(move |lsp, editor| {
-                    Box::pin(async move {
-                        println!("> Calling LSP with {secs}s");
-                        let request = lsp.lock().await.test_wait(secs).await;
-                        println!("- Waiting for {secs}s response");
-                        request.await;
-                        let editor = &editor.lock().unwrap();
-                        let root = editor.root.to_str().unwrap();
-                        println!("< After calling LSP for {secs}s, {root}");
-
-                        (editor.event_loop_sender)(EventLoopMessage::Test(secs));
-                    })
-                }),
-            })
-            .unwrap();
-        println!("<< Called async actor");
-    }
+    async_actor_sender: AsyncActorSender,
+    event_loop_sender: EventLoopSender,
 }
 
 impl Editor {
     pub fn new(
         root: PathBuf,
-        async_actor_sender: UnboundedSender<AsyncActorMessage>,
-        event_loop_sender: Box<dyn Fn(EventLoopMessage) + Send>,
+        async_actor_sender: AsyncActorSender,
+        event_loop_sender: EventLoopSender,
     ) -> Self {
         Self {
             root,

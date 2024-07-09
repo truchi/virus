@@ -1,10 +1,8 @@
 //! Winit events helper.
 
 use winit::{
-    dpi::{PhysicalPosition, PhysicalSize},
     event::{ElementState, KeyEvent, Modifiers, WindowEvent},
     keyboard::{Key as LogicalKey, ModifiersKeyState, NamedKey},
-    window::{Window, WindowId},
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -37,8 +35,6 @@ pub enum Event<'event> {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                                Events                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-const DEBUG: bool = false;
 
 #[derive(Debug)]
 pub struct Events {

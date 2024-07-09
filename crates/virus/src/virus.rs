@@ -12,27 +12,16 @@ use std::{
 use tokio::{process::Command, sync::mpsc::unbounded_channel};
 use virus_editor::{
     async_actor::AsyncActor,
-    document::Document,
     editor::{Editor, EventLoopMessage},
     fuzzy::Fuzzy,
 };
-use virus_lsp::{
-    enumerations::PositionEncodingKind,
-    structures::{
-        ClientCapabilities, GeneralClientCapabilities, InitializeParams, InitializeParamsProcessId,
-        InitializeParamsWorkspaceFolders, WindowClientCapabilities, WorkDoneProgressParams,
-        WorkspaceFolder,
-    },
-    type_aliases::{LspAny, ProgressToken},
-    LspClients,
-};
+use virus_lsp::LspClients;
 use virus_ui::{theme::Theme, tween::Tween, ui::Ui};
 use winit::{
     application::ApplicationHandler,
-    dpi::{PhysicalPosition, PhysicalSize},
     event::WindowEvent,
-    event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy},
-    window::{Fullscreen, Window, WindowAttributes, WindowId},
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
+    window::{Window, WindowId},
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -48,7 +37,7 @@ impl ApplicationHandler<EventLoopMessage> for Handler {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let editor = match self {
             Handler::Uninitialized { editor } => editor,
-            Handler::Initialized { virus } => panic!("Already initialized"),
+            Handler::Initialized { .. } => panic!("Already initialized"),
         };
 
         let window = event_loop
@@ -69,7 +58,7 @@ impl ApplicationHandler<EventLoopMessage> for Handler {
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
-        window_id: WindowId,
+        _window_id: WindowId,
         event: WindowEvent,
     ) {
         let virus = match self {
@@ -91,9 +80,7 @@ impl ApplicationHandler<EventLoopMessage> for Handler {
         }
     }
 
-    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: EventLoopMessage) {
-        dbg!(event);
-    }
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, _event: EventLoopMessage) {}
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -145,69 +132,29 @@ impl Virus {
             .build()
             .expect("Cannot create event loop");
         let event_loop_proxy = event_loop.create_proxy();
-        let (lsp_actor_sender, lsp_actor_receiver) = unbounded_channel();
+        let (async_actor_sender, async_actor_receiver) = unbounded_channel();
         let editor = {
             let file = PathBuf::from(std::env::args().skip(1).next().expect("File argument"));
             let root = Editor::find_git_root(file.clone())
-                .unwrap_or_else(|| std::env::current_dir().expect("Current dir").into());
+                .unwrap_or_else(|| std::env::current_dir().expect("Current directory").into());
 
             let mut editor = Editor::new(
                 root,
-                lsp_actor_sender,
-                Box::new(move |message| event_loop_proxy.send_event(message).unwrap()),
+                async_actor_sender.clone(),
+                Box::new(move |message| {
+                    event_loop_proxy
+                        .send_event(message)
+                        .expect("Send event loop event")
+                }),
             );
             editor.open(file).unwrap();
 
             Arc::new(Mutex::new(editor))
         };
-        // let process_id = std::process::id();
-        // let initialize_params = move |options| InitializeParams {
-        //     work_done_progress_params: WorkDoneProgressParams {
-        //         work_done_token: Some(ProgressToken::String(String::from(
-        //             "Initialize work done progress token",
-        //         ))),
-        //     },
-        //     process_id: InitializeParamsProcessId::Integer(process_id as i32),
-        //     client_info: None,
-        //     locale: None,
-        //     capabilities: ClientCapabilities {
-        //         workspace: None,
-        //         text_document: None,
-        //         notebook_document: None,
-        //         window: Some(WindowClientCapabilities {
-        //             work_done_progress: Some(true),
-        //             show_message: None,
-        //             show_document: None,
-        //         }),
-        //         general: Some(GeneralClientCapabilities {
-        //             stale_request_support: None,
-        //             regular_expressions: None,
-        //             markdown: None,
-        //             position_encodings: Some(vec![PositionEncodingKind::Utf8]),
-        //         }),
-        //         experimental: None,
-        //     },
-        //     initialization_options: options,
-        //     trace: None,
-        //     workspace_folders: None,
-        // };
         let async_actor = AsyncActor::new(
             editor.clone(),
-            LspClients::new((
-                Command::new("rust-analyzer"),
-                // initialize_params(Some(
-                //     serde_json::from_value::<LspAny>(serde_json::json!({
-                //         "rustfmt": {
-                //             "rangeFormatting": {
-                //                 "enable": true, // Requires nightly...
-                //             },
-                //         },
-                //     }))
-                //     .unwrap(),
-                // )),
-                Box::new(|message| {}),
-            )),
-            lsp_actor_receiver,
+            LspClients::new((Command::new("rust-analyzer"), Box::new(move |_message| {}))),
+            async_actor_receiver,
         );
 
         std::thread::spawn(|| {
@@ -216,8 +163,10 @@ impl Virus {
                 .build()
                 .expect("Tokio runtime")
                 .block_on(async {
-                    tokio::spawn(async_actor.run()).await.unwrap();
-                });
+                    tokio::spawn(async_actor.run())
+                        .await
+                        .expect("AsyncActor::run");
+                })
         });
 
         event_loop.set_control_flow(ControlFlow::Wait);
@@ -293,30 +242,7 @@ impl Virus {
 /// Event handlers.
 impl Virus {
     fn on_key(&mut self, key: Key, event_loop: &ActiveEventLoop) {
-        println!(">>> Handling {key:?}");
-
-        match key {
-            Key::Str("1") => {
-                self.editor.lock().unwrap().test_async_actor_wait(1);
-            }
-            Key::Str("2") => {
-                self.editor.lock().unwrap().test_async_actor_wait(2);
-            }
-            Key::Str("3") => {
-                self.editor.lock().unwrap().test_async_actor_wait(3);
-            }
-            Key::Str(str) => {
-                self.editor.lock().unwrap().test_handle_input(str);
-            }
-            Key::Escape => event_loop.exit(),
-            _ => {}
-        }
-
-        println!("<<< Handled {key:?}");
-
-        return;
-
-        let editor = self.editor.lock().unwrap();
+        let mut editor = self.editor.lock().unwrap();
 
         if let Some((needle, files, haystacks, selected)) = &mut self.search {
             match key {
@@ -496,7 +422,7 @@ impl Virus {
         self.on_redraw(event_loop);
     }
 
-    fn on_redraw(&mut self, event_loop: &ActiveEventLoop) {
+    fn on_redraw(&mut self, _event_loop: &ActiveEventLoop) {
         let now = Instant::now();
         let delta = if let Some(delta) = self.last_render.map(|last_render| now - last_render) {
             if delta.as_millis() < Self::MILLIS_PER_FRAME {

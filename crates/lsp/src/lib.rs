@@ -33,6 +33,10 @@ pub use transport::{Code, Error, Id};
 
 use serde::{Deserialize, Serialize};
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                           Base Types                                           //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
 /// Integer type.
 pub type Integer = i32;
 /// Unsigned integer type.
@@ -43,6 +47,8 @@ pub type Decimal = f32;
 pub type Uri = String;
 /// Document URI type.
 pub type DocumentUri = Uri;
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
 
 /// Null type.
 #[derive(Clone, PartialEq, Default, Debug)]

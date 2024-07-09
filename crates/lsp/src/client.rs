@@ -43,7 +43,7 @@ pub struct LspClient<W: AsyncWrite + Unpin> {
     writer: W,
     state: Arc<Mutex<State>>,
     handle: JoinHandle<()>,
-    progress_receiver: Receiver<Option<WorkDone>>,
+    work_done_receiver: Receiver<Option<WorkDone>>,
 }
 
 impl<W: AsyncWrite + Unpin> LspClient<W> {
@@ -53,9 +53,9 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
     >(
         mut reader: R,
         writer: W,
-        mut f: F,
+        mut handler: F,
     ) -> Self {
-        let (progress_sender, progress_receiver) = channel(None);
+        let (work_done_sender, work_done_receiver) = channel(None);
         let state = Arc::new(Mutex::new(State::new()));
         let handle = tokio::spawn({
             let state = state.clone();
@@ -71,20 +71,28 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
 
                     match message {
                         Ok(Message::Request(request)) => {
-                            f(ServerRequest::deserialize(request)
-                                .map(ServerMessage::ServerRequest));
+                            handler(
+                                ServerRequest::deserialize(request)
+                                    .map(ServerMessage::ServerRequest),
+                            );
                         }
                         Ok(Message::Notification(notification)) => {
-                            f(ServerNotification::deserialize(notification)
-                                .inspect(|notification| {
-                                    match notification {
-                                        ServerNotification::Progress(progress) => Some(progress),
-                                        _ => None,
-                                    }
-                                    .and_then(|progress| WorkDone::try_from(progress).ok())
-                                    .map(|work_done| progress_sender.send(Some(work_done)).ok());
-                                })
-                                .map(ServerMessage::ServerNotification));
+                            handler(
+                                ServerNotification::deserialize(notification)
+                                    .inspect(|notification| {
+                                        match notification {
+                                            ServerNotification::Progress(progress) => {
+                                                Some(progress)
+                                            }
+                                            _ => None,
+                                        }
+                                        .and_then(|progress| WorkDone::try_from(progress).ok())
+                                        .map(|work_done| {
+                                            work_done_sender.send(Some(work_done)).ok()
+                                        });
+                                    })
+                                    .map(ServerMessage::ServerNotification),
+                            );
                         }
                         Ok(Message::Response(response)) => {
                             let id = response.id.as_ref().expect("Response id");
@@ -98,7 +106,7 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
                                 waker.wake();
                             }
                         }
-                        Err(err) => f(Err(err)),
+                        Err(err) => handler(Err(err)),
                     }
                 }
             }
@@ -109,7 +117,7 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
             writer,
             state,
             handle,
-            progress_receiver,
+            work_done_receiver,
         }
     }
 
@@ -118,8 +126,8 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
 
         let mut tokens = HashSet::<Token>::new();
 
-        while let Ok(()) = self.progress_receiver.changed().await {
-            if let Some(work_done) = self.progress_receiver.borrow_and_update().as_ref() {
+        while let Ok(()) = self.work_done_receiver.changed().await {
+            if let Some(work_done) = self.work_done_receiver.borrow_and_update().as_ref() {
                 match work_done.kind {
                     Kind::Begin | Kind::Report => {
                         tokens.insert(work_done.token.clone());
@@ -133,23 +141,12 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
             if tokens.is_empty() {
                 tokio::time::sleep(Duration::from_millis(DELAY_MS)).await;
 
-                match self.progress_receiver.has_changed() {
+                match self.work_done_receiver.has_changed() {
                     Ok(true) => continue,
                     _ => break,
                 }
             }
         }
-    }
-
-    pub async fn test_wait(&mut self, secs: u64) -> impl Future<Output = ()> {
-        println!("[LSP] Requesting (takes 200ms)");
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-
-        println!("[LSP] Waiting for response ({secs}s)");
-        futures::FutureExt::map(
-            tokio::time::sleep(std::time::Duration::from_secs(secs)),
-            move |_| println!("[LSP] Got response ({secs}s)"),
-        )
     }
 
     pub fn notification(&mut self) -> LspClientNotification<W> {
@@ -298,11 +295,15 @@ impl TryFrom<&ProgressParams> for WorkDone {
     }
 }
 
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 enum Token {
     Integer(Integer),
     String(String),
 }
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
 
 #[derive(PartialEq)]
 enum Kind {
