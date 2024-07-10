@@ -19,8 +19,6 @@ use virus_lsp::{
 //                                              Lsp                                               //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-const ASYNC_ACTOR_SEND_FAIL: &'static str = "Failed to send to async actor";
-
 pub struct Lsp<'editor> {
     pub editor: &'editor mut Editor,
 }
@@ -30,60 +28,51 @@ impl<'editor> Lsp<'editor> {
         let process_id = std::process::id() as i32;
 
         self.editor
-            .async_actor
-            .send(Box::new(|editor| {
-                Box::pin(rust_lsp_handler(editor, rust_receiver))
-            }))
-            .expect(ASYNC_ACTOR_SEND_FAIL);
+            .async_actor(|editor| rust_lsp_handler(editor, rust_receiver));
 
-        self.editor
-            .async_actor
-            .send(Box::new(move |editor| {
-                Box::pin(async move {
-                    let (client, folder) = {
-                        let mut editor = editor.lock().unwrap();
-                        let root = editor.root();
-                        let folder = WorkspaceFolder {
-                            uri: format!("file://{}", root.to_owned().to_str().unwrap()),
-                            name: match root.components().last() {
-                                Some(Component::Normal(str)) => str.to_str().unwrap().to_owned(),
-                                _ => panic!(),
+        self.editor.async_actor(move |editor| async move {
+            let (client, folder) = {
+                let mut editor = editor.lock().unwrap();
+                let root = editor.root();
+                let folder = WorkspaceFolder {
+                    uri: format!("file://{}", root.to_owned().to_str().unwrap()),
+                    name: match root.components().last() {
+                        Some(Component::Normal(str)) => str.to_str().unwrap().to_owned(),
+                        _ => panic!(),
+                    },
+                };
+
+                (editor.lsps.rust(), folder)
+            };
+
+            let mut client = client.lock().await;
+            let result = client
+                .request()
+                .initialize(initialize_params(
+                    process_id,
+                    String::from("Initialize work done progress token"),
+                    Some(serde_json::json!({
+                        "rustfmt": {
+                            "rangeFormatting": {
+                                "enable": true, // Requires nightly...
                             },
-                        };
-
-                        (editor.lsps.rust(), folder)
-                    };
-
-                    let mut client = client.lock().await;
-                    let result = client
-                        .request()
-                        .initialize(initialize_params(
-                            process_id,
-                            String::from("Initialize work done progress token"),
-                            Some(serde_json::json!({
-                                "rustfmt": {
-                                    "rangeFormatting": {
-                                        "enable": true, // Requires nightly...
-                                    },
-                                },
-                            })),
-                            folder,
-                        ))
-                        .await
-                        .unwrap()
-                        .await
-                        .unwrap()
-                        .unwrap();
-                    client
-                        .notification()
-                        .initialized(InitializedParams {})
-                        .await
-                        .unwrap();
-                    client.wait_for_work_done().await;
-                    client.init(result);
-                })
-            }))
-            .expect(ASYNC_ACTOR_SEND_FAIL);
+                        },
+                    })),
+                    folder,
+                ))
+                .await
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap();
+            client
+                .notification()
+                .initialized(InitializedParams {})
+                .await
+                .unwrap();
+            client.wait_for_work_done().await;
+            client.init(result);
+        });
 
         self
     }

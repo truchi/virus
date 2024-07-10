@@ -10,20 +10,11 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 //                                       AsyncActorFunction                                       //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+pub type AsyncActorSender = UnboundedSender<AsyncActorFunction>;
+pub type AsyncActorReceiver = UnboundedReceiver<AsyncActorFunction>;
+
 pub type AsyncActorFunction =
     Box<dyn FnOnce(Arc<Mutex<Editor>>) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send>;
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                        AsyncActorSender                                        //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-pub type AsyncActorSender = UnboundedSender<AsyncActorFunction>;
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                       AsyncActorReceiver                                       //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-pub type AsyncActorReceiver = UnboundedReceiver<AsyncActorFunction>;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           AsyncActor                                           //

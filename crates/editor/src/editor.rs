@@ -1,6 +1,10 @@
 use crate::{async_actor::AsyncActorSender, document::Document, lsp::Lsp};
 use ignore::WalkBuilder;
-use std::path::{Path, PathBuf};
+use std::{
+    future::Future,
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+};
 use tokio::{process::Command, sync::mpsc::unbounded_channel};
 use virus_lsp::LspClients;
 
@@ -131,5 +135,15 @@ impl Editor {
 impl Editor {
     fn lsp(&mut self) -> Lsp {
         Lsp { editor: self }
+    }
+
+    pub(crate) fn async_actor<F, Fut>(&self, function: F)
+    where
+        F: 'static + Send + FnOnce(Arc<Mutex<Editor>>) -> Fut,
+        Fut: 'static + Send + Future<Output = ()>,
+    {
+        self.async_actor
+            .send(Box::new(|editor| Box::pin(function(editor))))
+            .expect("Failed to send to async actor");
     }
 }
