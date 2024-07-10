@@ -5,14 +5,14 @@ use std::{
     sync::{Arc, Mutex},
 };
 use virus_lsp::{
-    enumerations::PositionEncodingKind,
+    enumerations::{PositionEncodingKind, TraceValues},
     structures::{
         ClientCapabilities, GeneralClientCapabilities, InitializeParams, InitializeParamsProcessId,
         InitializeParamsWorkspaceFolders, InitializedParams, WindowClientCapabilities,
         WorkDoneProgressParams, WorkspaceFolder,
     },
     type_aliases::ProgressToken,
-    ServerMessageReceiver,
+    ServerMessage, ServerMessageReceiver, ServerNotification, ServerRequest,
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -53,8 +53,9 @@ impl<'editor> Lsp<'editor> {
 
                         (editor.lsps.rust(), folder)
                     };
+
                     let mut client = client.lock().await;
-                    let response = client
+                    let result = client
                         .request()
                         .initialize(initialize_params(
                             process_id,
@@ -73,14 +74,13 @@ impl<'editor> Lsp<'editor> {
                         .await
                         .unwrap()
                         .unwrap();
-
-                    dbg!(&response);
-
                     client
                         .notification()
                         .initialized(InitializedParams {})
                         .await
                         .unwrap();
+                    client.wait_for_work_done().await;
+                    client.init(result);
                 })
             }))
             .expect(ASYNC_ACTOR_SEND_FAIL);
@@ -93,7 +93,34 @@ impl<'editor> Lsp<'editor> {
 
 async fn rust_lsp_handler(_editor: Arc<Mutex<Editor>>, mut receiver: ServerMessageReceiver) {
     while let Some(message) = receiver.recv().await {
-        dbg!(message);
+        match message {
+            ServerMessage::ServerNotification(notification) => match notification {
+                ServerNotification::CancelRequest(_) => {}
+                ServerNotification::LogTrace(trace) => {
+                    dbg!(trace);
+                }
+                ServerNotification::Progress(_) => {}
+                ServerNotification::TelemetryEvent(_) => {}
+                ServerNotification::TextDocumentPublishDiagnostics(_) => {}
+                ServerNotification::WindowLogMessage(_) => {}
+                ServerNotification::WindowShowMessage(_) => {}
+            },
+            ServerMessage::ServerRequest(request) => match request {
+                ServerRequest::ClientRegisterCapability(_, _) => {}
+                ServerRequest::ClientUnregisterCapability(_, _) => {}
+                ServerRequest::WindowShowDocument(_, _) => {}
+                ServerRequest::WindowShowMessageRequest(_, _) => {}
+                ServerRequest::WindowWorkDoneProgressCreate(_, _) => {}
+                ServerRequest::WorkspaceApplyEdit(_, _) => {}
+                ServerRequest::WorkspaceCodeLensRefresh(_) => {}
+                ServerRequest::WorkspaceConfiguration(_, _) => {}
+                ServerRequest::WorkspaceDiagnosticRefresh(_) => {}
+                ServerRequest::WorkspaceInlayHintRefresh(_) => {}
+                ServerRequest::WorkspaceInlineValueRefresh(_) => {}
+                ServerRequest::WorkspaceSemanticTokensRefresh(_) => {}
+                ServerRequest::WorkspaceWorkspaceFolders(_) => {}
+            },
+        }
     }
 }
 
@@ -128,7 +155,7 @@ fn initialize_params(
             experimental: None,
         },
         initialization_options: options.map(|options| serde_json::from_value(options).unwrap()),
-        trace: None,
+        trace: Some(TraceValues::Messages),
         workspace_folders: Some(InitializeParamsWorkspaceFolders::WorkspaceFolderList(vec![
             folder,
         ])),

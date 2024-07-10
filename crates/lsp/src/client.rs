@@ -1,7 +1,7 @@
 use crate::{
     notifications::NotificationTrait,
     requests::RequestTrait,
-    structures::ProgressParams,
+    structures::{InitializeResult, ProgressParams},
     transport::{Message, Notification, Request, Response},
     type_aliases::{LspAny, ProgressToken},
     Error, Id, Integer, ServerNotification, ServerRequest,
@@ -21,7 +21,7 @@ use tokio::{
     process::ChildStdin,
     sync::{
         mpsc::{UnboundedReceiver, UnboundedSender},
-        watch::{channel, Receiver},
+        watch::{channel, Receiver, Sender},
     },
     task::JoinHandle,
 };
@@ -30,23 +30,14 @@ use tokio::{
 //                                         ServerMessage                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+pub type ServerMessageSender = UnboundedSender<ServerMessage>;
+pub type ServerMessageReceiver = UnboundedReceiver<ServerMessage>;
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum ServerMessage {
     ServerNotification(ServerNotification),
     ServerRequest(ServerRequest),
 }
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                      ServerMessageSender                                       //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-pub type ServerMessageSender = UnboundedSender<ServerMessage>;
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                     ServerMessageReceiver                                      //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-pub type ServerMessageReceiver = UnboundedReceiver<ServerMessage>;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           LspClient                                            //
@@ -60,6 +51,8 @@ pub struct LspClient<W: AsyncWrite + Unpin = ChildStdin> {
     state: Arc<Mutex<State>>,
     handle: JoinHandle<()>,
     work_done_receiver: Receiver<Option<WorkDone>>,
+    initialize_result_sender: Sender<Option<InitializeResult>>,
+    initialize_result_receiver: Receiver<Option<InitializeResult>>,
 }
 
 impl<W: AsyncWrite + Unpin> LspClient<W> {
@@ -69,6 +62,7 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
         server_message_sender: ServerMessageSender,
     ) -> Self {
         let (work_done_sender, work_done_receiver) = channel(None);
+        let (initialize_result_sender, initialize_result_receiver) = channel(None);
         let state = Arc::new(Mutex::new(State::new()));
         let handle = tokio::spawn({
             let state = state.clone();
@@ -103,7 +97,11 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
                                 _ => None,
                             }
                             .and_then(|progress| WorkDone::try_from(progress).ok())
-                            .map(|work_done| work_done_sender.send(Some(work_done)).ok());
+                            .map(|work_done| {
+                                work_done_sender
+                                    .send(Some(work_done))
+                                    .expect("Work done receiver")
+                            });
 
                             server_message_sender
                                 .send(ServerMessage::ServerNotification(notification))
@@ -132,7 +130,24 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
             state,
             handle,
             work_done_receiver,
+            initialize_result_sender,
+            initialize_result_receiver,
         }
+    }
+
+    pub fn init(&self, initialize_result: InitializeResult) {
+        self.initialize_result_sender
+            .send(Some(initialize_result))
+            .expect("Initialize result receiver");
+    }
+
+    pub async fn initied(&mut self) -> InitializeResult {
+        self.initialize_result_receiver
+            .wait_for(|initialize_result| initialize_result.is_some())
+            .await
+            .expect("Initialize result sender")
+            .clone()
+            .unwrap()
     }
 
     pub async fn wait_for_work_done(&mut self) {
@@ -140,25 +155,27 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
 
         let mut tokens = HashSet::<Token>::new();
 
-        while let Ok(()) = self.work_done_receiver.changed().await {
-            if let Some(work_done) = self.work_done_receiver.borrow_and_update().as_ref() {
-                match work_done.kind {
-                    Kind::Begin | Kind::Report => {
-                        tokens.insert(work_done.token.clone());
+        loop {
+            self.work_done_receiver
+                .wait_for(|work_done| {
+                    if let Some(work_done) = work_done {
+                        match work_done.kind {
+                            Kind::Begin | Kind::Report => tokens.insert(work_done.token.clone()),
+                            Kind::End => tokens.remove(&work_done.token),
+                        };
                     }
-                    Kind::End => {
-                        tokens.remove(&work_done.token);
-                    }
-                }
-            }
 
-            if tokens.is_empty() {
-                tokio::time::sleep(Duration::from_millis(DELAY_MS)).await;
+                    tokens.is_empty()
+                })
+                .await
+                .expect("Work done sender");
 
-                match self.work_done_receiver.has_changed() {
-                    Ok(true) => continue,
-                    _ => break,
-                }
+            tokio::time::sleep(Duration::from_millis(DELAY_MS)).await;
+
+            if let Ok(true) = self.work_done_receiver.has_changed() {
+                continue;
+            } else {
+                break;
             }
         }
     }
