@@ -15,7 +15,6 @@ use virus_editor::{
     editor::{Editor, EventLoopMessage},
     fuzzy::Fuzzy,
 };
-use virus_lsp::LspClients;
 use virus_ui::{theme::Theme, tween::Tween, ui::Ui};
 use winit::{
     application::ApplicationHandler,
@@ -132,7 +131,6 @@ impl Virus {
             .build()
             .expect("Cannot create event loop");
         let event_loop_proxy = event_loop.create_proxy();
-        let (rust_server_message_sender, rust_server_message_receiver) = unbounded_channel();
         let (async_actor_sender, async_actor_receiver) = unbounded_channel();
         let editor = {
             let file = PathBuf::from(std::env::args().skip(1).next().expect("File argument"));
@@ -140,24 +138,20 @@ impl Virus {
                 .unwrap_or_else(|| std::env::current_dir().expect("Current directory").into());
             let mut editor = Editor::new(
                 root,
-                async_actor_sender.clone(),
+                (Command::new("rust-analyzer"),),
+                async_actor_sender,
                 Box::new(move |message| {
                     event_loop_proxy
                         .send_event(message)
                         .expect("Send event loop event")
                 }),
-            )
-            .init_lsp_handlers(rust_server_message_receiver);
+            );
 
             editor.open(file).unwrap();
 
             Arc::new(Mutex::new(editor))
         };
-        let async_actor = AsyncActor::new(
-            editor.clone(),
-            LspClients::new((Command::new("rust-analyzer"), rust_server_message_sender)),
-            async_actor_receiver,
-        );
+        let async_actor = AsyncActor::new(editor.clone(), async_actor_receiver);
 
         std::thread::spawn(|| {
             tokio::runtime::Builder::new_multi_thread()

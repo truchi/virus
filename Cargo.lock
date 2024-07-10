@@ -1945,8 +1945,6 @@ name = "virus"
 version = "0.1.0"
 dependencies = [
  "editor",
- "lsp",
- "serde_json",
  "tokio",
  "ui",
  "winit",

@@ -4,8 +4,10 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
-use tokio::sync::Mutex as IoMutex;
-use virus_lsp::{LspClient, ServerMessageReceiver};
+use tokio::{process::Command, sync::mpsc::unbounded_channel};
+use virus_lsp::{LspClients, ServerMessageReceiver};
+
+const ASYNC_ACTOR_SEND_FAIL: &'static str = "Failed to send to async actor";
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
@@ -22,29 +24,30 @@ pub struct Editor {
     root: PathBuf,
     documents: Vec<Document>,
     active_document: usize,
+    _lsps: LspClients,
     async_actor: AsyncActorSender,
     _event_loop: EventLoopSender,
 }
 
 impl Editor {
-    pub fn new(root: PathBuf, async_actor: AsyncActorSender, event_loop: EventLoopSender) -> Self {
+    pub fn new(
+        root: PathBuf,
+        (rust_lsp,): (Command,),
+        async_actor: AsyncActorSender,
+        event_loop: EventLoopSender,
+    ) -> Self {
+        let (rust_server_message_sender, rust_server_message_receiver) = unbounded_channel();
+        let lsps = LspClients::new((rust_lsp, rust_server_message_sender));
+
         Self {
             root,
             documents: Default::default(),
             active_document: 0,
+            _lsps: lsps,
             async_actor,
             _event_loop: event_loop,
         }
-    }
-
-    pub fn init_lsp_handlers(self, rust_receiver: ServerMessageReceiver) -> Self {
-        self.async_actor
-            .send(Box::new(|editor, rust_client| {
-                Box::pin(Self::rust_lsp_handler(editor, rust_client, rust_receiver))
-            }))
-            .expect("Send to async actor");
-
-        self
+        .init_lsps(rust_server_message_receiver)
     }
 
     pub fn root(&self) -> &Path {
@@ -129,13 +132,19 @@ impl Editor {
     }
 }
 
-/// LSP server message handlers.
+/// Private: LSPs.
 impl Editor {
-    async fn rust_lsp_handler(
-        _editor: Arc<Mutex<Self>>,
-        _client: Arc<IoMutex<LspClient>>,
-        mut receiver: ServerMessageReceiver,
-    ) {
+    fn init_lsps(self, rust_receiver: ServerMessageReceiver) -> Self {
+        self.async_actor
+            .send(Box::new(|editor| {
+                Box::pin(Self::rust_lsp_handler(editor, rust_receiver))
+            }))
+            .expect(ASYNC_ACTOR_SEND_FAIL);
+
+        self
+    }
+
+    async fn rust_lsp_handler(_editor: Arc<Mutex<Self>>, mut receiver: ServerMessageReceiver) {
         while let Some(_message) = receiver.recv().await {
             // TODO
         }

@@ -5,9 +5,7 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
-serde_json.workspace = true
 tokio.workspace = true
 virus-editor.workspace = true
-virus-lsp.workspace = true
 virus-ui.workspace = true
 winit.workspace = true
