@@ -132,12 +132,12 @@ impl Virus {
             .build()
             .expect("Cannot create event loop");
         let event_loop_proxy = event_loop.create_proxy();
+        let (rust_server_message_sender, rust_server_message_receiver) = unbounded_channel();
         let (async_actor_sender, async_actor_receiver) = unbounded_channel();
         let editor = {
             let file = PathBuf::from(std::env::args().skip(1).next().expect("File argument"));
             let root = Editor::find_git_root(file.clone())
                 .unwrap_or_else(|| std::env::current_dir().expect("Current directory").into());
-
             let mut editor = Editor::new(
                 root,
                 async_actor_sender.clone(),
@@ -146,14 +146,16 @@ impl Virus {
                         .send_event(message)
                         .expect("Send event loop event")
                 }),
-            );
+            )
+            .init_lsp_handlers(rust_server_message_receiver);
+
             editor.open(file).unwrap();
 
             Arc::new(Mutex::new(editor))
         };
         let async_actor = AsyncActor::new(
             editor.clone(),
-            LspClients::new((Command::new("rust-analyzer"), Box::new(move |_message| {}))),
+            LspClients::new((Command::new("rust-analyzer"), rust_server_message_sender)),
             async_actor_receiver,
         );
 

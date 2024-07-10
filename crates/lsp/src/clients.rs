@@ -1,50 +1,46 @@
-use crate::{LspClient, ServerMessage};
-use std::{io, process::Stdio, sync::Arc};
-use tokio::{
-    io::BufReader,
-    process::{ChildStdin, Command},
-    sync::Mutex,
-};
+use crate::{LspClient, ServerMessageSender};
+use std::{process::Stdio, sync::Arc};
+use tokio::{io::BufReader, process::Command, sync::Mutex};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           LspClients                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-type Handler = Box<dyn FnMut(io::Result<ServerMessage>) + Send>;
-
-// ────────────────────────────────────────────────────────────────────────────────────────────── //
-
 // TODO handle dead children
-enum LspClientState {
+enum State {
     None {
         command: Option<Command>,
-        handler: Option<Handler>,
+        server_message_sender: Option<ServerMessageSender>,
     },
     Initialized {
-        client: Arc<Mutex<LspClient<ChildStdin>>>,
+        client: Arc<Mutex<LspClient>>,
     },
 }
 
-// ────────────────────────────────────────────────────────────────────────────────────────────── //
-
 pub struct LspClients {
-    rust: LspClientState,
+    rust: State,
 }
 
 impl LspClients {
-    pub fn new((rust_command, rust_handler): (Command, Handler)) -> Self {
+    pub fn new((rust_command, rust_server_message_sender): (Command, ServerMessageSender)) -> Self {
         Self {
-            rust: LspClientState::None {
+            rust: State::None {
                 command: Some(rust_command),
-                handler: Some(rust_handler),
+                server_message_sender: Some(rust_server_message_sender),
             },
         }
     }
 
-    pub fn rust(&mut self) -> Arc<Mutex<LspClient<ChildStdin>>> {
+    pub fn rust(&mut self) -> Arc<Mutex<LspClient>> {
         match &mut self.rust {
-            LspClientState::None { command, handler } => {
-                let (mut command, handler) = (command.take().unwrap(), handler.take().unwrap());
+            State::None {
+                command,
+                server_message_sender,
+            } => {
+                let (mut command, server_message_sender) = (
+                    command.take().unwrap(),
+                    server_message_sender.take().unwrap(),
+                );
                 let mut child = command
                     .stdin(Stdio::piped())
                     .stdout(Stdio::piped())
@@ -54,15 +50,15 @@ impl LspClients {
                     child.stdin.take().expect("Child stdin"),
                     child.stdout.take().expect("Child stdout"),
                 );
-                let client = LspClient::new(BufReader::new(stdout), stdin, handler);
+                let client = LspClient::new(BufReader::new(stdout), stdin, server_message_sender);
                 let client = Arc::new(Mutex::new(client));
                 let clone = client.clone();
 
-                self.rust = LspClientState::Initialized { client };
+                self.rust = State::Initialized { client };
 
                 clone
             }
-            LspClientState::Initialized { client } => client.clone(),
+            State::Initialized { client } => client.clone(),
         }
     }
 }

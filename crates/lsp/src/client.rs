@@ -18,7 +18,11 @@ use std::{
 };
 use tokio::{
     io::{AsyncBufRead, AsyncWrite},
-    sync::watch::{channel, Receiver},
+    process::ChildStdin,
+    sync::{
+        mpsc::{UnboundedReceiver, UnboundedSender},
+        watch::{channel, Receiver},
+    },
     task::JoinHandle,
 };
 
@@ -33,12 +37,24 @@ pub enum ServerMessage {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                      ServerMessageSender                                       //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub type ServerMessageSender = UnboundedSender<ServerMessage>;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                     ServerMessageReceiver                                      //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub type ServerMessageReceiver = UnboundedReceiver<ServerMessage>;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           LspClient                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 type State = HashMap<Id, (Option<Response<Value, Value>>, Option<Waker>)>;
 
-pub struct LspClient<W: AsyncWrite + Unpin> {
+pub struct LspClient<W: AsyncWrite + Unpin = ChildStdin> {
     id: Integer,
     writer: W,
     state: Arc<Mutex<State>>,
@@ -47,13 +63,10 @@ pub struct LspClient<W: AsyncWrite + Unpin> {
 }
 
 impl<W: AsyncWrite + Unpin> LspClient<W> {
-    pub fn new<
-        R: 'static + AsyncBufRead + Send + Unpin,
-        F: FnMut(io::Result<ServerMessage>) + Send + 'static,
-    >(
+    pub fn new<R: AsyncBufRead + Send + Unpin + 'static>(
         mut reader: R,
         writer: W,
-        mut handler: F,
+        server_message_sender: ServerMessageSender,
     ) -> Self {
         let (work_done_sender, work_done_receiver) = channel(None);
         let state = Arc::new(Mutex::new(State::new()));
@@ -63,38 +76,40 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
             async move {
                 loop {
                     let message = match Message::<Value, Value>::read(&mut reader).await {
-                        Err(err) if err.kind() == io::ErrorKind::UnexpectedEof => {
+                        Ok(message) => message,
+                        Err(err) => {
+                            dbg!(err);
                             break;
                         }
-                        message => message,
                     };
 
                     match message {
-                        Ok(Message::Request(request)) => {
-                            handler(
+                        Message::Request(request) => {
+                            let request = ServerMessage::ServerRequest(
                                 ServerRequest::deserialize(request)
-                                    .map(ServerMessage::ServerRequest),
+                                    .expect("ServerRequest::deserialize"),
                             );
+
+                            server_message_sender
+                                .send(request)
+                                .expect("Send server message");
                         }
-                        Ok(Message::Notification(notification)) => {
-                            handler(
-                                ServerNotification::deserialize(notification)
-                                    .inspect(|notification| {
-                                        match notification {
-                                            ServerNotification::Progress(progress) => {
-                                                Some(progress)
-                                            }
-                                            _ => None,
-                                        }
-                                        .and_then(|progress| WorkDone::try_from(progress).ok())
-                                        .map(|work_done| {
-                                            work_done_sender.send(Some(work_done)).ok()
-                                        });
-                                    })
-                                    .map(ServerMessage::ServerNotification),
-                            );
+                        Message::Notification(notification) => {
+                            let notification = ServerNotification::deserialize(notification)
+                                .expect("ServerNotification::deserialize");
+
+                            match &notification {
+                                ServerNotification::Progress(progress) => Some(progress),
+                                _ => None,
+                            }
+                            .and_then(|progress| WorkDone::try_from(progress).ok())
+                            .map(|work_done| work_done_sender.send(Some(work_done)).ok());
+
+                            server_message_sender
+                                .send(ServerMessage::ServerNotification(notification))
+                                .expect("Send server message");
                         }
-                        Ok(Message::Response(response)) => {
+                        Message::Response(response) => {
                             let id = response.id.as_ref().expect("Response id");
                             let mut state = state.lock().expect("State lock");
                             let (response_slot, waker) = state.get_mut(id).expect("Request state");
@@ -106,7 +121,6 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
                                 waker.wake();
                             }
                         }
-                        Err(err) => handler(Err(err)),
                     }
                 }
             }

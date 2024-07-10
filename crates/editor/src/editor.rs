@@ -1,6 +1,11 @@
 use crate::{async_actor::AsyncActorSender, document::Document};
 use ignore::WalkBuilder;
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+};
+use tokio::sync::Mutex as IoMutex;
+use virus_lsp::{LspClient, ServerMessageReceiver};
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
@@ -17,23 +22,29 @@ pub struct Editor {
     root: PathBuf,
     documents: Vec<Document>,
     active_document: usize,
-    async_actor_sender: AsyncActorSender,
-    event_loop_sender: EventLoopSender,
+    async_actor: AsyncActorSender,
+    _event_loop: EventLoopSender,
 }
 
 impl Editor {
-    pub fn new(
-        root: PathBuf,
-        async_actor_sender: AsyncActorSender,
-        event_loop_sender: EventLoopSender,
-    ) -> Self {
+    pub fn new(root: PathBuf, async_actor: AsyncActorSender, event_loop: EventLoopSender) -> Self {
         Self {
             root,
             documents: Default::default(),
             active_document: 0,
-            async_actor_sender,
-            event_loop_sender,
+            async_actor,
+            _event_loop: event_loop,
         }
+    }
+
+    pub fn init_lsp_handlers(self, rust_receiver: ServerMessageReceiver) -> Self {
+        self.async_actor
+            .send(Box::new(|editor, rust_client| {
+                Box::pin(Self::rust_lsp_handler(editor, rust_client, rust_receiver))
+            }))
+            .expect("Send to async actor");
+
+        self
     }
 
     pub fn root(&self) -> &Path {
@@ -115,5 +126,18 @@ impl Editor {
         }
 
         None
+    }
+}
+
+/// LSP server message handlers.
+impl Editor {
+    async fn rust_lsp_handler(
+        _editor: Arc<Mutex<Self>>,
+        _client: Arc<IoMutex<LspClient>>,
+        mut receiver: ServerMessageReceiver,
+    ) {
+        while let Some(_message) = receiver.recv().await {
+            // TODO
+        }
     }
 }

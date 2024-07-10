@@ -11,7 +11,7 @@ use lsp::{
     LspClient, ServerMessage,
 };
 use std::process::Stdio;
-use tokio::{io::BufReader, process::Command};
+use tokio::{io::BufReader, process::Command, sync::mpsc::unbounded_channel};
 
 #[tokio::main]
 async fn main() {
@@ -22,14 +22,20 @@ async fn main() {
         .unwrap();
 
     let (stdin, stdout) = (child.stdin.take().unwrap(), child.stdout.take().unwrap());
-    let mut client = LspClient::new(BufReader::new(stdout), stdin, |message| match message {
-        Ok(ServerMessage::ServerNotification(notification)) => {
-            dbg!(notification);
+    let (sender, mut receiver) = unbounded_channel();
+    let mut client = LspClient::new(BufReader::new(stdout), stdin, sender);
+
+    tokio::spawn(async move {
+        while let Some(message) = receiver.recv().await {
+            match message {
+                ServerMessage::ServerNotification(notification) => {
+                    dbg!(notification);
+                }
+                ServerMessage::ServerRequest(request) => {
+                    dbg!(request);
+                }
+            }
         }
-        Ok(ServerMessage::ServerRequest(request)) => {
-            dbg!(request);
-        }
-        Err(error) => panic!("{error}"),
     });
 
     println!("Initialize");
@@ -150,7 +156,7 @@ async fn main() {
                     character: 0,
                 },
                 end: Position {
-                    line: 10,
+                    line: 8,
                     character: 0,
                 },
             },
