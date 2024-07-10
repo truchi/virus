@@ -379,7 +379,7 @@ impl<'a> Quote<&'a StructureLiteralType> {
                 Some(quote! {
                     #documentation
                     #[serde(rename = #property_name)]
-                    #snake_name: #type_,
+                    pub #snake_name: #type_,
                 })
             })
             .collect::<Vec<_>>();

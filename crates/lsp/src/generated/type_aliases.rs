@@ -234,39 +234,39 @@ pub enum NotebookDocumentFilter {
 pub struct NotebookDocumentFilterNotebookTypeAndOptionalSchemeAndOptionalPattern {
     /// The type of the enclosing notebook.
     #[serde(rename = "notebookType")]
-    notebook_type: String,
+    pub notebook_type: String,
     /// A Uri {@link Uri.scheme scheme}, like `file` or `untitled`.
     #[serde(rename = "scheme")]
-    scheme: Option<String>,
+    pub scheme: Option<String>,
     /// A glob pattern.
     #[serde(rename = "pattern")]
-    pattern: Option<String>,
+    pub pattern: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct NotebookDocumentFilterOptionalNotebookTypeAndSchemeAndOptionalPattern {
     /// The type of the enclosing notebook.
     #[serde(rename = "notebookType")]
-    notebook_type: Option<String>,
+    pub notebook_type: Option<String>,
     /// A Uri {@link Uri.scheme scheme}, like `file` or `untitled`.
     #[serde(rename = "scheme")]
-    scheme: String,
+    pub scheme: String,
     /// A glob pattern.
     #[serde(rename = "pattern")]
-    pattern: Option<String>,
+    pub pattern: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct NotebookDocumentFilterOptionalNotebookTypeAndOptionalSchemeAndPattern {
     /// The type of the enclosing notebook.
     #[serde(rename = "notebookType")]
-    notebook_type: Option<String>,
+    pub notebook_type: Option<String>,
     /// A Uri {@link Uri.scheme scheme}, like `file` or `untitled`.
     #[serde(rename = "scheme")]
-    scheme: Option<String>,
+    pub scheme: Option<String>,
     /// A glob pattern.
     #[serde(rename = "pattern")]
-    pattern: String,
+    pub pattern: String,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -304,15 +304,15 @@ pub enum PrepareRenameResult {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct PrepareRenameResultRangeAndPlaceholder {
     #[serde(rename = "range")]
-    range: super::structures::Range,
+    pub range: super::structures::Range,
     #[serde(rename = "placeholder")]
-    placeholder: String,
+    pub placeholder: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct PrepareRenameResultDefaultBehavior {
     #[serde(rename = "defaultBehavior")]
-    default_behavior: bool,
+    pub default_behavior: bool,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -348,17 +348,17 @@ pub enum TextDocumentContentChangeEvent {
 pub struct TextDocumentContentChangeEventRangeAndText {
     /// The range of the document that changed.
     #[serde(rename = "range")]
-    range: super::structures::Range,
+    pub range: super::structures::Range,
     /// The new text for the provided range.
     #[serde(rename = "text")]
-    text: String,
+    pub text: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct TextDocumentContentChangeEventText {
     /// The new text of the whole document.
     #[serde(rename = "text")]
-    text: String,
+    pub text: String,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -401,39 +401,39 @@ pub enum TextDocumentFilter {
 pub struct TextDocumentFilterLanguageAndOptionalSchemeAndOptionalPattern {
     /// A language id, like `typescript`.
     #[serde(rename = "language")]
-    language: String,
+    pub language: String,
     /// A Uri {@link Uri.scheme scheme}, like `file` or `untitled`.
     #[serde(rename = "scheme")]
-    scheme: Option<String>,
+    pub scheme: Option<String>,
     /// A glob pattern, like **​/*.{ts,js}. See TextDocumentFilter for examples.
     #[serde(rename = "pattern")]
-    pattern: Option<String>,
+    pub pattern: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct TextDocumentFilterOptionalLanguageAndSchemeAndOptionalPattern {
     /// A language id, like `typescript`.
     #[serde(rename = "language")]
-    language: Option<String>,
+    pub language: Option<String>,
     /// A Uri {@link Uri.scheme scheme}, like `file` or `untitled`.
     #[serde(rename = "scheme")]
-    scheme: String,
+    pub scheme: String,
     /// A glob pattern, like **​/*.{ts,js}. See TextDocumentFilter for examples.
     #[serde(rename = "pattern")]
-    pattern: Option<String>,
+    pub pattern: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct TextDocumentFilterOptionalLanguageAndOptionalSchemeAndPattern {
     /// A language id, like `typescript`.
     #[serde(rename = "language")]
-    language: Option<String>,
+    pub language: Option<String>,
     /// A Uri {@link Uri.scheme scheme}, like `file` or `untitled`.
     #[serde(rename = "scheme")]
-    scheme: Option<String>,
+    pub scheme: Option<String>,
     /// A glob pattern, like **​/*.{ts,js}. See TextDocumentFilter for examples.
     #[serde(rename = "pattern")]
-    pattern: String,
+    pub pattern: String,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //

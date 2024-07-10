@@ -438,7 +438,7 @@ pub struct CodeActionDisabled {
     ///
     /// This is displayed in the code actions UI.
     #[serde(rename = "reason")]
-    reason: String,
+    pub reason: String,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -499,7 +499,7 @@ pub struct CodeActionClientCapabilitiesCodeActionLiteralSupport {
     /// The code action kind is support with the following value
     /// set.
     #[serde(rename = "codeActionKind")]
-    code_action_kind: CodeActionClientCapabilitiesCodeActionLiteralSupportCodeActionKind,
+    pub code_action_kind: CodeActionClientCapabilitiesCodeActionLiteralSupportCodeActionKind,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -509,14 +509,14 @@ pub struct CodeActionClientCapabilitiesCodeActionLiteralSupportCodeActionKind {
     /// handle values outside its set gracefully and falls back
     /// to a default value when unknown.
     #[serde(rename = "valueSet")]
-    value_set: Vec<super::enumerations::CodeActionKind>,
+    pub value_set: Vec<super::enumerations::CodeActionKind>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct CodeActionClientCapabilitiesResolveSupport {
     /// The properties that a client can resolve lazily.
     #[serde(rename = "properties")]
-    properties: Vec<String>,
+    pub properties: Vec<String>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -900,20 +900,20 @@ pub struct CompletionClientCapabilitiesCompletionItem {
     /// the end of the snippet. Placeholders with equal identifiers are linked,
     /// that is typing in one will update others too.
     #[serde(rename = "snippetSupport")]
-    snippet_support: Option<bool>,
+    pub snippet_support: Option<bool>,
     /// Client supports commit characters on a completion item.
     #[serde(rename = "commitCharactersSupport")]
-    commit_characters_support: Option<bool>,
+    pub commit_characters_support: Option<bool>,
     /// Client supports the following content formats for the documentation
     /// property. The order describes the preferred format of the client.
     #[serde(rename = "documentationFormat")]
-    documentation_format: Option<Vec<super::enumerations::MarkupKind>>,
+    pub documentation_format: Option<Vec<super::enumerations::MarkupKind>>,
     /// Client supports the deprecated property on a completion item.
     #[serde(rename = "deprecatedSupport")]
-    deprecated_support: Option<bool>,
+    pub deprecated_support: Option<bool>,
     /// Client supports the preselect property on a completion item.
     #[serde(rename = "preselectSupport")]
-    preselect_support: Option<bool>,
+    pub preselect_support: Option<bool>,
     /// Client supports the tag property on a completion item. Clients supporting
     /// tags have to handle unknown tags gracefully. Clients especially need to
     /// preserve unknown tags when sending a completion item back to the server in
@@ -921,54 +921,54 @@ pub struct CompletionClientCapabilitiesCompletionItem {
     ///
     /// @since 3.15.0
     #[serde(rename = "tagSupport")]
-    tag_support: Option<CompletionClientCapabilitiesCompletionItemTagSupport>,
+    pub tag_support: Option<CompletionClientCapabilitiesCompletionItemTagSupport>,
     /// Client support insert replace edit to control different behavior if a
     /// completion item is inserted in the text or should replace text.
     ///
     /// @since 3.16.0
     #[serde(rename = "insertReplaceSupport")]
-    insert_replace_support: Option<bool>,
+    pub insert_replace_support: Option<bool>,
     /// Indicates which properties a client can resolve lazily on a completion
     /// item. Before version 3.16.0 only the predefined properties `documentation`
     /// and `details` could be resolved lazily.
     ///
     /// @since 3.16.0
     #[serde(rename = "resolveSupport")]
-    resolve_support: Option<CompletionClientCapabilitiesCompletionItemResolveSupport>,
+    pub resolve_support: Option<CompletionClientCapabilitiesCompletionItemResolveSupport>,
     /// The client supports the `insertTextMode` property on
     /// a completion item to override the whitespace handling mode
     /// as defined by the client (see `insertTextMode`).
     ///
     /// @since 3.16.0
     #[serde(rename = "insertTextModeSupport")]
-    insert_text_mode_support:
+    pub insert_text_mode_support:
         Option<CompletionClientCapabilitiesCompletionItemInsertTextModeSupport>,
     /// The client has support for completion item label
     /// details (see also `CompletionItemLabelDetails`).
     ///
     /// @since 3.17.0
     #[serde(rename = "labelDetailsSupport")]
-    label_details_support: Option<bool>,
+    pub label_details_support: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct CompletionClientCapabilitiesCompletionItemTagSupport {
     /// The tags supported by the client.
     #[serde(rename = "valueSet")]
-    value_set: Vec<super::enumerations::CompletionItemTag>,
+    pub value_set: Vec<super::enumerations::CompletionItemTag>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct CompletionClientCapabilitiesCompletionItemResolveSupport {
     /// The properties that a client can resolve lazily.
     #[serde(rename = "properties")]
-    properties: Vec<String>,
+    pub properties: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct CompletionClientCapabilitiesCompletionItemInsertTextModeSupport {
     #[serde(rename = "valueSet")]
-    value_set: Vec<super::enumerations::InsertTextMode>,
+    pub value_set: Vec<super::enumerations::InsertTextMode>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -982,7 +982,7 @@ pub struct CompletionClientCapabilitiesCompletionItemKind {
     /// the completion items kinds from `Text` to `Reference` as defined in
     /// the initial version of the protocol.
     #[serde(rename = "valueSet")]
-    value_set: Option<Vec<super::enumerations::CompletionItemKind>>,
+    pub value_set: Option<Vec<super::enumerations::CompletionItemKind>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -996,7 +996,7 @@ pub struct CompletionClientCapabilitiesCompletionList {
     ///
     /// @since 3.17.0
     #[serde(rename = "itemDefaults")]
-    item_defaults: Option<Vec<String>>,
+    pub item_defaults: Option<Vec<String>>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -1238,27 +1238,27 @@ pub struct CompletionListItemDefaults {
     ///
     /// @since 3.17.0
     #[serde(rename = "commitCharacters")]
-    commit_characters: Option<Vec<String>>,
+    pub commit_characters: Option<Vec<String>>,
     /// A default edit range.
     ///
     /// @since 3.17.0
     #[serde(rename = "editRange")]
-    edit_range: Option<CompletionListItemDefaultsEditRange>,
+    pub edit_range: Option<CompletionListItemDefaultsEditRange>,
     /// A default insert text format.
     ///
     /// @since 3.17.0
     #[serde(rename = "insertTextFormat")]
-    insert_text_format: Option<super::enumerations::InsertTextFormat>,
+    pub insert_text_format: Option<super::enumerations::InsertTextFormat>,
     /// A default insert text mode.
     ///
     /// @since 3.17.0
     #[serde(rename = "insertTextMode")]
-    insert_text_mode: Option<super::enumerations::InsertTextMode>,
+    pub insert_text_mode: Option<super::enumerations::InsertTextMode>,
     /// A default data value.
     ///
     /// @since 3.17.0
     #[serde(rename = "data")]
-    data: Option<super::type_aliases::LspAny>,
+    pub data: Option<super::type_aliases::LspAny>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -1271,9 +1271,9 @@ pub enum CompletionListItemDefaultsEditRange {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct CompletionListItemDefaultsEditRangeInsertAndReplace {
     #[serde(rename = "insert")]
-    insert: super::structures::Range,
+    pub insert: super::structures::Range,
     #[serde(rename = "replace")]
-    replace: super::structures::Range,
+    pub replace: super::structures::Range,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -1327,7 +1327,7 @@ pub struct CompletionOptionsCompletionItem {
     ///
     /// @since 3.17.0
     #[serde(rename = "labelDetailsSupport")]
-    label_details_support: Option<bool>,
+    pub label_details_support: Option<bool>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -2720,14 +2720,14 @@ pub struct DocumentSymbolClientCapabilitiesSymbolKind {
     /// the symbol kinds from `File` to `Array` as defined in
     /// the initial version of the protocol.
     #[serde(rename = "valueSet")]
-    value_set: Option<Vec<super::enumerations::SymbolKind>>,
+    pub value_set: Option<Vec<super::enumerations::SymbolKind>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct DocumentSymbolClientCapabilitiesTagSupport {
     /// The tags supported by the client.
     #[serde(rename = "valueSet")]
-    value_set: Vec<super::enumerations::SymbolTag>,
+    pub value_set: Vec<super::enumerations::SymbolTag>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -3189,7 +3189,7 @@ pub struct FoldingRangeClientCapabilitiesFoldingRangeKind {
     /// handle values outside its set gracefully and falls back
     /// to a default value when unknown.
     #[serde(rename = "valueSet")]
-    value_set: Option<Vec<super::enumerations::FoldingRangeKind>>,
+    pub value_set: Option<Vec<super::enumerations::FoldingRangeKind>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -3199,7 +3199,7 @@ pub struct FoldingRangeClientCapabilitiesFoldingRange {
     ///
     /// @since 3.17.0
     #[serde(rename = "collapsedText")]
-    collapsed_text: Option<bool>,
+    pub collapsed_text: Option<bool>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -3370,12 +3370,12 @@ pub struct GeneralClientCapabilities {
 pub struct GeneralClientCapabilitiesStaleRequestSupport {
     /// The client will actively cancel the request.
     #[serde(rename = "cancel")]
-    cancel: bool,
+    pub cancel: bool,
     /// The list of requests for which the client
     /// will retry the request if it receives a
     /// response with error code `ContentModified`
     #[serde(rename = "retryOnContentModified")]
-    retry_on_content_modified: Vec<String>,
+    pub retry_on_content_modified: Vec<String>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -3622,10 +3622,10 @@ pub enum InitializeParamsProcessId {
 pub struct InitializeParamsClientInfo {
     /// The name of the client as defined by the client.
     #[serde(rename = "name")]
-    name: String,
+    pub name: String,
     /// The client's version as defined by the client.
     #[serde(rename = "version")]
-    version: Option<String>,
+    pub version: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -3658,10 +3658,10 @@ pub struct InitializeResult {
 pub struct InitializeResultServerInfo {
     /// The name of the server as defined by the server.
     #[serde(rename = "name")]
-    name: String,
+    pub name: String,
     /// The server's version as defined by the server.
     #[serde(rename = "version")]
-    version: Option<String>,
+    pub version: Option<String>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -3769,7 +3769,7 @@ pub struct InlayHintClientCapabilities {
 pub struct InlayHintClientCapabilitiesResolveSupport {
     /// The properties that a client can resolve lazily.
     #[serde(rename = "properties")]
-    properties: Vec<String>,
+    pub properties: Vec<String>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -4600,35 +4600,35 @@ pub struct NotebookDocumentChangeEventCells {
     /// Changes to the cell structure to add or
     /// remove cells.
     #[serde(rename = "structure")]
-    structure: Option<NotebookDocumentChangeEventCellsStructure>,
+    pub structure: Option<NotebookDocumentChangeEventCellsStructure>,
     /// Changes to notebook cells properties like its
     /// kind, execution summary or metadata.
     #[serde(rename = "data")]
-    data: Option<Vec<super::structures::NotebookCell>>,
+    pub data: Option<Vec<super::structures::NotebookCell>>,
     /// Changes to the text content of notebook cells.
     #[serde(rename = "textContent")]
-    text_content: Option<Vec<NotebookDocumentChangeEventCellsTextContent>>,
+    pub text_content: Option<Vec<NotebookDocumentChangeEventCellsTextContent>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct NotebookDocumentChangeEventCellsStructure {
     /// The change to the cell array.
     #[serde(rename = "array")]
-    array: super::structures::NotebookCellArrayChange,
+    pub array: super::structures::NotebookCellArrayChange,
     /// Additional opened cell text documents.
     #[serde(rename = "didOpen")]
-    did_open: Option<Vec<super::structures::TextDocumentItem>>,
+    pub did_open: Option<Vec<super::structures::TextDocumentItem>>,
     /// Additional closed cell text documents.
     #[serde(rename = "didClose")]
-    did_close: Option<Vec<super::structures::TextDocumentIdentifier>>,
+    pub did_close: Option<Vec<super::structures::TextDocumentIdentifier>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct NotebookDocumentChangeEventCellsTextContent {
     #[serde(rename = "document")]
-    document: super::structures::VersionedTextDocumentIdentifier,
+    pub document: super::structures::VersionedTextDocumentIdentifier,
     #[serde(rename = "changes")]
-    changes: Vec<super::type_aliases::TextDocumentContentChangeEvent>,
+    pub changes: Vec<super::type_aliases::TextDocumentContentChangeEvent>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -4730,10 +4730,11 @@ pub struct NotebookDocumentSyncOptionsNotebookSelectorNotebookAndOptionalCells {
     /// value is provided it matches against the
     /// notebook type. '*' matches every notebook.
     #[serde(rename = "notebook")]
-    notebook: NotebookDocumentSyncOptionsNotebookSelectorNotebookAndOptionalCellsNotebook,
+    pub notebook: NotebookDocumentSyncOptionsNotebookSelectorNotebookAndOptionalCellsNotebook,
     /// The cells of the matching notebook to be synced.
     #[serde(rename = "cells")]
-    cells: Option<Vec<NotebookDocumentSyncOptionsNotebookSelectorNotebookAndOptionalCellsCells>>,
+    pub cells:
+        Option<Vec<NotebookDocumentSyncOptionsNotebookSelectorNotebookAndOptionalCellsCells>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -4746,7 +4747,7 @@ pub enum NotebookDocumentSyncOptionsNotebookSelectorNotebookAndOptionalCellsNote
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct NotebookDocumentSyncOptionsNotebookSelectorNotebookAndOptionalCellsCells {
     #[serde(rename = "language")]
-    language: String,
+    pub language: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -4755,10 +4756,11 @@ pub struct NotebookDocumentSyncOptionsNotebookSelectorOptionalNotebookAndCells {
     /// value is provided it matches against the
     /// notebook type. '*' matches every notebook.
     #[serde(rename = "notebook")]
-    notebook: Option<NotebookDocumentSyncOptionsNotebookSelectorOptionalNotebookAndCellsNotebook>,
+    pub notebook:
+        Option<NotebookDocumentSyncOptionsNotebookSelectorOptionalNotebookAndCellsNotebook>,
     /// The cells of the matching notebook to be synced.
     #[serde(rename = "cells")]
-    cells: Vec<NotebookDocumentSyncOptionsNotebookSelectorOptionalNotebookAndCellsCells>,
+    pub cells: Vec<NotebookDocumentSyncOptionsNotebookSelectorOptionalNotebookAndCellsCells>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -4771,7 +4773,7 @@ pub enum NotebookDocumentSyncOptionsNotebookSelectorOptionalNotebookAndCellsNote
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct NotebookDocumentSyncOptionsNotebookSelectorOptionalNotebookAndCellsCells {
     #[serde(rename = "language")]
-    language: String,
+    pub language: String,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -5037,7 +5039,7 @@ pub struct PublishDiagnosticsClientCapabilities {
 pub struct PublishDiagnosticsClientCapabilitiesTagSupport {
     /// The tags supported by the client.
     #[serde(rename = "valueSet")]
-    value_set: Vec<super::enumerations::DiagnosticTag>,
+    pub value_set: Vec<super::enumerations::DiagnosticTag>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -5693,11 +5695,11 @@ pub struct SemanticTokensClientCapabilitiesRequests {
     /// The client will send the `textDocument/semanticTokens/range` request if
     /// the server provides a corresponding handler.
     #[serde(rename = "range")]
-    range: Option<SemanticTokensClientCapabilitiesRequestsRange>,
+    pub range: Option<SemanticTokensClientCapabilitiesRequestsRange>,
     /// The client will send the `textDocument/semanticTokens/full` request if
     /// the server provides a corresponding handler.
     #[serde(rename = "full")]
-    full: Option<SemanticTokensClientCapabilitiesRequestsFull>,
+    pub full: Option<SemanticTokensClientCapabilitiesRequestsFull>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -5722,7 +5724,7 @@ pub struct SemanticTokensClientCapabilitiesRequestsFullOptionalDelta {
     /// The client will send the `textDocument/semanticTokens/full/delta` request if
     /// the server provides a corresponding handler.
     #[serde(rename = "delta")]
-    delta: Option<bool>,
+    pub delta: Option<bool>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -5857,7 +5859,7 @@ pub enum SemanticTokensOptionsFull {
 pub struct SemanticTokensOptionsFullOptionalDelta {
     /// The server supports deltas for full documents.
     #[serde(rename = "delta")]
-    delta: Option<bool>,
+    pub delta: Option<bool>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -6306,12 +6308,12 @@ pub struct ServerCapabilitiesWorkspace {
     ///
     /// @since 3.6.0
     #[serde(rename = "workspaceFolders")]
-    workspace_folders: Option<super::structures::WorkspaceFoldersServerCapabilities>,
+    pub workspace_folders: Option<super::structures::WorkspaceFoldersServerCapabilities>,
     /// The server is interested in notifications/requests for operations on files.
     ///
     /// @since 3.16.0
     #[serde(rename = "fileOperations")]
-    file_operations: Option<super::structures::FileOperationOptions>,
+    pub file_operations: Option<super::structures::FileOperationOptions>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -6430,7 +6432,7 @@ pub struct ShowMessageRequestClientCapabilitiesMessageActionItem {
     /// are preserved and send back to the server in the
     /// request's response.
     #[serde(rename = "additionalPropertiesSupport")]
-    additional_properties_support: Option<bool>,
+    pub additional_properties_support: Option<bool>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -6520,17 +6522,17 @@ pub struct SignatureHelpClientCapabilitiesSignatureInformation {
     /// Client supports the following content formats for the documentation
     /// property. The order describes the preferred format of the client.
     #[serde(rename = "documentationFormat")]
-    documentation_format: Option<Vec<super::enumerations::MarkupKind>>,
+    pub documentation_format: Option<Vec<super::enumerations::MarkupKind>>,
     /// Client capabilities specific to parameter information.
     #[serde(rename = "parameterInformation")]
-    parameter_information:
+    pub parameter_information:
         Option<SignatureHelpClientCapabilitiesSignatureInformationParameterInformation>,
     /// The client supports the `activeParameter` property on `SignatureInformation`
     /// literal.
     ///
     /// @since 3.16.0
     #[serde(rename = "activeParameterSupport")]
-    active_parameter_support: Option<bool>,
+    pub active_parameter_support: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -6540,7 +6542,7 @@ pub struct SignatureHelpClientCapabilitiesSignatureInformationParameterInformati
     ///
     /// @since 3.14.0
     #[serde(rename = "labelOffsetSupport")]
-    label_offset_support: Option<bool>,
+    pub label_offset_support: Option<bool>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -7849,7 +7851,7 @@ pub struct WorkspaceEditClientCapabilitiesChangeAnnotationSupport {
     /// for instance all edits labelled with "Changes in Strings" would
     /// be a tree node.
     #[serde(rename = "groupsOnLabel")]
-    groups_on_label: Option<bool>,
+    pub groups_on_label: Option<bool>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -7988,7 +7990,7 @@ pub enum WorkspaceSymbolLocation {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct WorkspaceSymbolLocationUri {
     #[serde(rename = "uri")]
-    uri: DocumentUri,
+    pub uri: DocumentUri,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -8032,14 +8034,14 @@ pub struct WorkspaceSymbolClientCapabilitiesSymbolKind {
     /// the symbol kinds from `File` to `Array` as defined in
     /// the initial version of the protocol.
     #[serde(rename = "valueSet")]
-    value_set: Option<Vec<super::enumerations::SymbolKind>>,
+    pub value_set: Option<Vec<super::enumerations::SymbolKind>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct WorkspaceSymbolClientCapabilitiesTagSupport {
     /// The tags supported by the client.
     #[serde(rename = "valueSet")]
-    value_set: Vec<super::enumerations::SymbolTag>,
+    pub value_set: Vec<super::enumerations::SymbolTag>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -8047,7 +8049,7 @@ pub struct WorkspaceSymbolClientCapabilitiesResolveSupport {
     /// The properties that a client can resolve lazily. Usually
     /// `location.range`
     #[serde(rename = "properties")]
-    properties: Vec<String>,
+    pub properties: Vec<String>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
