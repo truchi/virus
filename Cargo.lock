@@ -483,6 +483,7 @@ dependencies = [
  "ignore",
  "lsp",
  "ropey",
+ "serde_json",
  "tokio",
  "tree-sitter",
  "tree-sitter-rust",

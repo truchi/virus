@@ -3,6 +3,7 @@ pub mod cursor;
 pub mod document;
 pub mod editor;
 pub mod fuzzy;
+pub mod lsp;
 pub mod rope {
     pub use cursor::chunk::*;
     pub use cursor::grapheme::*;

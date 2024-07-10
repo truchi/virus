@@ -1,13 +1,8 @@
-use crate::{async_actor::AsyncActorSender, document::Document};
+use crate::{async_actor::AsyncActorSender, document::Document, lsp::Lsp};
 use ignore::WalkBuilder;
-use std::{
-    path::{Path, PathBuf},
-    sync::{Arc, Mutex},
-};
+use std::path::{Path, PathBuf};
 use tokio::{process::Command, sync::mpsc::unbounded_channel};
-use virus_lsp::{LspClients, ServerMessageReceiver};
-
-const ASYNC_ACTOR_SEND_FAIL: &'static str = "Failed to send to async actor";
+use virus_lsp::LspClients;
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
@@ -24,8 +19,8 @@ pub struct Editor {
     root: PathBuf,
     documents: Vec<Document>,
     active_document: usize,
-    _lsps: LspClients,
-    async_actor: AsyncActorSender,
+    pub(crate) lsps: LspClients,
+    pub(crate) async_actor: AsyncActorSender,
     _event_loop: EventLoopSender,
 }
 
@@ -37,17 +32,17 @@ impl Editor {
         event_loop: EventLoopSender,
     ) -> Self {
         let (rust_server_message_sender, rust_server_message_receiver) = unbounded_channel();
-        let lsps = LspClients::new((rust_lsp, rust_server_message_sender));
-
-        Self {
+        let mut editor = Self {
             root,
             documents: Default::default(),
             active_document: 0,
-            _lsps: lsps,
+            lsps: LspClients::new((rust_lsp, rust_server_message_sender)),
             async_actor,
             _event_loop: event_loop,
-        }
-        .init_lsps(rust_server_message_receiver)
+        };
+
+        editor.lsp().init(rust_server_message_receiver);
+        editor
     }
 
     pub fn root(&self) -> &Path {
@@ -132,21 +127,9 @@ impl Editor {
     }
 }
 
-/// Private: LSPs.
+/// Private.
 impl Editor {
-    fn init_lsps(self, rust_receiver: ServerMessageReceiver) -> Self {
-        self.async_actor
-            .send(Box::new(|editor| {
-                Box::pin(Self::rust_lsp_handler(editor, rust_receiver))
-            }))
-            .expect(ASYNC_ACTOR_SEND_FAIL);
-
-        self
-    }
-
-    async fn rust_lsp_handler(_editor: Arc<Mutex<Self>>, mut receiver: ServerMessageReceiver) {
-        while let Some(_message) = receiver.recv().await {
-            // TODO
-        }
+    fn lsp(&mut self) -> Lsp {
+        Lsp { editor: self }
     }
 }
