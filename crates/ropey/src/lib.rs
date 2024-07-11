@@ -175,6 +175,7 @@ mod rope;
 mod rope_builder;
 mod slice;
 mod tree;
+mod weak_rope;
 
 pub mod iter;
 pub mod str_utils;
@@ -184,6 +185,7 @@ use std::ops::Bound;
 pub use crate::rope::Rope;
 pub use crate::rope_builder::RopeBuilder;
 pub use crate::slice::RopeSlice;
+pub use crate::weak_rope::WeakRope;
 
 /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
 /// These are only exposed for tests that live in the `tests` directory.
