@@ -1,6 +1,7 @@
 [package]
 name = "ropey"
 version = "1.6.1"
+edition = "2021"
 authors = ["Nathan Vegdahl <cessen@cessen.com>"]
 description = "A fast and robust text rope for Rust"
 documentation = "https://docs.rs/ropey"

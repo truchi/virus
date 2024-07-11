@@ -19,7 +19,7 @@ futures = "0.3"
 ignore = "0.4"
 image = { version = "0.25", default-features = false, features = ["png"] }
 pollster = "0.3"
-ropey = "1.6"
+ropey = { path = "crates/ropey" } # Git subtree (https://github.com/truchi/ropey, v1.6.1)
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 swash = "0.1"
