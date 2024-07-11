@@ -91,8 +91,9 @@ pub struct Document {
     highlights: Query,
     parser: Parser,
     tree: Tree,
-    cached_shaping: Option<CachedShaping>,
     is_tree_dirty: bool,
+    version: usize,
+    cached_shaping: Option<CachedShaping>,
 }
 
 impl Document {
@@ -123,8 +124,9 @@ impl Document {
             highlights,
             parser,
             tree,
-            cached_shaping: None,
             is_tree_dirty: false,
+            version: 0,
+            cached_shaping: None,
         })
     }
 
@@ -204,6 +206,10 @@ impl Document {
 
     pub fn tree(&self) -> &Tree {
         &self.tree
+    }
+
+    pub fn version(&self) -> usize {
+        self.version
     }
 }
 
@@ -523,6 +529,7 @@ impl Document {
             },
         });
         self.is_tree_dirty = true;
+        self.version += 1;
         self.cached_shaping = None;
     }
 }
