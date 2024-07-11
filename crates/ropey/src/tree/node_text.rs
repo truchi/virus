@@ -236,6 +236,7 @@ mod inner {
     use std::str;
 
     /// The backing internal buffer type for `NodeText`.
+    #[allow(unused)]
     #[derive(Copy, Clone)]
     struct BackingArray([u8; MAX_BYTES]);
 
