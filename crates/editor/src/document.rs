@@ -1,6 +1,6 @@
 use crate::{
     cursor::Cursor,
-    rope::{RopeExt, WordClass, WordCursor},
+    rope::{RopeExt, Text, WordClass, WordCursor},
     syntax::{Capture, Theme},
 };
 use ropey::Rope;
@@ -37,6 +37,12 @@ impl Selection {
 
     pub fn cursor(cursor: Cursor) -> Self {
         Self::new(cursor.clone(), cursor)
+    }
+
+    pub fn len(&self) -> usize {
+        let range = self.range();
+
+        range.end.index() - range.start.index()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -311,7 +317,7 @@ impl Document {
 
 /// Edition.
 impl Document {
-    pub fn edit(&mut self, str: &str) {
+    pub fn edit(&mut self, text: &Text) {
         let Range {
             start,
             end: old_end,
@@ -328,10 +334,17 @@ impl Document {
             self.rope.char_to_byte(index) == old_end_index
         });
 
-        let remove = start_index != old_end_index;
-        let insert = !str.is_empty();
+        let removing = start_index != old_end_index;
+        let inserting = !text.is_empty();
 
-        match (remove, insert) {
+        fn insert(rope: &mut Rope, mut char_index: usize, text: &Text) {
+            for str in text.chunks() {
+                rope.insert(char_index, str);
+                char_index += str.chars().count();
+            }
+        }
+
+        match (removing, inserting) {
             // Replace
             (true, true) => {
                 let start_line = start.line(&self.rope);
@@ -344,10 +357,10 @@ impl Document {
                     let end = self.rope.byte_to_char(old_end_index);
 
                     self.rope.remove(start..end);
-                    self.rope.insert(start, str);
+                    insert(&mut self.rope, start, text);
                 }
 
-                let new_end = self.rope.cursor().at_index(start_index + str.len());
+                let new_end = self.rope.cursor().at_index(start_index + text.len());
                 let new_end_index = new_end.index();
                 let new_end_line = new_end.line(&self.rope);
                 let new_end_column = new_end.column(&self.rope);
@@ -401,11 +414,10 @@ impl Document {
 
                 {
                     let start = self.rope.byte_to_char(start_index);
-
-                    self.rope.insert(start, str);
+                    insert(&mut self.rope, start, text);
                 }
 
-                let new_end = self.rope.cursor().at_index(start_index + str.len());
+                let new_end = self.rope.cursor().at_index(start_index + text.len());
                 let new_end_index = new_end.index();
                 let new_end_line = new_end.line(&self.rope);
                 let new_end_column = new_end.column(&self.rope);
@@ -434,7 +446,7 @@ impl Document {
             self.move_prev_grapheme(true);
         }
 
-        self.edit("");
+        self.edit(&Text::default());
     }
 }
 

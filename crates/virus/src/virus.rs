@@ -343,6 +343,8 @@ impl Virus {
                         self.ui
                             .ensure_visibility(editor.active_document().head_line());
                     }
+                    Key::Str("c") if self.events.command() => editor.paste(),
+                    Key::Str("c") => editor.copy(),
                     Key::Str("y") => {
                         editor
                             .active_document_mut()
@@ -390,10 +392,10 @@ impl Virus {
                 },
                 Mode::Insert => match key {
                     Key::Str("@") if self.events.command() => event_loop.exit(),
-                    Key::Str(str) => editor.active_document_mut().edit(str),
-                    Key::Space => editor.active_document_mut().edit(" "),
+                    Key::Str(str) => editor.active_document_mut().edit(&str.into()),
+                    Key::Space => editor.active_document_mut().edit(&" ".into()),
                     Key::Backspace => editor.active_document_mut().backspace(),
-                    Key::Enter => editor.active_document_mut().edit("\n"),
+                    Key::Enter => editor.active_document_mut().edit(&"\n".into()),
                     Key::Escape => {
                         self.mode = Mode::Normal {
                             select_mode: (!editor.active_document().selection().range().is_empty())

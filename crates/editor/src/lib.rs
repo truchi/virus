@@ -9,6 +9,7 @@ pub mod rope {
     pub use cursor::grapheme::*;
     pub use cursor::word::*;
     pub use extension::*;
+    pub use text::*;
 
     mod cursor {
         pub mod chunk;
@@ -16,6 +17,7 @@ pub mod rope {
         pub mod word;
     }
     mod extension;
+    mod text;
 }
 pub mod syntax {
     pub use capture::*;

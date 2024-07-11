@@ -1,4 +1,4 @@
-use crate::{async_actor::AsyncActorSender, document::Document, lsp::Lsp};
+use crate::{async_actor::AsyncActorSender, document::Document, lsp::Lsp, rope::Text};
 use ignore::WalkBuilder;
 use std::{
     future::Future,
@@ -23,6 +23,7 @@ pub struct Editor {
     root: PathBuf,
     documents: Vec<Document>,
     active_document: usize,
+    clipboard: Text,
     pub(crate) lsps: LspClients,
     pub(crate) async_actor: AsyncActorSender,
     _event_loop: EventLoopSender,
@@ -40,6 +41,7 @@ impl Editor {
             root,
             documents: Default::default(),
             active_document: 0,
+            clipboard: Text::default(),
             lsps: LspClients::new((rust_lsp, rust_server_message_sender)),
             async_actor,
             _event_loop: event_loop,
@@ -111,6 +113,23 @@ impl Editor {
                     .map(|path| path.to_owned())
                     .ok()
             })
+    }
+
+    pub fn copy(&mut self) {
+        let document = self.active_document();
+        let range = document.selection().range();
+        let slice = document
+            .rope()
+            .byte_slice(range.start.index()..range.end.index());
+
+        self.clipboard = Text::from(slice);
+    }
+
+    pub fn paste(&mut self) {
+        self.documents
+            .get_mut(self.active_document)
+            .unwrap()
+            .edit(&self.clipboard);
     }
 
     pub fn find_git_root(path: PathBuf) -> Option<PathBuf> {
