@@ -1,5 +1,5 @@
 use crate::{
-    cursor::Cursor,
+    cursor::CachedCursor,
     rope::{RopeExt, Text, WordClass, WordCursor},
     syntax::{Capture, Theme},
 };
@@ -20,22 +20,22 @@ use virus_graphics::text::{Cluster, Context, FontFamilyKey, FontSize, Line};
 
 #[derive(Clone, Eq, PartialEq, Default, Debug)]
 pub struct Selection {
-    pub anchor: Cursor,
-    pub head: Cursor,
+    pub anchor: CachedCursor,
+    pub head: CachedCursor,
 }
 
-impl From<Cursor> for Selection {
-    fn from(cursor: Cursor) -> Self {
+impl From<CachedCursor> for Selection {
+    fn from(cursor: CachedCursor) -> Self {
         Self::cursor(cursor)
     }
 }
 
 impl Selection {
-    pub fn new(anchor: Cursor, head: Cursor) -> Self {
+    pub fn new(anchor: CachedCursor, head: CachedCursor) -> Self {
         Self { anchor, head }
     }
 
-    pub fn cursor(cursor: Cursor) -> Self {
+    pub fn cursor(cursor: CachedCursor) -> Self {
         Self::new(cursor.clone(), cursor)
     }
 
@@ -57,7 +57,7 @@ impl Selection {
         }
     }
 
-    pub fn range(&self) -> Range<&Cursor> {
+    pub fn range(&self) -> Range<&CachedCursor> {
         if self.is_forward() {
             &self.anchor..&self.head
         } else {
@@ -73,7 +73,7 @@ impl Selection {
         *self = self.flip();
     }
 
-    pub fn move_to(&self, cursor: Cursor, selection: bool) -> Self {
+    pub fn move_to(&self, cursor: CachedCursor, selection: bool) -> Self {
         if selection {
             Self::new(self.anchor.clone(), cursor)
         } else {
@@ -81,7 +81,7 @@ impl Selection {
         }
     }
 
-    pub fn move_to_mut(&mut self, cursor: Cursor, selection: bool) {
+    pub fn move_to_mut(&mut self, cursor: CachedCursor, selection: bool) {
         *self = self.move_to(cursor, selection);
     }
 }

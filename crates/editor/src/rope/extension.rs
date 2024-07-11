@@ -1,5 +1,5 @@
 use crate::{
-    cursor::Cursor,
+    cursor::CachedCursor,
     rope::{GraphemeCursor, WordClass, WordCursor},
 };
 use ropey::Rope;
@@ -45,33 +45,33 @@ pub struct RopeExtCursor<'rope>(&'rope Rope);
 
 impl<'rope> RopeExtCursor<'rope> {
     /// Returns a cursor at the start of the rope.
-    pub fn at_start(&self) -> Cursor {
-        Cursor::at_start()
+    pub fn at_start(&self) -> CachedCursor {
+        CachedCursor::at_start(self.0)
     }
 
     /// Returns a cursor at the end of the rope.
-    pub fn at_end(&self) -> Cursor {
-        Cursor::at_end(self.0)
+    pub fn at_end(&self) -> CachedCursor {
+        CachedCursor::at_end(self.0)
     }
 
     /// Returns a cursor at `index`.
-    pub fn at_index(&self, index: usize) -> Cursor {
-        Cursor::at_index(index)
+    pub fn at_index(&self, index: usize) -> CachedCursor {
+        CachedCursor::at_index(self.0, index)
     }
 
     /// Returns a cursor at `line`.
-    pub fn at_line(&self, line: usize) -> Cursor {
-        Cursor::at_line(line, self.0)
+    pub fn at_line(&self, line: usize) -> CachedCursor {
+        CachedCursor::at_line(self.0, line)
     }
 
     /// Returns a cursor at `(line, column)`.
-    pub fn at_line_column(&self, line: usize, column: usize) -> Cursor {
-        Cursor::at_line_column(line, column, self.0)
+    pub fn at_line_column(&self, line: usize, column: usize) -> CachedCursor {
+        CachedCursor::at_line_column(self.0, line, column)
     }
 
     /// Returns a cursor at `(line, width)`.
-    pub fn at_line_width(&self, line: usize, width: usize) -> Cursor {
-        Cursor::at_line_width(line, width, self.0)
+    pub fn at_line_width(&self, line: usize, width: usize) -> CachedCursor {
+        CachedCursor::at_line_width(self.0, line, width)
     }
 }
 
@@ -89,14 +89,14 @@ impl<'rope> RopeExtGrapheme<'rope> {
     }
 
     /// Finds the previous grapheme boundary before the given `index`.
-    pub fn prev(&self, index: usize) -> Option<Cursor> {
+    pub fn prev(&self, index: usize) -> Option<CachedCursor> {
         GraphemeCursor::new(self.0.slice(..), index)
             .prev()
             .map(|(range, _)| self.0.cursor().at_index(range.start))
     }
 
     /// Finds the next grapheme boundary after the given `index`.
-    pub fn next(&self, index: usize) -> Option<Cursor> {
+    pub fn next(&self, index: usize) -> Option<CachedCursor> {
         GraphemeCursor::new(self.0.slice(..), index)
             .next()
             .map(|(range, _)| self.0.cursor().at_index(range.end))
@@ -112,7 +112,7 @@ pub struct RopeExtWord<'rope>(&'rope Rope);
 
 impl<'rope> RopeExtWord<'rope> {
     /// Finds the previous start of word before the given `index`.
-    pub fn prev_start(&self, index: usize) -> Option<Cursor> {
+    pub fn prev_start(&self, index: usize) -> Option<CachedCursor> {
         let mut words = WordCursor::new(self.0.slice(..), index);
 
         words.prev().map(|(range, class)| match class {
@@ -125,7 +125,7 @@ impl<'rope> RopeExtWord<'rope> {
     }
 
     /// Finds the previous end of word before the given `index`.
-    pub fn prev_end(&self, index: usize) -> Option<Cursor> {
+    pub fn prev_end(&self, index: usize) -> Option<CachedCursor> {
         let mut words = WordCursor::new(self.0.slice(..), index);
 
         words.prev().map(|(range, class)| match class {
@@ -141,7 +141,7 @@ impl<'rope> RopeExtWord<'rope> {
     }
 
     /// Finds the next start of word after the given `index`.
-    pub fn next_start(&self, index: usize) -> Option<Cursor> {
+    pub fn next_start(&self, index: usize) -> Option<CachedCursor> {
         let mut words = WordCursor::new(self.0.slice(..), index);
 
         words.next().map(|(range, class)| match class {
@@ -157,7 +157,7 @@ impl<'rope> RopeExtWord<'rope> {
     }
 
     /// Finds the next end of word after the given `index`.
-    pub fn next_end(&self, index: usize) -> Option<Cursor> {
+    pub fn next_end(&self, index: usize) -> Option<CachedCursor> {
         let mut words = WordCursor::new(self.0.slice(..), index);
 
         words.next().map(|(range, class)| match class {

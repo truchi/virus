@@ -1,62 +1,66 @@
 use crate::rope::GraphemeCursor;
-use ropey::Rope;
+use ropey::{Rope, WeakRope};
 use std::{cell::Cell, cmp::Ordering};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
+/// A `(index , line, column, width)` cursor.
+#[derive(Copy, Clone, Eq, Ord, Default, Debug)]
+pub struct Cursor {
+    pub index: usize,
+    pub line: usize,
+    pub column: usize,
+    pub width: usize,
+}
+
+impl PartialEq for Cursor {
+    fn eq(&self, other: &Self) -> bool {
+        self.index == other.index
+    }
+}
+
+impl PartialOrd for Cursor {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.index.cmp(&other.index))
+    }
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                             Cursor                                             //
+//                                          CachedCursor                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// A `(index , line, column, width)` cursor.
 ///
-/// Values for `line`, `column` and `width` are cached.
-/// Since `width()` depends on `column()` and `column()` depends on `line()`,
-/// you have to construct the cursor and call these functions with the same `Rope`
-/// for results to be valid.
-#[derive(Clone, Eq, Ord, Default, Debug)]
-pub struct Cursor {
+/// Values for `line`, `column` and `width` are cached
+/// and recomputed only if [`Rope::is_instance()`] is `false`.
+#[derive(Default)]
+pub struct CachedCursor {
     index: usize,
     line: Cell<Option<usize>>,
     column: Cell<Option<usize>>,
     width: Cell<Option<usize>>,
+    rope: Cell<WeakRope>,
 }
 
-impl Cursor {
-    pub const ZERO: Self = Self::at_start();
-
-    pub const fn new(
-        index: usize,
-        line: Option<usize>,
-        column: Option<usize>,
-        width: Option<usize>,
-    ) -> Self {
-        Self {
-            index,
-            line: Cell::new(line),
-            column: Cell::new(column),
-            width: Cell::new(width),
-        }
-    }
-
-    pub const fn at_start() -> Self {
-        Self::new(0, Some(0), Some(0), Some(0))
+impl CachedCursor {
+    pub fn at_start(rope: &Rope) -> Self {
+        Self::new(0, Some(0), Some(0), Some(0), rope)
     }
 
     pub fn at_end(rope: &Rope) -> Self {
-        Self::new(rope.len_bytes(), None, None, None)
+        Self::new(rope.len_bytes(), None, None, None, rope)
     }
 
-    pub const fn at_index(index: usize) -> Self {
-        Self::new(index, None, None, None)
+    pub fn at_index(rope: &Rope, index: usize) -> Self {
+        Self::new(index, None, None, None, rope)
     }
 
-    pub fn at_line(line: usize, rope: &Rope) -> Self {
+    pub fn at_line(rope: &Rope, line: usize) -> Self {
         debug_assert!(line < rope.len_lines());
 
-        Self::new(rope.line_to_byte(line), Some(line), Some(0), None)
+        Self::new(rope.line_to_byte(line), Some(line), Some(0), None, rope)
     }
 
-    pub fn at_line_column(line: usize, column: usize, rope: &Rope) -> Self {
+    pub fn at_line_column(rope: &Rope, line: usize, column: usize) -> Self {
         debug_assert!(line < rope.len_lines());
         debug_assert!(column <= rope.line(line).to_string().trim_end_matches('\n').len());
 
@@ -65,10 +69,11 @@ impl Cursor {
             Some(line),
             Some(column),
             None,
+            rope,
         )
     }
 
-    pub fn at_line_width(line: usize, width: usize, rope: &Rope) -> Self {
+    pub fn at_line_width(rope: &Rope, line: usize, width: usize) -> Self {
         debug_assert!(line < rope.len_lines());
 
         let (index, mut graphemes) = {
@@ -105,11 +110,12 @@ impl Cursor {
             }
         }
 
-        Cursor::new(
+        Self::new(
             index + current_column,
             Some(line),
             Some(current_column),
             Some(current_width),
+            rope,
         )
     }
 
@@ -117,121 +123,259 @@ impl Cursor {
         self.index
     }
 
-    pub fn line<T: CursorArg>(&self, rope: T) -> T::Output {
-        rope.line(self)
+    pub fn line(&self, rope: &Rope) -> usize {
+        let new_rope = Rope::downgrade(rope);
+        let old_rope = self.rope.replace(new_rope.clone());
+        let is_instance = new_rope.is_instance(&old_rope);
+
+        if is_instance {
+            debug_assert!(self.clone().debug_asserts());
+
+            if let Some(line) = self.line.get() {
+                return line;
+            }
+        }
+
+        self.set_line(rope)
     }
 
-    pub fn column<T: CursorArg>(&self, rope: T) -> T::Output {
-        rope.column(self)
+    pub fn column(&self, rope: &Rope) -> usize {
+        let new_rope = Rope::downgrade(rope);
+        let old_rope = self.rope.replace(new_rope.clone());
+        let is_instance = new_rope.is_instance(&old_rope);
+
+        let line = if is_instance {
+            debug_assert!(self.clone().debug_asserts());
+
+            if let Some(column) = self.column.get() {
+                return column;
+            }
+
+            self.get_or_set_line(rope)
+        } else {
+            self.set_line(rope)
+        };
+
+        self.set_column(rope, line)
     }
 
-    pub fn width<T: CursorArg>(&self, rope: T) -> T::Output {
-        rope.width(self)
+    pub fn width(&self, rope: &Rope) -> usize {
+        let new_rope = Rope::downgrade(rope);
+        let old_rope = self.rope.replace(new_rope.clone());
+        let is_instance = new_rope.is_instance(&old_rope);
+
+        let (line, column) = if is_instance {
+            debug_assert!(self.clone().debug_asserts());
+
+            if let Some(cached) = self.width.get() {
+                return cached;
+            }
+
+            let line = self.get_or_set_line(rope);
+            let column = self.get_or_set_column(rope, line);
+
+            (line, column)
+        } else {
+            let line = self.set_line(rope);
+            let column = self.set_column(rope, line);
+
+            (line, column)
+        };
+
+        self.set_width(rope, line, column)
+    }
+
+    pub fn cursor(&self, rope: &Rope) -> Cursor {
+        let new_rope = Rope::downgrade(rope);
+        let old_rope = self.rope.replace(new_rope.clone());
+        let is_instance = new_rope.is_instance(&old_rope);
+
+        let (line, column, width) = if is_instance {
+            debug_assert!(self.clone().debug_asserts());
+
+            let line = self.get_or_set_line(rope);
+            let column = self.get_or_set_column(rope, line);
+            let width = self.get_or_set_width(rope, line, column);
+
+            (line, column, width)
+        } else {
+            let line = self.set_line(rope);
+            let column = self.set_column(rope, line);
+            let width = self.set_width(rope, line, column);
+
+            (line, column, width)
+        };
+
+        Cursor {
+            index: self.index,
+            line,
+            column,
+            width,
+        }
     }
 }
 
-impl PartialEq for Cursor {
+/// Private.
+impl CachedCursor {
+    fn new(
+        index: usize,
+        line: Option<usize>,
+        column: Option<usize>,
+        width: Option<usize>,
+        rope: &Rope,
+    ) -> Self {
+        let cursor = Self {
+            index,
+            line: Cell::new(line),
+            column: Cell::new(column),
+            width: Cell::new(width),
+            rope: Cell::new(Rope::downgrade(&rope)),
+        };
+
+        debug_assert!(cursor.clone().debug_asserts());
+        cursor
+    }
+
+    fn set_line(&self, rope: &Rope) -> usize {
+        let line = get_line(rope, self.index);
+        self.line.set(Some(line));
+        line
+    }
+
+    fn set_column(&self, rope: &Rope, line: usize) -> usize {
+        let column = get_column(rope, self.index, line);
+        self.column.set(Some(column));
+        column
+    }
+
+    fn set_width(&self, rope: &Rope, line: usize, column: usize) -> usize {
+        let width = get_width(rope, line, column);
+        self.width.set(Some(width));
+        width
+    }
+
+    fn get_or_set_line(&self, rope: &Rope) -> usize {
+        if let Some(line) = self.line.get() {
+            line
+        } else {
+            self.set_line(rope)
+        }
+    }
+
+    fn get_or_set_column(&self, rope: &Rope, line: usize) -> usize {
+        if let Some(column) = self.column.get() {
+            column
+        } else {
+            self.set_column(rope, line)
+        }
+    }
+
+    fn get_or_set_width(&self, rope: &Rope, line: usize, column: usize) -> usize {
+        if let Some(width) = self.width.get() {
+            width
+        } else {
+            self.set_width(rope, line, column)
+        }
+    }
+
+    fn debug_asserts(self) -> bool {
+        let rope = self.rope.take().upgrade().unwrap();
+
+        debug_assert!(self.index <= rope.len_bytes());
+
+        if let Some(line) = self.line.get() {
+            debug_assert!(line == get_line(&rope, self.index));
+        }
+
+        if let Some(column) = self.column.get() {
+            debug_assert!(column == get_column(&rope, self.index, self.line.get().unwrap()));
+        }
+
+        if let Some(width) = self.width.get() {
+            debug_assert!(
+                width == get_width(&rope, self.line.get().unwrap(), self.column.get().unwrap())
+            );
+        }
+
+        true
+    }
+}
+
+impl Clone for CachedCursor {
+    fn clone(&self) -> Self {
+        let rope = self.rope.take();
+
+        // NOTE
+        // Std does not allow this, but I don't understand why...
+        // This might be an issue!
+        self.rope.set(rope.clone());
+
+        Self {
+            rope: Cell::new(rope),
+            index: self.index,
+            line: self.line.clone(),
+            column: self.column.clone(),
+            width: self.width.clone(),
+        }
+    }
+}
+
+impl PartialEq for CachedCursor {
     fn eq(&self, other: &Self) -> bool {
         self.index == other.index
     }
 }
 
-impl PartialOrd for Cursor {
+impl Eq for CachedCursor {}
+
+impl PartialOrd for CachedCursor {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.index.cmp(&other.index))
+        Some(self.cmp(other))
     }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                           CursorArg                                            //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-pub trait CursorArg {
-    type Output;
-
-    fn line(&self, cursor: &Cursor) -> Self::Output;
-
-    fn column(&self, cursor: &Cursor) -> Self::Output;
-
-    fn width(&self, cursor: &Cursor) -> Self::Output;
+impl Ord for CachedCursor {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.index.cmp(&other.index)
+    }
 }
 
-// ────────────────────────────────────────────────────────────────────────────────────────────── //
+impl std::fmt::Debug for CachedCursor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        #[allow(unused)]
+        #[derive(Debug)]
+        struct Cursor {
+            index: usize,
+            line: Option<usize>,
+            column: Option<usize>,
+            width: Option<usize>,
+        }
 
-impl CursorArg for () {
-    type Output = Option<usize>;
-
-    fn line(&self, cursor: &Cursor) -> Self::Output {
-        cursor.line.get()
-    }
-
-    fn column(&self, cursor: &Cursor) -> Self::Output {
-        cursor.column.get()
-    }
-
-    fn width(&self, cursor: &Cursor) -> Self::Output {
-        cursor.width.get()
+        Cursor::fmt(
+            &Cursor {
+                index: self.index,
+                line: self.line.get(),
+                column: self.column.get(),
+                width: self.width.get(),
+            },
+            f,
+        )
     }
 }
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
-impl<'a> CursorArg for &'a Rope {
-    type Output = usize;
-
-    fn line(&self, cursor: &Cursor) -> Self::Output {
-        debug_assert!(cursor.index <= self.len_bytes());
-
-        if let Some(cached) = cursor.line.get() {
-            debug_assert!(cached == line(cursor, self));
-            cached
-        } else {
-            let line = line(cursor, self);
-            cursor.line.set(Some(line));
-            line
-        }
-    }
-
-    fn column(&self, cursor: &Cursor) -> Self::Output {
-        debug_assert!(cursor.index <= self.len_bytes());
-
-        if let Some(cached) = cursor.column.get() {
-            debug_assert!(cached == column(cursor, self));
-            cached
-        } else {
-            let column = column(cursor, self);
-            cursor.column.set(Some(column));
-            column
-        }
-    }
-
-    fn width(&self, cursor: &Cursor) -> Self::Output {
-        debug_assert!(cursor.index <= self.len_bytes());
-
-        if let Some(cached) = cursor.width.get() {
-            debug_assert!(cached == width(cursor, self));
-            cached
-        } else {
-            let width = width(cursor, self);
-            cursor.width.set(Some(width));
-            width
-        }
-    }
+fn get_line(rope: &Rope, index: usize) -> usize {
+    rope.byte_to_line(index)
 }
 
-// ────────────────────────────────────────────────────────────────────────────────────────────── //
-
-fn line(cursor: &Cursor, rope: &Rope) -> usize {
-    rope.byte_to_line(cursor.index)
+fn get_column(rope: &Rope, index: usize, line: usize) -> usize {
+    index - rope.line_to_byte(line)
 }
 
-fn column(cursor: &Cursor, rope: &Rope) -> usize {
-    cursor.index - rope.line_to_byte(cursor.line(rope))
-}
-
-fn width(cursor: &Cursor, rope: &Rope) -> usize {
-    rope.line(cursor.line(rope))
-        .byte_slice(..cursor.column(rope))
+fn get_width(rope: &Rope, line: usize, column: usize) -> usize {
+    rope.line(line)
+        .byte_slice(..column)
         .chars()
         .map(|char| char.width().unwrap_or_default())
         .sum()
@@ -306,8 +450,8 @@ mod tests {
 
             for (index, line, column, width) in data.iter().copied() {
                 for cursor in [
-                    Cursor::at_index(index),
-                    Cursor::at_line_column(line, column, &rope),
+                    CachedCursor::at_index(&rope, index),
+                    CachedCursor::at_line_column(&rope, line, column),
                 ] {
                     assert!(cursor.index() == index);
                     assert!(cursor.line(&rope) == line);
@@ -316,7 +460,7 @@ mod tests {
                 }
 
                 if index == str.len() {
-                    let cursor = Cursor::at_end(&rope);
+                    let cursor = CachedCursor::at_end(&rope);
 
                     assert!(cursor.index() == index);
                     assert!(cursor.line(&rope) == line);
@@ -343,7 +487,7 @@ mod tests {
             assert!(data.len() == rope.len_lines(), "Wrong test data");
 
             for (i, (index, line, column, width)) in data.iter().copied().enumerate() {
-                let cursor = Cursor::at_line(i, &rope);
+                let cursor = CachedCursor::at_line(&rope, i);
 
                 assert!(cursor.index() == index);
                 assert!(cursor.line(&rope) == line);
@@ -367,7 +511,7 @@ mod tests {
         .into_iter()
         .enumerate()
         {
-            let cursor = Cursor::at_line_width(line, i, &rope);
+            let cursor = CachedCursor::at_line_width(&rope, line, i);
 
             assert!(cursor.index() == index);
             assert!(cursor.line(&rope) == line);
