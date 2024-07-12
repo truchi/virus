@@ -1,6 +1,6 @@
 use crate::{
-    cursor::CachedCursor,
-    rope::{RopeExt, Text, WordClass, WordCursor},
+    cursor::{CachedCursor, Cursor},
+    rope::{Edit, RopeExt, Text, WordClass, WordCursor},
     syntax::{Capture, Theme},
 };
 use ropey::Rope;
@@ -317,136 +317,81 @@ impl Document {
 
 /// Edition.
 impl Document {
-    pub fn edit(&mut self, text: &Text) {
+    pub fn edit(&mut self, inserted: Text) -> Edit {
         let Range {
             start,
-            end: old_end,
+            end: removed_end,
         } = self.selection.range();
-        let start_index = start.index();
-        let old_end_index = old_end.index();
+        let start = start.cursor(&self.rope);
+        let removed_end = removed_end.cursor(&self.rope);
+        let insert = !inserted.is_empty();
+        let remove = start.index != removed_end.index;
 
-        debug_assert!({
-            let index = self.rope.byte_to_char(start_index);
-            self.rope.char_to_byte(index) == start_index
-        });
-        debug_assert!({
-            let index = self.rope.byte_to_char(old_end_index);
-            self.rope.char_to_byte(index) == old_end_index
-        });
-
-        let removing = start_index != old_end_index;
-        let inserting = !text.is_empty();
-
-        fn insert(rope: &mut Rope, mut char_index: usize, text: &Text) {
-            for str in text.chunks() {
-                rope.insert(char_index, str);
-                char_index += str.chars().count();
-            }
-        }
-
-        match (removing, inserting) {
+        match (insert, remove) {
             // Replace
             (true, true) => {
-                let start_line = start.line(&self.rope);
-                let start_column = start.column(&self.rope);
-                let old_end_line = old_end.line(&self.rope);
-                let old_end_column = old_end.column(&self.rope);
+                let removed =
+                    Edit::replace(&mut self.rope, start.index..removed_end.index, &inserted)
+                        .slice(..)
+                        .into();
+                let inserted_end = self
+                    .rope
+                    .cursor()
+                    .at_index(start.index + inserted.len())
+                    .cursor(&self.rope);
 
-                {
-                    let start = self.rope.byte_to_char(start_index);
-                    let end = self.rope.byte_to_char(old_end_index);
+                self.selection = inserted_end.cached(&self.rope).into();
+                self.edit_tree(start, removed_end, inserted_end);
 
-                    self.rope.remove(start..end);
-                    insert(&mut self.rope, start, text);
-                }
-
-                let new_end = self.rope.cursor().at_index(start_index + text.len());
-                let new_end_index = new_end.index();
-                let new_end_line = new_end.line(&self.rope);
-                let new_end_column = new_end.column(&self.rope);
-
-                self.edit_tree(
-                    start_index,
-                    start_line,
-                    start_column,
-                    old_end_index,
-                    old_end_line,
-                    old_end_column,
-                    new_end_index,
-                    new_end_line,
-                    new_end_column,
-                );
-                self.selection = new_end.into();
-            }
-            // Remove
-            (true, false) => {
-                let start_line = start.line(&self.rope);
-                let start_column = start.column(&self.rope);
-                let old_end_line = old_end.line(&self.rope);
-                let old_end_column = old_end.column(&self.rope);
-
-                {
-                    let start = self.rope.byte_to_char(start_index);
-                    let end = self.rope.byte_to_char(old_end_index);
-
-                    self.rope.remove(start..end);
-                }
-
-                let new_end = start.clone();
-
-                self.edit_tree(
-                    start_index,
-                    start_line,
-                    start_column,
-                    old_end_index,
-                    old_end_line,
-                    old_end_column,
-                    start_index,
-                    start_line,
-                    start_column,
-                );
-                self.selection = new_end.into();
+                Edit::new(start, removed_end, inserted_end, removed, inserted)
             }
             // Insert
-            (false, true) => {
-                let start_line = start.line(&self.rope);
-                let start_column = start.column(&self.rope);
+            (true, false) => {
+                let removed = {
+                    Edit::insert(&mut self.rope, start.index, &inserted);
+                    Default::default()
+                };
+                let inserted_end = self
+                    .rope
+                    .cursor()
+                    .at_index(start.index + inserted.len())
+                    .cursor(&self.rope);
 
-                {
-                    let start = self.rope.byte_to_char(start_index);
-                    insert(&mut self.rope, start, text);
-                }
+                self.selection = inserted_end.cached(&self.rope).into();
+                self.edit_tree(start, removed_end, inserted_end);
 
-                let new_end = self.rope.cursor().at_index(start_index + text.len());
-                let new_end_index = new_end.index();
-                let new_end_line = new_end.line(&self.rope);
-                let new_end_column = new_end.column(&self.rope);
-
-                self.edit_tree(
-                    start_index,
-                    start_line,
-                    start_column,
-                    start_index,
-                    start_line,
-                    start_column,
-                    new_end_index,
-                    new_end_line,
-                    new_end_column,
-                );
-                self.selection = new_end.into();
+                Edit::new(start, removed_end, inserted_end, removed, inserted)
             }
-            // Nothing
-            (false, false) => {}
+            // Remove
+            (false, true) => {
+                let removed = Edit::remove(&mut self.rope, start.index..removed_end.index)
+                    .slice(..)
+                    .into();
+                let inserted_end = start;
+
+                self.selection = inserted_end.cached(&self.rope).into();
+                self.edit_tree(start, removed_end, inserted_end);
+
+                Edit::new(start, removed_end, inserted_end, removed, inserted)
+            }
+            // Noop
+            (false, false) => Edit::new(
+                start,
+                removed_end,
+                removed_end,
+                Text::default(),
+                Text::default(),
+            ),
         }
     }
 
     // TODO: convenient for now but does not feel good
-    pub fn backspace(&mut self) {
+    pub fn backspace(&mut self) -> Edit {
         if self.selection.is_empty() {
             self.move_prev_grapheme(true);
         }
 
-        self.edit(&Text::default());
+        self.edit(Text::default())
     }
 }
 
@@ -511,33 +456,22 @@ impl Document {
             .expect("Cannot parse")
     }
 
-    fn edit_tree(
-        &mut self,
-        start_index: usize,
-        start_line: usize,
-        start_column: usize,
-        old_end_index: usize,
-        old_end_line: usize,
-        old_end_column: usize,
-        new_end_index: usize,
-        new_end_line: usize,
-        new_end_column: usize,
-    ) {
+    fn edit_tree(&mut self, start: Cursor, removed_end: Cursor, inserted_end: Cursor) {
         self.tree.edit(&InputEdit {
-            start_byte: start_index,
-            old_end_byte: old_end_index,
-            new_end_byte: new_end_index,
+            start_byte: start.index,
+            old_end_byte: removed_end.index,
+            new_end_byte: inserted_end.index,
             start_position: Point {
-                row: start_line,
-                column: start_column,
+                row: start.line,
+                column: start.column,
             },
             old_end_position: Point {
-                row: old_end_line,
-                column: old_end_column,
+                row: removed_end.line,
+                column: removed_end.column,
             },
             new_end_position: Point {
-                row: new_end_line,
-                column: new_end_column,
+                row: inserted_end.line,
+                column: inserted_end.column,
             },
         });
         self.is_tree_dirty = true;

@@ -12,6 +12,18 @@ pub struct Cursor {
     pub width: usize,
 }
 
+impl Cursor {
+    pub fn cached(&self, rope: &Rope) -> CachedCursor {
+        CachedCursor::new(
+            self.index,
+            Some(self.line),
+            Some(self.column),
+            Some(self.width),
+            rope,
+        )
+    }
+}
+
 impl PartialEq for Cursor {
     fn eq(&self, other: &Self) -> bool {
         self.index == other.index

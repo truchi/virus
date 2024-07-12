@@ -129,7 +129,7 @@ impl Editor {
         self.documents
             .get_mut(self.active_document)
             .unwrap()
-            .edit(&self.clipboard);
+            .edit(self.clipboard.clone());
     }
 
     pub fn find_git_root(path: PathBuf) -> Option<PathBuf> {
