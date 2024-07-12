@@ -1,5 +1,6 @@
 use crate::{
-    cursor::{CachedCursor, Cursor},
+    cursor::CachedCursor,
+    history::History,
     rope::{Edit, RopeExt, Text, WordClass, WordCursor},
     syntax::{Capture, Theme},
 };
@@ -11,7 +12,7 @@ use std::{
     ops::Range,
     path::{Path, PathBuf},
 };
-use tree_sitter::{InputEdit, Node, Parser, Point, Query, Tree};
+use tree_sitter::{Node, Parser, Query, Tree};
 use virus_graphics::text::{Cluster, Context, FontFamilyKey, FontSize, Line};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -99,6 +100,7 @@ pub struct Document {
     tree: Tree,
     is_tree_dirty: bool,
     version: usize,
+    history: History,
     cached_shaping: Option<CachedShaping>,
 }
 
@@ -126,12 +128,13 @@ impl Document {
         Ok(Self {
             path,
             rope,
-            selection: Default::default(),
+            selection: Selection::default(),
             highlights,
             parser,
             tree,
             is_tree_dirty: false,
             version: 0,
+            history: History::default(),
             cached_shaping: None,
         })
     }
@@ -317,7 +320,7 @@ impl Document {
 
 /// Edition.
 impl Document {
-    pub fn edit(&mut self, inserted: Text) -> Edit {
+    pub fn edit(&mut self, inserted: Text) {
         let Range {
             start,
             end: removed_end,
@@ -327,71 +330,79 @@ impl Document {
         let insert = !inserted.is_empty();
         let remove = start.index != removed_end.index;
 
-        match (insert, remove) {
+        let (removed, inserted_end) = match (insert, remove) {
             // Replace
-            (true, true) => {
-                let removed =
-                    Edit::replace(&mut self.rope, start.index..removed_end.index, &inserted)
-                        .slice(..)
-                        .into();
-                let inserted_end = self
-                    .rope
+            (true, true) => (
+                Edit::replace(&mut self.rope, start.index..removed_end.index, &inserted)
+                    .slice(..)
+                    .into(),
+                self.rope
                     .cursor()
                     .at_index(start.index + inserted.len())
-                    .cursor(&self.rope);
-
-                self.selection = inserted_end.cached(&self.rope).into();
-                self.edit_tree(start, removed_end, inserted_end);
-
-                Edit::new(start, removed_end, inserted_end, removed, inserted)
-            }
+                    .cursor(&self.rope),
+            ),
             // Insert
-            (true, false) => {
-                let removed = {
+            (true, false) => (
+                {
                     Edit::insert(&mut self.rope, start.index, &inserted);
                     Default::default()
-                };
-                let inserted_end = self
-                    .rope
+                },
+                self.rope
                     .cursor()
                     .at_index(start.index + inserted.len())
-                    .cursor(&self.rope);
-
-                self.selection = inserted_end.cached(&self.rope).into();
-                self.edit_tree(start, removed_end, inserted_end);
-
-                Edit::new(start, removed_end, inserted_end, removed, inserted)
-            }
-            // Remove
-            (false, true) => {
-                let removed = Edit::remove(&mut self.rope, start.index..removed_end.index)
-                    .slice(..)
-                    .into();
-                let inserted_end = start;
-
-                self.selection = inserted_end.cached(&self.rope).into();
-                self.edit_tree(start, removed_end, inserted_end);
-
-                Edit::new(start, removed_end, inserted_end, removed, inserted)
-            }
-            // Noop
-            (false, false) => Edit::new(
-                start,
-                removed_end,
-                removed_end,
-                Text::default(),
-                Text::default(),
+                    .cursor(&self.rope),
             ),
-        }
+            // Remove
+            (false, true) => (
+                Edit::remove(&mut self.rope, start.index..removed_end.index)
+                    .slice(..)
+                    .into(),
+                start,
+            ),
+            // Noop
+            (false, false) => (Default::default(), removed_end),
+        };
+
+        let edit = Edit::new(start, removed_end, inserted_end, removed, inserted);
+        self.selection = inserted_end.cached(&self.rope).into();
+        self.tree.edit(&edit.input_edit());
+        self.is_tree_dirty = true;
+        self.version += 1;
+        self.history.edit(edit);
+        self.cached_shaping = None;
     }
 
     // TODO: convenient for now but does not feel good
-    pub fn backspace(&mut self) -> Edit {
+    pub fn backspace(&mut self) {
         if self.selection.is_empty() {
             self.move_prev_grapheme(true);
         }
 
-        self.edit(Text::default())
+        self.edit(Text::default());
+    }
+
+    pub fn undo(&mut self) {
+        if let Some(edit) = self.history.undo() {
+            let input_edit = edit.unapply(&mut self.rope);
+            self.selection.anchor = edit.start().cached(&self.rope);
+            self.selection.head = edit.removed_end().cached(&self.rope);
+            self.tree.edit(&input_edit);
+            self.is_tree_dirty = true;
+            self.version += 1;
+            self.cached_shaping = None;
+        }
+    }
+
+    pub fn redo(&mut self) {
+        if let Some(edit) = self.history.redo() {
+            let input_edit = edit.apply(&mut self.rope);
+            self.selection.anchor = edit.start().cached(&self.rope);
+            self.selection.head = edit.inserted_end().cached(&self.rope);
+            self.tree.edit(&input_edit);
+            self.is_tree_dirty = true;
+            self.version += 1;
+            self.cached_shaping = None;
+        }
     }
 }
 
@@ -454,29 +465,6 @@ impl Document {
                 tree,
             )
             .expect("Cannot parse")
-    }
-
-    fn edit_tree(&mut self, start: Cursor, removed_end: Cursor, inserted_end: Cursor) {
-        self.tree.edit(&InputEdit {
-            start_byte: start.index,
-            old_end_byte: removed_end.index,
-            new_end_byte: inserted_end.index,
-            start_position: Point {
-                row: start.line,
-                column: start.column,
-            },
-            old_end_position: Point {
-                row: removed_end.line,
-                column: removed_end.column,
-            },
-            new_end_position: Point {
-                row: inserted_end.line,
-                column: inserted_end.column,
-            },
-        });
-        self.is_tree_dirty = true;
-        self.version += 1;
-        self.cached_shaping = None;
     }
 }
 

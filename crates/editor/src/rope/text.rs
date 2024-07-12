@@ -1,6 +1,7 @@
 use crate::cursor::Cursor;
 use ropey::{iter::Chunks, Rope, RopeSlice};
 use std::ops::Range;
+use tree_sitter::{InputEdit, Point};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Text                                              //
@@ -114,12 +115,42 @@ impl Edit {
         }
     }
 
-    pub fn apply(&self, rope: &mut Rope) {
-        Self::apply_impl(rope, self.start, &self.removed, &self.inserted);
+    pub fn start(&self) -> Cursor {
+        self.start
     }
 
-    pub fn unapply(&self, rope: &mut Rope) {
-        Self::apply_impl(rope, self.start, &self.inserted, &self.removed);
+    pub fn removed_end(&self) -> Cursor {
+        self.removed_end
+    }
+
+    pub fn inserted_end(&self) -> Cursor {
+        self.inserted_end
+    }
+
+    pub fn input_edit(&self) -> InputEdit {
+        Self::input_edit_impl(self.start, self.removed_end, self.inserted_end)
+    }
+
+    pub fn apply(&self, rope: &mut Rope) -> InputEdit {
+        Self::apply_impl(
+            rope,
+            self.start,
+            self.removed_end,
+            self.inserted_end,
+            &self.removed,
+            &self.inserted,
+        )
+    }
+
+    pub fn unapply(&self, rope: &mut Rope) -> InputEdit {
+        Self::apply_impl(
+            rope,
+            self.start,
+            self.inserted_end,
+            self.removed_end,
+            &self.inserted,
+            &self.removed,
+        )
     }
 
     pub fn insert(rope: &mut Rope, index: usize, inserted: &Text) {
@@ -177,7 +208,14 @@ impl Edit {
 
 /// Private.
 impl Edit {
-    fn apply_impl(rope: &mut Rope, start: Cursor, removed: &Text, inserted: &Text) {
+    fn apply_impl(
+        rope: &mut Rope,
+        start: Cursor,
+        removed_end: Cursor,
+        inserted_end: Cursor,
+        removed: &Text,
+        inserted: &Text,
+    ) -> InputEdit {
         let index = start.index;
         let range = index..index + removed.len();
 
@@ -190,6 +228,28 @@ impl Edit {
             (false, false) => {
                 Edit::replace(rope, range, inserted);
             }
+        }
+
+        Self::input_edit_impl(start, removed_end, inserted_end)
+    }
+
+    fn input_edit_impl(start: Cursor, removed_end: Cursor, inserted_end: Cursor) -> InputEdit {
+        InputEdit {
+            start_byte: start.index,
+            old_end_byte: removed_end.index,
+            new_end_byte: inserted_end.index,
+            start_position: Point {
+                row: start.line,
+                column: start.column,
+            },
+            old_end_position: Point {
+                row: removed_end.line,
+                column: removed_end.column,
+            },
+            new_end_position: Point {
+                row: inserted_end.line,
+                column: inserted_end.column,
+            },
         }
     }
 }

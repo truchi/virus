@@ -26,3 +26,4 @@ pub mod syntax {
     mod capture;
     mod theme;
 }
+pub mod history;
