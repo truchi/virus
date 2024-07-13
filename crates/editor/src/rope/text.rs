@@ -2,6 +2,7 @@ use crate::cursor::Cursor;
 use ropey::{iter::Chunks, Rope, RopeSlice};
 use std::ops::Range;
 use tree_sitter::{InputEdit, Point};
+use virus_lsp::type_aliases::TextDocumentContentChangeEventRangeAndText;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Text                                              //
@@ -44,6 +45,15 @@ impl<'a> From<RopeSlice<'a>> for Text {
             } else {
                 Inner::Rope(slice.into())
             },
+        }
+    }
+}
+
+impl ToString for Text {
+    fn to_string(&self) -> String {
+        match &self.inner {
+            Inner::String(string) => string.to_string(),
+            Inner::Rope(rope) => rope.to_string(),
         }
     }
 }
@@ -127,8 +137,29 @@ impl Edit {
         self.inserted_end
     }
 
-    pub fn input_edit(&self) -> InputEdit {
+    pub fn to_ts_edit(&self) -> InputEdit {
         Self::input_edit_impl(self.start, self.removed_end, self.inserted_end)
+    }
+
+    pub fn to_lsp_edit(&self) -> TextDocumentContentChangeEventRangeAndText {
+        use virus_lsp::{
+            structures::{Position, Range},
+            UInteger,
+        };
+
+        TextDocumentContentChangeEventRangeAndText {
+            range: Range {
+                start: Position {
+                    line: self.start.line as UInteger,
+                    character: self.start.column as UInteger,
+                },
+                end: virus_lsp::structures::Position {
+                    line: self.removed_end.line as UInteger,
+                    character: self.removed_end.column as UInteger,
+                },
+            },
+            text: self.inserted.to_string(),
+        }
     }
 
     pub fn apply(&self, rope: &mut Rope) -> InputEdit {

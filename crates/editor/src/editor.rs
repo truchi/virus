@@ -1,10 +1,6 @@
 use crate::{async_actor::AsyncActorSender, document::Document, lsp::Lsp, rope::Text};
 use ignore::WalkBuilder;
-use std::{
-    future::Future,
-    path::{Path, PathBuf},
-    sync::{Mutex, Weak},
-};
+use std::path::{Path, PathBuf};
 use tokio::{
     process::Command,
     sync::{mpsc::unbounded_channel, oneshot::Sender},
@@ -40,7 +36,7 @@ impl Editor {
         event_loop: EventLoopSender,
     ) -> Self {
         let (rust_server_message_sender, rust_server_message_receiver) = unbounded_channel();
-        let mut editor = Self {
+        let editor = Self {
             root,
             documents: Default::default(),
             active_document: 0,
@@ -74,7 +70,7 @@ impl Editor {
         {
             self.active_document = active_document;
         } else {
-            let mut document = Document::open(path)?;
+            let mut document = Document::open(path, self.lsp())?;
             document.parse();
 
             self.active_document = self.documents.len();
@@ -159,17 +155,7 @@ impl Editor {
 
 /// Private.
 impl Editor {
-    fn lsp(&mut self) -> Lsp {
-        Lsp { editor: self }
-    }
-
-    pub(crate) fn async_actor<F, Fut>(&self, function: F)
-    where
-        F: 'static + Send + FnOnce(Weak<Mutex<Editor>>) -> Fut,
-        Fut: 'static + Send + Future<Output = ()>,
-    {
-        self.async_actor
-            .send(Box::new(|editor| Box::pin(function(editor))))
-            .expect("Failed to send to async actor");
+    fn lsp(&self) -> Lsp {
+        Lsp::new(self.async_actor.clone())
     }
 }

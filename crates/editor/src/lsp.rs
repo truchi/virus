@@ -1,7 +1,7 @@
-use crate::{document::Document, editor::Editor};
+use crate::{async_actor::AsyncActorSender, document::Document, editor::Editor};
 use serde_json::Value;
 use std::{
-    ops::Range,
+    future::Future,
     path::Component,
     sync::{Mutex, Weak},
 };
@@ -11,34 +11,36 @@ use virus_lsp::{
     structures::{
         ClientCapabilities, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
         DidOpenTextDocumentParams, GeneralClientCapabilities, InitializeParams,
-        InitializeParamsProcessId, InitializeParamsWorkspaceFolders, InitializedParams, Position,
-        Range as LspRange, TextDocumentIdentifier, TextDocumentItem,
-        VersionedTextDocumentIdentifier, WindowClientCapabilities, WorkDoneProgressParams,
-        WorkspaceFolder,
+        InitializeParamsProcessId, InitializeParamsWorkspaceFolders, InitializedParams,
+        TextDocumentIdentifier, TextDocumentItem, VersionedTextDocumentIdentifier,
+        WindowClientCapabilities, WorkDoneProgressParams, WorkspaceFolder,
     },
     type_aliases::{
         ProgressToken, TextDocumentContentChangeEvent, TextDocumentContentChangeEventRangeAndText,
     },
-    Integer, ServerMessage, ServerMessageReceiver, ServerNotification, ServerRequest, UInteger,
+    Integer, ServerMessage, ServerMessageReceiver, ServerNotification, ServerRequest,
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Lsp                                               //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-pub struct Lsp<'editor> {
-    pub editor: &'editor mut Editor,
+#[derive(Clone)]
+pub struct Lsp {
+    async_actor: AsyncActorSender,
 }
 
-impl<'editor> Lsp<'editor> {
-    pub fn init(self, rust_receiver: ServerMessageReceiver) -> Self {
+impl Lsp {
+    pub fn new(async_actor: AsyncActorSender) -> Self {
+        Self { async_actor }
+    }
+
+    pub fn init(&self, rust_receiver: ServerMessageReceiver) {
         let process_id = std::process::id() as Integer;
 
-        self.editor
-            .async_actor(|editor| rust_lsp_handler(editor, rust_receiver));
-
-        self.editor.async_actor(move |editor| async move {
-            let (client, folder) = {
+        self.send(|editor| Self::rust_lsp_handler(editor, rust_receiver));
+        self.send(move |editor| async move {
+            let (mut client, folder) = {
                 let editor = editor.upgrade().unwrap();
                 let mut editor = editor.lock().unwrap();
                 let root = editor.root();
@@ -53,7 +55,6 @@ impl<'editor> Lsp<'editor> {
                 (editor.lsps.rust(), folder)
             };
 
-            let mut client = client.lock().await;
             let result = client
                 .request()
                 .initialize(initialize_params(
@@ -78,13 +79,12 @@ impl<'editor> Lsp<'editor> {
                 .initialized(InitializedParams {})
                 .await
                 .unwrap();
+            client.wait_for_work_done().await;
             client.init(result);
         });
-
-        self
     }
 
-    pub fn open_document(self, document: &Document) -> Self {
+    pub fn open_document(&self, document: &Document) {
         let uri = document.path().as_os_str().to_str().unwrap();
         let uri = format!("file://{uri}");
         let language_id = document.path().extension().unwrap().to_str().unwrap();
@@ -95,16 +95,15 @@ impl<'editor> Lsp<'editor> {
         let text = document.rope().to_string();
         let version = document.version() as Integer;
 
-        self.editor.async_actor(move |editor| async move {
-            let client = {
+        self.send(move |editor| async move {
+            let mut client = {
                 let editor = editor.upgrade().unwrap();
                 let mut editor = editor.lock().unwrap();
 
                 editor.lsps.rust()
             };
 
-            let mut client = client.lock().await;
-            client.initied().await;
+            client.inited().await;
             client
                 .notification()
                 .text_document_did_open(DidOpenTextDocumentParams {
@@ -118,29 +117,26 @@ impl<'editor> Lsp<'editor> {
                 .await
                 .unwrap();
         });
-
-        self
     }
 
     pub fn change_document(
-        self,
+        &self,
         document: &Document,
-        changes: impl IntoIterator<Item = (Range<(usize, usize)>, String)> + Send + 'static,
-    ) -> Self {
+        changes: impl IntoIterator<Item = TextDocumentContentChangeEventRangeAndText> + Send + 'static,
+    ) {
         let uri = document.path().as_os_str().to_str().unwrap();
         let uri = format!("file://{uri}");
         let version = document.version() as Integer;
 
-        self.editor.async_actor(move |editor| async move {
-            let client = {
+        self.send(move |editor| async move {
+            let mut client = {
                 let editor = editor.upgrade().unwrap();
                 let mut editor = editor.lock().unwrap();
 
                 editor.lsps.rust()
             };
 
-            let mut client = client.lock().await;
-            client.initied().await;
+            client.inited().await;
             client
                 .notification()
                 .text_document_did_change(DidChangeTextDocumentParams {
@@ -150,46 +146,27 @@ impl<'editor> Lsp<'editor> {
                     },
                     content_changes: changes
                         .into_iter()
-                        .map(|(range, text)| {
-                            TextDocumentContentChangeEvent::RangeAndText(
-                                TextDocumentContentChangeEventRangeAndText {
-                                    range: LspRange {
-                                        start: Position {
-                                            line: range.start.0 as UInteger,
-                                            character: range.start.1 as UInteger,
-                                        },
-                                        end: Position {
-                                            line: range.end.0 as UInteger,
-                                            character: range.end.1 as UInteger,
-                                        },
-                                    },
-                                    text,
-                                },
-                            )
-                        })
+                        .map(TextDocumentContentChangeEvent::RangeAndText)
                         .collect(),
                 })
                 .await
                 .unwrap();
         });
-
-        self
     }
 
-    pub fn close_document(self, document: &Document) -> Self {
+    pub fn close_document(self, document: &Document) {
         let uri = document.path().as_os_str().to_str().unwrap();
         let uri = format!("file://{uri}");
 
-        self.editor.async_actor(|editor| async move {
-            let client = {
+        self.send(|editor| async move {
+            let mut client = {
                 let editor = editor.upgrade().unwrap();
                 let mut editor = editor.lock().unwrap();
 
                 editor.lsps.rust()
             };
 
-            let mut client = client.lock().await;
-            client.initied().await;
+            client.inited().await;
             client
                 .notification()
                 .text_document_did_close(DidCloseTextDocumentParams {
@@ -198,21 +175,18 @@ impl<'editor> Lsp<'editor> {
                 .await
                 .unwrap();
         });
-
-        self
     }
 
-    pub fn exit(self, sender: Sender<()>) -> Self {
-        self.editor.async_actor(|editor| async move {
+    pub fn exit(&self, sender: Sender<()>) {
+        self.send(|editor| async move {
             let client = {
                 let editor = editor.upgrade().unwrap();
-                let mut editor = editor.lock().unwrap();
+                let editor = editor.lock().unwrap();
 
                 editor.lsps.rust_if_spawned()
             };
 
-            if let Some(client) = client {
-                let mut client = client.lock().await;
+            if let Some(mut client) = client {
                 client
                     .request()
                     .shutdown()
@@ -226,45 +200,64 @@ impl<'editor> Lsp<'editor> {
 
             sender.send(()).unwrap();
         });
+    }
+}
 
-        self
+/// Private.
+impl Lsp {
+    fn send<F, Fut>(&self, function: F)
+    where
+        F: 'static + Send + FnOnce(Weak<Mutex<Editor>>) -> Fut,
+        Fut: 'static + Send + Future<Output = ()>,
+    {
+        self.async_actor
+            .send(Box::new(|editor| Box::pin(function(editor))))
+            .expect("Failed to send to async actor");
+    }
+
+    async fn rust_lsp_handler(_editor: Weak<Mutex<Editor>>, mut receiver: ServerMessageReceiver) {
+        while let Some(message) = receiver.recv().await {
+            match message {
+                ServerMessage::ServerNotification(notification) => {
+                    // dbg!(&notification);
+
+                    match notification {
+                        ServerNotification::CancelRequest(_) => {}
+                        ServerNotification::LogTrace(trace) => {
+                            dbg!(trace);
+                        }
+                        ServerNotification::Progress(_) => {}
+                        ServerNotification::TelemetryEvent(_) => {}
+                        ServerNotification::TextDocumentPublishDiagnostics(_) => {}
+                        ServerNotification::WindowLogMessage(_) => {}
+                        ServerNotification::WindowShowMessage(_) => {}
+                    }
+                }
+                ServerMessage::ServerRequest(request) => {
+                    // dbg!(&request);
+
+                    match request {
+                        ServerRequest::ClientRegisterCapability(_, _) => {}
+                        ServerRequest::ClientUnregisterCapability(_, _) => {}
+                        ServerRequest::WindowShowDocument(_, _) => {}
+                        ServerRequest::WindowShowMessageRequest(_, _) => {}
+                        ServerRequest::WindowWorkDoneProgressCreate(_, _) => {}
+                        ServerRequest::WorkspaceApplyEdit(_, _) => {}
+                        ServerRequest::WorkspaceCodeLensRefresh(_) => {}
+                        ServerRequest::WorkspaceConfiguration(_, _) => {}
+                        ServerRequest::WorkspaceDiagnosticRefresh(_) => {}
+                        ServerRequest::WorkspaceInlayHintRefresh(_) => {}
+                        ServerRequest::WorkspaceInlineValueRefresh(_) => {}
+                        ServerRequest::WorkspaceSemanticTokensRefresh(_) => {}
+                        ServerRequest::WorkspaceWorkspaceFolders(_) => {}
+                    }
+                }
+            }
+        }
     }
 }
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
-
-async fn rust_lsp_handler(_editor: Weak<Mutex<Editor>>, mut receiver: ServerMessageReceiver) {
-    while let Some(message) = receiver.recv().await {
-        match message {
-            ServerMessage::ServerNotification(notification) => match notification {
-                ServerNotification::CancelRequest(_) => {}
-                ServerNotification::LogTrace(trace) => {
-                    dbg!(trace);
-                }
-                ServerNotification::Progress(_) => {}
-                ServerNotification::TelemetryEvent(_) => {}
-                ServerNotification::TextDocumentPublishDiagnostics(_) => {}
-                ServerNotification::WindowLogMessage(_) => {}
-                ServerNotification::WindowShowMessage(_) => {}
-            },
-            ServerMessage::ServerRequest(request) => match request {
-                ServerRequest::ClientRegisterCapability(_, _) => {}
-                ServerRequest::ClientUnregisterCapability(_, _) => {}
-                ServerRequest::WindowShowDocument(_, _) => {}
-                ServerRequest::WindowShowMessageRequest(_, _) => {}
-                ServerRequest::WindowWorkDoneProgressCreate(_, _) => {}
-                ServerRequest::WorkspaceApplyEdit(_, _) => {}
-                ServerRequest::WorkspaceCodeLensRefresh(_) => {}
-                ServerRequest::WorkspaceConfiguration(_, _) => {}
-                ServerRequest::WorkspaceDiagnosticRefresh(_) => {}
-                ServerRequest::WorkspaceInlayHintRefresh(_) => {}
-                ServerRequest::WorkspaceInlineValueRefresh(_) => {}
-                ServerRequest::WorkspaceSemanticTokensRefresh(_) => {}
-                ServerRequest::WorkspaceWorkspaceFolders(_) => {}
-            },
-        }
-    }
-}
 
 fn initialize_params(
     process_id: Integer,

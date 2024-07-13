@@ -22,6 +22,7 @@ use tokio::{
     sync::{
         mpsc::{UnboundedReceiver, UnboundedSender},
         watch::{channel, Receiver, Sender},
+        Mutex as IoMutex,
     },
     task::JoinHandle,
 };
@@ -43,26 +44,134 @@ pub enum ServerMessage {
 //                                           LspClient                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-type State = HashMap<Id, (Option<Response<Value, Value>>, Option<Waker>)>;
-
-pub struct LspClient<W: AsyncWrite + Unpin = ChildStdin> {
-    id: Integer,
-    writer: W,
-    state: Arc<Mutex<State>>,
-    handle: JoinHandle<()>,
+#[derive(Clone)]
+pub struct LspClient {
+    pub(crate) inner: Arc<IoMutex<InnerLspClient<ChildStdin>>>,
     work_done_receiver: Receiver<Option<WorkDone>>,
     initialize_result_sender: Sender<Option<InitializeResult>>,
     initialize_result_receiver: Receiver<Option<InitializeResult>>,
 }
 
-impl<W: AsyncWrite + Unpin> LspClient<W> {
+impl LspClient {
     pub fn new<R: AsyncBufRead + Send + Unpin + 'static>(
-        mut reader: R,
-        writer: W,
+        reader: R,
+        writer: ChildStdin,
         server_message_sender: ServerMessageSender,
     ) -> Self {
         let (work_done_sender, work_done_receiver) = channel(None);
         let (initialize_result_sender, initialize_result_receiver) = channel(None);
+        let inner = InnerLspClient::new(reader, writer, work_done_sender, server_message_sender);
+
+        Self {
+            inner: Arc::new(IoMutex::new(inner)),
+            work_done_receiver,
+            initialize_result_sender,
+            initialize_result_receiver,
+        }
+    }
+
+    pub fn init(&self, initialize_result: InitializeResult) {
+        self.initialize_result_sender
+            .send(Some(initialize_result))
+            .expect("Initialize result receiver");
+    }
+
+    pub async fn inited(&mut self) -> InitializeResult {
+        self.initialize_result_receiver
+            .wait_for(|initialize_result| initialize_result.is_some())
+            .await
+            .expect("Initialize result sender")
+            .clone()
+            .unwrap()
+    }
+
+    pub async fn wait_for_work_done(&mut self) {
+        const DELAY_MS: u64 = 1000;
+
+        let mut tokens = HashSet::<Token>::new();
+
+        loop {
+            self.work_done_receiver
+                .wait_for(|work_done| {
+                    if let Some(work_done) = work_done {
+                        match work_done.kind {
+                            Kind::Begin | Kind::Report => tokens.insert(work_done.token.clone()),
+                            Kind::End => tokens.remove(&work_done.token),
+                        };
+                    }
+
+                    tokens.is_empty()
+                })
+                .await
+                .expect("Work done sender");
+
+            tokio::time::sleep(Duration::from_millis(DELAY_MS)).await;
+
+            if let Ok(true) = self.work_done_receiver.has_changed() {
+                continue;
+            } else {
+                break;
+            }
+        }
+    }
+
+    pub fn notification(&mut self) -> LspClientNotification {
+        LspClientNotification { client: self }
+    }
+
+    pub fn request(&mut self) -> LspClientRequest {
+        LspClientRequest { client: self }
+    }
+
+    pub fn response(&mut self) -> LspClientResponse {
+        LspClientResponse { client: self }
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                     LspClientNotification                                      //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub struct LspClientNotification<'client> {
+    pub(crate) client: &'client mut LspClient,
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                        LspClientRequest                                        //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub struct LspClientRequest<'client> {
+    pub(crate) client: &'client mut LspClient,
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                       LspClientResponse                                        //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub struct LspClientResponse<'client> {
+    pub(crate) client: &'client mut LspClient,
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                           LspClient                                            //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+type State = HashMap<Id, (Option<Response<Value, Value>>, Option<Waker>)>;
+
+pub(crate) struct InnerLspClient<W: AsyncWrite + Unpin = ChildStdin> {
+    id: Integer,
+    writer: W,
+    state: Arc<Mutex<State>>,
+    handle: JoinHandle<()>,
+}
+
+impl<W: AsyncWrite + Unpin> InnerLspClient<W> {
+    fn new<R: AsyncBufRead + Send + Unpin + 'static>(
+        mut reader: R,
+        writer: W,
+        work_done_sender: Sender<Option<WorkDone>>,
+        server_message_sender: ServerMessageSender,
+    ) -> Self {
         let state = Arc::new(Mutex::new(State::new()));
         let handle = tokio::spawn({
             let state = state.clone();
@@ -130,72 +239,9 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
             writer,
             state,
             handle,
-            work_done_receiver,
-            initialize_result_sender,
-            initialize_result_receiver,
         }
     }
 
-    pub fn init(&self, initialize_result: InitializeResult) {
-        self.initialize_result_sender
-            .send(Some(initialize_result))
-            .expect("Initialize result receiver");
-    }
-
-    pub async fn initied(&mut self) -> InitializeResult {
-        self.initialize_result_receiver
-            .wait_for(|initialize_result| initialize_result.is_some())
-            .await
-            .expect("Initialize result sender")
-            .clone()
-            .unwrap()
-    }
-
-    pub async fn wait_for_work_done(&mut self) {
-        const DELAY_MS: u64 = 1000;
-
-        let mut tokens = HashSet::<Token>::new();
-
-        loop {
-            self.work_done_receiver
-                .wait_for(|work_done| {
-                    if let Some(work_done) = work_done {
-                        match work_done.kind {
-                            Kind::Begin | Kind::Report => tokens.insert(work_done.token.clone()),
-                            Kind::End => tokens.remove(&work_done.token),
-                        };
-                    }
-
-                    tokens.is_empty()
-                })
-                .await
-                .expect("Work done sender");
-
-            tokio::time::sleep(Duration::from_millis(DELAY_MS)).await;
-
-            if let Ok(true) = self.work_done_receiver.has_changed() {
-                continue;
-            } else {
-                break;
-            }
-        }
-    }
-
-    pub fn notification(&mut self) -> LspClientNotification<W> {
-        LspClientNotification { client: self }
-    }
-
-    pub fn request(&mut self) -> LspClientRequest<W> {
-        LspClientRequest { client: self }
-    }
-
-    pub fn response(&mut self) -> LspClientResponse<W> {
-        LspClientResponse { client: self }
-    }
-}
-
-/// Private.
-impl<W: AsyncWrite + Unpin> LspClient<W> {
     pub(crate) async fn send_notification<T: NotificationTrait>(
         &mut self,
         params: T::Params,
@@ -208,7 +254,7 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
     pub(crate) async fn send_request<T: RequestTrait>(
         &mut self,
         params: T::Params,
-    ) -> io::Result<impl '_ + Future<Output = io::Result<Result<T::Result, Error<T::Error>>>>> {
+    ) -> io::Result<impl Future<Output = io::Result<Result<T::Result, Error<T::Error>>>>> {
         let id = Id::Integer({
             let id = self.id;
             self.id += 1;
@@ -221,8 +267,9 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
             .write(&mut self.writer)
             .await?;
 
+        let state = self.state.clone();
         Ok(futures::future::poll_fn(move |cx| {
-            let mut state = self.state.lock().unwrap();
+            let mut state = state.lock().unwrap();
             let Some((response, waker)) = state.get_mut(&id) else {
                 // Was polled to completion already...
                 return Poll::Pending;
@@ -258,34 +305,10 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
     }
 }
 
-impl<W: AsyncWrite + Unpin> Drop for LspClient<W> {
+impl<W: AsyncWrite + Unpin> Drop for InnerLspClient<W> {
     fn drop(&mut self) {
         self.handle.abort();
     }
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                     LspClientNotification                                      //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-pub struct LspClientNotification<'client, W: AsyncWrite + Unpin> {
-    pub(crate) client: &'client mut LspClient<W>,
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                        LspClientRequest                                        //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-pub struct LspClientRequest<'client, W: AsyncWrite + Unpin> {
-    pub(crate) client: &'client mut LspClient<W>,
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                       LspClientResponse                                        //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-pub struct LspClientResponse<'client, W: AsyncWrite + Unpin> {
-    pub(crate) client: &'client mut LspClient<W>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //

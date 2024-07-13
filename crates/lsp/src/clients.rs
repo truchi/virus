@@ -1,6 +1,6 @@
 use crate::{LspClient, ServerMessageSender};
-use std::{process::Stdio, sync::Arc};
-use tokio::{io::BufReader, process::Command, sync::Mutex};
+use std::process::Stdio;
+use tokio::{io::BufReader, process::Command};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           LspClients                                           //
@@ -13,7 +13,7 @@ enum State {
         server_message_sender: Option<ServerMessageSender>,
     },
     Initialized {
-        client: Arc<Mutex<LspClient>>,
+        client: LspClient,
     },
 }
 
@@ -31,7 +31,7 @@ impl LspClients {
         }
     }
 
-    pub fn rust(&mut self) -> Arc<Mutex<LspClient>> {
+    pub fn rust(&mut self) -> LspClient {
         match &mut self.rust {
             State::None {
                 command,
@@ -51,7 +51,6 @@ impl LspClients {
                     child.stdout.take().expect("Child stdout"),
                 );
                 let client = LspClient::new(BufReader::new(stdout), stdin, server_message_sender);
-                let client = Arc::new(Mutex::new(client));
                 let clone = client.clone();
 
                 self.rust = State::Initialized { client };
@@ -62,8 +61,8 @@ impl LspClients {
         }
     }
 
-    pub fn rust_if_spawned(&mut self) -> Option<Arc<Mutex<LspClient>>> {
-        match &mut self.rust {
+    pub fn rust_if_spawned(&self) -> Option<LspClient> {
+        match &self.rust {
             State::None { .. } => None,
             State::Initialized { client } => Some(client.clone()),
         }

@@ -1,6 +1,7 @@
 use crate::{
     cursor::CachedCursor,
     history::History,
+    lsp::Lsp,
     rope::{Edit, RopeExt, Text, WordClass, WordCursor},
     syntax::{Capture, Theme},
 };
@@ -102,13 +103,14 @@ pub struct Document {
     version: usize,
     history: History,
     cached_shaping: Option<CachedShaping>,
+    lsp: Lsp,
 }
 
 impl Document {
     // NOTE:
     // This function is convenient for now.
     // We will need to deal with unsupported languages later.
-    pub fn open(path: PathBuf) -> std::io::Result<Self> {
+    pub fn open(path: PathBuf, lsp: Lsp) -> std::io::Result<Self> {
         if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
             panic!("File type not supported");
         }
@@ -125,7 +127,7 @@ impl Document {
             .expect("Cannot set parser's language");
         let tree = Self::parse_with(&rope, &mut parser, None);
 
-        Ok(Self {
+        let document = Self {
             path,
             rope,
             selection: Selection::default(),
@@ -136,7 +138,12 @@ impl Document {
             version: 0,
             history: History::default(),
             cached_shaping: None,
-        })
+            lsp: lsp.clone(),
+        };
+
+        lsp.open_document(&document);
+
+        Ok(document)
     }
 
     // NOTE: good enough for now
@@ -365,7 +372,8 @@ impl Document {
 
         let edit = Edit::new(start, removed_end, inserted_end, removed, inserted);
         self.selection = inserted_end.cached(&self.rope).into();
-        self.tree.edit(&edit.input_edit());
+        self.lsp.change_document(&self, [edit.to_lsp_edit()]);
+        self.tree.edit(&edit.to_ts_edit());
         self.is_tree_dirty = true;
         self.version += 1;
         self.history.edit(edit);

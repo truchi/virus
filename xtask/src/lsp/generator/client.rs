@@ -121,20 +121,22 @@ fn notification(
                 quote! {
                     #[doc = #documentation]
                     pub async fn #snake_method(&mut self, params: #usage) -> std::io::Result<()> {
-                        self.client.send_notification::<#pascal_method>(params).await
+                        let mut client = self.client.inner.lock().await;
+                        client.send_notification::<#pascal_method>(params).await
                     }
                 }
             } else {
                 quote! {
                     #[doc = #documentation]
                     pub async fn #snake_method(&mut self) -> std::io::Result<()> {
-                        self.client.send_notification::<#pascal_method>(()).await
+                        let mut client = self.client.inner.lock().await;
+                        client.send_notification::<#pascal_method>(()).await
                     }
                 }
             }
         });
     let implementation = quote! {
-        impl<'client, W: AsyncWrite + Unpin> super::LspClientNotification<'client, W> {
+        impl<'client> super::LspClientNotification<'client> {
             #(#methods)*
         }
     };
@@ -158,7 +160,7 @@ fn request(model: &Model, requests: Vec<(Request, Option<Type>, Ident, Ident)>) 
             };
             let return_type = quote! {
                 std::io::Result<
-                    impl '_ + futures::Future<Output = std::io::Result<Result<#ok, Error<#err>>>>
+                    impl futures::Future<Output = std::io::Result<Result<#ok, Error<#err>>>>
                 >
             };
 
@@ -169,20 +171,22 @@ fn request(model: &Model, requests: Vec<(Request, Option<Type>, Ident, Ident)>) 
                 quote! {
                     #[doc = #documentation]
                     pub async fn #snake_method(&mut self, params: #usage) -> #return_type {
-                        self.client.send_request::<#pascal_method>(params).await
+                        let mut client = self.client.inner.lock().await;
+                        client.send_request::<#pascal_method>(params).await
                     }
                 }
             } else {
                 quote! {
                     #[doc = #documentation]
                     pub async fn #snake_method(&mut self) -> #return_type {
-                        self.client.send_request::<#pascal_method>(()).await
+                        let mut client = self.client.inner.lock().await;
+                        client.send_request::<#pascal_method>(()).await
                     }
                 }
             }
         });
     let implementation = quote! {
-        impl<'client, W: AsyncWrite + Unpin> super::LspClientRequest<'client, W> {
+        impl<'client> super::LspClientRequest<'client> {
             #(#methods)*
         }
     };
@@ -212,12 +216,13 @@ fn response(model: &Model, requests: Vec<(Request, Option<Type>, Ident, Ident)>)
                     id: Option<Id>,
                     data: Result<#ok, Error<#err>>,
                 ) -> std::io::Result<()> {
-                    self.client.send_response::<#pascal_method>(id, data).await
+                    let mut client = self.client.inner.lock().await;
+                    client.send_response::<#pascal_method>(id, data).await
                 }
             }
         });
     let implementation = quote! {
-        impl<'client, W: AsyncWrite + Unpin> super::LspClientResponse<'client, W> {
+        impl<'client> super::LspClientResponse<'client> {
             #(#methods)*
         }
     };

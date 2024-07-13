@@ -17,7 +17,6 @@ mod generated {
     use serde::de::DeserializeOwned;
     use serde_json::Value;
     use std::collections::HashMap;
-    use tokio::io::AsyncWrite;
 }
 mod transport {
     mod lsp;
