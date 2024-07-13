@@ -175,8 +175,6 @@ async fn main() {
         .unwrap();
     dbg!(response);
 
-    wait(3).await;
-
     println!("Shutdown");
     let response = client
         .request()
@@ -187,8 +185,6 @@ async fn main() {
         .unwrap()
         .unwrap();
     dbg!(response);
-
-    wait(3).await;
 
     println!("Exit");
     client.notification().exit().await.unwrap();

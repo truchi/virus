@@ -37,16 +37,23 @@ impl Message {
         &self.content
     }
 
+    // TODO proper EOF errors and tests
     pub async fn read<T: AsyncBufRead + Unpin>(reader: &mut T) -> io::Result<Self> {
         fn invalid_data(err: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> io::Error {
             io::Error::new(io::ErrorKind::InvalidData, err)
+        }
+
+        fn unexpected_eof() -> io::Error {
+            io::Error::from(io::ErrorKind::UnexpectedEof)
         }
 
         let lf = *SEPARATOR.as_bytes().last().expect("Separator last byte");
         let mut content = Vec::new();
 
         // Read content length
-        reader.read_until(lf, &mut content).await?;
+        if reader.read_until(lf, &mut content).await? == 0 {
+            return Err(unexpected_eof());
+        }
 
         if !content.starts_with(CONTENT_LENGTH.as_bytes())
             || !content.ends_with(SEPARATOR.as_bytes())

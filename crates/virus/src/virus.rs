@@ -9,7 +9,10 @@ use std::{
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
-use tokio::{process::Command, sync::mpsc::unbounded_channel};
+use tokio::{
+    process::Command,
+    sync::{mpsc::unbounded_channel, oneshot::channel},
+};
 use virus_editor::{
     async_actor::AsyncActor,
     editor::{Editor, EventLoopMessage},
@@ -94,7 +97,7 @@ pub enum SelectMode {
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Mode {
     Normal { select_mode: Option<SelectMode> },
     Insert,
@@ -151,9 +154,9 @@ impl Virus {
 
             Arc::new(Mutex::new(editor))
         };
-        let async_actor = AsyncActor::new(editor.clone(), async_actor_receiver);
+        let async_actor = AsyncActor::new(Arc::downgrade(&editor), async_actor_receiver);
 
-        std::thread::spawn(|| {
+        let async_actor_handle = std::thread::spawn(|| {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
@@ -162,15 +165,29 @@ impl Virus {
                     tokio::spawn(async_actor.run())
                         .await
                         .expect("AsyncActor::run");
-                })
+                });
         });
 
+        //
+        // Run
+        //
+
+        let mut handler = Handler::Uninitialized {
+            editor: Some(editor),
+        };
         event_loop.set_control_flow(ControlFlow::Wait);
-        event_loop
-            .run_app(&mut Handler::Uninitialized {
-                editor: Some(editor),
-            })
-            .unwrap();
+        event_loop.run_app(&mut handler).unwrap();
+
+        //
+        // Exit
+        //
+
+        match handler {
+            Handler::Uninitialized { .. } => panic!("Not initialized"),
+            Handler::Initialized { virus } => virus.exit(),
+        };
+
+        async_actor_handle.join().unwrap();
     }
 }
 
@@ -232,6 +249,17 @@ impl Virus {
             last_render: None,
             search: None,
         }
+    }
+
+    pub fn exit(self) {
+        // NOTE: This is supposed to close the window early but doesn't
+        // TODO: Try a very small example?
+        drop(self.ui);
+
+        let (sender, receiver) = channel();
+        self.editor.lock().unwrap().exit(sender);
+
+        receiver.blocking_recv().unwrap();
     }
 }
 

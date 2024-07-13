@@ -3,9 +3,12 @@ use ignore::WalkBuilder;
 use std::{
     future::Future,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{Mutex, Weak},
 };
-use tokio::{process::Command, sync::mpsc::unbounded_channel};
+use tokio::{
+    process::Command,
+    sync::{mpsc::unbounded_channel, oneshot::Sender},
+};
 use virus_lsp::LspClients;
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
@@ -148,6 +151,10 @@ impl Editor {
 
         None
     }
+
+    pub fn exit(&mut self, sender: Sender<()>) {
+        self.lsp().exit(sender);
+    }
 }
 
 /// Private.
@@ -158,7 +165,7 @@ impl Editor {
 
     pub(crate) fn async_actor<F, Fut>(&self, function: F)
     where
-        F: 'static + Send + FnOnce(Arc<Mutex<Editor>>) -> Fut,
+        F: 'static + Send + FnOnce(Weak<Mutex<Editor>>) -> Fut,
         Fut: 'static + Send + Future<Output = ()>,
     {
         self.async_actor

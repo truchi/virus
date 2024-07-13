@@ -2,7 +2,7 @@ use crate::editor::Editor;
 use std::{
     future::Future,
     pin::Pin,
-    sync::{Arc, Mutex},
+    sync::{Mutex, Weak},
 };
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
@@ -14,19 +14,19 @@ pub type AsyncActorSender = UnboundedSender<AsyncActorFunction>;
 pub type AsyncActorReceiver = UnboundedReceiver<AsyncActorFunction>;
 
 pub type AsyncActorFunction =
-    Box<dyn FnOnce(Arc<Mutex<Editor>>) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send>;
+    Box<dyn FnOnce(Weak<Mutex<Editor>>) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send>;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           AsyncActor                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct AsyncActor {
-    editor: Arc<Mutex<Editor>>,
+    editor: Weak<Mutex<Editor>>,
     receiver: AsyncActorReceiver,
 }
 
 impl AsyncActor {
-    pub fn new(editor: Arc<Mutex<Editor>>, receiver: AsyncActorReceiver) -> Self {
+    pub fn new(editor: Weak<Mutex<Editor>>, receiver: AsyncActorReceiver) -> Self {
         Self { editor, receiver }
     }
 

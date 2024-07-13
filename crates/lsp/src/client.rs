@@ -10,7 +10,7 @@ use futures::Future;
 use serde_json::Value;
 use std::{
     collections::{HashMap, HashSet},
-    io,
+    io::{self, ErrorKind},
     str::FromStr,
     sync::{Arc, Mutex},
     task::{Poll, Waker},
@@ -71,6 +71,7 @@ impl<W: AsyncWrite + Unpin> LspClient<W> {
                 loop {
                     let message = match Message::<Value, Value>::read(&mut reader).await {
                         Ok(message) => message,
+                        Err(err) if err.kind() == ErrorKind::UnexpectedEof => break,
                         Err(err) => {
                             dbg!(err);
                             break;

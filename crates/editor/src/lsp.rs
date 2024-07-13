@@ -3,8 +3,9 @@ use serde_json::Value;
 use std::{
     ops::Range,
     path::Component,
-    sync::{Arc, Mutex},
+    sync::{Mutex, Weak},
 };
+use tokio::sync::oneshot::Sender;
 use virus_lsp::{
     enumerations::{PositionEncodingKind, TraceValues},
     structures::{
@@ -38,6 +39,7 @@ impl<'editor> Lsp<'editor> {
 
         self.editor.async_actor(move |editor| async move {
             let (client, folder) = {
+                let editor = editor.upgrade().unwrap();
                 let mut editor = editor.lock().unwrap();
                 let root = editor.root();
                 let folder = WorkspaceFolder {
@@ -76,7 +78,6 @@ impl<'editor> Lsp<'editor> {
                 .initialized(InitializedParams {})
                 .await
                 .unwrap();
-            client.wait_for_work_done().await;
             client.init(result);
         });
 
@@ -96,6 +97,7 @@ impl<'editor> Lsp<'editor> {
 
         self.editor.async_actor(move |editor| async move {
             let client = {
+                let editor = editor.upgrade().unwrap();
                 let mut editor = editor.lock().unwrap();
 
                 editor.lsps.rust()
@@ -131,6 +133,7 @@ impl<'editor> Lsp<'editor> {
 
         self.editor.async_actor(move |editor| async move {
             let client = {
+                let editor = editor.upgrade().unwrap();
                 let mut editor = editor.lock().unwrap();
 
                 editor.lsps.rust()
@@ -179,6 +182,7 @@ impl<'editor> Lsp<'editor> {
 
         self.editor.async_actor(|editor| async move {
             let client = {
+                let editor = editor.upgrade().unwrap();
                 let mut editor = editor.lock().unwrap();
 
                 editor.lsps.rust()
@@ -197,11 +201,39 @@ impl<'editor> Lsp<'editor> {
 
         self
     }
+
+    pub fn exit(self, sender: Sender<()>) -> Self {
+        self.editor.async_actor(|editor| async move {
+            let client = {
+                let editor = editor.upgrade().unwrap();
+                let mut editor = editor.lock().unwrap();
+
+                editor.lsps.rust_if_spawned()
+            };
+
+            if let Some(client) = client {
+                let mut client = client.lock().await;
+                client
+                    .request()
+                    .shutdown()
+                    .await
+                    .unwrap()
+                    .await
+                    .unwrap()
+                    .unwrap();
+                client.notification().exit().await.unwrap();
+            }
+
+            sender.send(()).unwrap();
+        });
+
+        self
+    }
 }
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
-async fn rust_lsp_handler(_editor: Arc<Mutex<Editor>>, mut receiver: ServerMessageReceiver) {
+async fn rust_lsp_handler(_editor: Weak<Mutex<Editor>>, mut receiver: ServerMessageReceiver) {
     while let Some(message) = receiver.recv().await {
         match message {
             ServerMessage::ServerNotification(notification) => match notification {

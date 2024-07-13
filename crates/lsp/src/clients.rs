@@ -61,4 +61,11 @@ impl LspClients {
             State::Initialized { client } => client.clone(),
         }
     }
+
+    pub fn rust_if_spawned(&mut self) -> Option<Arc<Mutex<LspClient>>> {
+        match &mut self.rust {
+            State::None { .. } => None,
+            State::Initialized { client } => Some(client.clone()),
+        }
+    }
 }
