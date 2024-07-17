@@ -1,2 +1,0 @@
-[alias]
-xtask-lsp = "run --quiet --manifest-path ./xtask/Cargo.toml --bin lsp --"
