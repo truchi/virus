@@ -1,6 +1,14 @@
-use crate::{async_actor::AsyncActorSender, document::Document, lsp::Lsp, rope::Text};
+use crate::{
+    async_actor::AsyncActorSender,
+    document::{Document, DocumentId},
+    lsp::Lsp,
+    rope::Text,
+};
 use ignore::WalkBuilder;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 use tokio::{
     process::Command,
     sync::{mpsc::unbounded_channel, oneshot::Sender},
@@ -20,8 +28,9 @@ pub type EventLoopSender = Box<dyn Fn(EventLoopMessage) + Send>;
 
 pub struct Editor {
     root: PathBuf,
-    documents: Vec<Document>,
-    active_document: usize,
+    document_id: DocumentId,
+    documents: HashMap<DocumentId, Document>,
+    active_document: Option<DocumentId>,
     clipboard: Text,
     pub(crate) lsps: LspClients,
     pub(crate) async_actor: AsyncActorSender,
@@ -36,10 +45,14 @@ impl Editor {
         event_loop: EventLoopSender,
     ) -> Self {
         let (rust_server_message_sender, rust_server_message_receiver) = unbounded_channel();
+        let mut document_id = DocumentId::default();
+        let active_document = Some(document_id.generate());
+
         let editor = Self {
             root,
+            document_id,
             documents: Default::default(),
-            active_document: 0,
+            active_document,
             clipboard: Text::default(),
             lsps: LspClients::new((rust_lsp, rust_server_message_sender)),
             async_actor,
@@ -54,27 +67,42 @@ impl Editor {
         self.root.as_path()
     }
 
-    pub fn active_document(&self) -> &Document {
-        self.documents.get(self.active_document).unwrap()
+    pub fn get_document(&self, id: DocumentId) -> Option<&Document> {
+        self.documents.get(&id)
     }
 
-    pub fn active_document_mut(&mut self) -> &mut Document {
-        self.documents.get_mut(self.active_document).unwrap()
+    pub fn get_document_mut(&mut self, id: DocumentId) -> Option<&mut Document> {
+        self.documents.get_mut(&id)
+    }
+
+    pub fn active_document(&self) -> Option<DocumentId> {
+        self.active_document
+    }
+
+    pub fn get_active_document(&self) -> Option<&Document> {
+        self.active_document.and_then(|id| self.get_document(id))
+    }
+
+    pub fn get_active_document_mut(&mut self) -> Option<&mut Document> {
+        self.active_document
+            .and_then(|id| self.get_document_mut(id))
     }
 
     pub fn open(&mut self, path: PathBuf) -> std::io::Result<()> {
-        if let Some(active_document) = self
+        if let Some((id, _)) = self
             .documents
             .iter()
-            .position(|document| document.path() == path)
+            .find(|(_, document)| document.path() == path)
         {
-            self.active_document = active_document;
+            self.active_document = Some(*id);
         } else {
-            let mut document = Document::open(path, self.lsp())?;
+            let id = self.document_id.generate();
+
+            let mut document = Document::open(id, path, self.lsp())?;
             document.parse();
 
-            self.active_document = self.documents.len();
-            self.documents.push(document);
+            self.active_document = Some(id);
+            self.documents.insert(id, document);
         }
 
         Ok(())
@@ -115,7 +143,7 @@ impl Editor {
     }
 
     pub fn copy(&mut self) {
-        let document = self.active_document();
+        let document = self.get_active_document().unwrap();
         let range = document.selection().range();
         let slice = document
             .rope()
@@ -125,10 +153,9 @@ impl Editor {
     }
 
     pub fn paste(&mut self) {
-        self.documents
-            .get_mut(self.active_document)
-            .unwrap()
-            .edit(self.clipboard.clone());
+        let edit = self.clipboard.clone();
+
+        self.get_active_document_mut().unwrap().edit(edit);
     }
 
     pub fn find_git_root(path: PathBuf) -> Option<PathBuf> {

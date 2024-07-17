@@ -325,65 +325,73 @@ impl Virus {
                     Key::Str("@") if self.events.command() => event_loop.exit(),
                     Key::Str("i") => {
                         editor
-                            .active_document_mut()
+                            .get_active_document_mut()
+                            .unwrap()
                             .move_up(select_mode.is_some(), 1);
                         self.ui
-                            .ensure_visibility(editor.active_document().head_line());
+                            .ensure_visibility(editor.get_active_document().unwrap().head_line());
                     }
                     Key::Str("k") => {
                         editor
-                            .active_document_mut()
+                            .get_active_document_mut()
+                            .unwrap()
                             .move_down(select_mode.is_some(), 1);
                         self.ui
-                            .ensure_visibility(editor.active_document().head_line());
+                            .ensure_visibility(editor.get_active_document().unwrap().head_line());
                     }
                     Key::Str("j") => editor
-                        .active_document_mut()
+                        .get_active_document_mut()
+                        .unwrap()
                         .move_prev_grapheme(select_mode.is_some()),
                     Key::Str("l") => editor
-                        .active_document_mut()
+                        .get_active_document_mut()
+                        .unwrap()
                         .move_next_grapheme(select_mode.is_some()),
                     Key::Str("e") => {
                         editor
-                            .active_document_mut()
+                            .get_active_document_mut()
+                            .unwrap()
                             .move_next_end_of_word(select_mode.is_some());
                         self.ui
-                            .ensure_visibility(editor.active_document().head_line());
+                            .ensure_visibility(editor.get_active_document().unwrap().head_line());
                     }
                     Key::Str("E") => {
                         editor
-                            .active_document_mut()
+                            .get_active_document_mut()
+                            .unwrap()
                             .move_prev_end_of_word(select_mode.is_some());
                         self.ui
-                            .ensure_visibility(editor.active_document().head_line());
+                            .ensure_visibility(editor.get_active_document().unwrap().head_line());
                     }
                     Key::Str("w") => {
                         editor
-                            .active_document_mut()
+                            .get_active_document_mut()
+                            .unwrap()
                             .move_next_start_of_word(select_mode.is_some());
                         self.ui
-                            .ensure_visibility(editor.active_document().head_line());
+                            .ensure_visibility(editor.get_active_document().unwrap().head_line());
                     }
                     Key::Str("W") => {
                         editor
-                            .active_document_mut()
+                            .get_active_document_mut()
+                            .unwrap()
                             .move_prev_start_of_word(select_mode.is_some());
                         self.ui
-                            .ensure_visibility(editor.active_document().head_line());
+                            .ensure_visibility(editor.get_active_document().unwrap().head_line());
                     }
                     Key::Str("c") if self.events.command() => editor.paste(),
                     Key::Str("c") => editor.copy(),
                     Key::Str("z") if self.events.command() => {
-                        editor.active_document_mut().redo();
-                        if editor.active_document().selection().is_empty() {
+                        editor.get_active_document_mut().unwrap().redo();
+                        if editor.get_active_document().unwrap().selection().is_empty() {
                             *select_mode = None;
                         } else {
                             *select_mode = Some(SelectMode::Range);
                         }
                     }
                     Key::Str("z") => {
-                        editor.active_document_mut().undo();
-                        if editor.active_document().selection().is_empty() {
+                        editor.get_active_document_mut().unwrap().undo();
+                        if editor.get_active_document().unwrap().selection().is_empty() {
                             *select_mode = None;
                         } else {
                             *select_mode = Some(SelectMode::Range);
@@ -391,32 +399,40 @@ impl Virus {
                     }
                     Key::Str("y") => {
                         editor
-                            .active_document_mut()
+                            .get_active_document_mut()
+                            .unwrap()
                             .move_up(select_mode.is_some(), 10);
                         self.ui
-                            .ensure_visibility(editor.active_document().head_line());
+                            .ensure_visibility(editor.get_active_document().unwrap().head_line());
                     }
                     Key::Str("h") => {
                         editor
-                            .active_document_mut()
+                            .get_active_document_mut()
+                            .unwrap()
                             .move_down(select_mode.is_some(), 10);
                         self.ui
-                            .ensure_visibility(editor.active_document().head_line());
+                            .ensure_visibility(editor.get_active_document().unwrap().head_line());
                     }
                     Key::Str("v") => match select_mode {
                         Some(SelectMode::Range) => *select_mode = Some(SelectMode::Line),
                         Some(SelectMode::Line) => {
-                            editor.active_document_mut().flip_anchor_and_head();
+                            editor
+                                .get_active_document_mut()
+                                .unwrap()
+                                .flip_anchor_and_head();
                             *select_mode = Some(SelectMode::Range);
                         }
                         None => *select_mode = Some(SelectMode::Range),
                     },
                     Key::Str("V") => {
                         *select_mode = None;
-                        editor.active_document_mut().move_anchor_to_head();
+                        editor
+                            .get_active_document_mut()
+                            .unwrap()
+                            .move_anchor_to_head();
                     }
                     Key::Str("s") if self.events.command() => {
-                        editor.active_document_mut().save().unwrap()
+                        editor.get_active_document_mut().unwrap().save().unwrap()
                     }
                     Key::Str("/") => {
                         let files = editor
@@ -436,14 +452,19 @@ impl Virus {
                 },
                 Mode::Insert => match key {
                     Key::Str("@") if self.events.command() => event_loop.exit(),
-                    Key::Str(str) => editor.active_document_mut().edit(str.into()),
-                    Key::Space => editor.active_document_mut().edit(" ".into()),
-                    Key::Backspace => editor.active_document_mut().backspace(),
-                    Key::Enter => editor.active_document_mut().edit("\n".into()),
+                    Key::Str(str) => editor.get_active_document_mut().unwrap().edit(str.into()),
+                    Key::Space => editor.get_active_document_mut().unwrap().edit(" ".into()),
+                    Key::Backspace => editor.get_active_document_mut().unwrap().backspace(),
+                    Key::Enter => editor.get_active_document_mut().unwrap().edit("\n".into()),
                     Key::Escape => {
                         self.mode = Mode::Normal {
-                            select_mode: (!editor.active_document().selection().range().is_empty())
-                                .then_some(SelectMode::Range),
+                            select_mode: (!editor
+                                .get_active_document()
+                                .unwrap()
+                                .selection()
+                                .range()
+                                .is_empty())
+                            .then_some(SelectMode::Range),
                         }
                     }
                     _ => (),
@@ -452,7 +473,7 @@ impl Virus {
         }
 
         // TODO handle that better
-        editor.active_document_mut().parse();
+        editor.get_active_document_mut().unwrap().parse();
 
         // TODO handle that better
         self.ui.window().request_redraw();
@@ -485,7 +506,7 @@ impl Virus {
         let outline_insert_mode_colors = &self.ui.theme().outline_insert_mode_colors.clone();
         let mut editor = self.editor.lock().unwrap();
         self.ui.render(
-            editor.active_document_mut(),
+            editor.get_active_document_mut().unwrap(),
             matches!(
                 self.mode,
                 Mode::Normal {

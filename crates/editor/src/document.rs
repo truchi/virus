@@ -17,6 +17,21 @@ use tree_sitter::{Node, Parser, Query, Tree};
 use virus_graphics::text::{Cluster, Context, FontFamilyKey, FontSize, Line};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                           DocumentId                                           //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Default, Debug)]
+pub struct DocumentId(usize);
+
+impl DocumentId {
+    pub fn generate(&mut self) -> Self {
+        let id = *self;
+        self.0 += 1;
+        id
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           Selection                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
@@ -93,6 +108,7 @@ impl Selection {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct Document {
+    id: DocumentId,
     path: PathBuf,
     rope: Rope,
     selection: Selection, // TODO Should we really have this here?
@@ -110,7 +126,7 @@ impl Document {
     // NOTE:
     // This function is convenient for now.
     // We will need to deal with unsupported languages later.
-    pub fn open(path: PathBuf, lsp: Lsp) -> std::io::Result<Self> {
+    pub fn open(id: DocumentId, path: PathBuf, lsp: Lsp) -> std::io::Result<Self> {
         if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
             panic!("File type not supported");
         }
@@ -128,6 +144,7 @@ impl Document {
         let tree = Self::parse_with(&rope, &mut parser, None);
 
         let document = Self {
+            id,
             path,
             rope,
             selection: Selection::default(),
@@ -176,6 +193,10 @@ impl Document {
 
 /// Getters.
 impl Document {
+    pub fn id(&self) -> DocumentId {
+        self.id
+    }
+
     pub fn path(&self) -> &Path {
         self.path.as_path()
     }
