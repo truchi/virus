@@ -1,8 +1,9 @@
 use crate::{
-    cursor::CachedCursor,
-    rope::{GraphemeCursor, WordClass, WordCursor},
+    cursor::{CachedCursor, Cursor},
+    rope::{Edit, GraphemeCursor, Text, WordClass, WordCursor},
 };
 use ropey::Rope;
+use std::ops::Range;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            RopeExt                                             //
@@ -18,6 +19,9 @@ pub trait RopeExt {
 
     /// Returns the [`RopeExtWord`] API.
     fn word<'rope>(&'rope self) -> RopeExtWord<'rope>;
+
+    /// Returns the [`RopeExtEdit`] API.
+    fn edit<'rope>(&'rope mut self) -> RopeExtEdit<'rope>;
 }
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
@@ -33,6 +37,10 @@ impl RopeExt for Rope {
 
     fn word<'rope>(&'rope self) -> RopeExtWord<'rope> {
         RopeExtWord(self)
+    }
+
+    fn edit<'rope>(&'rope mut self) -> RopeExtEdit<'rope> {
+        RopeExtEdit(self)
     }
 }
 
@@ -89,17 +97,17 @@ impl<'rope> RopeExtGrapheme<'rope> {
     }
 
     /// Finds the previous grapheme boundary before the given `index`.
-    pub fn prev(&self, index: usize) -> Option<CachedCursor> {
+    pub fn prev(&self, index: usize) -> Option<usize> {
         GraphemeCursor::new(self.0.slice(..), index)
             .prev()
-            .map(|(range, _)| self.0.cursor().at_index(range.start))
+            .map(|(range, _)| range.start)
     }
 
     /// Finds the next grapheme boundary after the given `index`.
-    pub fn next(&self, index: usize) -> Option<CachedCursor> {
+    pub fn next(&self, index: usize) -> Option<usize> {
         GraphemeCursor::new(self.0.slice(..), index)
             .next()
-            .map(|(range, _)| self.0.cursor().at_index(range.end))
+            .map(|(range, _)| range.end)
     }
 }
 
@@ -112,61 +120,79 @@ pub struct RopeExtWord<'rope>(&'rope Rope);
 
 impl<'rope> RopeExtWord<'rope> {
     /// Finds the previous start of word before the given `index`.
-    pub fn prev_start(&self, index: usize) -> Option<CachedCursor> {
+    pub fn prev_start(&self, index: usize) -> Option<usize> {
         let mut words = WordCursor::new(self.0.slice(..), index);
 
         words.prev().map(|(range, class)| match class {
-            WordClass::Whitespace => words
-                .prev()
-                .map(|(range, _)| self.0.cursor().at_index(range.start))
-                .unwrap_or_else(|| self.0.cursor().at_start()),
-            _ => self.0.cursor().at_index(range.start),
+            WordClass::Whitespace => words.prev().map(|(range, _)| range.start).unwrap_or(0),
+            _ => range.start,
         })
     }
 
     /// Finds the previous end of word before the given `index`.
-    pub fn prev_end(&self, index: usize) -> Option<CachedCursor> {
+    pub fn prev_end(&self, index: usize) -> Option<usize> {
         let mut words = WordCursor::new(self.0.slice(..), index);
 
         words.prev().map(|(range, class)| match class {
-            WordClass::Whitespace => self.0.cursor().at_index(range.start),
+            WordClass::Whitespace => range.start,
             _ => words
                 .prev()
                 .map(|(range, class)| match class {
-                    WordClass::Whitespace => self.0.cursor().at_index(range.start),
-                    _ => self.0.cursor().at_index(range.end),
+                    WordClass::Whitespace => range.start,
+                    _ => range.end,
                 })
-                .unwrap_or_else(|| self.0.cursor().at_start()),
+                .unwrap_or(0),
         })
     }
 
     /// Finds the next start of word after the given `index`.
-    pub fn next_start(&self, index: usize) -> Option<CachedCursor> {
+    pub fn next_start(&self, index: usize) -> Option<usize> {
         let mut words = WordCursor::new(self.0.slice(..), index);
 
         words.next().map(|(range, class)| match class {
-            WordClass::Whitespace => self.0.cursor().at_index(range.end),
+            WordClass::Whitespace => range.end,
             _ => words
                 .next()
                 .map(|(range, class)| match class {
-                    WordClass::Whitespace => self.0.cursor().at_index(range.end),
-                    _ => self.0.cursor().at_index(range.start),
+                    WordClass::Whitespace => range.end,
+                    _ => range.start,
                 })
-                .unwrap_or_else(|| self.0.cursor().at_end()),
+                .unwrap_or_else(|| self.0.len_bytes()),
         })
     }
 
     /// Finds the next end of word after the given `index`.
-    pub fn next_end(&self, index: usize) -> Option<CachedCursor> {
+    pub fn next_end(&self, index: usize) -> Option<usize> {
         let mut words = WordCursor::new(self.0.slice(..), index);
 
         words.next().map(|(range, class)| match class {
             WordClass::Whitespace => words
                 .next()
-                .map(|(range, _)| self.0.cursor().at_index(range.end))
-                .unwrap_or_else(|| self.0.cursor().at_end()),
-            _ => self.0.cursor().at_index(range.end),
+                .map(|(range, _)| range.end)
+                .unwrap_or_else(|| self.0.len_bytes()),
+            _ => range.end,
         })
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                          RopeExtEdit                                           //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+/// [`RopeExt::edit()`] API.
+pub struct RopeExtEdit<'rope>(&'rope mut Rope);
+
+impl<'rope> RopeExtEdit<'rope> {
+    pub fn edit(self, range: Range<Cursor>, inserted: Text) -> Edit {
+        Edit::edit(self.0, range, inserted)
+    }
+
+    pub fn apply(self, edit: &Edit) {
+        edit.apply(self.0);
+    }
+
+    pub fn unapply(self, edit: &Edit) {
+        edit.unapply(self.0);
     }
 }
 
@@ -235,7 +261,6 @@ mod tests {
             );
 
             let rope = Rope::from(str);
-            let cursor = |index| rope.cursor().at_index(index);
 
             assert!(rope.word().prev_start(0).is_none());
             assert!(rope.word().prev_end(0).is_none());
@@ -259,12 +284,12 @@ mod tests {
             }
 
             the_loop(starts, |offset, word, char| {
-                assert!(rope.word().prev_start(char.end) == Some(cursor(offset)));
-                assert!(rope.word().next_start(char.start) == Some(cursor(offset + word.len())));
+                assert!(rope.word().prev_start(char.end) == Some(offset));
+                assert!(rope.word().next_start(char.start) == Some(offset + word.len()));
             });
             the_loop(ends, |offset, word, char| {
-                assert!(rope.word().prev_end(char.end) == Some(cursor(offset)));
-                assert!(rope.word().next_end(char.start) == Some(cursor(offset + word.len())));
+                assert!(rope.word().prev_end(char.end) == Some(offset));
+                assert!(rope.word().next_end(char.start) == Some(offset + word.len()));
             });
         }
     }

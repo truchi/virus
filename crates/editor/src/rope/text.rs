@@ -1,5 +1,5 @@
-use crate::cursor::Cursor;
-use ropey::{iter::Chunks, Rope, RopeSlice};
+use crate::{cursor::Cursor, rope::RopeExt};
+use ropey::{Rope, RopeSlice};
 use std::ops::Range;
 use tree_sitter::{InputEdit, Point};
 use virus_lsp::type_aliases::TextDocumentContentChangeEventRangeAndText;
@@ -37,6 +37,14 @@ impl<'a> From<&'a str> for Text {
     }
 }
 
+impl<'a> From<String> for Text {
+    fn from(string: String) -> Self {
+        Self {
+            inner: Inner::String(string),
+        }
+    }
+}
+
 impl<'a> From<RopeSlice<'a>> for Text {
     fn from(slice: RopeSlice<'a>) -> Self {
         Self {
@@ -44,6 +52,18 @@ impl<'a> From<RopeSlice<'a>> for Text {
                 Inner::String(slice.into())
             } else {
                 Inner::Rope(slice.into())
+            },
+        }
+    }
+}
+
+impl<'a> From<Rope> for Text {
+    fn from(rope: Rope) -> Self {
+        Self {
+            inner: if rope.len_bytes() <= Self::MAX_BYTES {
+                Inner::String(rope.into())
+            } else {
+                Inner::Rope(rope)
             },
         }
     }
@@ -71,23 +91,6 @@ impl Text {
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
-    }
-
-    pub fn chunks(&self) -> impl Iterator<Item = &str> {
-        enum Iter<'a> {
-            String(Option<&'a str>),
-            Rope(Chunks<'a>),
-        }
-
-        let mut iter = match &self.inner {
-            Inner::String(string) => Iter::String(Some(&string)),
-            Inner::Rope(rope) => Iter::Rope(rope.chunks()),
-        };
-
-        std::iter::from_fn(move || match &mut iter {
-            Iter::String(string) => string.take(),
-            Iter::Rope(chunks) => chunks.next(),
-        })
     }
 }
 
@@ -137,29 +140,28 @@ impl Edit {
         self.inserted_end
     }
 
-    pub fn to_ts_edit(&self) -> InputEdit {
-        Self::input_edit_impl(self.start, self.removed_end, self.inserted_end)
+    pub fn removed(&self) -> &Text {
+        &self.removed
     }
 
-    pub fn to_lsp_edit(&self) -> TextDocumentContentChangeEventRangeAndText {
-        use virus_lsp::{
-            structures::{Position, Range},
-            UInteger,
-        };
+    pub fn inserted(&self) -> &Text {
+        &self.inserted
+    }
 
-        TextDocumentContentChangeEventRangeAndText {
-            range: Range {
-                start: Position {
-                    line: self.start.line as UInteger,
-                    character: self.start.column as UInteger,
-                },
-                end: virus_lsp::structures::Position {
-                    line: self.removed_end.line as UInteger,
-                    character: self.removed_end.column as UInteger,
-                },
-            },
-            text: self.inserted.to_string(),
-        }
+    pub fn to_ts_edit_applied(&self) -> InputEdit {
+        Self::to_input_edit_impl(self.start, self.removed_end, self.inserted_end)
+    }
+
+    pub fn to_ts_edit_unapplied(&self) -> InputEdit {
+        Self::to_input_edit_impl(self.start, self.inserted_end, self.removed_end)
+    }
+
+    pub fn to_lsp_edit_applied(&self) -> TextDocumentContentChangeEventRangeAndText {
+        Self::to_lsp_edit_impl(self.start, self.removed_end, &self.inserted)
+    }
+
+    pub fn to_lsp_edit_unapplied(&self) -> TextDocumentContentChangeEventRangeAndText {
+        Self::to_lsp_edit_impl(self.start, self.inserted_end, &self.removed)
     }
 
     pub fn apply(&self, rope: &mut Rope) -> InputEdit {
@@ -184,7 +186,65 @@ impl Edit {
         )
     }
 
-    pub fn insert(rope: &mut Rope, index: usize, inserted: &Text) {
+    pub fn edit(rope: &mut Rope, range: Range<Cursor>, inserted: Text) -> Self {
+        debug_assert!(range.start <= range.end);
+
+        let Range {
+            start,
+            end: removed_end,
+        } = range;
+        let insert = !inserted.is_empty();
+        let remove = !range.is_empty();
+
+        let (removed, inserted_end) = match (insert, remove) {
+            // Replace
+            (true, true) => (
+                Self::replace(rope, start.index..removed_end.index, &inserted).into(),
+                rope.cursor()
+                    .at_index(start.index + inserted.len())
+                    .cursor(rope),
+            ),
+            // Insert
+            (true, false) => (
+                {
+                    Self::insert(rope, start.index, &inserted);
+                    Default::default()
+                },
+                rope.cursor()
+                    .at_index(start.index + inserted.len())
+                    .cursor(rope),
+            ),
+            // Remove
+            (false, true) => (
+                Self::remove(rope, start.index..removed_end.index).into(),
+                start,
+            ),
+            // Noop
+            (false, false) => (Default::default(), removed_end),
+        };
+
+        Self::new(start, removed_end, inserted_end, removed, inserted)
+    }
+}
+
+/// Private.
+impl Edit {
+    fn remove(rope: &mut Rope, range: Range<usize>) -> Rope {
+        debug_assert!(!range.is_empty());
+        debug_assert!(rope.char_to_byte(rope.byte_to_char(range.start)) == range.start);
+        debug_assert!(rope.char_to_byte(rope.byte_to_char(range.end)) == range.end);
+
+        let start = rope.byte_to_char(range.start);
+        let end = rope.byte_to_char(range.end);
+
+        let right = rope.split_off(end);
+        let removed = rope.split_off(start);
+
+        rope.append(right);
+        removed
+    }
+
+    fn insert(rope: &mut Rope, index: usize, inserted: &Text) {
         debug_assert!(!inserted.is_empty());
         debug_assert!(rope.char_to_byte(rope.byte_to_char(index)) == index);
 
@@ -200,22 +260,7 @@ impl Edit {
         }
     }
 
-    pub fn remove(rope: &mut Rope, range: Range<usize>) -> Rope {
-        debug_assert!(!range.is_empty());
-        debug_assert!(rope.char_to_byte(rope.byte_to_char(range.start)) == range.start);
-        debug_assert!(rope.char_to_byte(rope.byte_to_char(range.end)) == range.end);
-
-        let start = rope.byte_to_char(range.start);
-        let end = rope.byte_to_char(range.end);
-
-        let right = rope.split_off(end);
-        let removed = rope.split_off(start);
-
-        rope.append(right);
-        removed
-    }
-
-    pub fn replace(rope: &mut Rope, range: Range<usize>, inserted: &Text) -> Rope {
+    fn replace(rope: &mut Rope, range: Range<usize>, inserted: &Text) -> Rope {
         debug_assert!(!inserted.is_empty());
         debug_assert!(!range.is_empty());
         debug_assert!(rope.char_to_byte(rope.byte_to_char(range.start)) == range.start);
@@ -235,10 +280,7 @@ impl Edit {
         rope.append(right);
         removed
     }
-}
 
-/// Private.
-impl Edit {
     fn apply_impl(
         rope: &mut Rope,
         start: Cursor,
@@ -252,19 +294,21 @@ impl Edit {
 
         match (removed.is_empty(), inserted.is_empty()) {
             (true, true) => {}
-            (true, false) => Edit::insert(rope, index, inserted),
+            (true, false) => {
+                Self::insert(rope, index, inserted);
+            }
             (false, true) => {
-                Edit::remove(rope, range);
+                Self::remove(rope, range);
             }
             (false, false) => {
-                Edit::replace(rope, range, inserted);
+                Self::replace(rope, range, inserted);
             }
         }
 
-        Self::input_edit_impl(start, removed_end, inserted_end)
+        Self::to_input_edit_impl(start, removed_end, inserted_end)
     }
 
-    fn input_edit_impl(start: Cursor, removed_end: Cursor, inserted_end: Cursor) -> InputEdit {
+    fn to_input_edit_impl(start: Cursor, removed_end: Cursor, inserted_end: Cursor) -> InputEdit {
         InputEdit {
             start_byte: start.index,
             old_end_byte: removed_end.index,
@@ -281,6 +325,31 @@ impl Edit {
                 row: inserted_end.line,
                 column: inserted_end.column,
             },
+        }
+    }
+
+    fn to_lsp_edit_impl(
+        start: Cursor,
+        removed_end: Cursor,
+        inserted: &Text,
+    ) -> TextDocumentContentChangeEventRangeAndText {
+        use virus_lsp::{
+            structures::{Position, Range},
+            UInteger,
+        };
+
+        TextDocumentContentChangeEventRangeAndText {
+            range: Range {
+                start: Position {
+                    line: start.line as UInteger,
+                    character: start.column as UInteger,
+                },
+                end: virus_lsp::structures::Position {
+                    line: removed_end.line as UInteger,
+                    character: removed_end.column as UInteger,
+                },
+            },
+            text: inserted.to_string(),
         }
     }
 }

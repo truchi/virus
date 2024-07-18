@@ -2,7 +2,7 @@ use crate::{
     cursor::CachedCursor,
     history::History,
     lsp::Lsp,
-    rope::{Edit, RopeExt, Text, WordClass, WordCursor},
+    rope::{RopeExt, Text, WordClass, WordCursor},
     syntax::{Capture, Theme},
 };
 use ropey::Rope;
@@ -13,8 +13,9 @@ use std::{
     ops::Range,
     path::{Path, PathBuf},
 };
-use tree_sitter::{Node, Parser, Query, Tree};
+use tree_sitter::{InputEdit, Node, Parser, Query, Tree};
 use virus_graphics::text::{Cluster, Context, FontFamilyKey, FontSize, Line};
+use virus_lsp::type_aliases::TextDocumentContentChangeEventRangeAndText;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           DocumentId                                           //
@@ -290,6 +291,7 @@ impl Document {
             self.rope
                 .grapheme()
                 .prev(self.selection.head.index())
+                .map(|index| self.rope.cursor().at_index(index))
                 .unwrap_or_else(|| self.selection.head.clone()),
             selection,
         );
@@ -300,6 +302,7 @@ impl Document {
             self.rope
                 .grapheme()
                 .next(self.selection.head.index())
+                .map(|index| self.rope.cursor().at_index(index))
                 .unwrap_or_else(|| self.selection.head.clone()),
             selection,
         );
@@ -310,6 +313,7 @@ impl Document {
             self.rope
                 .word()
                 .prev_start(self.selection.head.index())
+                .map(|index| self.rope.cursor().at_index(index))
                 .unwrap_or_else(|| self.selection.head.clone()),
             selection,
         );
@@ -320,6 +324,7 @@ impl Document {
             self.rope
                 .word()
                 .prev_end(self.selection.head.index())
+                .map(|index| self.rope.cursor().at_index(index))
                 .unwrap_or_else(|| self.selection.head.clone()),
             selection,
         );
@@ -330,6 +335,7 @@ impl Document {
             self.rope
                 .word()
                 .next_start(self.selection.head.index())
+                .map(|index| self.rope.cursor().at_index(index))
                 .unwrap_or_else(|| self.selection.head.clone()),
             selection,
         );
@@ -340,6 +346,7 @@ impl Document {
             self.rope
                 .word()
                 .next_end(self.selection.head.index())
+                .map(|index| self.rope.cursor().at_index(index))
                 .unwrap_or_else(|| self.selection.head.clone()),
             selection,
         );
@@ -349,56 +356,18 @@ impl Document {
 /// Edition.
 impl Document {
     pub fn edit(&mut self, inserted: Text) {
-        let Range {
-            start,
-            end: removed_end,
-        } = self.selection.range();
-        let start = start.cursor(&self.rope);
-        let removed_end = removed_end.cursor(&self.rope);
-        let insert = !inserted.is_empty();
-        let remove = start.index != removed_end.index;
+        let edit = {
+            let Range { start, end } = self.selection.range();
+            let range = start.cursor(&self.rope)..end.cursor(&self.rope);
 
-        let (removed, inserted_end) = match (insert, remove) {
-            // Replace
-            (true, true) => (
-                Edit::replace(&mut self.rope, start.index..removed_end.index, &inserted)
-                    .slice(..)
-                    .into(),
-                self.rope
-                    .cursor()
-                    .at_index(start.index + inserted.len())
-                    .cursor(&self.rope),
-            ),
-            // Insert
-            (true, false) => (
-                {
-                    Edit::insert(&mut self.rope, start.index, &inserted);
-                    Default::default()
-                },
-                self.rope
-                    .cursor()
-                    .at_index(start.index + inserted.len())
-                    .cursor(&self.rope),
-            ),
-            // Remove
-            (false, true) => (
-                Edit::remove(&mut self.rope, start.index..removed_end.index)
-                    .slice(..)
-                    .into(),
-                start,
-            ),
-            // Noop
-            (false, false) => (Default::default(), removed_end),
+            self.rope.edit().edit(range, inserted)
         };
+        let ts_edit = edit.to_ts_edit_applied();
+        let lsp_edit = edit.to_lsp_edit_applied();
 
-        let edit = Edit::new(start, removed_end, inserted_end, removed, inserted);
-        self.selection = inserted_end.cached(&self.rope).into();
-        self.lsp.change_document(&self, [edit.to_lsp_edit()]);
-        self.tree.edit(&edit.to_ts_edit());
-        self.is_tree_dirty = true;
-        self.version += 1;
+        self.selection = edit.inserted_end().cached(&self.rope).into();
         self.history.edit(edit);
-        self.cached_shaping = None;
+        self.after_edit(ts_edit, lsp_edit);
     }
 
     // TODO: convenient for now but does not feel good
@@ -412,26 +381,38 @@ impl Document {
 
     pub fn undo(&mut self) {
         if let Some(edit) = self.history.undo() {
-            let input_edit = edit.unapply(&mut self.rope);
+            let ts_edit = edit.to_ts_edit_unapplied();
+            let lsp_edit = edit.to_lsp_edit_unapplied();
+
+            self.rope.edit().unapply(edit);
             self.selection.anchor = edit.start().cached(&self.rope);
             self.selection.head = edit.removed_end().cached(&self.rope);
-            self.tree.edit(&input_edit);
-            self.is_tree_dirty = true;
-            self.version += 1;
-            self.cached_shaping = None;
+            self.after_edit(ts_edit, lsp_edit);
         }
     }
 
     pub fn redo(&mut self) {
         if let Some(edit) = self.history.redo() {
-            let input_edit = edit.apply(&mut self.rope);
+            let ts_edit = edit.to_ts_edit_applied();
+            let lsp_edit = edit.to_lsp_edit_applied();
+
+            self.rope.edit().apply(edit);
             self.selection.anchor = edit.start().cached(&self.rope);
             self.selection.head = edit.inserted_end().cached(&self.rope);
-            self.tree.edit(&input_edit);
-            self.is_tree_dirty = true;
-            self.version += 1;
-            self.cached_shaping = None;
+            self.after_edit(ts_edit, lsp_edit);
         }
+    }
+
+    fn after_edit(
+        &mut self,
+        ts_edit: InputEdit,
+        lsp_edit: TextDocumentContentChangeEventRangeAndText,
+    ) {
+        self.version += 1;
+        self.is_tree_dirty = true;
+        self.cached_shaping = None;
+        self.tree.edit(&ts_edit);
+        self.lsp.change_document(&self, [lsp_edit]);
     }
 }
 
