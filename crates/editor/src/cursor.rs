@@ -22,6 +22,46 @@ impl Cursor {
             rope,
         )
     }
+
+    pub fn edit(&self, start: Self, removed_end: Self, inserted_end: Self) -> Option<Self> {
+        if self.index <= start.index {
+            return Some(*self);
+        }
+
+        if start.index < self.index && self.index < removed_end.index {
+            return None;
+        }
+
+        debug_assert!(removed_end.line <= self.line);
+
+        let (index, line) = (
+            self.index - (removed_end.index - start.index) + (inserted_end.index - start.index),
+            self.line - (removed_end.line - start.line) + (inserted_end.line - start.line),
+        );
+
+        if removed_end.line < self.line {
+            return Some(Self {
+                index,
+                line,
+                column: self.column,
+                width: self.width,
+            });
+        }
+
+        debug_assert!(removed_end.line == self.line);
+
+        let (column, width) = (
+            self.column - removed_end.column + inserted_end.column,
+            self.width - removed_end.width + inserted_end.width,
+        );
+
+        Some(Self {
+            index,
+            line,
+            column,
+            width,
+        })
+    }
 }
 
 impl PartialEq for Cursor {

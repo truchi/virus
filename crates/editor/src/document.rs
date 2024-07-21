@@ -13,9 +13,8 @@ use std::{
     ops::Range,
     path::{Path, PathBuf},
 };
-use tree_sitter::{InputEdit, Node, Parser, Query, Tree};
+use tree_sitter::{Node, Parser, Query, Tree};
 use virus_graphics::text::{Cluster, Context, FontFamilyKey, FontSize, Line};
-use virus_lsp::type_aliases::TextDocumentContentChangeEventRangeAndText;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           DocumentId                                           //
@@ -366,8 +365,12 @@ impl Document {
         let lsp_edit = edit.to_lsp_edit_applied();
 
         self.selection = edit.inserted_end().cached(&self.rope).into();
-        self.history.edit(edit);
-        self.after_edit(ts_edit, lsp_edit);
+        self.version += 1;
+        self.is_tree_dirty = true;
+        self.cached_shaping = None;
+        self.history.push(edit);
+        self.tree.edit(&ts_edit);
+        self.lsp.change_document(&self, [lsp_edit]);
     }
 
     // TODO: convenient for now but does not feel good
@@ -380,39 +383,63 @@ impl Document {
     }
 
     pub fn undo(&mut self) {
-        if let Some(edit) = self.history.undo() {
-            let ts_edit = edit.to_ts_edit_unapplied();
-            let lsp_edit = edit.to_lsp_edit_unapplied();
+        let edits = match self.history.undo() {
+            Some(edits) if !edits.is_empty() => edits,
+            _ => return,
+        };
 
+        let mut anchor = self.selection.anchor.cursor(&self.rope);
+        let mut head = self.selection.head.cursor(&self.rope);
+        let mut lsp_edits = Vec::with_capacity(edits.len());
+
+        for edit in edits {
             self.rope.edit().unapply(edit);
-            self.selection.anchor = edit.start().cached(&self.rope);
-            self.selection.head = edit.removed_end().cached(&self.rope);
-            self.after_edit(ts_edit, lsp_edit);
+            self.tree.edit(&edit.to_ts_edit_applied());
+            lsp_edits.push(edit.to_lsp_edit_unapplied());
+
+            anchor = anchor
+                .edit(edit.start(), edit.removed_end(), edit.inserted_end())
+                .unwrap_or(edit.start());
+            head = head
+                .edit(edit.start(), edit.removed_end(), edit.inserted_end())
+                .unwrap_or(edit.start());
         }
-    }
 
-    pub fn redo(&mut self) {
-        if let Some(edit) = self.history.redo() {
-            let ts_edit = edit.to_ts_edit_applied();
-            let lsp_edit = edit.to_lsp_edit_applied();
-
-            self.rope.edit().apply(edit);
-            self.selection.anchor = edit.start().cached(&self.rope);
-            self.selection.head = edit.inserted_end().cached(&self.rope);
-            self.after_edit(ts_edit, lsp_edit);
-        }
-    }
-
-    fn after_edit(
-        &mut self,
-        ts_edit: InputEdit,
-        lsp_edit: TextDocumentContentChangeEventRangeAndText,
-    ) {
+        self.selection = Selection::new(anchor.cached(&self.rope), head.cached(&self.rope));
         self.version += 1;
         self.is_tree_dirty = true;
         self.cached_shaping = None;
-        self.tree.edit(&ts_edit);
-        self.lsp.change_document(&self, [lsp_edit]);
+        self.lsp.change_document(&self, lsp_edits);
+    }
+
+    pub fn redo(&mut self) {
+        let edits = match self.history.redo() {
+            Some(edits) if !edits.is_empty() => edits,
+            _ => return,
+        };
+
+        let mut anchor = self.selection.anchor.cursor(&self.rope);
+        let mut head = self.selection.head.cursor(&self.rope);
+        let mut lsp_edits = Vec::with_capacity(edits.len());
+
+        for edit in edits {
+            self.rope.edit().apply(edit);
+            self.tree.edit(&edit.to_ts_edit_applied());
+            lsp_edits.push(edit.to_lsp_edit_applied());
+
+            anchor = anchor
+                .edit(edit.start(), edit.removed_end(), edit.inserted_end())
+                .unwrap_or(edit.start());
+            head = head
+                .edit(edit.start(), edit.removed_end(), edit.inserted_end())
+                .unwrap_or(edit.start());
+        }
+
+        self.selection = Selection::new(anchor.cached(&self.rope), head.cached(&self.rope));
+        self.version += 1;
+        self.is_tree_dirty = true;
+        self.cached_shaping = None;
+        self.lsp.change_document(&self, lsp_edits);
     }
 }
 
