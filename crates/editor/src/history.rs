@@ -21,11 +21,18 @@ impl History {
 
     /// Pushes an `edit` onto the undo stack, emptying the redo stack.
     pub fn push(&mut self, edit: Edit) {
-        self.push_impl(Item::Single([edit]));
+        if !edit.is_noop().unwrap_or_default() {
+            self.push_impl(Item::Single([edit]));
+        }
     }
 
     /// Pushes a bulk of `edits` onto the undo stack, emptying the redo stack.
-    pub fn push_bulk(&mut self, edits: Vec<Edit>) {
+    pub fn push_bulk(&mut self, edits: impl IntoIterator<Item = Edit>) {
+        let edits = edits
+            .into_iter()
+            .filter(|edit| !edit.is_noop().unwrap_or_default())
+            .collect::<Vec<_>>();
+
         if !edits.is_empty() {
             self.push_impl(Item::Multiple(edits));
         }

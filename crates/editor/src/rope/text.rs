@@ -8,15 +8,26 @@ use virus_lsp::type_aliases::TextDocumentContentChangeEventRangeAndText;
 //                                              Text                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Eq, Debug)]
 enum Inner {
     String(String),
     Rope(Rope),
 }
 
+impl PartialEq for Inner {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::String(a), Self::String(b)) => a == b,
+            (Self::String(a), Self::Rope(b)) => a == b,
+            (Self::Rope(a), Self::String(b)) => a == b,
+            (Self::Rope(a), Self::Rope(b)) => a == b,
+        }
+    }
+}
+
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Text {
     inner: Inner,
 }
@@ -48,7 +59,7 @@ impl<'a> From<String> for Text {
 impl<'a> From<RopeSlice<'a>> for Text {
     fn from(slice: RopeSlice<'a>) -> Self {
         Self {
-            inner: if slice.len_bytes() <= Self::MAX_BYTES {
+            inner: if slice.len_bytes() <= Self::BREAKPOINT {
                 Inner::String(slice.into())
             } else {
                 Inner::Rope(slice.into())
@@ -60,7 +71,7 @@ impl<'a> From<RopeSlice<'a>> for Text {
 impl<'a> From<Rope> for Text {
     fn from(rope: Rope) -> Self {
         Self {
-            inner: if rope.len_bytes() <= Self::MAX_BYTES {
+            inner: if rope.len_bytes() <= Self::BREAKPOINT {
                 Inner::String(rope.into())
             } else {
                 Inner::Rope(rope)
@@ -79,8 +90,11 @@ impl ToString for Text {
 }
 
 impl Text {
+    /// Ropes greater than this breakpoint will be stored as is.
+    /// Other ropes will be converted into strings.
+    ///
     /// @see [`Rope::try_insert()`] comments.
-    pub const MAX_BYTES: usize = 6 * 984; // 6 * ropey::MAX_BYTES
+    pub const BREAKPOINT: usize = 6 * 984; // 6 * ropey::MAX_BYTES
 
     pub fn len(&self) -> usize {
         match &self.inner {
@@ -146,6 +160,20 @@ impl Edit {
 
     pub fn inserted(&self) -> &Text {
         &self.inserted
+    }
+
+    /// Returns whether this edit would leave some text unchanged,
+    /// or `None` if the edit is larger that `Text::BREAKPOINT`.
+    pub fn is_noop(&self) -> Option<bool> {
+        if self.removed.len() != self.inserted.len() {
+            return Some(false);
+        }
+
+        if self.removed.len() > Text::BREAKPOINT {
+            return None;
+        }
+
+        Some(self.removed == self.inserted)
     }
 
     pub fn to_ts_edit_applied(&self) -> InputEdit {

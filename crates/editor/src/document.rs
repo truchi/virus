@@ -361,6 +361,11 @@ impl Document {
 
             self.rope.edit().edit(range, inserted)
         };
+
+        if edit.is_noop().unwrap_or_default() {
+            return;
+        }
+
         let ts_edit = edit.to_ts_edit_applied();
         let lsp_edit = edit.to_lsp_edit_applied();
 
@@ -383,11 +388,9 @@ impl Document {
     }
 
     pub fn undo(&mut self) {
-        let edits = match self.history.undo() {
-            Some(edits) if !edits.is_empty() => edits,
-            _ => return,
+        let Some(edits) = self.history.undo() else {
+            return;
         };
-
         let mut anchor = self.selection.anchor.cursor(&self.rope);
         let mut head = self.selection.head.cursor(&self.rope);
         let mut lsp_edits = Vec::with_capacity(edits.len());
@@ -413,11 +416,9 @@ impl Document {
     }
 
     pub fn redo(&mut self) {
-        let edits = match self.history.redo() {
-            Some(edits) if !edits.is_empty() => edits,
-            _ => return,
+        let Some(edits) = self.history.redo() else {
+            return;
         };
-
         let mut anchor = self.selection.anchor.cursor(&self.rope);
         let mut head = self.selection.head.cursor(&self.rope);
         let mut lsp_edits = Vec::with_capacity(edits.len());
