@@ -16,13 +16,15 @@ What `virus` aims to be/have:
 - **Command palette/Which key**
 - **LSP** (can we dream?)
 
-What I *should* resist doing to achieve these goals:
+What I _should_ resist doing to achieve these goals:
+
 - Rewrite `ropey`
 - Font variations axis animation (with Recursive)
 - Lottie renderer (for Noto animated emojis)
 - Magit levels of git integration
 
 What `virus` will never be/have:
+
 - Mouse
 - Windows/Tabs (ok, maybe)
 - Configuration
@@ -65,5 +67,3 @@ My next objective is to have some sort of keyboard handler and an mvp modal edit
 ## Ropey
 
 ## Tree-sitter
-
-
