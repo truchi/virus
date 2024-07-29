@@ -1,8 +1,7 @@
 use crate::{
-    cursor::CachedCursor,
     history::History,
     lsp::Lsp,
-    rope::{RopeExt, Text, WordClass, WordCursor},
+    rope::{Cursor, CursorRef, Edit, Text, WordClass, WordCursor},
     syntax::{Capture, Theme},
 };
 use ropey::Rope;
@@ -35,25 +34,25 @@ impl DocumentId {
 //                                           Selection                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Clone, Eq, PartialEq, Default, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
 pub struct Selection {
-    pub anchor: CachedCursor,
-    pub head: CachedCursor,
+    pub anchor: Cursor,
+    pub head: Cursor,
 }
 
-impl From<CachedCursor> for Selection {
-    fn from(cursor: CachedCursor) -> Self {
+impl From<Cursor> for Selection {
+    fn from(cursor: Cursor) -> Self {
         Self::cursor(cursor)
     }
 }
 
 impl Selection {
-    pub fn new(anchor: CachedCursor, head: CachedCursor) -> Self {
+    pub fn new(anchor: Cursor, head: Cursor) -> Self {
         Self { anchor, head }
     }
 
-    pub fn cursor(cursor: CachedCursor) -> Self {
-        Self::new(cursor.clone(), cursor)
+    pub fn cursor(cursor: Cursor) -> Self {
+        Self::new(cursor, cursor)
     }
 
     pub fn len(&self) -> usize {
@@ -74,31 +73,31 @@ impl Selection {
         }
     }
 
-    pub fn range(&self) -> Range<&CachedCursor> {
+    pub fn range(&self) -> Range<Cursor> {
         if self.is_forward() {
-            &self.anchor..&self.head
+            self.anchor..self.head
         } else {
-            &self.head..&self.anchor
+            self.head..self.anchor
         }
     }
 
     pub fn flip(&self) -> Self {
-        Self::new(self.head.clone(), self.anchor.clone())
+        Self::new(self.head, self.anchor)
     }
 
     pub fn flip_mut(&mut self) {
         *self = self.flip();
     }
 
-    pub fn move_to(&self, cursor: CachedCursor, selection: bool) -> Self {
+    pub fn move_to(&self, cursor: Cursor, selection: bool) -> Self {
         if selection {
-            Self::new(self.anchor.clone(), cursor)
+            Self::new(self.anchor, cursor)
         } else {
             Self::cursor(cursor)
         }
     }
 
-    pub fn move_to_mut(&mut self, cursor: CachedCursor, selection: bool) {
+    pub fn move_to_mut(&mut self, cursor: Cursor, selection: bool) {
         *self = self.move_to(cursor, selection);
     }
 }
@@ -205,40 +204,8 @@ impl Document {
         &self.rope
     }
 
-    pub fn anchor_index(&self) -> usize {
-        self.selection.anchor.index()
-    }
-
-    pub fn anchor_line(&self) -> usize {
-        self.selection.anchor.line(&self.rope)
-    }
-
-    pub fn anchor_column(&self) -> usize {
-        self.selection.anchor.column(&self.rope)
-    }
-
-    pub fn anchor_width(&self) -> usize {
-        self.selection.anchor.width(&self.rope)
-    }
-
-    pub fn head_index(&self) -> usize {
-        self.selection.head.index()
-    }
-
-    pub fn head_line(&self) -> usize {
-        self.selection.head.line(&self.rope)
-    }
-
-    pub fn head_column(&self) -> usize {
-        self.selection.head.column(&self.rope)
-    }
-
-    pub fn head_width(&self) -> usize {
-        self.selection.head.width(&self.rope)
-    }
-
-    pub fn selection(&self) -> &Selection {
-        &self.selection
+    pub fn selection(&self) -> Selection {
+        self.selection
     }
 
     pub fn tree(&self) -> &Tree {
@@ -261,92 +228,96 @@ impl Document {
     }
 
     pub fn move_up(&mut self, selection: bool, lines: usize) {
-        let line = self.selection.head.line(&self.rope);
-        let width = self.selection.head.width(&self.rope);
+        let line = self.selection.head.line();
+        let width = self.selection.head.width();
+        let cursor = CursorRef::with(self.rope.slice(..));
 
         self.selection.move_to_mut(
             line.checked_sub(lines)
-                .map(|line| self.rope.cursor().at_line_width(line, width))
-                .unwrap_or_else(|| self.rope().cursor().at_start()),
+                .map(|line| cursor.at_line_width(line, width))
+                .unwrap_or_else(|| cursor.at_start())
+                .as_cursor(),
             selection,
         );
     }
 
     pub fn move_down(&mut self, selection: bool, lines: usize) {
-        let line = self.selection.head.line(&self.rope);
-        let width = self.selection.head.width(&self.rope);
+        let line = self.selection.head.line();
+        let width = self.selection.head.width();
 
         self.selection.move_to_mut(
-            self.rope().cursor().at_line_width(
-                self.rope.len_lines().saturating_sub(1).min(line + lines),
-                width,
-            ),
+            CursorRef::with(self.rope.slice(..))
+                .at_line_width(
+                    self.rope.len_lines().saturating_sub(1).min(line + lines),
+                    width,
+                )
+                .as_cursor(),
             selection,
         );
     }
 
     pub fn move_prev_grapheme(&mut self, selection: bool) {
         self.selection.move_to_mut(
-            self.rope
-                .grapheme()
-                .prev(self.selection.head.index())
-                .map(|index| self.rope.cursor().at_index(index))
-                .unwrap_or_else(|| self.selection.head.clone()),
+            CursorRef::with(self.rope.slice(..))
+                .at_cursor(self.selection.head)
+                .prev_grapheme()
+                .map(|cursor| cursor.as_cursor())
+                .unwrap_or(self.selection.head),
             selection,
         );
     }
 
     pub fn move_next_grapheme(&mut self, selection: bool) {
         self.selection.move_to_mut(
-            self.rope
-                .grapheme()
-                .next(self.selection.head.index())
-                .map(|index| self.rope.cursor().at_index(index))
-                .unwrap_or_else(|| self.selection.head.clone()),
+            CursorRef::with(self.rope.slice(..))
+                .at_cursor(self.selection.head)
+                .next_grapheme()
+                .map(|cursor| cursor.as_cursor())
+                .unwrap_or(self.selection.head),
             selection,
         );
     }
 
     pub fn move_prev_start_of_word(&mut self, selection: bool) {
         self.selection.move_to_mut(
-            self.rope
-                .word()
-                .prev_start(self.selection.head.index())
-                .map(|index| self.rope.cursor().at_index(index))
-                .unwrap_or_else(|| self.selection.head.clone()),
+            CursorRef::with(self.rope.slice(..))
+                .at_cursor(self.selection.head)
+                .prev_word_start()
+                .map(|cursor| cursor.as_cursor())
+                .unwrap_or(self.selection.head),
             selection,
         );
     }
 
     pub fn move_prev_end_of_word(&mut self, selection: bool) {
         self.selection.move_to_mut(
-            self.rope
-                .word()
-                .prev_end(self.selection.head.index())
-                .map(|index| self.rope.cursor().at_index(index))
-                .unwrap_or_else(|| self.selection.head.clone()),
+            CursorRef::with(self.rope.slice(..))
+                .at_cursor(self.selection.head)
+                .prev_word_end()
+                .map(|cursor| cursor.as_cursor())
+                .unwrap_or(self.selection.head),
             selection,
         );
     }
 
     pub fn move_next_start_of_word(&mut self, selection: bool) {
         self.selection.move_to_mut(
-            self.rope
-                .word()
-                .next_start(self.selection.head.index())
-                .map(|index| self.rope.cursor().at_index(index))
-                .unwrap_or_else(|| self.selection.head.clone()),
+            CursorRef::with(self.rope.slice(..))
+                .at_cursor(self.selection.head)
+                .next_word_start()
+                .map(|cursor| cursor.as_cursor())
+                .unwrap_or(self.selection.head),
             selection,
         );
     }
 
     pub fn move_next_end_of_word(&mut self, selection: bool) {
         self.selection.move_to_mut(
-            self.rope
-                .word()
-                .next_end(self.selection.head.index())
-                .map(|index| self.rope.cursor().at_index(index))
-                .unwrap_or_else(|| self.selection.head.clone()),
+            CursorRef::with(self.rope.slice(..))
+                .at_cursor(self.selection.head)
+                .next_word_end()
+                .map(|cursor| cursor.as_cursor())
+                .unwrap_or(self.selection.head),
             selection,
         );
     }
@@ -356,10 +327,8 @@ impl Document {
 impl Document {
     pub fn edit(&mut self, inserted: Text) {
         let edit = {
-            let Range { start, end } = self.selection.range();
-            let range = start.cursor(&self.rope)..end.cursor(&self.rope);
-
-            self.rope.edit().edit(range, inserted)
+            let selection = self.selection();
+            Edit::edit(&mut self.rope, selection.range(), inserted)
         };
 
         if edit.is_noop().unwrap_or_default() {
@@ -369,7 +338,7 @@ impl Document {
         let ts_edit = edit.to_ts_edit_applied();
         let lsp_edit = edit.to_lsp_edit_applied();
 
-        self.selection = edit.inserted_end().cached(&self.rope).into();
+        self.selection = edit.inserted_end().into();
         self.version += 1;
         self.is_tree_dirty = true;
         self.cached_shaping = None;
@@ -391,12 +360,12 @@ impl Document {
         let Some(edits) = self.history.undo() else {
             return;
         };
-        let mut anchor = self.selection.anchor.cursor(&self.rope);
-        let mut head = self.selection.head.cursor(&self.rope);
+        let mut anchor = self.selection.anchor;
+        let mut head = self.selection.head;
         let mut lsp_edits = Vec::with_capacity(edits.len());
 
         for edit in edits {
-            self.rope.edit().unapply(edit);
+            edit.unapply(&mut self.rope);
             self.tree.edit(&edit.to_ts_edit_applied());
             lsp_edits.push(edit.to_lsp_edit_unapplied());
 
@@ -408,7 +377,7 @@ impl Document {
                 .unwrap_or(edit.start());
         }
 
-        self.selection = Selection::new(anchor.cached(&self.rope), head.cached(&self.rope));
+        self.selection = Selection::new(anchor, head);
         self.version += 1;
         self.is_tree_dirty = true;
         self.cached_shaping = None;
@@ -419,12 +388,12 @@ impl Document {
         let Some(edits) = self.history.redo() else {
             return;
         };
-        let mut anchor = self.selection.anchor.cursor(&self.rope);
-        let mut head = self.selection.head.cursor(&self.rope);
+        let mut anchor = self.selection.anchor;
+        let mut head = self.selection.head;
         let mut lsp_edits = Vec::with_capacity(edits.len());
 
         for edit in edits {
-            self.rope.edit().apply(edit);
+            edit.apply(&mut self.rope);
             self.tree.edit(&edit.to_ts_edit_applied());
             lsp_edits.push(edit.to_lsp_edit_applied());
 
@@ -436,7 +405,7 @@ impl Document {
                 .unwrap_or(edit.start());
         }
 
-        self.selection = Selection::new(anchor.cached(&self.rope), head.cached(&self.rope));
+        self.selection = Selection::new(anchor, head);
         self.version += 1;
         self.is_tree_dirty = true;
         self.cached_shaping = None;
@@ -464,10 +433,10 @@ impl Document {
                 self.tree.root_node(),
                 &self.highlights,
                 lines.clone(),
-                self.selection.anchor.line(&self.rope),
-                self.selection.anchor.column(&self.rope),
-                self.selection.head.line(&self.rope),
-                self.selection.head.column(&self.rope),
+                self.selection.anchor.line(),
+                self.selection.anchor.column(),
+                self.selection.head.line(),
+                self.selection.head.column(),
                 family,
                 theme,
                 font_size,
@@ -480,10 +449,10 @@ impl Document {
             self.tree.root_node(),
             &self.highlights,
             lines,
-            self.selection.anchor.line(&self.rope),
-            self.selection.anchor.column(&self.rope),
-            self.selection.head.line(&self.rope),
-            self.selection.head.column(&self.rope),
+            self.selection.anchor.line(),
+            self.selection.anchor.column(),
+            self.selection.head.line(),
+            self.selection.head.column(),
             family,
             theme,
             font_size,

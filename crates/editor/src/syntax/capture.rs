@@ -1,4 +1,4 @@
-use crate::{rope::RopeExt, syntax::ThemeKey};
+use crate::{rope::CursorRef, syntax::ThemeKey};
 use ropey::Rope;
 use std::ops::Range;
 use tree_sitter::{Node, Point, Query, QueryCursor};
@@ -26,31 +26,29 @@ impl Capture {
         debug_assert!(lines.start <= lines.end);
         debug_assert!(lines.end <= rope.len_lines());
 
-        let (start, end) = (
-            rope.cursor().at_line(lines.start),
-            if lines.end == rope.len_lines() {
-                rope.cursor().at_end()
-            } else {
-                rope.cursor().at_line(lines.end)
-            },
-        );
-        let start_index = start.index();
-        let start_line = start.line(rope);
-        let start_column = start.column(rope);
-        let end_index = end.index();
-        let end_line = end.line(rope);
-        let end_column = end.column(rope);
+        let (start, end) = {
+            let cursor = CursorRef::with(rope.slice(..));
+
+            (
+                cursor.at_line(lines.start),
+                if lines.end == rope.len_lines() {
+                    cursor.at_end()
+                } else {
+                    cursor.at_line(lines.end)
+                },
+            )
+        };
 
         {
             let mut cursor = QueryCursor::new();
             cursor.set_point_range(Range {
                 start: Point {
-                    row: start_line,
-                    column: start_column,
+                    row: start.line(),
+                    column: start.column(),
                 },
                 end: Point {
-                    row: end_line,
-                    column: end_column,
+                    row: end.line(),
+                    column: end.column(),
                 },
             });
             cursor
@@ -73,22 +71,22 @@ impl Capture {
             })
         })
         .flatten()
-        .filter(|capture| start_index < capture.end_index)
-        .filter(|capture| capture.start_index < end_index)
+        .filter(|capture| start.index() < capture.end_index)
+        .filter(|capture| capture.start_index < end.index())
         .map(|capture| {
-            let (start_index, start_line, start_column) = if start_index <= capture.start_index {
+            let (start_index, start_line, start_column) = if start.index() <= capture.start_index {
                 (
                     capture.start_index,
                     capture.start_line,
                     capture.start_column,
                 )
             } else {
-                (start_index, start_line, start_column)
+                (start.index(), start.line(), start.column())
             };
-            let (end_index, end_line, end_column) = if capture.end_index <= end_index {
+            let (end_index, end_line, end_column) = if capture.end_index <= end.index() {
                 (capture.end_index, capture.end_line, capture.end_column)
             } else {
-                (end_index, end_line, end_column)
+                (end.index(), end.line(), end.column())
             };
 
             Capture {

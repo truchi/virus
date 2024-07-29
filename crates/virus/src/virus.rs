@@ -328,16 +328,28 @@ impl Virus {
                             .get_active_document_mut()
                             .unwrap()
                             .move_up(select_mode.is_some(), 1);
-                        self.ui
-                            .ensure_visibility(editor.get_active_document().unwrap().head_line());
+                        self.ui.ensure_visibility(
+                            editor
+                                .get_active_document()
+                                .unwrap()
+                                .selection()
+                                .head
+                                .line(),
+                        );
                     }
                     Key::Str("k") => {
                         editor
                             .get_active_document_mut()
                             .unwrap()
                             .move_down(select_mode.is_some(), 1);
-                        self.ui
-                            .ensure_visibility(editor.get_active_document().unwrap().head_line());
+                        self.ui.ensure_visibility(
+                            editor
+                                .get_active_document()
+                                .unwrap()
+                                .selection()
+                                .head
+                                .line(),
+                        );
                     }
                     Key::Str("j") => editor
                         .get_active_document_mut()
@@ -352,32 +364,56 @@ impl Virus {
                             .get_active_document_mut()
                             .unwrap()
                             .move_next_end_of_word(select_mode.is_some());
-                        self.ui
-                            .ensure_visibility(editor.get_active_document().unwrap().head_line());
+                        self.ui.ensure_visibility(
+                            editor
+                                .get_active_document()
+                                .unwrap()
+                                .selection()
+                                .head
+                                .line(),
+                        );
                     }
                     Key::Str("E") => {
                         editor
                             .get_active_document_mut()
                             .unwrap()
                             .move_prev_end_of_word(select_mode.is_some());
-                        self.ui
-                            .ensure_visibility(editor.get_active_document().unwrap().head_line());
+                        self.ui.ensure_visibility(
+                            editor
+                                .get_active_document()
+                                .unwrap()
+                                .selection()
+                                .head
+                                .line(),
+                        );
                     }
                     Key::Str("w") => {
                         editor
                             .get_active_document_mut()
                             .unwrap()
                             .move_next_start_of_word(select_mode.is_some());
-                        self.ui
-                            .ensure_visibility(editor.get_active_document().unwrap().head_line());
+                        self.ui.ensure_visibility(
+                            editor
+                                .get_active_document()
+                                .unwrap()
+                                .selection()
+                                .head
+                                .line(),
+                        );
                     }
                     Key::Str("W") => {
                         editor
                             .get_active_document_mut()
                             .unwrap()
                             .move_prev_start_of_word(select_mode.is_some());
-                        self.ui
-                            .ensure_visibility(editor.get_active_document().unwrap().head_line());
+                        self.ui.ensure_visibility(
+                            editor
+                                .get_active_document()
+                                .unwrap()
+                                .selection()
+                                .head
+                                .line(),
+                        );
                     }
                     Key::Str("c") if self.events.command() => editor.paste(),
                     Key::Str("c") => editor.copy(),
@@ -402,16 +438,28 @@ impl Virus {
                             .get_active_document_mut()
                             .unwrap()
                             .move_up(select_mode.is_some(), 10);
-                        self.ui
-                            .ensure_visibility(editor.get_active_document().unwrap().head_line());
+                        self.ui.ensure_visibility(
+                            editor
+                                .get_active_document()
+                                .unwrap()
+                                .selection()
+                                .head
+                                .line(),
+                        );
                     }
                     Key::Str("h") => {
                         editor
                             .get_active_document_mut()
                             .unwrap()
                             .move_down(select_mode.is_some(), 10);
-                        self.ui
-                            .ensure_visibility(editor.get_active_document().unwrap().head_line());
+                        self.ui.ensure_visibility(
+                            editor
+                                .get_active_document()
+                                .unwrap()
+                                .selection()
+                                .head
+                                .line(),
+                        );
                     }
                     Key::Str("v") => match select_mode {
                         Some(SelectMode::Range) => *select_mode = Some(SelectMode::Line),
