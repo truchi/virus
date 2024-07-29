@@ -11,23 +11,19 @@
 > Reruns on exit
 
 ```sh
-countdown() {
-    for i in {3..1}; do
-        echo "Restarts in ${i}s"
-        read -n 1 -t 1 key && return 0
-        tput cuu1
-        tput el
-    done
-
-    return 1
-}
-
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
 while true; do
-    cargo build || exit
-    cargo run crates/virus/src/virus.rs
+    if cargo build; then
+        cargo run crates/virus/src/virus.rs
+    else
+        echo "${RED}Running old binary${NC}"
+        ./target/debug/virus crates/virus/src/virus.rs
+    fi
 
-    echo "Reruns in 1s (press any key to exit)"
+    echo "${BLUE}Reruns in 1s (press any key to exit)${NC}"
     read -n 1 -t 1 key && exit
 done
 ```
