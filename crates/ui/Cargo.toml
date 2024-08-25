@@ -5,8 +5,10 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
+lru.workspace = true
 ropey.workspace = true
 swash.workspace = true
+tree-sitter.workspace = true
 tween.workspace = true
 virus-editor.workspace = true
 virus-graphics.workspace = true

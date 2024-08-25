@@ -1,6 +1,9 @@
-use crate::LineColumn;
+use crate::{syntax::Lines, theme::UiTheme};
 use ropey::Rope;
-use virus_editor::{document::Document, syntax::Theme};
+use virus_editor::{
+    document::{Document, DocumentId},
+    rope::{Cursor, Selection},
+};
 use virus_graphics::{
     text::{
         Advance, Context, FontFamilyKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
@@ -14,39 +17,18 @@ use virus_graphics::{
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct DocumentView {
-    family: FontFamilyKey,
-    theme: Theme,
-    font_size: FontSize,
-    line_height: LineHeight,
+    id: DocumentId,
+    lines: Lines,
     rope: Rope,
 }
 
 impl DocumentView {
-    pub fn new(
-        family: FontFamilyKey,
-        theme: Theme,
-        font_size: FontSize,
-        line_height: LineHeight,
-    ) -> Self {
+    pub fn new(id: DocumentId) -> Self {
         Self {
-            family,
-            theme,
-            font_size,
-            line_height,
+            id,
+            lines: Default::default(),
             rope: Default::default(),
         }
-    }
-
-    pub fn family(&self) -> FontFamilyKey {
-        self.family
-    }
-
-    pub fn font_size(&self) -> FontSize {
-        self.font_size
-    }
-
-    pub fn line_height(&self) -> LineHeight {
-        self.line_height
     }
 
     pub fn rope(&self) -> &Rope {
@@ -65,15 +47,13 @@ impl DocumentView {
         caret_color: Rgba,
         caret_width: u32,
         selection_color: Rgba,
+        theme: &UiTheme,
     ) {
-        // NOTE: I'd like this the be done outside this file (or even better outside this crate)
-
         self.rope = document.rope().clone();
 
         let rope_lines = document.rope().len_lines();
-        let region_height_in_lines = layer.size().height as f32 / self.line_height as f32;
-        let scroll_top_in_lines = scroll_top as f32 / self.line_height as f32;
-
+        let region_height_in_lines = layer.size().height as f32 / theme.line_height as f32;
+        let scroll_top_in_lines = scroll_top as f32 / theme.line_height as f32;
         let (start_line, end_line) = {
             let start = scroll_top_in_lines.floor() as usize;
             let end = scroll_top_in_lines.ceil() as usize + region_height_in_lines.ceil() as usize;
@@ -83,13 +63,11 @@ impl DocumentView {
 
             (start, end)
         };
-
         let advance = context
             .fonts()
-            .get((self.family, FontWeight::Regular, FontStyle::Normal))
+            .get((theme.family, FontWeight::Regular, FontStyle::Normal))
             .unwrap()
-            .advance_for_size(self.font_size);
-
+            .advance_for_size(theme.font_size);
         let scrollbar_rectangle = if rope_lines <= region_height_in_lines as usize {
             Rectangle::default()
         } else {
@@ -104,35 +82,20 @@ impl DocumentView {
                 width: (advance / 4.0).round() as u32,
             }
         };
-
-        let anchor = LineColumn {
-            line: document.selection().anchor.line(),
-            column: document.selection().anchor.column(),
-        };
-        let head = LineColumn {
-            line: document.selection().head.line(),
-            column: document.selection().head.column(),
-        };
-
-        let lines = document.shape(
-            context,
-            start_line..end_line,
-            self.family,
-            self.theme,
-            self.font_size,
-        );
+        let lines = self
+            .lines
+            .lines(context, document, start_line..end_line, theme);
 
         Renderer {
             context,
             layer,
-            family: self.family,
-            font_size: self.font_size,
-            line_height: self.line_height,
-            anchor,
-            head,
+            family: theme.family,
+            font_size: theme.font_size,
+            line_height: theme.line_height,
+            selection: document.selection(),
             start_line,
             line_numbers_width: (advance * (rope_lines.ilog10() + 3) as Advance).round() as u32,
-            line_numbers_color: self.theme.comment.foreground,
+            line_numbers_color: theme.syntax.comment.foreground,
             lines: &lines[..],
             scroll_top,
             show_selection_as_lines,
@@ -157,8 +120,7 @@ struct Renderer<'context, 'layer, 'graphics, 'lines, 'outline_colors> {
     family: FontFamilyKey,
     font_size: FontSize,
     line_height: LineHeight,
-    anchor: LineColumn,
-    head: LineColumn,
+    selection: Selection,
     lines: &'lines [Line],
     start_line: usize,
     line_numbers_width: u32,
@@ -231,19 +193,20 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
 
     fn render_selection(&mut self) {
         let pos = |top, left| Position { top, left };
-        let row = |LineColumn { line, .. }| {
-            line as i32 * self.line_height as i32 - self.scroll_top as i32
+        let row = |cursor: Cursor| {
+            cursor.line() as i32 * self.line_height as i32 - self.scroll_top as i32
         };
-        let column = |LineColumn { line, column }| -> i32 {
+        let column = |cursor: Cursor| -> i32 {
             self.line_numbers_width as i32
-                + if (self.start_line..self.start_line + self.lines.len()).contains(&line) {
-                    let line = &self.lines[line - self.start_line];
+                + if (self.start_line..self.start_line + self.lines.len()).contains(&cursor.line())
+                {
+                    let line = &self.lines[cursor.line() - self.start_line];
 
                     line.glyphs()
                         .iter()
                         .find_map(|glyph| {
                             // TODO: consecutive glyphs may have same range!
-                            (glyph.range.end as usize > column).then_some(glyph.offset)
+                            (glyph.range.end as usize > cursor.column()).then_some(glyph.offset)
                         })
                         .unwrap_or_else(|| line.advance())
                         .round() as i32
@@ -253,11 +216,7 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
         };
 
         let layer = 1;
-        let (selection, is_forward) = if self.anchor <= self.head {
-            (self.anchor..self.head, true)
-        } else {
-            (self.head..self.anchor, false)
-        };
+        let (selection, is_forward) = (self.selection.range(), self.selection.is_forward());
         let (width, height) = (self.layer.size().width as i32, self.line_height as i32);
         let top = row(selection.start);
         let bottom = row(selection.end);
@@ -319,7 +278,7 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
             render_caret(self, top, start);
         }
         // Single line
-        else if selection.start.line == selection.end.line {
+        else if selection.start.line() == selection.end.line() {
             let bottom = top + height;
 
             if self.show_selection_as_lines {

@@ -83,13 +83,15 @@ pub struct Graphics {
 
 impl Graphics {
     /// Creates a new `Graphics`.
-    pub fn new(window: &Arc<Window>) -> Self {
+    pub fn new(window: Arc<Window>) -> Self {
+        let size = window.inner_size();
+
         // WGPU instance
         let instance = Instance::new(Default::default());
 
         // Surface (window/canvas)
         let surface = instance
-            .create_surface(Arc::clone(window))
+            .create_surface(window)
             .expect("Cannot create surface");
 
         // Request adapter (device handle), device (gpu connection) and queue (handle to command queue)
@@ -113,7 +115,6 @@ impl Graphics {
 
         // Configure surface
         let config = {
-            let size = window.inner_size();
             let capabilities = surface.get_capabilities(&adapter);
             SurfaceConfiguration {
                 usage: TextureUsages::RENDER_ATTACHMENT,

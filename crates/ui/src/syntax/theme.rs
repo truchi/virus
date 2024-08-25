@@ -102,11 +102,11 @@ impl ThemeKey {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                             Theme                                              //
+//                                          SyntaxTheme                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub struct Theme {
+pub struct SyntaxTheme {
     pub default: Styles,
     pub attribute: Styles,
     pub comment: Styles,
@@ -151,7 +151,7 @@ pub struct Theme {
     pub variable_parameter: Styles,
 }
 
-impl Theme {
+impl SyntaxTheme {
     /// https://github.com/catppuccin/helix/blob/main/themes/default/catppuccin_latte.toml
     pub fn catppuccin() -> Self {
         use virus_graphics::text::{
@@ -219,7 +219,7 @@ impl Theme {
     }
 }
 
-impl Index<ThemeKey> for Theme {
+impl Index<ThemeKey> for SyntaxTheme {
     type Output = Styles;
 
     fn index(&self, key: ThemeKey) -> &Self::Output {

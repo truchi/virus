@@ -18,7 +18,7 @@ use virus_editor::{
     editor::{Editor, EventLoopMessage},
     fuzzy::Fuzzy,
 };
-use virus_ui::{theme::Theme, tween::Tween, ui::Ui};
+use virus_ui::{theme::UiTheme, tween::Tween, ui::Ui};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -205,10 +205,11 @@ impl Virus {
             let select_mode = catppuccin.pink;
             let insert_mode = catppuccin.green;
 
-            Theme {
-                syntax: virus_editor::syntax::Theme::catppuccin(),
-                font_size: 20,
-                line_height: 25,
+            UiTheme {
+                syntax: virus_ui::syntax::SyntaxTheme::catppuccin(),
+                family: "Victor",
+                font_size: 15,
+                line_height: 20,
                 scrollbar_color: catppuccin.surface1.solid(),
                 scroll_duration: Duration::from_millis(500),
                 scroll_tween: Tween::ExpoOut,
@@ -233,8 +234,8 @@ impl Virus {
                 caret_normal_mode_color: normal_mode,
                 caret_select_mode_color: select_mode,
                 caret_insert_mode_color: insert_mode,
-                caret_normal_mode_width: 4,
-                caret_select_mode_width: 4,
+                caret_normal_mode_width: 2,
+                caret_select_mode_width: 2,
                 caret_insert_mode_width: 2,
                 selection_select_mode_color: select_mode.solid().transparent(255 / 2),
                 selection_insert_mode_color: insert_mode.solid().transparent(255 / 2),

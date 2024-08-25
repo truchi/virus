@@ -1,10 +1,10 @@
 use crate::{
-    theme::Theme,
+    theme::UiTheme,
     tween::Tweened,
     views::{DocumentView, FilesView},
 };
 use std::{ops::Range, sync::Arc, time::Duration};
-use virus_editor::document::Document;
+use virus_editor::document::{Document, DocumentId};
 use virus_graphics::{
     text::{Context, Font, FontStyle, FontWeight, Fonts},
     types::{Rectangle, Rgba},
@@ -20,7 +20,7 @@ pub struct Ui {
     window: Arc<Window>,
     graphics: Graphics,
     context: Context,
-    theme: Theme,
+    theme: UiTheme,
     document_view: DocumentView,
     scroll_top: Tweened<u32>,
     scrollbar_alpha: Tweened<u8>,
@@ -28,19 +28,13 @@ pub struct Ui {
 }
 
 impl Ui {
-    pub fn new(window: Arc<Window>, theme: Theme) -> Self {
-        let graphics = Graphics::new(&window);
+    pub fn new(window: Arc<Window>, theme: UiTheme<&str>) -> Self {
+        let graphics = Graphics::new(Arc::clone(&window));
         let context = Context::new(fonts());
-        let family = context.fonts().get("Victor").unwrap();
-
-        let document_view = DocumentView::new(
-            family.key(),
-            theme.syntax,
-            theme.font_size,
-            theme.line_height,
-        );
+        let theme = theme.resolve(&context);
+        let document_view = DocumentView::new(DocumentId::default().generate());
         let files_view = FilesView::new(
-            family.key(),
+            theme.family,
             theme.font_size,
             theme.line_height,
             Rgba::WHITE,
@@ -52,8 +46,8 @@ impl Ui {
             context,
             theme,
             document_view,
-            scroll_top: Tweened::new(0),
-            scrollbar_alpha: Tweened::new(0),
+            scroll_top: Default::default(),
+            scrollbar_alpha: Default::default(),
             files_view,
         }
     }
@@ -62,7 +56,7 @@ impl Ui {
         &self.window
     }
 
-    pub fn theme(&self) -> &Theme {
+    pub fn theme(&self) -> &UiTheme {
         &self.theme
     }
 
@@ -71,12 +65,12 @@ impl Ui {
     }
 
     pub fn scroll_up(&mut self) {
-        let scroll = self.screen_height_in_lines() / 2 * self.document_view.line_height();
+        let scroll = self.screen_height_in_lines() / 2 * self.theme.line_height;
         self.scroll_to(self.scroll_top.end().saturating_sub(scroll))
     }
 
     pub fn scroll_down(&mut self) {
-        let line_height = self.document_view.line_height();
+        let line_height = self.theme.line_height;
         let rope_lines = self.document_view.rope().len_lines() as u32;
         let screen_height_in_lines = self.screen_height_in_lines();
 
@@ -87,7 +81,7 @@ impl Ui {
     }
 
     pub fn ensure_visibility(&mut self, line: usize) {
-        let line_height = self.document_view.line_height();
+        let line_height = self.theme.line_height;
         let screen_height_in_lines = self.screen_height_in_lines();
         let line = line as u32;
         let start = self.scroll_top.end() / line_height;
@@ -134,6 +128,7 @@ impl Ui {
             caret_color,
             caret_width,
             selection_color,
+            &self.theme,
         );
 
         if let Some((needle, haystack, selected)) = search {
@@ -145,6 +140,7 @@ impl Ui {
                 selected,
             );
         }
+
         self.graphics.render();
     }
 }
@@ -152,12 +148,12 @@ impl Ui {
 /// Private.
 impl Ui {
     fn screen_height_in_lines(&self) -> u32 {
-        self.window.inner_size().height / self.document_view.line_height()
+        self.window.inner_size().height / self.theme.line_height
     }
 
     fn region(&self) -> Rectangle {
         let size = self.window.inner_size();
-        let height = self.screen_height_in_lines() * self.document_view.line_height();
+        let height = self.screen_height_in_lines() * self.theme.line_height;
 
         Rectangle {
             top: (size.height - height) as i32 / 2,

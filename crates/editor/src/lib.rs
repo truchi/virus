@@ -22,11 +22,4 @@ pub mod rope {
     mod selection;
     mod text;
 }
-pub mod syntax {
-    pub use capture::*;
-    pub use theme::*;
-
-    mod capture;
-    mod theme;
-}
 pub mod history;

@@ -1,7 +1,8 @@
-use crate::{rope::CursorRef, syntax::ThemeKey};
+use crate::syntax::ThemeKey;
 use ropey::Rope;
 use std::ops::Range;
 use tree_sitter::{Node, Point, Query, QueryCursor};
+use virus_editor::rope::CursorRef;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            Capture                                             //

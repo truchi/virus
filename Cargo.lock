@@ -435,7 +435,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b28bfe653d79bd16c77f659305b195b82bb5ce0c0eb2a4846b82ddbd77586813"
 dependencies = [
  "bitflags 2.5.0",
- "libloading 0.7.4",
+ "libloading 0.8.0",
  "winapi",
 ]
 
@@ -451,7 +451,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330c60081dcc4c72131f8eb70510f1ac07223e5d4163db481a04a0befcffa412"
 dependencies = [
- "libloading 0.7.4",
+ "libloading 0.8.0",
 ]
 
 [[package]]
@@ -803,7 +803,7 @@ dependencies = [
  "bitflags 2.5.0",
  "com",
  "libc",
- "libloading 0.7.4",
+ "libloading 0.8.0",
  "thiserror",
  "widestring",
  "winapi",
@@ -996,6 +996,15 @@ name = "log"
 version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90ed8c1e510134f979dbc4f070f87d4313098b704861a105fe34231c70a3901c"
+
+[[package]]
+name = "lru"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37ee39891760e7d94734f6f63fedc29a2e4a152f836120753a72503f09fcf904"
+dependencies = [
+ "hashbrown 0.14.5",
+]
 
 [[package]]
 name = "lsp"
@@ -2052,8 +2061,10 @@ version = "0.1.0"
 dependencies = [
  "editor",
  "graphics",
+ "lru",
  "ropey",
  "swash",
+ "tree-sitter",
  "tween",
  "winit",
 ]
@@ -2386,7 +2397,7 @@ dependencies = [
  "js-sys",
  "khronos-egl",
  "libc",
- "libloading 0.7.4",
+ "libloading 0.8.0",
  "log",
  "metal",
  "naga",

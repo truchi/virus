@@ -1,3 +1,12 @@
+pub mod syntax {
+    mod capture;
+    mod lines;
+    mod theme;
+
+    pub use capture::*;
+    pub use lines::*;
+    pub use theme::*;
+}
 pub mod theme;
 pub mod tween;
 pub mod ui;
@@ -11,13 +20,3 @@ pub mod views {
 
 // For convenience.
 pub use virus_graphics::Catppuccin;
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                           LineColumn                                           //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
-pub struct LineColumn {
-    pub line: usize,
-    pub column: usize,
-}
