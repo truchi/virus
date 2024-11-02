@@ -4,7 +4,7 @@ use crate::{
     views::{DocumentView, FilesView},
 };
 use std::{ops::Range, sync::Arc, time::Duration};
-use virus_editor::document::{Document, DocumentId};
+use virus_editor::document::Document;
 use virus_graphics::{
     text::{Context, Font, FontStyle, FontWeight, Fonts},
     types::{Rectangle, Rgba},
@@ -32,7 +32,7 @@ impl Ui {
         let graphics = Graphics::new(Arc::clone(&window));
         let context = Context::new(fonts());
         let theme = theme.resolve(&context);
-        let document_view = DocumentView::new(DocumentId::default().generate());
+        let document_view = DocumentView::new();
         let files_view = FilesView::new(
             theme.family,
             theme.font_size,

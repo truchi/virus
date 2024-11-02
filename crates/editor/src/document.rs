@@ -1,5 +1,6 @@
 use crate::{
     history::History,
+    ids,
     rope::{CursorRef, Edit, Selection, Text},
 };
 use ropey::Rope;
@@ -10,20 +11,12 @@ use std::{
 };
 use tree_sitter::{Parser, Query, Tree};
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                           DocumentId                                           //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Default, Debug)]
-pub struct DocumentId(usize);
-
-impl DocumentId {
-    pub fn generate(&mut self) -> Self {
-        let id = *self;
-        self.0 += 1;
-        id
-    }
-}
+ids!(
+    /// [`DocumentId`] generator.
+    pub DocumentIds,
+    /// [`Document`] id.
+    pub DocumentId,
+);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            Document                                            //

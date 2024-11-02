@@ -1,5 +1,5 @@
 use crate::{
-    document::{Document, DocumentId},
+    document::{Document, DocumentId, DocumentIds},
     rope::Text,
 };
 use ignore::WalkBuilder;
@@ -21,7 +21,7 @@ pub type EventLoopSender = Box<dyn Fn(EventLoopMessage) + Send>;
 
 pub struct Editor {
     root: PathBuf,
-    document_id: DocumentId,
+    document_ids: DocumentIds,
     documents: HashMap<DocumentId, Document>,
     active_document: Option<DocumentId>,
     clipboard: Text,
@@ -29,12 +29,12 @@ pub struct Editor {
 
 impl Editor {
     pub fn new(root: PathBuf) -> Self {
-        let mut document_id = DocumentId::default();
-        let active_document = Some(document_id.generate());
+        let mut document_ids = DocumentIds::default();
+        let active_document = Some(document_ids.id());
 
         let editor = Self {
             root,
-            document_id,
+            document_ids,
             documents: Default::default(),
             active_document,
             clipboard: Text::default(),
@@ -76,7 +76,7 @@ impl Editor {
         {
             self.active_document = Some(*id);
         } else {
-            let id = self.document_id.generate();
+            let id = self.document_ids.id();
 
             let mut document = Document::open(id, path)?;
             document.parse();

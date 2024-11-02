@@ -1,7 +1,7 @@
 use crate::{syntax::Lines, theme::UiTheme};
 use ropey::Rope;
 use virus_editor::{
-    document::{Document, DocumentId},
+    document::Document,
     rope::{Cursor, Selection},
 };
 use virus_graphics::{
@@ -17,15 +17,13 @@ use virus_graphics::{
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct DocumentView {
-    id: DocumentId,
     lines: Lines,
     rope: Rope,
 }
 
 impl DocumentView {
-    pub fn new(id: DocumentId) -> Self {
+    pub fn new() -> Self {
         Self {
-            id,
             lines: Default::default(),
             rope: Default::default(),
         }
