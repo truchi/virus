@@ -14,4 +14,3 @@ tree-sitter.workspace = true
 unicode-segmentation.workspace = true
 unicode-width.workspace = true
 virus-graphics.workspace = true
-virus-lsp.workspace = true

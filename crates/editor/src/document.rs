@@ -1,6 +1,5 @@
 use crate::{
     history::History,
-    lsp::Lsp,
     rope::{CursorRef, Edit, Selection, Text},
 };
 use ropey::Rope;
@@ -41,14 +40,13 @@ pub struct Document {
     is_tree_dirty: bool,
     version: usize,
     history: History,
-    lsp: Lsp,
 }
 
 impl Document {
     // NOTE:
     // This function is convenient for now.
     // We will need to deal with unsupported languages later.
-    pub fn open(id: DocumentId, path: PathBuf, lsp: Lsp) -> std::io::Result<Self> {
+    pub fn open(id: DocumentId, path: PathBuf) -> std::io::Result<Self> {
         if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
             panic!("File type not supported");
         }
@@ -76,10 +74,7 @@ impl Document {
             is_tree_dirty: false,
             version: 0,
             history: History::default(),
-            lsp: lsp.clone(),
         };
-
-        lsp.open_document(&document);
 
         Ok(document)
     }
@@ -262,14 +257,12 @@ impl Document {
         }
 
         let ts_edit = edit.to_ts_edit_applied();
-        let lsp_edit = edit.to_lsp_edit_applied();
 
         self.selection = edit.inserted_end().into();
         self.version += 1;
         self.is_tree_dirty = true;
         self.history.push(edit);
         self.tree.edit(&ts_edit);
-        self.lsp.change_document(&self, [lsp_edit]);
     }
 
     // TODO: convenient for now but does not feel good
@@ -287,12 +280,10 @@ impl Document {
         };
         let mut anchor = self.selection.anchor;
         let mut head = self.selection.head;
-        let mut lsp_edits = Vec::with_capacity(edits.len());
 
         for edit in edits {
             edit.unapply(&mut self.rope);
             self.tree.edit(&edit.to_ts_edit_applied());
-            lsp_edits.push(edit.to_lsp_edit_unapplied());
 
             anchor = anchor
                 .edit(edit.start(), edit.removed_end(), edit.inserted_end())
@@ -305,7 +296,6 @@ impl Document {
         self.selection = Selection::new(anchor, head);
         self.version += 1;
         self.is_tree_dirty = true;
-        self.lsp.change_document(&self, lsp_edits);
     }
 
     pub fn redo(&mut self) {
@@ -314,12 +304,10 @@ impl Document {
         };
         let mut anchor = self.selection.anchor;
         let mut head = self.selection.head;
-        let mut lsp_edits = Vec::with_capacity(edits.len());
 
         for edit in edits {
             edit.apply(&mut self.rope);
             self.tree.edit(&edit.to_ts_edit_applied());
-            lsp_edits.push(edit.to_lsp_edit_applied());
 
             anchor = anchor
                 .edit(edit.start(), edit.removed_end(), edit.inserted_end())
@@ -332,7 +320,6 @@ impl Document {
         self.selection = Selection::new(anchor, head);
         self.version += 1;
         self.is_tree_dirty = true;
-        self.lsp.change_document(&self, lsp_edits);
     }
 }
 

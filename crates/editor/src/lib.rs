@@ -1,8 +1,6 @@
-pub mod async_actor;
 pub mod document;
 pub mod editor;
 pub mod fuzzy;
-pub mod lsp;
 pub mod rope {
     pub use cursor::*;
     pub use cursors::chunk::*;

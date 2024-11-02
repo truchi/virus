@@ -2,7 +2,6 @@ use crate::rope::{Cursor, CursorRef, Inner, Text};
 use ropey::Rope;
 use std::ops::Range;
 use tree_sitter::{InputEdit, Point};
-use virus_lsp::type_aliases::TextDocumentContentChangeEventRangeAndText;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Edit                                              //
@@ -78,14 +77,6 @@ impl Edit {
 
     pub fn to_ts_edit_unapplied(&self) -> InputEdit {
         Self::to_input_edit_impl(self.start, self.inserted_end, self.removed_end)
-    }
-
-    pub fn to_lsp_edit_applied(&self) -> TextDocumentContentChangeEventRangeAndText {
-        Self::to_lsp_edit_impl(self.start, self.removed_end, &self.inserted)
-    }
-
-    pub fn to_lsp_edit_unapplied(&self) -> TextDocumentContentChangeEventRangeAndText {
-        Self::to_lsp_edit_impl(self.start, self.inserted_end, &self.removed)
     }
 
     pub fn apply(&self, rope: &mut Rope) -> InputEdit {
@@ -249,31 +240,6 @@ impl Edit {
                 row: inserted_end.line(),
                 column: inserted_end.column(),
             },
-        }
-    }
-
-    fn to_lsp_edit_impl(
-        start: Cursor,
-        removed_end: Cursor,
-        inserted: &Text,
-    ) -> TextDocumentContentChangeEventRangeAndText {
-        use virus_lsp::{
-            structures::{Position, Range},
-            UInteger,
-        };
-
-        TextDocumentContentChangeEventRangeAndText {
-            range: Range {
-                start: Position {
-                    line: start.line() as UInteger,
-                    character: start.column() as UInteger,
-                },
-                end: virus_lsp::structures::Position {
-                    line: removed_end.line() as UInteger,
-                    character: removed_end.column() as UInteger,
-                },
-            },
-            text: inserted.to_string(),
         }
     }
 }

@@ -1,7 +1,5 @@
 use crate::{
-    async_actor::AsyncActorSender,
     document::{Document, DocumentId},
-    lsp::Lsp,
     rope::Text,
 };
 use ignore::WalkBuilder;
@@ -9,11 +7,6 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
-use tokio::{
-    process::Command,
-    sync::{mpsc::unbounded_channel, oneshot::Sender},
-};
-use virus_lsp::LspClients;
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
@@ -32,19 +25,10 @@ pub struct Editor {
     documents: HashMap<DocumentId, Document>,
     active_document: Option<DocumentId>,
     clipboard: Text,
-    pub(crate) lsps: LspClients,
-    pub(crate) async_actor: AsyncActorSender,
-    _event_loop: EventLoopSender,
 }
 
 impl Editor {
-    pub fn new(
-        root: PathBuf,
-        (rust_lsp,): (Command,),
-        async_actor: AsyncActorSender,
-        event_loop: EventLoopSender,
-    ) -> Self {
-        let (rust_server_message_sender, rust_server_message_receiver) = unbounded_channel();
+    pub fn new(root: PathBuf) -> Self {
         let mut document_id = DocumentId::default();
         let active_document = Some(document_id.generate());
 
@@ -54,12 +38,8 @@ impl Editor {
             documents: Default::default(),
             active_document,
             clipboard: Text::default(),
-            lsps: LspClients::new((rust_lsp, rust_server_message_sender)),
-            async_actor,
-            _event_loop: event_loop,
         };
 
-        editor.lsp().init(rust_server_message_receiver);
         editor
     }
 
@@ -98,7 +78,7 @@ impl Editor {
         } else {
             let id = self.document_id.generate();
 
-            let mut document = Document::open(id, path, self.lsp())?;
+            let mut document = Document::open(id, path)?;
             document.parse();
 
             self.active_document = Some(id);
@@ -173,16 +153,5 @@ impl Editor {
         }
 
         None
-    }
-
-    pub fn exit(&mut self, sender: Sender<()>) {
-        self.lsp().exit(sender);
-    }
-}
-
-/// Private.
-impl Editor {
-    fn lsp(&self) -> Lsp {
-        Lsp::new(self.async_actor.clone())
     }
 }
