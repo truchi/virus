@@ -1,0 +1,94 @@
+# This is an example, remove
+#
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
+#                                             Aliases                                              #
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
+
+ALIASES:
+  up: i, arrow_up
+  down: k, arrow_down
+  left: j, arrow_left
+  right: l, arrow_right
+  space: space
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
+#                                           Normal mode                                            #
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
+
+# stick=None
+NORMAL MODE: # #0
+  ?!lines $up: move_up ?!lines -wrap timeout=1
+  ?lines $up: move_up ?lines +wrap
+  ?lines $down: move_down ?lines
+  ?columns $left: move_left ?columns
+  ?columns $right: move_right ?columns
+  ?times u: undo ?times
+  ?times U: redo ?times
+  i: enter_insert_mode
+  command s: save_file
+
+  $space: # #1
+    _text: Things related to stuff
+    _sticky: true
+    a: test
+    b: _unstick test
+    c: # #2
+      _text: Buffers
+      _sticky: true
+      $up, $left: previous_buffer
+      $down, $right: next_buffer
+      s: _unstick save_file
+    w:
+      _text: Windows
+      _sticky: true
+      $up, $left: previous_window
+      $left: previous_window
+      $down, $right: next_window
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
+#                                           Insert mode                                            #
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
+
+# æ Æ
+#
+# { modified: a, unmodified: a, modifiers:  }
+# { modified: A, unmodified: a, modifiers: SHIFT }
+# { modified: æ, unmodified: a, modifiers: ALT }
+# { modified: Æ, unmodified: a, modifiers: SHIFT ALT }
+INSERT MODE:
+  escape: enter normal mode
+  a: action
+  A: action
+  æ: action
+  Æ: action
+
+  control a: action
+  control A: action
+  control æ: action
+  control Æ: action
+  shift a: action
+  shift A: action
+  shift æ: action
+  shift Æ: action
+  alt a: action
+  alt A: action
+  alt æ: action
+  alt Æ: action
+
+  control shift a: action
+  control shift A: action
+  control shift æ: action
+  control shift Æ: action
+  control alt a: action
+  control alt A: action
+  control alt æ: action
+  control alt Æ: action
+  shift alt a: action
+  shift alt A: action
+  shift alt æ: action
+  shift alt Æ: action
+
+  control shift alt a: action
+  control shift alt A: action
+  control shift alt æ: action
+  control shift alt Æ: action

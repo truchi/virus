@@ -2,7 +2,7 @@
 // Hello! -- the-world - _ hello- _ ____world - the----w __ salut HTTPProxyOfTheDeath23MORE123
 // hello {((((world))))}, salut
 
-use crate::events::{Event, Events, Key};
+use crate::events::{Event, Events, Key, KeyEvent};
 use std::{
     ops::Range,
     path::PathBuf,
@@ -168,8 +168,8 @@ impl Virus {
             UiTheme {
                 syntax: virus_ui::syntax::SyntaxTheme::catppuccin(),
                 family: "Victor",
-                font_size: 15,
-                line_height: 20,
+                font_size: 30,
+                line_height: 40,
                 scrollbar_color: catppuccin.surface1.solid(),
                 scroll_duration: Duration::from_millis(500),
                 scroll_tween: Tween::ExpoOut,
@@ -215,17 +215,17 @@ impl Virus {
 
 /// Event handlers.
 impl Virus {
-    fn on_key(&mut self, key: Key, event_loop: &ActiveEventLoop) {
+    fn on_key(&mut self, event: KeyEvent, event_loop: &ActiveEventLoop) {
         if let Some((needle, files, haystacks, selected)) = &mut self.search {
-            match key {
-                Key::Str("i") if self.events.command() => {
+            match event.modded().as_str() {
+                Key::Str("i") if event.command() => {
                     if *selected == 0 {
                         *selected = haystacks.len().saturating_sub(1);
                     } else {
                         *selected = *selected - 1;
                     }
                 }
-                Key::Str("k") if self.events.command() => {
+                Key::Str("k") if event.command() => {
                     if *selected == haystacks.len().saturating_sub(1) {
                         *selected = 0;
                     } else {
@@ -266,11 +266,12 @@ impl Virus {
                 Key::Escape => {
                     self.search = None;
                 }
+                _ => {}
             }
         } else {
             match &mut self.mode {
-                Mode::Normal { select_mode } => match key {
-                    Key::Str("@") if self.events.command() => event_loop.exit(),
+                Mode::Normal { select_mode } => match event.modded().as_str() {
+                    Key::Str("@") if event.command() => event_loop.exit(),
                     Key::Str("i") => {
                         self.editor
                             .get_active_document_mut()
@@ -365,9 +366,9 @@ impl Virus {
                                 .line(),
                         );
                     }
-                    Key::Str("c") if self.events.command() => self.editor.paste(),
+                    Key::Str("c") if event.command() => self.editor.paste(),
                     Key::Str("c") => self.editor.copy(),
-                    Key::Str("z") if self.events.command() => {
+                    Key::Str("z") if event.command() => {
                         self.editor.get_active_document_mut().unwrap().redo();
                         if self
                             .editor
@@ -441,7 +442,7 @@ impl Virus {
                             .unwrap()
                             .move_anchor_to_head();
                     }
-                    Key::Str("s") if self.events.command() => self
+                    Key::Str("s") if event.command() => self
                         .editor
                         .get_active_document_mut()
                         .unwrap()
@@ -464,8 +465,8 @@ impl Virus {
                     Key::Escape => self.mode = Mode::Insert,
                     _ => (),
                 },
-                Mode::Insert => match key {
-                    Key::Str("@") if self.events.command() => event_loop.exit(),
+                Mode::Insert => match event.modded().as_str() {
+                    Key::Str("@") if event.command() => event_loop.exit(),
                     Key::Str(str) => self
                         .editor
                         .get_active_document_mut()

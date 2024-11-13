@@ -1,0 +1,62 @@
+# This is an example, remove
+#
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
+#                                             Aliases                                              #
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
+
+aliases:
+  up: i, arrow_up
+  down: k, arrow_down
+  left: j, arrow_left
+  right: l, arrow_right
+  space: space
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
+#                                           Normal mode                                            #
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
+
+normal mode:
+  keys:
+    count@lines $up: move up @lines
+    count@lines $down: move down @lines
+    count@columns $left: move left @columns
+    count@columns $right: move right @columns
+    count@times u: undo @times
+    count@times U: redo @times
+    i: enter insert mode
+    command s: save file
+    $space:
+      text: Things related to stuff
+      keys:
+        b:
+          text: Buffers
+          sticky: true
+          keys:
+            $up, $left:
+              text: Previous buffer
+              action: previous buffer
+            $down, $right:
+              text: Next buffer
+              action: next buffer
+            s:
+              action: save file
+              unstick: true
+        w:
+          text: Windows
+          sticky: true
+          keys:
+            $up, $left:
+              text: Previous window
+              action: previous window
+            $down, $right:
+              text: Next window
+              action: next window
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
+#                                           Insert mode                                            #
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
+
+insert mode:
+  keys:
+    escape:
+      action: enter normal mode
