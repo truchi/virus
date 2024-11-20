@@ -10,27 +10,15 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 /// An `(index , line, column, width)` cursor.
 #[derive(Copy, Clone, Eq, Ord, Default, Debug)]
 pub struct Cursor {
-    index: usize,
-    line: usize,
-    column: usize,
-    width: usize,
+    pub index: usize,
+    pub line: usize,
+    pub column: usize,
+    pub width: usize,
 }
 
 impl Cursor {
-    pub fn index(&self) -> usize {
-        self.index
-    }
-
-    pub fn line(&self) -> usize {
-        self.line
-    }
-
-    pub fn column(&self) -> usize {
-        self.column
-    }
-
-    pub fn width(&self) -> usize {
-        self.width
+    pub fn as_cursor_ref<'rope>(&self, rope: RopeSlice<'rope>) -> CursorRef<'rope> {
+        CursorRef::with(rope).at_cursor(*self)
     }
 
     pub fn edit(&self, start: Self, removed_end: Self, inserted_end: Self) -> Option<Self> {
@@ -71,10 +59,6 @@ impl Cursor {
             column,
             width,
         })
-    }
-
-    pub fn as_cursor_ref<'rope>(&self, rope: RopeSlice<'rope>) -> CursorRef<'rope> {
-        CursorRef::with(rope).at_cursor(*self)
     }
 }
 
@@ -165,7 +149,7 @@ impl<'rope> CursorRef<'rope> {
     }
 
     /// Finds the previous start of word.
-    pub fn prev_word_start(&self) -> Option<Self> {
+    pub fn prev_start_of_subword(&self) -> Option<Self> {
         let mut words = WordCursor::new(self.rope, self.index);
 
         words
@@ -178,7 +162,7 @@ impl<'rope> CursorRef<'rope> {
     }
 
     /// Finds the previous end of word.
-    pub fn prev_word_end(&self) -> Option<Self> {
+    pub fn prev_end_of_subword(&self) -> Option<Self> {
         let mut words = WordCursor::new(self.rope, self.index);
 
         words
@@ -197,7 +181,7 @@ impl<'rope> CursorRef<'rope> {
     }
 
     /// Finds the next start of word.
-    pub fn next_word_start(&self) -> Option<Self> {
+    pub fn next_start_of_subword(&self) -> Option<Self> {
         let mut words = WordCursor::new(self.rope, self.index);
 
         words
@@ -216,7 +200,7 @@ impl<'rope> CursorRef<'rope> {
     }
 
     /// Finds the next end of word.
-    pub fn next_word_end(&self) -> Option<Self> {
+    pub fn next_end_of_subword(&self) -> Option<Self> {
         let mut words = WordCursor::new(self.rope, self.index);
 
         words
@@ -649,10 +633,10 @@ mod tests {
             let rope = Rope::from(str);
             let cursor = CursorRef::with(rope.slice(..));
 
-            assert!(cursor.at_index(0).prev_word_start().is_none());
-            assert!(cursor.at_index(0).prev_word_end().is_none());
-            assert!(cursor.at_index(str.len()).next_word_start().is_none());
-            assert!(cursor.at_index(str.len()).next_word_end().is_none());
+            assert!(cursor.at_index(0).prev_start_of_subword().is_none());
+            assert!(cursor.at_index(0).prev_end_of_subword().is_none());
+            assert!(cursor.at_index(str.len()).next_start_of_subword().is_none());
+            assert!(cursor.at_index(str.len()).next_end_of_subword().is_none());
 
             fn the_loop(words: &[&str], f: impl Fn(Range<usize>, Range<usize>)) {
                 let mut offset = 0;
@@ -671,12 +655,40 @@ mod tests {
             }
 
             the_loop(starts, |w, c| {
-                assert!(cursor.at_index(c.end).prev_word_start().unwrap().index() == w.start);
-                assert!(cursor.at_index(c.start).next_word_start().unwrap().index() == w.end);
+                assert!(
+                    cursor
+                        .at_index(c.end)
+                        .prev_start_of_subword()
+                        .unwrap()
+                        .index()
+                        == w.start
+                );
+                assert!(
+                    cursor
+                        .at_index(c.start)
+                        .next_start_of_subword()
+                        .unwrap()
+                        .index()
+                        == w.end
+                );
             });
             the_loop(ends, |w, c| {
-                assert!(cursor.at_index(c.end).prev_word_end().unwrap().index() == w.start);
-                assert!(cursor.at_index(c.start).next_word_end().unwrap().index() == w.end);
+                assert!(
+                    cursor
+                        .at_index(c.end)
+                        .prev_end_of_subword()
+                        .unwrap()
+                        .index()
+                        == w.start
+                );
+                assert!(
+                    cursor
+                        .at_index(c.start)
+                        .next_end_of_subword()
+                        .unwrap()
+                        .index()
+                        == w.end
+                );
             });
         }
     }

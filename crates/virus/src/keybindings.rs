@@ -1,4 +1,7 @@
-use crate::events::{Event, Key, KeyEvent, Mods};
+use crate::{
+    events::{Event, Key, KeyEvent, Mods},
+    virus::Mode,
+};
 use serde::Deserialize;
 use smol_str::{SmolStr, ToSmolStr};
 use std::{
@@ -36,7 +39,7 @@ use KeybindingsError::*;
 
 /// [`Keybindings`] errors.
 #[derive(thiserror::Error, Debug)]
-enum KeybindingsError {
+pub enum KeybindingsError {
     #[error("YAML error: {0}")]
     Yaml(#[from] serde_yaml::Error),
 
@@ -65,17 +68,11 @@ enum KeybindingsError {
     #[error("Conflicting binding `{binding}`")]
     ConflictingBinding { binding: SmolStr },
 
-    #[error("Duplicated count `{count:?}` in binding {binding}")]
-    DuplicatedCountInBinding {
-        binding: SmolStr,
-        count: Count<SmolStr>,
-    },
+    #[error("Duplicated count in binding {binding}")]
+    DuplicatedCountInBinding { binding: SmolStr },
 
-    #[error("Unused count `{count:?}` in binding {binding}")]
-    UnusedCountInBinding {
-        binding: SmolStr,
-        count: Count<SmolStr>,
-    },
+    #[error("Unused count in binding {binding}")]
+    UnusedCountInBinding { binding: SmolStr },
 
     #[error("Unexpected unstick in action `{action}`")]
     UnexpectedUnstickInAction { action: SmolStr },
@@ -92,11 +89,8 @@ enum KeybindingsError {
     #[error("Unknown argument `{argument}` in action `{action}`")]
     UnknownArgumentInAction { action: SmolStr, argument: SmolStr },
 
-    #[error("Unknown count `{count:?}` in action `{action}`")]
-    UnknownCountInAction {
-        action: SmolStr,
-        count: Count<SmolStr>,
-    },
+    #[error("Unknown count in action `{action}`")]
+    UnknownCountInAction { action: SmolStr },
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -241,7 +235,7 @@ macro_rules! actions {
                                             argument: name.to_smolstr(),
                                         });
                                     }
-                            )*,
+                            ),*
                             _ => return Err(UnknownArgumentInAction {
                                 action: stringify!($action).to_smolstr(),
                                 argument: name.to_smolstr(),
@@ -267,7 +261,7 @@ macro_rules! actions {
         /// `Virus`'s actions.
         #[derive(Eq, PartialEq, Debug)]
         #[allow(non_camel_case_types)]
-        enum Action { $(
+        pub enum Action { $(
             $(#[$action_meta])*
             $action { $(
                 $(#[$arg_meta])*
@@ -275,7 +269,7 @@ macro_rules! actions {
             )* },
         )* }
 
-        trait ActionHandler {
+        pub trait ActionHandler {
             /// Handles `action`.
             fn handle(&mut self, action: Action) {
                 match action { $(
@@ -317,17 +311,150 @@ macro_rules! actions {
 }
 
 actions!(
-    /// Moves cursor up.
-    move_up(
-        /// Lines to move up.
-        lines: (Option<Number>) = 1,
-        wrap: (Option<bool>),
-        test: (Number),
+    //
+    // MOVE
+    //
+
+    // MOVE up
+
+    move_top(
+        blank: (Option<bool>) = false,
     ),
+
+    move_up_page(
+        pages: (Option<Number>) = 1,
+        half: (Option<bool>) = false,
+        wrap: (Option<bool>) = false,
+    ),
+
+    move_up_line(
+        lines: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    // MOVE down
+
+    move_bottom(
+        blank: (Option<bool>) = false,
+    ),
+
+    move_down_page(
+        pages: (Option<Number>) = 1,
+        half: (Option<bool>) = false,
+        wrap: (Option<bool>) = false,
+    ),
+
+    move_down_line(
+        lines: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    // MOVE left
+
+    move_start(
+        blank: (Option<bool>) = false,
+    ),
+
+    move_left_word(
+        words: (Option<Number>) = 1,
+        symbols: (Option<bool>) = false,
+        sub: (Option<bool>) = false,
+        end: (Option<bool>) = false,
+        wrap: (Option<bool>) = false,
+    ),
+
+    move_left_char(
+        chars: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    // MOVE right
+
+    move_end(
+        blank: (Option<bool>) = false,
+    ),
+
+    move_right_word(
+        words: (Option<Number>) = 1,
+        symbols: (Option<bool>) = false,
+        sub: (Option<bool>) = false,
+        end: (Option<bool>) = false,
+        wrap: (Option<bool>) = false,
+    ),
+
+    move_right_char(
+        chars: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    //
+    // SCROLL
+    //
+
+    // SCROLL up
+
+    scroll_top(
+        blank: (Option<bool>) = false,
+    ),
+
+    scroll_up_page(
+        pages: (Option<Number>) = 1,
+        half: (Option<bool>) = false,
+        wrap: (Option<bool>) = false,
+    ),
+
+    scroll_up_line(
+        lines: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    // SCROLL down
+
+    scroll_bottom(
+        blank: (Option<bool>) = false,
+    ),
+
+    scroll_down_page(
+        pages: (Option<Number>) = 1,
+        half: (Option<bool>) = false,
+        wrap: (Option<bool>) = false,
+    ),
+
+    scroll_down_line(
+        lines: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    //
+    //
+    //
+
+    copy(),
+
+    paste(),
+
+    undo(),
+
+    redo(),
+
+    select(),
+
+    unselect(),
+
+    files(),
+
+    open(),
+
+    save(),
+
+    close(),
 
     /// An action for tests.
     #[cfg(test)]
-    test(value: (Option<Number>) = 0),
+    test(
+        /// Some value to test against.
+        value: (Option<Number>) = 0,
+    ),
 );
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -431,23 +558,50 @@ impl ParsedArgument {
 type Aliases = HashMap<SmolStr, Vec<ModdedKey>>;
 
 #[derive(Eq, PartialEq, Debug)]
-struct Keybindings {
+pub struct Keybindings {
+    mode: Mode,
     aliases: Aliases,
-    normal_mode: Nodes,
+    normal: Nodes,
+    select: Nodes,
+    lines: Nodes,
+    insert: Nodes,
+    files: Nodes,
 }
 
 impl Keybindings {
     /// Deserializes [`Keybindings`] from `yaml`.
-    fn from_yaml(yaml: &str) -> KeybindingsResult<Self> {
+    pub fn from_yaml(yaml: &str) -> KeybindingsResult<Self> {
         Self::try_from(serde_yaml::from_str::<deserialize::Keybindings>(yaml)?)
+    }
+
+    /// Resets to `mode`.
+    pub fn mode(&mut self, mode: Mode) {
+        self.mode = mode;
+        self.normal.reset();
+        self.select.reset();
+        self.lines.reset();
+        self.insert.reset();
+        self.files.reset();
     }
 
     /// Handles an `event`, returning:
     /// - `Err(())` when no bindings accepts `event`
     /// - `Ok(None)` when a binding accepts `event` without triggering an action
     /// - `Ok(Some(action))` when a binding accepts `event` to trigger `action`
-    fn handle(&mut self, event: &KeyEvent) -> Result<Option<Action>, ()> {
-        self.normal_mode.handle(event)
+    pub fn handle(&mut self, event: &KeyEvent) -> Result<Option<Action>, ()> {
+        match self.mode {
+            Mode::Normal => self.normal.handle(event),
+            Mode::Select => self.select.handle(event),
+            Mode::Lines => self.lines.handle(event),
+            Mode::Insert => self.insert.handle(event),
+            Mode::Files => self.files.handle(event),
+        }
+    }
+}
+
+impl Default for Keybindings {
+    fn default() -> Self {
+        Self::from_yaml(&deserialize::DEFAULT).unwrap()
     }
 }
 
@@ -465,11 +619,20 @@ impl TryFrom<deserialize::Keybindings> for Keybindings {
                 ))
             })
             .collect::<Result<_, Self::Error>>()?;
-        let normal_mode = Nodes::try_from((&aliases, keybindings.normal_mode))?;
+        let normal = Nodes::try_from((&aliases, keybindings.normal))?;
+        let select = Nodes::try_from((&aliases, keybindings.select))?;
+        let lines = Nodes::try_from((&aliases, keybindings.lines))?;
+        let insert = Nodes::try_from((&aliases, keybindings.insert))?;
+        let files = Nodes::try_from((&aliases, keybindings.files))?;
 
         Ok(Self {
+            mode: Default::default(),
             aliases,
-            normal_mode,
+            normal,
+            select,
+            lines,
+            insert,
+            files,
         })
     }
 }
@@ -608,6 +771,12 @@ impl Nodes {
             }
         }
     }
+
+    /// Resets to the initial state.
+    fn reset(&mut self) {
+        self.current = 0;
+        self.counts.clear();
+    }
 }
 
 impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
@@ -689,12 +858,10 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                 action_str: String,
             ) -> KeybindingsResult<Node> {
                 let (unstick, action) = parse::action(&action_str, |count| {
-                    let count = count.to_smol();
                     self.counts
-                        .get_mut(&count)
+                        .get_mut(&count.to_smol())
                         .ok_or_else(|| UnknownCountInAction {
                             action: action_str.to_smolstr(),
-                            count,
                         })
                         .map(|(count, used)| {
                             // Mark that count as used
@@ -752,7 +919,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                     let (count, keys) = parse::binding(&binding, self.aliases)?;
 
                     // Create the count node
-                    let id = if let Some(count) = count {
+                    let parent_id = if let Some(count) = count {
                         let id = *Self::get_children_mut(&mut node)
                             .entry(Count(match count {
                                 Optional(count) => Optional(()),
@@ -780,7 +947,6 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                         {
                             return Err(DuplicatedCountInBinding {
                                 binding: binding.to_smolstr(),
-                                count,
                             });
                         }
 
@@ -793,25 +959,29 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                     };
 
                     // Create the child node
-                    let child_id = insert!(
-                        self,
-                        id,
-                        match deserialized_child {
-                            deserialize::Node::Node {
-                                text,
-                                sticky,
-                                children,
-                            } => self.node(has_sticky, Some(node_id), id, text, sticky, children),
-                            deserialize::Node::Leaf(action) => {
-                                self.leaf(has_sticky, Some(node_id), action)
-                            }
-                        }?
-                    );
+                    let child_id = {
+                        let parent = parent_id.or(Some(node_id));
+
+                        insert!(
+                            self,
+                            id,
+                            match deserialized_child {
+                                deserialize::Node::Node {
+                                    text,
+                                    sticky,
+                                    children,
+                                } => self.node(has_sticky, parent, id, text, sticky, children),
+                                deserialize::Node::Leaf(action) => {
+                                    self.leaf(has_sticky, parent, action)
+                                }
+                            }?
+                        )
+                    };
 
                     // Attach the child to all keys in the binding
                     for key in keys.map(Key) {
                         // Children of the currently created node or its above count child node
-                        let children = match id {
+                        let children = match parent_id {
                             Some(id) => Self::get_children_mut(self.nodes.get_mut(&id).unwrap()),
                             None => Self::get_children_mut(&mut node),
                         };
@@ -831,7 +1001,6 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                         if !self.counts.get(&count).unwrap().1 {
                             return Err(UnusedCountInBinding {
                                 binding: binding.to_smolstr(),
-                                count,
                             });
                         }
 
@@ -935,15 +1104,24 @@ enum Node {
 mod deserialize {
     use super::*;
 
+    pub const DEFAULT: &'static str = include_str!("keybindings.yml");
+
     #[derive(Deserialize, Debug)]
+    #[serde(rename_all = "UPPERCASE")]
     #[serde(deny_unknown_fields)]
     pub struct Keybindings {
-        #[serde(rename = "ALIASES")]
         #[serde(default)]
         pub aliases: HashMap<String, String>,
-        #[serde(rename = "NORMAL MODE")]
         #[serde(default)]
-        pub normal_mode: Nodes,
+        pub normal: Nodes,
+        #[serde(default)]
+        pub select: Nodes,
+        #[serde(default)]
+        pub lines: Nodes,
+        #[serde(default)]
+        pub insert: Nodes,
+        #[serde(default)]
+        pub files: Nodes,
     }
 
     #[derive(Deserialize, Clone, Default, Debug)]
@@ -1329,7 +1507,7 @@ mod tests {
 
             match assert_current.clone().into() {
                 Some(Root) => assert_eq!(nodes.current, 0),
-                Some(Is(is)) => _ = currents.insert(is, nodes.current),
+                Some(Is(is)) => assert_eq!(currents.insert(is, nodes.current), None),
                 Some(At(at)) => assert_eq!(nodes.current, *currents.get(at).expect("at")),
                 None => {}
             }
@@ -1417,7 +1595,7 @@ mod tests {
             assert!(matches!(
                 Keybindings::from_yaml(
                     r#"
-                        NORMAL MODE:
+                        NORMAL:
                             $my_alias: test
                     "#,
                 ),
@@ -1430,7 +1608,7 @@ mod tests {
             assert!(matches!(
                 Keybindings::from_yaml(
                     r#"
-                        NORMAL MODE:
+                        NORMAL:
                             control: test
                     "#,
                 ),
@@ -1443,7 +1621,7 @@ mod tests {
             assert!(matches!(
                 Keybindings::from_yaml(
                     r#"
-                        NORMAL MODE:
+                        NORMAL:
                             a b: test
                     "#,
                 ),
@@ -1458,7 +1636,7 @@ mod tests {
                     r#"
                         ALIASES:
                             up: arrow_up
-                        NORMAL MODE:
+                        NORMAL:
                             $up: test
                             arrow_up: test
                     "#,
@@ -1472,7 +1650,7 @@ mod tests {
             assert!(matches!(
                 Keybindings::from_yaml(
                     r#"
-                        NORMAL MODE:
+                        NORMAL:
                             ?value a: test ?value
                             a: test
                     "#,
@@ -1486,7 +1664,7 @@ mod tests {
             assert!(matches!(
                 Keybindings::from_yaml(
                     r#"
-                        NORMAL MODE:
+                        NORMAL:
                             ?value a: test ?value
                             1: test
                     "#,
@@ -1500,7 +1678,7 @@ mod tests {
             assert!(matches!(
                 Keybindings::from_yaml(
                     r#"
-                        NORMAL MODE:
+                        NORMAL:
                             ?!value a: test ?!value
                             1: test
                     "#,
@@ -1514,7 +1692,7 @@ mod tests {
             assert!(matches!(
                 Keybindings::from_yaml(
                     r#"
-                        NORMAL MODE:
+                        NORMAL:
                             ?value a: test ?value
                             ?!value b: test ?!value
                     "#,
@@ -1528,7 +1706,7 @@ mod tests {
             assert!(matches!(
                 Keybindings::from_yaml(
                     r#"
-                        NORMAL MODE:
+                        NORMAL:
                             ?value 1: test ?value
                     "#,
                 ),
@@ -1541,7 +1719,7 @@ mod tests {
             assert!(matches!(
                 Keybindings::from_yaml(
                     r#"
-                        NORMAL MODE:
+                        NORMAL:
                             ?!value 1: test ?!value
                     "#,
                 ),
@@ -1554,7 +1732,7 @@ mod tests {
             assert!(matches!(
                 Keybindings::from_yaml(
                     r#"
-                        NORMAL MODE:
+                        NORMAL:
                             ?a a:
                                 ?a a: test value=?a
                     "#,
@@ -1568,7 +1746,7 @@ mod tests {
             assert!(matches!(
                 Keybindings::from_yaml(
                     r#"
-                        NORMAL MODE:
+                        NORMAL:
                             ?a a: test
                     "#,
                 ),
@@ -1581,7 +1759,7 @@ mod tests {
             assert!(matches!(
                 Keybindings::from_yaml(
                     r#"
-                        NORMAL MODE:
+                        NORMAL:
                             a: _unstick test
                     "#,
                 ),
@@ -1594,7 +1772,7 @@ mod tests {
             assert!(matches!(
                 Keybindings::from_yaml(
                     r#"
-                        NORMAL MODE:
+                        NORMAL:
                             a: test foo $bar _baz
                     "#,
                 ),
@@ -1607,7 +1785,7 @@ mod tests {
             assert!(matches!(
                 Keybindings::from_yaml(
                     r#"
-                        NORMAL MODE:
+                        NORMAL:
                             a: test value=false
                     "#,
                 ),
@@ -1620,7 +1798,7 @@ mod tests {
             assert!(matches!(
                 Keybindings::from_yaml(
                     r#"
-                        NORMAL MODE:
+                        NORMAL:
                             a: test foo=0
                     "#,
                 ),
@@ -1633,7 +1811,7 @@ mod tests {
             assert!(matches!(
                 Keybindings::from_yaml(
                     r#"
-                        NORMAL MODE:
+                        NORMAL:
                             ?lines a: test value=?rows
                     "#,
                 ),
@@ -1643,17 +1821,22 @@ mod tests {
     }
 
     #[test]
+    fn default() {
+        Keybindings::default();
+    }
+
+    #[test]
     fn alias() {
         let mut nodes = Keybindings::from_yaml(
             r#"
                 ALIASES:
                     up: u, arrow_up
-                NORMAL MODE:
+                NORMAL:
                     $up: test value=1
             "#,
         )
         .unwrap()
-        .normal_mode;
+        .normal;
 
         assert(
             &nodes,
@@ -1671,7 +1854,7 @@ mod tests {
     fn sticky() {
         let mut nodes = Keybindings::from_yaml(
             r#"
-                NORMAL MODE:
+                NORMAL:
                     a:
                         _sticky: true
                         b: test value=1
@@ -1686,7 +1869,7 @@ mod tests {
             "#,
         )
         .unwrap()
-        .normal_mode;
+        .normal;
 
         assert(
             &nodes,
@@ -1742,12 +1925,12 @@ mod tests {
     fn count() {
         let mut nodes = Keybindings::from_yaml(
             r#"
-                NORMAL MODE:
+                NORMAL:
                     ?value a: test ?value
             "#,
         )
         .unwrap()
-        .normal_mode;
+        .normal;
 
         assert(
             &nodes,
@@ -1762,10 +1945,13 @@ mod tests {
                 (NONE, "escape", "escape", Ok(None), Root),
             ],
         );
+    }
 
+    #[test]
+    fn sticky_count() {
         let mut nodes = Keybindings::from_yaml(
             r#"
-                NORMAL MODE:
+                NORMAL:
                     ?value a:
                         _sticky: true
                         b:
@@ -1773,12 +1959,13 @@ mod tests {
             "#,
         )
         .unwrap()
-        .normal_mode;
+        .normal;
 
         assert(
             &nodes,
             &[
                 (NONE, "1", "1", Ok(None), Is("?value")),
+                (NONE, "3", "3", Ok(None), At("?value")),
                 (NONE, "escape", "escape", Ok(None), Root),
                 (NONE, "2", "2", Ok(None), At("?value")),
                 (NONE, "a", "a", Ok(None), Is("a")),
@@ -1800,7 +1987,7 @@ mod tests {
     fn mods() {
         let mut nodes = Keybindings::from_yaml(
             r#"
-                NORMAL MODE:
+                NORMAL:
                     shift a: test value=1
                     b: test value=2
                     B: test value=3
@@ -1810,7 +1997,7 @@ mod tests {
             "#,
         )
         .unwrap()
-        .normal_mode;
+        .normal;
 
         assert(
             &nodes,

@@ -1,7 +1,9 @@
 use crate::{
+    add_in_range,
     history::History,
     ids,
     rope::{CursorRef, Edit, Selection, Text},
+    sub_in_range,
 };
 use ropey::Rope;
 use std::{
@@ -33,6 +35,52 @@ pub struct Document {
     is_tree_dirty: bool,
     version: usize,
     history: History,
+}
+
+/// Private.
+impl Document {
+    fn parse_with(rope: &Rope, parser: &mut Parser, tree: Option<&Tree>) -> Tree {
+        parser
+            .parse_with(
+                &mut |index, _| {
+                    let (chunk, chunk_index, ..) = rope.chunk_at_byte(index);
+                    &chunk[index - chunk_index..]
+                },
+                tree,
+            )
+            .expect("Cannot parse")
+    }
+}
+
+/// Getters.
+impl Document {
+    pub fn id(&self) -> DocumentId {
+        self.id
+    }
+
+    pub fn path(&self) -> &Path {
+        self.path.as_path()
+    }
+
+    pub fn rope(&self) -> &Rope {
+        &self.rope
+    }
+
+    pub fn selection(&self) -> Selection {
+        self.selection
+    }
+
+    pub fn tree(&self) -> &Tree {
+        &self.tree
+    }
+
+    pub fn highlights(&self) -> &Query {
+        &self.highlights
+    }
+
+    pub fn version(&self) -> usize {
+        self.version
+    }
 }
 
 impl Document {
@@ -98,142 +146,269 @@ impl Document {
             self.is_tree_dirty = false;
         }
     }
-}
 
-/// Getters.
-impl Document {
-    pub fn id(&self) -> DocumentId {
-        self.id
-    }
-
-    pub fn path(&self) -> &Path {
-        self.path.as_path()
-    }
-
-    pub fn rope(&self) -> &Rope {
-        &self.rope
-    }
-
-    pub fn selection(&self) -> Selection {
-        self.selection
-    }
-
-    pub fn tree(&self) -> &Tree {
-        &self.tree
-    }
-
-    pub fn highlights(&self) -> &Query {
-        &self.highlights
-    }
-
-    pub fn version(&self) -> usize {
-        self.version
+    pub fn movements(&mut self) -> DocumentMovements {
+        DocumentMovements { document: self }
     }
 }
 
-/// Movements.
-impl Document {
-    pub fn move_anchor_to_head(&mut self) {
-        self.selection = self.selection.head.clone().into();
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                       DocumentMovements                                        //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub struct DocumentMovements<'document> {
+    document: &'document mut Document,
+}
+
+impl<'document> DocumentMovements<'document> {
+    pub fn collapse(&mut self, collapse: bool) -> &mut Self {
+        collapse.then(|| self.document.selection.collapse_mut());
+        self
     }
 
-    pub fn flip_anchor_and_head(&mut self) {
-        self.selection.flip_mut();
+    pub fn flip(&mut self, flip: bool) -> &mut Self {
+        flip.then(|| self.document.selection.flip_mut());
+        self
     }
 
-    pub fn move_up(&mut self, selection: bool, lines: usize) {
-        let line = self.selection.head.line();
-        let width = self.selection.head.width();
-        let cursor = CursorRef::with(self.rope.slice(..));
-
-        self.selection.move_to_mut(
-            line.checked_sub(lines)
-                .map(|line| cursor.at_line_width(line, width))
-                .unwrap_or_else(|| cursor.at_start())
-                .as_cursor(),
-            selection,
-        );
+    pub fn top(&mut self, blank: bool) -> &mut Self {
+        self.document.selection.head = CursorRef::with(self.document.rope.slice(..))
+            .at_line_width(
+                if blank {
+                    0
+                } else {
+                    self.document
+                        .rope
+                        .lines()
+                        .take_while(|line| line.len_bytes() == 0)
+                        .count()
+                },
+                self.document.selection.head.width,
+            )
+            .as_cursor();
+        self
     }
 
-    pub fn move_down(&mut self, selection: bool, lines: usize) {
-        let line = self.selection.head.line();
-        let width = self.selection.head.width();
-
-        self.selection.move_to_mut(
-            CursorRef::with(self.rope.slice(..))
-                .at_line_width(
-                    self.rope.len_lines().saturating_sub(1).min(line + lines),
-                    width,
-                )
-                .as_cursor(),
-            selection,
-        );
+    pub fn bottom(&mut self, blank: bool) -> &mut Self {
+        self.document.selection.head = CursorRef::with(self.document.rope.slice(..))
+            .at_line_width(
+                self.document.rope.len_lines().saturating_sub(
+                    1 + if blank {
+                        0
+                    } else {
+                        self.document
+                            .rope
+                            .lines_at(self.document.rope.len_lines())
+                            .reversed()
+                            .take_while(|line| line.len_bytes() == 0)
+                            .count()
+                    },
+                ),
+                self.document.selection.head.width,
+            )
+            .as_cursor();
+        self
     }
 
-    pub fn move_prev_grapheme(&mut self, selection: bool) {
-        self.selection.move_to_mut(
-            CursorRef::with(self.rope.slice(..))
-                .at_cursor(self.selection.head)
-                .prev_grapheme()
-                .map(|cursor| cursor.as_cursor())
-                .unwrap_or(self.selection.head),
-            selection,
-        );
+    pub fn up(&mut self, lines: usize, wrap: bool) -> &mut Self {
+        self.document.selection.head = CursorRef::with(self.document.rope.slice(..))
+            .at_line_width(
+                sub_in_range(
+                    self.document.rope.len_lines(),
+                    self.document.selection.head.line,
+                    lines,
+                    wrap,
+                ),
+                self.document.selection.head.width,
+            )
+            .as_cursor();
+
+        self
     }
 
-    pub fn move_next_grapheme(&mut self, selection: bool) {
-        self.selection.move_to_mut(
-            CursorRef::with(self.rope.slice(..))
-                .at_cursor(self.selection.head)
-                .next_grapheme()
-                .map(|cursor| cursor.as_cursor())
-                .unwrap_or(self.selection.head),
-            selection,
-        );
+    pub fn down(&mut self, lines: usize, wrap: bool) -> &mut Self {
+        self.document.selection.head = CursorRef::with(self.document.rope.slice(..))
+            .at_line_width(
+                add_in_range(
+                    self.document.rope.len_lines(),
+                    self.document.selection.head.line,
+                    lines,
+                    wrap,
+                ),
+                self.document.selection.head.width,
+            )
+            .as_cursor();
+
+        self
     }
 
-    pub fn move_prev_start_of_word(&mut self, selection: bool) {
-        self.selection.move_to_mut(
-            CursorRef::with(self.rope.slice(..))
-                .at_cursor(self.selection.head)
-                .prev_word_start()
-                .map(|cursor| cursor.as_cursor())
-                .unwrap_or(self.selection.head),
-            selection,
-        );
+    pub fn start(&mut self, blank: bool) -> &mut Self {
+        self.document.selection.head = CursorRef::with(self.document.rope.slice(..))
+            .at_line_column(
+                self.document.selection.head.line,
+                if blank {
+                    0
+                } else {
+                    self.document
+                        .rope
+                        .line(self.document.selection.head.line)
+                        .chars()
+                        .take_while(|char| char.is_whitespace())
+                        .map(|char| char.len_utf8())
+                        .sum()
+                },
+            )
+            .as_cursor();
+
+        self
     }
 
-    pub fn move_prev_end_of_word(&mut self, selection: bool) {
-        self.selection.move_to_mut(
-            CursorRef::with(self.rope.slice(..))
-                .at_cursor(self.selection.head)
-                .prev_word_end()
-                .map(|cursor| cursor.as_cursor())
-                .unwrap_or(self.selection.head),
-            selection,
-        );
+    pub fn end(&mut self, blank: bool) -> &mut Self {
+        self.document.selection.head = CursorRef::with(self.document.rope.slice(..))
+            .at_line_column(
+                self.document.selection.head.line,
+                self.document
+                    .rope
+                    .line(self.document.selection.head.line)
+                    .len_bytes()
+                    .saturating_sub(
+                        1 + if blank {
+                            0
+                        } else {
+                            self.document
+                                .rope
+                                .line(self.document.selection.head.line)
+                                .chars_at(self.document.rope.len_chars())
+                                .reversed()
+                                .take_while(|char| char.is_whitespace())
+                                .map(|char| char.len_utf8())
+                                .sum()
+                        },
+                    ),
+            )
+            .as_cursor();
+
+        self
     }
 
-    pub fn move_next_start_of_word(&mut self, selection: bool) {
-        self.selection.move_to_mut(
-            CursorRef::with(self.rope.slice(..))
-                .at_cursor(self.selection.head)
-                .next_word_start()
-                .map(|cursor| cursor.as_cursor())
-                .unwrap_or(self.selection.head),
-            selection,
-        );
+    pub fn prev_grapheme(&mut self, graphemes: usize, wrap: bool) -> &mut Self {
+        let mut cursor_ref =
+            CursorRef::with(self.document.rope.slice(..)).at_cursor(self.document.selection.head);
+
+        for _ in 0..graphemes {
+            if let Some(cursor) = cursor_ref.prev_grapheme() {
+                cursor_ref = cursor;
+            } else {
+                if wrap {
+                    cursor_ref = CursorRef::with(self.document.rope.slice(..)).at_end();
+                }
+
+                break;
+            }
+        }
+
+        self.document.selection.head = cursor_ref.as_cursor();
+        self
     }
 
-    pub fn move_next_end_of_word(&mut self, selection: bool) {
-        self.selection.move_to_mut(
-            CursorRef::with(self.rope.slice(..))
-                .at_cursor(self.selection.head)
-                .next_word_end()
-                .map(|cursor| cursor.as_cursor())
-                .unwrap_or(self.selection.head),
-            selection,
-        );
+    pub fn next_grapheme(&mut self, graphemes: usize, wrap: bool) -> &mut Self {
+        let mut cursor_ref =
+            CursorRef::with(self.document.rope.slice(..)).at_cursor(self.document.selection.head);
+
+        for _ in 0..graphemes {
+            if let Some(cursor) = cursor_ref.next_grapheme() {
+                cursor_ref = cursor;
+            } else {
+                if wrap {
+                    cursor_ref = CursorRef::with(self.document.rope.slice(..)).at_start();
+                }
+
+                break;
+            }
+        }
+
+        self.document.selection.head = cursor_ref.as_cursor();
+        self
+    }
+
+    pub fn prev_start_of_subword(&mut self, words: usize, wrap: bool) -> &mut Self {
+        let mut cursor_ref =
+            CursorRef::with(self.document.rope.slice(..)).at_cursor(self.document.selection.head);
+
+        for _ in 0..words {
+            if let Some(cursor) = cursor_ref.prev_start_of_subword() {
+                cursor_ref = cursor;
+            } else {
+                if wrap {
+                    cursor_ref = CursorRef::with(self.document.rope.slice(..)).at_end();
+                }
+
+                break;
+            }
+        }
+
+        self.document.selection.head = cursor_ref.as_cursor();
+        self
+    }
+
+    pub fn prev_end_of_subword(&mut self, words: usize, wrap: bool) -> &mut Self {
+        let mut cursor_ref =
+            CursorRef::with(self.document.rope.slice(..)).at_cursor(self.document.selection.head);
+
+        for _ in 0..words {
+            if let Some(cursor) = cursor_ref.prev_end_of_subword() {
+                cursor_ref = cursor;
+            } else {
+                if wrap {
+                    cursor_ref = CursorRef::with(self.document.rope.slice(..)).at_end();
+                }
+
+                break;
+            }
+        }
+
+        self.document.selection.head = cursor_ref.as_cursor();
+        self
+    }
+
+    pub fn next_start_of_subword(&mut self, words: usize, wrap: bool) -> &mut Self {
+        let mut cursor_ref =
+            CursorRef::with(self.document.rope.slice(..)).at_cursor(self.document.selection.head);
+
+        for _ in 0..words {
+            if let Some(cursor) = cursor_ref.next_start_of_subword() {
+                cursor_ref = cursor;
+            } else {
+                if wrap {
+                    cursor_ref = CursorRef::with(self.document.rope.slice(..)).at_start();
+                }
+
+                break;
+            }
+        }
+
+        self.document.selection.head = cursor_ref.as_cursor();
+        self
+    }
+
+    pub fn next_end_of_subword(&mut self, words: usize, wrap: bool) -> &mut Self {
+        let mut cursor_ref =
+            CursorRef::with(self.document.rope.slice(..)).at_cursor(self.document.selection.head);
+
+        for _ in 0..words {
+            if let Some(cursor) = cursor_ref.next_end_of_subword() {
+                cursor_ref = cursor;
+            } else {
+                if wrap {
+                    cursor_ref = CursorRef::with(self.document.rope.slice(..)).at_start();
+                }
+
+                break;
+            }
+        }
+
+        self.document.selection.head = cursor_ref.as_cursor();
+        self
     }
 }
 
@@ -261,7 +436,7 @@ impl Document {
     // TODO: convenient for now but does not feel good
     pub fn backspace(&mut self) {
         if self.selection.is_empty() {
-            self.move_prev_grapheme(true);
+            self.movements().prev_grapheme(1, false);
         }
 
         self.edit(Text::default());
@@ -313,20 +488,5 @@ impl Document {
         self.selection = Selection::new(anchor, head);
         self.version += 1;
         self.is_tree_dirty = true;
-    }
-}
-
-/// Private.
-impl Document {
-    fn parse_with(rope: &Rope, parser: &mut Parser, tree: Option<&Tree>) -> Tree {
-        parser
-            .parse_with(
-                &mut |index, _| {
-                    let (chunk, chunk_index, ..) = rope.chunk_at_byte(index);
-                    &chunk[index - chunk_index..]
-                },
-                tree,
-            )
-            .expect("Cannot parse")
     }
 }

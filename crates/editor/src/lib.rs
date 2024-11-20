@@ -51,3 +51,33 @@ macro_rules! ids {
         }
     };
 }
+
+pub fn add_in_range(end: usize, at: usize, add: usize, wrap: bool) -> usize {
+    debug_assert!((0..end).contains(&at));
+
+    let result = at + add;
+
+    let result = if wrap {
+        result % end
+    } else {
+        result.clamp(0, end - 1)
+    };
+
+    debug_assert!((0..end).contains(&result));
+    result
+}
+
+pub fn sub_in_range(end: usize, at: usize, sub: usize, wrap: bool) -> usize {
+    debug_assert!((0..end).contains(&at));
+
+    let result = if sub <= at {
+        at - sub
+    } else if wrap {
+        end - ((sub - at) % end)
+    } else {
+        0
+    };
+
+    debug_assert!((0..end).contains(&result));
+    result
+}

@@ -25,8 +25,8 @@ impl Edit {
         removed: Text,
         inserted: Text,
     ) -> Self {
-        debug_assert!(removed.len() == (start.index()..removed_end.index()).len());
-        debug_assert!(inserted.len() == (start.index()..inserted_end.index()).len());
+        debug_assert!(removed.len() == (start.index..removed_end.index).len());
+        debug_assert!(inserted.len() == (start.index..inserted_end.index).len());
 
         Self {
             start,
@@ -114,24 +114,24 @@ impl Edit {
         let (removed, inserted_end) = match (insert, remove) {
             // Replace
             (true, true) => (
-                Self::replace(rope, start.index()..removed_end.index(), &inserted).into(),
+                Self::replace(rope, start.index..removed_end.index, &inserted).into(),
                 CursorRef::with(rope.slice(..))
-                    .at_index(start.index() + inserted.len())
+                    .at_index(start.index + inserted.len())
                     .as_cursor(),
             ),
             // Insert
             (true, false) => (
                 {
-                    Self::insert(rope, start.index(), &inserted);
+                    Self::insert(rope, start.index, &inserted);
                     Default::default()
                 },
                 CursorRef::with(rope.slice(..))
-                    .at_index(start.index() + inserted.len())
+                    .at_index(start.index + inserted.len())
                     .as_cursor(),
             ),
             // Remove
             (false, true) => (
-                Self::remove(rope, start.index()..removed_end.index()).into(),
+                Self::remove(rope, start.index..removed_end.index).into(),
                 start,
             ),
             // Noop
@@ -204,7 +204,7 @@ impl Edit {
         removed: &Text,
         inserted: &Text,
     ) -> InputEdit {
-        let index = start.index();
+        let index = start.index;
         let range = index..index + removed.len();
 
         match (removed.is_empty(), inserted.is_empty()) {
@@ -225,20 +225,20 @@ impl Edit {
 
     fn to_input_edit_impl(start: Cursor, removed_end: Cursor, inserted_end: Cursor) -> InputEdit {
         InputEdit {
-            start_byte: start.index(),
-            old_end_byte: removed_end.index(),
-            new_end_byte: inserted_end.index(),
+            start_byte: start.index,
+            old_end_byte: removed_end.index,
+            new_end_byte: inserted_end.index,
             start_position: Point {
-                row: start.line(),
-                column: start.column(),
+                row: start.line,
+                column: start.column,
             },
             old_end_position: Point {
-                row: removed_end.line(),
-                column: removed_end.column(),
+                row: removed_end.line,
+                column: removed_end.column,
             },
             new_end_position: Point {
-                row: inserted_end.line(),
-                column: inserted_end.column(),
+                row: inserted_end.line,
+                column: inserted_end.column,
             },
         }
     }

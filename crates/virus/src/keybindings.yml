@@ -1,94 +1,46 @@
-# This is an example, remove
-#
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
-#                                             Aliases                                              #
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
-
 ALIASES:
   up: i, arrow_up
   down: k, arrow_down
   left: j, arrow_left
   right: l, arrow_right
-  space: space
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
-#                                           Normal mode                                            #
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
+NORMAL:
+  # Navigation
+  ?lines $up: move_up_line ?lines
+  ?lines $down: move_down_line ?lines
+  ?pages command $up: move_up_page ?pages +half
+  ?pages command $down: move_down_page ?pages +half
+  command shift $up: move_top
+  command shift $down: move_bottom
+  ?chars $left: move_left_char ?chars
+  ?chars $right: move_right_char ?chars
+  ?words command $left: move_left_word ?words +symbols +sub
+  ?words command $right: move_right_word ?words +symbols +sub
+  command shift $left: move_start
+  command shift $right: move_end
 
-# stick=None
-NORMAL MODE: # #0
-  ?!lines $up: move_up ?!lines -wrap timeout=1
-  ?lines $up: move_up ?lines +wrap
-  ?lines $down: move_down ?lines
-  ?columns $left: move_left ?columns
-  ?columns $right: move_right ?columns
-  ?times u: undo ?times
-  ?times U: redo ?times
-  i: enter_insert_mode
-  command s: save_file
+  # Scroll
+  ?pages shift $up: scroll_up_page ?pages +half
+  ?pages shift $down: scroll_down_page ?pages +half
 
-  $space: # #1
-    _text: Things related to stuff
-    _sticky: true
-    a: test
-    b: _unstick test
-    c: # #2
-      _text: Buffers
-      _sticky: true
-      $up, $left: previous_buffer
-      $down, $right: next_buffer
-      s: _unstick save_file
-    w:
-      _text: Windows
-      _sticky: true
-      $up, $left: previous_window
-      $left: previous_window
-      $down, $right: next_window
+  v: select
+  command c: copy
+  command v: paste
+  command z: undo
+  command Z: redo
+  command s: save
+  command f: files
+  command q: close
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
-#                                           Insert mode                                            #
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #
+# SELECT:
+#   v: select
 
-# æ Æ
-#
-# { modified: a, unmodified: a, modifiers:  }
-# { modified: A, unmodified: a, modifiers: SHIFT }
-# { modified: æ, unmodified: a, modifiers: ALT }
-# { modified: Æ, unmodified: a, modifiers: SHIFT ALT }
-INSERT MODE:
-  escape: enter normal mode
-  a: action
-  A: action
-  æ: action
-  Æ: action
+# LINES:
+#   v: select
 
-  control a: action
-  control A: action
-  control æ: action
-  control Æ: action
-  shift a: action
-  shift A: action
-  shift æ: action
-  shift Æ: action
-  alt a: action
-  alt A: action
-  alt æ: action
-  alt Æ: action
+# INSERT:
 
-  control shift a: action
-  control shift A: action
-  control shift æ: action
-  control shift Æ: action
-  control alt a: action
-  control alt A: action
-  control alt æ: action
-  control alt Æ: action
-  shift alt a: action
-  shift alt A: action
-  shift alt æ: action
-  shift alt Æ: action
-
-  control shift alt a: action
-  control shift alt A: action
-  control shift alt æ: action
-  control shift alt Æ: action
+FILES:
+  command $up: move_up_line +wrap
+  command $down: move_down_line +wrap
+  command $right: open

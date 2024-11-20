@@ -191,20 +191,18 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
 
     fn render_selection(&mut self) {
         let pos = |top, left| Position { top, left };
-        let row = |cursor: Cursor| {
-            cursor.line() as i32 * self.line_height as i32 - self.scroll_top as i32
-        };
+        let row =
+            |cursor: Cursor| cursor.line as i32 * self.line_height as i32 - self.scroll_top as i32;
         let column = |cursor: Cursor| -> i32 {
             self.line_numbers_width as i32
-                + if (self.start_line..self.start_line + self.lines.len()).contains(&cursor.line())
-                {
-                    let line = &self.lines[cursor.line() - self.start_line];
+                + if (self.start_line..self.start_line + self.lines.len()).contains(&cursor.line) {
+                    let line = &self.lines[cursor.line - self.start_line];
 
                     line.glyphs()
                         .iter()
                         .find_map(|glyph| {
                             // TODO: consecutive glyphs may have same range!
-                            (glyph.range.end as usize > cursor.column()).then_some(glyph.offset)
+                            (glyph.range.end as usize > cursor.column).then_some(glyph.offset)
                         })
                         .unwrap_or_else(|| line.advance())
                         .round() as i32
@@ -276,7 +274,7 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
             render_caret(self, top, start);
         }
         // Single line
-        else if selection.start.line() == selection.end.line() {
+        else if selection.start.line == selection.end.line {
             let bottom = top + height;
 
             if self.show_selection_as_lines {

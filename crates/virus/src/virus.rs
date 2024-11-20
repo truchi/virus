@@ -2,7 +2,10 @@
 // Hello! -- the-world - _ hello- _ ____world - the----w __ salut HTTPProxyOfTheDeath23MORE123
 // hello {((((world))))}, salut
 
-use crate::events::{Event, Events, Key, KeyEvent};
+use crate::{
+    events::{Event, Events, Key, KeyEvent},
+    keybindings::{ActionHandler, Keybindings},
+};
 use std::{
     ops::Range,
     path::PathBuf,
@@ -10,8 +13,10 @@ use std::{
     time::{Duration, Instant},
 };
 use virus_editor::{
+    add_in_range,
     editor::{Editor, EventLoopMessage},
     fuzzy::Fuzzy,
+    sub_in_range,
 };
 use virus_ui::{theme::UiTheme, tween::Tween, ui::Ui};
 use winit::{
@@ -55,7 +60,7 @@ impl ApplicationHandler<EventLoopMessage> for Handler {
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
-        _window_id: WindowId,
+        window_id: WindowId,
         event: WindowEvent,
     ) {
         let virus = match self {
@@ -63,47 +68,31 @@ impl ApplicationHandler<EventLoopMessage> for Handler {
             Handler::Initialized { virus } => virus,
         };
 
-        let event = match virus.events.update(&event) {
-            Some(event) => event,
-            None => return,
-        };
-
-        match event {
-            Event::Key(key) => virus.on_key(key, event_loop),
-            Event::Resized => virus.on_resized(event_loop),
-            Event::Redraw => virus.on_redraw(event_loop),
-            Event::Close => virus.on_close(),
-            Event::Closed => virus.on_closed(),
-        }
+        virus.window_event(event_loop, window_id, event);
     }
 
-    fn user_event(&mut self, _event_loop: &ActiveEventLoop, _event: EventLoopMessage) {}
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: EventLoopMessage) {
+        let virus = match self {
+            Handler::Uninitialized { .. } => panic!("Not initialized"),
+            Handler::Initialized { virus } => virus,
+        };
+
+        virus.user_event(event_loop, event);
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Virus                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum SelectMode {
-    Range,
-    Line,
-}
-
-// ────────────────────────────────────────────────────────────────────────────────────────────── //
-
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
 pub enum Mode {
-    Normal { select_mode: Option<SelectMode> },
+    #[default]
+    Normal,
+    Select,
+    Lines,
     Insert,
-}
-
-impl Default for Mode {
-    fn default() -> Self {
-        Self::Normal {
-            select_mode: Default::default(),
-        }
-    }
+    Files,
 }
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
@@ -120,6 +109,7 @@ pub struct Virus {
         Vec<(String, isize, Vec<Range<usize>>)>,
         usize,
     )>,
+    keybindings: Keybindings,
 }
 
 impl Virus {
@@ -168,8 +158,8 @@ impl Virus {
             UiTheme {
                 syntax: virus_ui::syntax::SyntaxTheme::catppuccin(),
                 family: "Victor",
-                font_size: 30,
-                line_height: 40,
+                font_size: 20,
+                line_height: 25,
                 scrollbar_color: catppuccin.surface1.solid(),
                 scroll_duration: Duration::from_millis(500),
                 scroll_tween: Tween::ExpoOut,
@@ -209,295 +199,165 @@ impl Virus {
             ui,
             last_render: None,
             search: None,
+            keybindings: Default::default(),
         }
+    }
+
+    fn mode(&mut self, mode: Mode) {
+        self.mode = mode;
+        self.keybindings.mode(mode);
+    }
+
+    fn ensure_visibility(&mut self) {
+        self.ui.ensure_visibility(
+            self.editor
+                .get_active_document()
+                .unwrap()
+                .selection()
+                .head
+                .line,
+        );
     }
 }
 
 /// Event handlers.
 impl Virus {
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        match self.events.update(&event) {
+            Some(Event::Key(event)) => self.on_key(event, event_loop),
+            Some(Event::Resized) => self.on_resized(event_loop),
+            Some(Event::Redraw) => self.on_redraw(event_loop),
+            Some(Event::Close) => self.on_close(),
+            Some(Event::Closed) => self.on_closed(),
+            None => {}
+        }
+    }
+
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: EventLoopMessage) {}
+
     fn on_key(&mut self, event: KeyEvent, event_loop: &ActiveEventLoop) {
-        if let Some((needle, files, haystacks, selected)) = &mut self.search {
-            match event.modded().as_str() {
-                Key::Str("i") if event.command() => {
-                    if *selected == 0 {
-                        *selected = haystacks.len().saturating_sub(1);
-                    } else {
-                        *selected = *selected - 1;
+        match self.keybindings.handle(&event) {
+            Ok(Some(action)) => {
+                VirusActionHandler {
+                    virus: self,
+                    event_loop,
+                }
+                .handle(action);
+            }
+            Ok(None) => {}
+            Err(()) => match self.mode {
+                Mode::Normal => {}
+                Mode::Select => {}
+                Mode::Lines => {}
+                Mode::Insert => {}
+                Mode::Files => {
+                    let (needle, files, haystacks, selected) = self.search.as_mut().unwrap();
+
+                    match event.modded().as_str() {
+                        Key::Str(str) => {
+                            needle.push_str(str);
+                            *selected = 0;
+                            *haystacks = Fuzzy::new_file_search(needle)
+                                .scores(files.iter().map(|file| file.as_str()));
+                        }
+                        Key::Space => {
+                            needle.push(' ');
+                            *selected = 0;
+                            *haystacks = Fuzzy::new_file_search(needle)
+                                .scores(files.iter().map(|file| file.as_str()));
+                        }
+                        Key::Backspace => {
+                            needle.pop();
+                            *selected = 0;
+                            if needle.is_empty() {
+                                *haystacks = files
+                                    .iter()
+                                    .map(|file| (file.to_owned(), 0, Vec::new()))
+                                    .collect();
+                            } else {
+                                *haystacks = Fuzzy::new_file_search(needle)
+                                    .scores(files.iter().map(|file| file.as_str()));
+                            }
+                        }
+                        _ => {}
                     }
                 }
-                Key::Str("k") if event.command() => {
-                    if *selected == haystacks.len().saturating_sub(1) {
-                        *selected = 0;
-                    } else {
-                        *selected = *selected + 1;
-                    }
-                }
-                Key::Str(str) => {
-                    needle.push_str(str);
-                    *selected = 0;
-                    *haystacks = Fuzzy::new_file_search(needle)
-                        .scores(files.iter().map(|file| file.as_str()));
-                }
-                Key::Tab => {}
-                Key::Space => {
-                    needle.push(' ');
-                    *selected = 0;
-                    *haystacks = Fuzzy::new_file_search(needle)
-                        .scores(files.iter().map(|file| file.as_str()));
-                }
-                Key::Backspace => {
-                    needle.pop();
-                    *selected = 0;
-                    if needle.is_empty() {
-                        *haystacks = files
-                            .iter()
-                            .map(|file| (file.to_owned(), 0, Vec::new()))
-                            .collect();
-                    } else {
-                        *haystacks = Fuzzy::new_file_search(needle)
-                            .scores(files.iter().map(|file| file.as_str()));
-                    }
-                }
-                Key::Enter => {
-                    let path = self.editor.root().join(&haystacks[*selected].0);
-                    self.editor.open(path).unwrap();
-                    self.search = None;
-                }
+            },
+        }
+
+        // TODO handle that better
+        self.editor.get_active_document_mut().unwrap().parse();
+
+        // TODO handle that better
+        self.ui.window().request_redraw();
+
+        return;
+
+        match &mut self.mode {
+            Mode::Normal => match event.modded().as_str() {
+                // TODO
+                // Key::Str("v") => match select_mode {
+                //     Some(SelectMode::Range) => *select_mode = Some(SelectMode::Line),
+                //     Some(SelectMode::Line) => {
+                //         self.editor
+                //             .get_active_document_mut()
+                //             .unwrap()
+                //             .flip_anchor_and_head();
+                //         *select_mode = Some(SelectMode::Range);
+                //     }
+                //     None => *select_mode = Some(SelectMode::Range),
+                // },
+                // Key::Str("V") => {
+                //     // *select_mode = None; // TODO
+                //     self.editor
+                //         .get_active_document_mut()
+                //         .unwrap()
+                //         .move_anchor_to_head();
+                // }
+                Key::Escape => self.mode = Mode::Insert,
+                _ => (),
+            },
+            Mode::Select => {}
+            Mode::Lines => {}
+            Mode::Insert => match event.modded().as_str() {
+                Key::Str("@") if event.command() => event_loop.exit(),
+                Key::Str(str) => self
+                    .editor
+                    .get_active_document_mut()
+                    .unwrap()
+                    .edit(str.into()),
+                Key::Space => self
+                    .editor
+                    .get_active_document_mut()
+                    .unwrap()
+                    .edit(" ".into()),
+                Key::Backspace => self.editor.get_active_document_mut().unwrap().backspace(),
+                Key::Enter => self
+                    .editor
+                    .get_active_document_mut()
+                    .unwrap()
+                    .edit("\n".into()),
                 Key::Escape => {
-                    self.search = None;
+                    // TODO
+                    // self.mode = Mode::Normal {
+                    //     select_mode: (!self
+                    //         .editor
+                    //         .get_active_document()
+                    //         .unwrap()
+                    //         .selection()
+                    //         .range()
+                    //         .is_empty())
+                    //     .then_some(SelectMode::Range),
+                    // }
                 }
-                _ => {}
-            }
-        } else {
-            match &mut self.mode {
-                Mode::Normal { select_mode } => match event.modded().as_str() {
-                    Key::Str("@") if event.command() => event_loop.exit(),
-                    Key::Str("i") => {
-                        self.editor
-                            .get_active_document_mut()
-                            .unwrap()
-                            .move_up(select_mode.is_some(), 1);
-                        self.ui.ensure_visibility(
-                            self.editor
-                                .get_active_document()
-                                .unwrap()
-                                .selection()
-                                .head
-                                .line(),
-                        );
-                    }
-                    Key::Str("k") => {
-                        self.editor
-                            .get_active_document_mut()
-                            .unwrap()
-                            .move_down(select_mode.is_some(), 1);
-                        self.ui.ensure_visibility(
-                            self.editor
-                                .get_active_document()
-                                .unwrap()
-                                .selection()
-                                .head
-                                .line(),
-                        );
-                    }
-                    Key::Str("j") => self
-                        .editor
-                        .get_active_document_mut()
-                        .unwrap()
-                        .move_prev_grapheme(select_mode.is_some()),
-                    Key::Str("l") => self
-                        .editor
-                        .get_active_document_mut()
-                        .unwrap()
-                        .move_next_grapheme(select_mode.is_some()),
-                    Key::Str("e") => {
-                        self.editor
-                            .get_active_document_mut()
-                            .unwrap()
-                            .move_next_end_of_word(select_mode.is_some());
-                        self.ui.ensure_visibility(
-                            self.editor
-                                .get_active_document()
-                                .unwrap()
-                                .selection()
-                                .head
-                                .line(),
-                        );
-                    }
-                    Key::Str("E") => {
-                        self.editor
-                            .get_active_document_mut()
-                            .unwrap()
-                            .move_prev_end_of_word(select_mode.is_some());
-                        self.ui.ensure_visibility(
-                            self.editor
-                                .get_active_document()
-                                .unwrap()
-                                .selection()
-                                .head
-                                .line(),
-                        );
-                    }
-                    Key::Str("w") => {
-                        self.editor
-                            .get_active_document_mut()
-                            .unwrap()
-                            .move_next_start_of_word(select_mode.is_some());
-                        self.ui.ensure_visibility(
-                            self.editor
-                                .get_active_document()
-                                .unwrap()
-                                .selection()
-                                .head
-                                .line(),
-                        );
-                    }
-                    Key::Str("W") => {
-                        self.editor
-                            .get_active_document_mut()
-                            .unwrap()
-                            .move_prev_start_of_word(select_mode.is_some());
-                        self.ui.ensure_visibility(
-                            self.editor
-                                .get_active_document()
-                                .unwrap()
-                                .selection()
-                                .head
-                                .line(),
-                        );
-                    }
-                    Key::Str("c") if event.command() => self.editor.paste(),
-                    Key::Str("c") => self.editor.copy(),
-                    Key::Str("z") if event.command() => {
-                        self.editor.get_active_document_mut().unwrap().redo();
-                        if self
-                            .editor
-                            .get_active_document()
-                            .unwrap()
-                            .selection()
-                            .is_empty()
-                        {
-                            *select_mode = None;
-                        } else {
-                            *select_mode = Some(SelectMode::Range);
-                        }
-                    }
-                    Key::Str("z") => {
-                        self.editor.get_active_document_mut().unwrap().undo();
-                        if self
-                            .editor
-                            .get_active_document()
-                            .unwrap()
-                            .selection()
-                            .is_empty()
-                        {
-                            *select_mode = None;
-                        } else {
-                            *select_mode = Some(SelectMode::Range);
-                        }
-                    }
-                    Key::Str("y") => {
-                        self.editor
-                            .get_active_document_mut()
-                            .unwrap()
-                            .move_up(select_mode.is_some(), 10);
-                        self.ui.ensure_visibility(
-                            self.editor
-                                .get_active_document()
-                                .unwrap()
-                                .selection()
-                                .head
-                                .line(),
-                        );
-                    }
-                    Key::Str("h") => {
-                        self.editor
-                            .get_active_document_mut()
-                            .unwrap()
-                            .move_down(select_mode.is_some(), 10);
-                        self.ui.ensure_visibility(
-                            self.editor
-                                .get_active_document()
-                                .unwrap()
-                                .selection()
-                                .head
-                                .line(),
-                        );
-                    }
-                    Key::Str("v") => match select_mode {
-                        Some(SelectMode::Range) => *select_mode = Some(SelectMode::Line),
-                        Some(SelectMode::Line) => {
-                            self.editor
-                                .get_active_document_mut()
-                                .unwrap()
-                                .flip_anchor_and_head();
-                            *select_mode = Some(SelectMode::Range);
-                        }
-                        None => *select_mode = Some(SelectMode::Range),
-                    },
-                    Key::Str("V") => {
-                        *select_mode = None;
-                        self.editor
-                            .get_active_document_mut()
-                            .unwrap()
-                            .move_anchor_to_head();
-                    }
-                    Key::Str("s") if event.command() => self
-                        .editor
-                        .get_active_document_mut()
-                        .unwrap()
-                        .save()
-                        .unwrap(),
-                    Key::Str("/") => {
-                        let files = self
-                            .editor
-                            .files(true, false)
-                            .filter_map(|file| {
-                                file.as_os_str().to_str().map(|file| file.to_owned())
-                            })
-                            .collect::<Vec<_>>();
-                        let haystacks = files
-                            .iter()
-                            .map(|file| (file.to_owned(), 0, Vec::new()))
-                            .collect();
-                        self.search = Some((String::new(), files, haystacks, 0));
-                    }
-                    Key::Escape => self.mode = Mode::Insert,
-                    _ => (),
-                },
-                Mode::Insert => match event.modded().as_str() {
-                    Key::Str("@") if event.command() => event_loop.exit(),
-                    Key::Str(str) => self
-                        .editor
-                        .get_active_document_mut()
-                        .unwrap()
-                        .edit(str.into()),
-                    Key::Space => self
-                        .editor
-                        .get_active_document_mut()
-                        .unwrap()
-                        .edit(" ".into()),
-                    Key::Backspace => self.editor.get_active_document_mut().unwrap().backspace(),
-                    Key::Enter => self
-                        .editor
-                        .get_active_document_mut()
-                        .unwrap()
-                        .edit("\n".into()),
-                    Key::Escape => {
-                        self.mode = Mode::Normal {
-                            select_mode: (!self
-                                .editor
-                                .get_active_document()
-                                .unwrap()
-                                .selection()
-                                .range()
-                                .is_empty())
-                            .then_some(SelectMode::Range),
-                        }
-                    }
-                    _ => (),
-                },
-            }
+                _ => (),
+            },
+            Mode::Files => {}
         }
 
         // TODO handle that better
@@ -534,39 +394,34 @@ impl Virus {
         let outline_insert_mode_colors = &self.ui.theme().outline_insert_mode_colors.clone();
         self.ui.render(
             self.editor.get_active_document_mut().unwrap(),
-            matches!(
-                self.mode,
-                Mode::Normal {
-                    select_mode: Some(SelectMode::Line)
-                },
-            ),
+            matches!(self.mode, Mode::Lines),
             match self.mode {
-                Mode::Normal {
-                    select_mode: Some(_),
-                } => outline_select_mode_colors,
-                Mode::Normal { select_mode: None } => outline_normal_mode_colors,
+                Mode::Normal => outline_normal_mode_colors,
+                Mode::Select => outline_select_mode_colors,
+                Mode::Lines => outline_select_mode_colors,
                 Mode::Insert => outline_insert_mode_colors,
+                Mode::Files => outline_select_mode_colors,
             },
             match self.mode {
-                Mode::Normal {
-                    select_mode: Some(_),
-                } => self.ui.theme().caret_select_mode_color,
-                Mode::Normal { select_mode: None } => self.ui.theme().caret_normal_mode_color,
+                Mode::Normal => self.ui.theme().caret_normal_mode_color,
+                Mode::Select => self.ui.theme().caret_select_mode_color,
+                Mode::Lines => self.ui.theme().caret_select_mode_color,
                 Mode::Insert => self.ui.theme().caret_insert_mode_color,
+                Mode::Files => self.ui.theme().caret_normal_mode_color,
             },
             match self.mode {
-                Mode::Normal {
-                    select_mode: Some(_),
-                } => self.ui.theme().caret_select_mode_width,
-                Mode::Normal { select_mode: None } => self.ui.theme().caret_normal_mode_width,
+                Mode::Normal => self.ui.theme().caret_normal_mode_width,
+                Mode::Select => self.ui.theme().caret_select_mode_width,
+                Mode::Lines => self.ui.theme().caret_select_mode_width,
                 Mode::Insert => self.ui.theme().caret_insert_mode_width,
+                Mode::Files => self.ui.theme().caret_normal_mode_width,
             },
             match self.mode {
-                Mode::Normal {
-                    select_mode: Some(_),
-                } => self.ui.theme().selection_select_mode_color,
-                Mode::Normal { select_mode: None } => self.ui.theme().selection_select_mode_color,
+                Mode::Normal => self.ui.theme().selection_select_mode_color,
+                Mode::Select => self.ui.theme().selection_select_mode_color,
+                Mode::Lines => self.ui.theme().selection_select_mode_color,
                 Mode::Insert => self.ui.theme().selection_insert_mode_color,
+                Mode::Files => self.ui.theme().selection_select_mode_color,
             },
             self.search
                 .as_ref()
@@ -580,11 +435,453 @@ impl Virus {
         }
     }
 
-    fn on_close(&mut self) {
-        println!("Close")
+    fn on_close(&mut self) {}
+
+    fn on_closed(&mut self) {}
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                       VirusActionHandler                                       //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+struct VirusActionHandler<'a> {
+    virus: &'a mut Virus,
+    event_loop: &'a ActiveEventLoop,
+}
+
+impl<'a> ActionHandler for VirusActionHandler<'a> {
+    //
+    // MOVE
+    //
+
+    // MOVE up
+
+    fn move_top(&mut self, blank: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {
+                if let Some(document) = self.virus.editor.get_active_document_mut() {
+                    document
+                        .movements()
+                        .top(blank)
+                        .collapse(self.virus.mode == Mode::Normal);
+                    self.virus.ensure_visibility();
+                }
+            }
+            Mode::Files => {
+                let (_, _, _, selected) = self.virus.search.as_mut().unwrap();
+                *selected = 0;
+            }
+        }
     }
 
-    fn on_closed(&mut self) {
-        println!("Closed")
+    fn move_up_page(&mut self, pages: usize, half: bool, wrap: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {
+                if let Some(document) = self.virus.editor.get_active_document_mut() {
+                    let lines = self.virus.ui.screen_height_in_lines() as usize;
+                    let lines = lines / if half { 2 } else { 1 };
+                    document
+                        .movements()
+                        .up(pages * lines, wrap)
+                        .collapse(self.virus.mode == Mode::Normal);
+                    self.virus.ensure_visibility();
+                }
+            }
+            Mode::Files => {
+                let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
+                let lines = 10; // TODO: we don't know the height in lines here...
+                let lines = lines / if half { 2 } else { 1 };
+                *selected = sub_in_range(haystacks.len(), *selected, pages * lines, wrap);
+            }
+        }
     }
+
+    fn move_up_line(&mut self, lines: usize, wrap: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {
+                if let Some(document) = self.virus.editor.get_active_document_mut() {
+                    document
+                        .movements()
+                        .up(lines, wrap)
+                        .collapse(self.virus.mode == Mode::Normal);
+                    self.virus.ensure_visibility();
+                }
+            }
+            Mode::Files => {
+                let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
+                *selected = sub_in_range(haystacks.len(), *selected, lines, wrap);
+            }
+        }
+    }
+
+    // MOVE down
+
+    fn move_bottom(&mut self, blank: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {
+                if let Some(document) = self.virus.editor.get_active_document_mut() {
+                    document
+                        .movements()
+                        .bottom(blank)
+                        .collapse(self.virus.mode == Mode::Normal);
+                    self.virus.ensure_visibility();
+                }
+            }
+            Mode::Files => {
+                let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
+                *selected = haystacks.len().saturating_sub(1);
+            }
+        }
+    }
+
+    fn move_down_page(&mut self, pages: usize, half: bool, wrap: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {
+                if let Some(document) = self.virus.editor.get_active_document_mut() {
+                    let lines = self.virus.ui.screen_height_in_lines() as usize;
+                    let lines = lines / if half { 2 } else { 1 };
+                    document
+                        .movements()
+                        .down(pages * lines, wrap)
+                        .collapse(self.virus.mode == Mode::Normal);
+                    self.virus.ensure_visibility();
+                }
+            }
+            Mode::Files => {
+                let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
+                let lines = 10; // TODO: we don't know the height in lines here...
+                let lines = lines / if half { 2 } else { 1 };
+                *selected = add_in_range(haystacks.len(), *selected, pages * lines, wrap);
+            }
+        }
+    }
+
+    fn move_down_line(&mut self, lines: usize, wrap: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {
+                if let Some(document) = self.virus.editor.get_active_document_mut() {
+                    document
+                        .movements()
+                        .down(lines, wrap)
+                        .collapse(self.virus.mode == Mode::Normal);
+                    self.virus.ensure_visibility();
+                }
+            }
+            Mode::Files => {
+                let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
+                *selected = add_in_range(haystacks.len(), *selected, lines, wrap);
+            }
+        }
+    }
+
+    // MOVE left
+
+    fn move_start(&mut self, blank: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {
+                if let Some(document) = self.virus.editor.get_active_document_mut() {
+                    document
+                        .movements()
+                        .start(blank)
+                        .collapse(self.virus.mode == Mode::Normal);
+                    self.virus.ensure_visibility();
+                }
+            }
+            Mode::Files => {
+                let (_, _, _, selected) = self.virus.search.as_mut().unwrap();
+                *selected = 0;
+            }
+        }
+    }
+
+    // TODO: that could be nice to have:
+    // - symbols=false: ignore non-alphanum words
+    // - sub=false: WORD/longword
+    //
+    // NOTE: that could also be super nice to have a "smart word":
+    // - in normal mode: stop at every boudaries (symbols, sub, start, end)
+    // - in select mode:
+    //   - no symbols, no sub
+    //   - growing selection moves to growing end
+    //   - shriking selection moves to shriking end
+    //   - pairs?
+    // Or syntaxically...
+    fn move_left_word(&mut self, words: usize, symbols: bool, sub: bool, end: bool, wrap: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {
+                if let Some(document) = self.virus.editor.get_active_document_mut() {
+                    let mut movements = document.movements();
+                    match (symbols, sub, end) {
+                        (true, true, true) => movements.prev_end_of_subword(words, wrap),
+                        (true, true, false) => movements.prev_start_of_subword(words, wrap),
+                        _ => todo!(),
+                    }
+                    .collapse(self.virus.mode == Mode::Normal);
+                    self.virus.ensure_visibility();
+                }
+            }
+            Mode::Files => {}
+        }
+    }
+
+    fn move_left_char(&mut self, chars: usize, wrap: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {
+                if let Some(document) = self.virus.editor.get_active_document_mut() {
+                    document
+                        .movements()
+                        .prev_grapheme(chars, wrap)
+                        .collapse(self.virus.mode == Mode::Normal);
+                    self.virus.ensure_visibility();
+                }
+            }
+            Mode::Files => {}
+        }
+    }
+
+    // MOVE right
+
+    fn move_end(&mut self, blank: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {
+                if let Some(document) = self.virus.editor.get_active_document_mut() {
+                    document
+                        .movements()
+                        .end(blank)
+                        .collapse(self.virus.mode == Mode::Normal);
+                    self.virus.ensure_visibility();
+                }
+            }
+            Mode::Files => {
+                let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
+                *selected = haystacks.len().saturating_sub(1);
+            }
+        }
+    }
+
+    fn move_right_word(&mut self, words: usize, symbols: bool, sub: bool, end: bool, wrap: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {
+                if let Some(document) = self.virus.editor.get_active_document_mut() {
+                    let mut movements = document.movements();
+                    match (symbols, sub, end) {
+                        (true, true, true) => movements.next_end_of_subword(words, wrap),
+                        (true, true, false) => movements.next_start_of_subword(words, wrap),
+                        _ => todo!(),
+                    }
+                    .collapse(self.virus.mode == Mode::Normal);
+                    self.virus.ensure_visibility();
+                }
+            }
+            Mode::Files => {}
+        }
+    }
+
+    fn move_right_char(&mut self, chars: usize, wrap: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {
+                if let Some(document) = self.virus.editor.get_active_document_mut() {
+                    document
+                        .movements()
+                        .next_grapheme(chars, wrap)
+                        .collapse(self.virus.mode == Mode::Normal);
+                    self.virus.ensure_visibility();
+                }
+            }
+            Mode::Files => {}
+        }
+    }
+
+    //
+    // SCROLL
+    //
+
+    // SCROLL up
+
+    fn scroll_top(&mut self, blank: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {}
+            Mode::Files => {}
+        }
+    }
+
+    fn scroll_up_page(&mut self, pages: usize, half: bool, wrap: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {}
+            Mode::Files => {}
+        }
+    }
+
+    fn scroll_up_line(&mut self, lines: usize, wrap: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {}
+            Mode::Files => {}
+        }
+    }
+
+    // SCROLL down
+
+    fn scroll_bottom(&mut self, blank: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {}
+            Mode::Files => {}
+        }
+    }
+
+    fn scroll_down_page(&mut self, pages: usize, half: bool, wrap: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {}
+            Mode::Files => {}
+        }
+    }
+
+    fn scroll_down_line(&mut self, lines: usize, wrap: bool) {
+        match self.virus.mode {
+            Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {}
+            Mode::Files => {}
+        }
+    }
+
+    //
+    //
+    //
+
+    fn copy(&mut self) {
+        match self.virus.mode {
+            Mode::Normal => self.virus.editor.copy(),
+            Mode::Select => {}
+            Mode::Lines => {}
+            Mode::Insert => {}
+            Mode::Files => {}
+        }
+    }
+
+    fn paste(&mut self) {
+        match self.virus.mode {
+            Mode::Normal => self.virus.editor.paste(),
+            Mode::Select => {}
+            Mode::Lines => {}
+            Mode::Insert => {}
+            Mode::Files => {}
+        }
+    }
+
+    fn undo(&mut self) {
+        match self.virus.mode {
+            Mode::Normal => self.virus.editor.get_active_document_mut().unwrap().undo(),
+            Mode::Select => {}
+            Mode::Lines => {}
+            Mode::Insert => {}
+            Mode::Files => {}
+        }
+    }
+
+    fn redo(&mut self) {
+        match self.virus.mode {
+            Mode::Normal => self.virus.editor.get_active_document_mut().unwrap().redo(),
+            Mode::Select => {}
+            Mode::Lines => {}
+            Mode::Insert => {}
+            Mode::Files => {}
+        }
+    }
+
+    fn select(&mut self) {
+        match self.virus.mode {
+            Mode::Normal => self.virus.mode(Mode::Select),
+            Mode::Select => self.virus.mode(Mode::Lines),
+            Mode::Lines => {
+                self.virus
+                    .editor
+                    .get_active_document_mut()
+                    .unwrap()
+                    .movements()
+                    .flip(true);
+                self.virus.mode(Mode::Select);
+            }
+            Mode::Insert => {}
+            Mode::Files => {}
+        }
+    }
+
+    fn unselect(&mut self) {
+        match self.virus.mode {
+            Mode::Normal => {}
+            Mode::Select | Mode::Lines => {
+                self.virus
+                    .editor
+                    .get_active_document_mut()
+                    .unwrap()
+                    .movements()
+                    .collapse(true);
+                self.virus.mode(Mode::Normal);
+            }
+            Mode::Insert => {}
+            Mode::Files => {}
+        }
+    }
+
+    fn files(&mut self) {
+        match self.virus.mode {
+            Mode::Normal => {
+                let files = self
+                    .virus
+                    .editor
+                    .files(true, false)
+                    .filter_map(|file| file.as_os_str().to_str().map(|file| file.to_owned()))
+                    .collect::<Vec<_>>();
+                let haystacks = files
+                    .iter()
+                    .map(|file| (file.to_owned(), 0, Vec::new()))
+                    .collect();
+
+                self.virus.search = Some((String::new(), files, haystacks, 0));
+                self.virus.mode(Mode::Files)
+            }
+            Mode::Select => {}
+            Mode::Lines => {}
+            Mode::Insert => {}
+            Mode::Files => {}
+        }
+    }
+
+    fn open(&mut self) {
+        match self.virus.mode {
+            Mode::Normal => {}
+            Mode::Select => {}
+            Mode::Lines => {}
+            Mode::Insert => {}
+            Mode::Files => {
+                let (needle, files, haystacks, selected) = self.virus.search.as_mut().unwrap();
+
+                let path = self.virus.editor.root().join(&haystacks[*selected].0);
+                self.virus.editor.open(path).unwrap();
+                self.virus.search = None;
+                self.virus.mode(Mode::Normal)
+            }
+        }
+    }
+
+    fn save(&mut self) {
+        match self.virus.mode {
+            Mode::Normal => self
+                .virus
+                .editor
+                .get_active_document_mut()
+                .unwrap()
+                .save()
+                .unwrap(),
+            Mode::Select => {}
+            Mode::Lines => {}
+            Mode::Insert => {}
+            Mode::Files => {}
+        }
+    }
+
+    fn close(&mut self) {
+        self.event_loop.exit();
+    }
+
+    #[cfg(test)]
+    fn test(&mut self, value: usize) {}
 }

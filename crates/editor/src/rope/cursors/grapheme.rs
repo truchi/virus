@@ -136,6 +136,7 @@ impl<'rope> GraphemeCursor<'rope> {
 
                 // FIXME: `next_boundary()` panics if its cursor is at the end of the given chunk!
                 //        (see https://github.com/unicode-rs/unicode-segmentation/issues/135)
+                // TODO: has been fixed on master?
                 if self.graphemes.cur_cursor() - chunk_start == chunk.len() {
                     chunk_start += chunk.len();
                     chunk = self.slice.chunk_at_byte(chunk_start).0;

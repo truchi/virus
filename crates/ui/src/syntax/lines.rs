@@ -46,10 +46,10 @@ impl Lines {
             };
         } else if self.selection != document.selection() {
             let mut lines = vec![
-                self.selection.anchor.line(),
-                self.selection.head.line(),
-                document.selection().anchor.line(),
-                document.selection().head.line(),
+                self.selection.anchor.line,
+                self.selection.head.line,
+                document.selection().anchor.line,
+                document.selection().head.line,
             ];
             lines.sort();
             lines.dedup();
@@ -170,10 +170,10 @@ impl Lines {
                     context,
                     theme.family,
                     theme.font_size,
-                    (range.start + i == document.selection().anchor.line())
-                        .then(|| word(document.selection().anchor.column())),
-                    (range.start + i == document.selection().head.line())
-                        .then(|| word(document.selection().head.column())),
+                    (range.start + i == document.selection().anchor.line)
+                        .then(|| word(document.selection().anchor.column)),
+                    (range.start + i == document.selection().head.line)
+                        .then(|| word(document.selection().head.column)),
                 )
             })
             .collect()

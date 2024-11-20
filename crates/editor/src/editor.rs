@@ -127,7 +127,7 @@ impl Editor {
         let range = document.selection().range();
         let slice = document
             .rope()
-            .byte_slice(range.start.index()..range.end.index());
+            .byte_slice(range.start.index..range.end.index);
 
         self.clipboard = Text::from(slice);
     }

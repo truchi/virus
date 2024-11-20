@@ -64,6 +64,10 @@ impl Ui {
         self.scroll_top.is_animating() || self.scrollbar_alpha.is_animating()
     }
 
+    pub fn screen_height_in_lines(&self) -> u32 {
+        self.window.inner_size().height / self.theme.line_height
+    }
+
     pub fn scroll_up(&mut self) {
         let scroll = self.screen_height_in_lines() / 2 * self.theme.line_height;
         self.scroll_to(self.scroll_top.end().saturating_sub(scroll))
@@ -78,6 +82,16 @@ impl Ui {
             let end = self.scroll_top.end() + screen_height_in_lines / 2 * line_height;
             self.scroll_to(end.min((rope_lines - screen_height_in_lines) * line_height));
         }
+    }
+
+    pub fn scroll_to(&mut self, scroll_top: u32) {
+        self.scroll_top.to(
+            scroll_top,
+            self.theme.scroll_duration,
+            self.theme.scroll_tween,
+        );
+        self.scrollbar_alpha =
+            Tweened::with_animation(255, 0, self.theme.scroll_duration, self.theme.scroll_tween);
     }
 
     pub fn ensure_visibility(&mut self, line: usize) {
@@ -147,10 +161,6 @@ impl Ui {
 
 /// Private.
 impl Ui {
-    fn screen_height_in_lines(&self) -> u32 {
-        self.window.inner_size().height / self.theme.line_height
-    }
-
     fn region(&self) -> Rectangle {
         let size = self.window.inner_size();
         let height = self.screen_height_in_lines() * self.theme.line_height;
@@ -161,16 +171,6 @@ impl Ui {
             width: size.width,
             height,
         }
-    }
-
-    fn scroll_to(&mut self, scroll_top: u32) {
-        self.scroll_top.to(
-            scroll_top,
-            self.theme.scroll_duration,
-            self.theme.scroll_tween,
-        );
-        self.scrollbar_alpha =
-            Tweened::with_animation(255, 0, self.theme.scroll_duration, self.theme.scroll_tween);
     }
 }
 
