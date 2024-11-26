@@ -7,6 +7,7 @@ pub mod rope {
     pub use cursors::grapheme::*;
     pub use cursors::word::*;
     pub use edit::*;
+    pub use segmentation::*;
     pub use selection::*;
     pub use text::*;
 
@@ -17,6 +18,7 @@ pub mod rope {
         pub mod word;
     }
     mod edit;
+    mod segmentation;
     mod selection;
     mod text;
 }

@@ -5,12 +5,13 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
+bitflags.workspace = true
 ignore.workspace = true
 ropey.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 tree-sitter-rust.workspace = true
 tree-sitter.workspace = true
+unicode-properties.workspace = true
 unicode-segmentation.workspace = true
 unicode-width.workspace = true
-virus-graphics.workspace = true

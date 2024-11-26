@@ -60,6 +60,40 @@ impl Cursor {
             width,
         })
     }
+
+    /// Extracts multiple `┃` as cursors in the rope.
+    ///
+    /// (`┣`, `┫`)
+    #[cfg(test)]
+    pub(crate) fn extract(mut str: &str) -> (ropey::Rope, Vec<Self>) {
+        let mut cursors = Vec::new();
+        let mut rope = ropey::Rope::from("");
+
+        loop {
+            if let Some((before, after)) = str.split_once('┃') {
+                rope.append(ropey::Rope::from(before));
+
+                if !(before.ends_with('\r') && after.starts_with('\n')) {
+                    cursors.push({
+                        let line = rope.line(rope.len_lines() - 1);
+                        Self {
+                            index: rope.len_bytes(),
+                            line: rope.len_lines() - 1,
+                            column: line.len_bytes(),
+                            width: line.chars().flat_map(char::width).sum(),
+                        }
+                    });
+                }
+                str = after;
+            } else {
+                break;
+            }
+        }
+
+        rope.append(ropey::Rope::from(str));
+
+        (rope, cursors)
+    }
 }
 
 impl PartialEq for Cursor {
