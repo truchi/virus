@@ -13,7 +13,7 @@ use unicode_width::UnicodeWidthChar;
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-enum Grapheme {
+pub enum GraphemeCategory {
     Break,
     Space,
     Punctuation,
@@ -24,7 +24,7 @@ enum Grapheme {
     Symbol,
 }
 
-impl From<&str> for Grapheme {
+impl From<&str> for GraphemeCategory {
     fn from(grapheme: &str) -> Self {
         debug_assert!(!grapheme.is_empty());
 
@@ -83,7 +83,7 @@ bitflags::bitflags! {
 
 mod bundaries {
     use super::*;
-    use Grapheme::*;
+    use GraphemeCategory::*;
 
     #[rustfmt::skip]
     macro_rules! whitespace { () => { None | Some(Break | Space) } }
@@ -108,19 +108,19 @@ mod bundaries {
         index: usize,
         line: &str,
     ) -> (
-        impl FnMut() -> Option<Grapheme> + '_,
-        impl FnMut() -> Option<Grapheme> + '_,
+        impl FnMut() -> Option<GraphemeCategory> + '_,
+        impl FnMut() -> Option<GraphemeCategory> + '_,
     ) {
         let (left, right) = line.split_at(index);
         let (mut left, mut right) = (left.graphemes(true).rev(), right.graphemes(true));
 
         (
-            move || left.next().map(Grapheme::from),
-            move || right.next().map(Grapheme::from),
+            move || left.next().map(GraphemeCategory::from),
+            move || right.next().map(GraphemeCategory::from),
         )
     }
 
-    fn is_word(mut dir: impl FnMut() -> Option<Grapheme>) -> bool {
+    fn is_word(mut dir: impl FnMut() -> Option<GraphemeCategory>) -> bool {
         loop {
             match dir() {
                 Some(Separator) => continue,
