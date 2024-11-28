@@ -467,8 +467,6 @@ actions!(
 
     files(),
 
-    escape(),
-
     //
     //
     //
@@ -695,17 +693,6 @@ impl Nodes {
             .get(&Count(Optional(())))
             .map(|id| get_children(*id));
 
-        // Escape without mods
-        if event.modded() == &Key::Escape
-            && !event.control()
-            && !event.shift()
-            && !event.alt()
-            && !event.command()
-        {
-            self.escape();
-            return Ok(None);
-        }
-
         // Parse event as number for count nodes
         if let Some(current) = None
             .or(children.get(&Count(Optional(()))))
@@ -724,7 +711,7 @@ impl Nodes {
         }
 
         // Transition state machine if a binding is matched
-        self.current = if event.modded() == event.unmodded() {
+        let current = if event.modded() == event.unmodded() {
             let modded = Key(ModdedKey::new(
                 Mods::new(event.control(), event.shift(), event.alt(), event.command()),
                 event.modded().clone(),
@@ -753,9 +740,23 @@ impl Nodes {
                 .or_else(|| children_after_optional.and_then(|children| children.get(&modded)))
                 .or_else(|| children.get(&unmodded))
                 .or_else(|| children_after_optional.and_then(|children| children.get(&unmodded)))
-        }
-        .copied()
-        .ok_or(())?;
+        };
+
+        self.current = if let Some(&current) = current {
+            current
+        } else {
+            if *event.modded() == Key::Escape
+                && !event.control()
+                && !event.shift()
+                && !event.alt()
+                && !event.command()
+            {
+                self.escape();
+                return Ok(None);
+            } else {
+                return Err(());
+            }
+        };
 
         // Return action
         match self.nodes.get(&self.current).unwrap() {

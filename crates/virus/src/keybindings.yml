@@ -5,7 +5,6 @@ ALIASES:
   right: l, arrow_right
 
 NORMAL:
-  # Navigation
   ?lines $up: move_up_line ?lines
   ?lines $down: move_down_line ?lines
   ?pages command $up: move_up_page ?pages +half
@@ -18,23 +17,44 @@ NORMAL:
   command $left: move_start
   command $right: move_end
 
-  # Scroll
   ?pages shift $up: scroll_up_page ?pages +half
   ?pages shift $down: scroll_down_page ?pages +half
 
   ",": select_smart
-  command ,: unselect
+  ";": unselect
+  f: files
+  escape: insert
+
   c: copy
   v: paste
   z: undo
-  command z: redo
+  Z: redo
+
   s: save
-  f: files
   q: close
 
 INSERT:
+  command $up: move_up_line
+  command $down: move_down_line
+  command $left: move_left_smart
+  command $right: move_right_smart
+
+  command ,: select_smart
+  command ;: unselect
+  command f: files
+  escape: normal
+
+  command c: copy
+  command v: paste
+  command z: undo
+  command Z: redo
+
+  command s: save
+  command q: close
 
 FILES:
   command $up: move_up_line +wrap
   command $down: move_down_line +wrap
   command $right: open
+
+  escape: normal

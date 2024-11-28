@@ -925,9 +925,25 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     // Modes
     //
 
-    fn normal(&mut self) {}
+    fn normal(&mut self) {
+        match self.virus.mode {
+            Mode::Normal { .. } => {}
+            Mode::Insert { select } => self.virus.mode(Mode::Normal { select }),
+            Mode::Files => self.virus.mode(Mode::Normal {
+                select: Select::None,
+            }),
+        }
+    }
 
-    fn insert(&mut self) {}
+    fn insert(&mut self) {
+        match self.virus.mode {
+            Mode::Normal { select } => self.virus.mode(Mode::Insert { select }),
+            Mode::Insert { .. } => {}
+            Mode::Files => self.virus.mode(Mode::Normal {
+                select: Select::None,
+            }),
+        }
+    }
 
     fn files(&mut self) {
         match self.virus.mode {
@@ -949,8 +965,6 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
             Mode::Files => {}
         }
     }
-
-    fn escape(&mut self) {}
 
     //
     //
