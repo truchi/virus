@@ -135,7 +135,7 @@ impl Editor {
     pub fn paste(&mut self) {
         let edit = self.clipboard.clone();
 
-        self.get_active_document_mut().unwrap().edit(edit);
+        self.get_active_document_mut().unwrap().edition().edit(edit);
     }
 
     pub fn find_git_root(path: PathBuf) -> Option<PathBuf> {

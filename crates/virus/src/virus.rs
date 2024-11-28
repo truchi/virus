@@ -281,7 +281,25 @@ impl Virus {
             Ok(None) => {}
             Err(()) => match self.mode {
                 Mode::Normal { .. } => {}
-                Mode::Insert { .. } => {}
+                Mode::Insert { select } => match event.modded() {
+                    Key::Str(str) => self
+                        .unwrap_active_document_mut()
+                        .edition()
+                        .edit(str.as_str().into()),
+                    Key::Tab => self
+                        .unwrap_active_document_mut()
+                        .edition()
+                        .edit("    ".into()),
+                    Key::Space => self.unwrap_active_document_mut().edition().edit(" ".into()),
+                    Key::Backspace => self.unwrap_active_document_mut().edition().backspace(),
+                    Key::Enter => self
+                        .editor
+                        .get_active_document_mut()
+                        .unwrap()
+                        .edition()
+                        .edit("\n".into()),
+                    _ => {}
+                },
                 Mode::Files => {
                     let (needle, files, haystacks, selected) = self.search.as_mut().unwrap();
 
@@ -322,68 +340,6 @@ impl Virus {
 
         // TODO handle that better
         self.ui.window().request_redraw();
-
-        // match &mut self.mode {
-        //     Mode::Normal => match event.modded().as_str() {
-        //         // TODO
-        //         // Key::Str("v") => match select_mode {
-        //         //     Some(SelectMode::Range) => *select_mode = Some(SelectMode::Line),
-        //         //     Some(SelectMode::Line) => {
-        //         //         self.editor
-        //         //             .get_active_document_mut()
-        //         //             .unwrap()
-        //         //             .flip_anchor_and_head();
-        //         //         *select_mode = Some(SelectMode::Range);
-        //         //     }
-        //         //     None => *select_mode = Some(SelectMode::Range),
-        //         // },
-        //         // Key::Str("V") => {
-        //         //     // *select_mode = None; // TODO
-        //         //     self.editor
-        //         //         .get_active_document_mut()
-        //         //         .unwrap()
-        //         //         .move_anchor_to_head();
-        //         // }
-        //         Key::Escape => self.mode = Mode::Insert,
-        //         _ => (),
-        //     },
-        //     Mode::Select => {}
-        //     Mode::Lines => {}
-        //     Mode::Insert => match event.modded().as_str() {
-        //         Key::Str("@") if event.command() => event_loop.exit(),
-        //         Key::Str(str) => self
-        //             .editor
-        //             .get_active_document_mut()
-        //             .unwrap()
-        //             .edit(str.into()),
-        //         Key::Space => self
-        //             .editor
-        //             .get_active_document_mut()
-        //             .unwrap()
-        //             .edit(" ".into()),
-        //         Key::Backspace => self.editor.get_active_document_mut().unwrap().backspace(),
-        //         Key::Enter => self
-        //             .editor
-        //             .get_active_document_mut()
-        //             .unwrap()
-        //             .edit("\n".into()),
-        //         Key::Escape => {
-        //             // TODO
-        //             // self.mode = Mode::Normal {
-        //             //     select_mode: (!self
-        //             //         .editor
-        //             //         .get_active_document()
-        //             //         .unwrap()
-        //             //         .selection()
-        //             //         .range()
-        //             //         .is_empty())
-        //             //     .then_some(SelectMode::Range),
-        //             // }
-        //         }
-        //         _ => (),
-        //     },
-        //     Mode::Files => {}
-        // }
     }
 
     fn on_resized(&mut self, event_loop: &ActiveEventLoop) {
@@ -987,7 +943,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn undo(&mut self) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
-                self.virus.unwrap_active_document_mut().undo()
+                self.virus.unwrap_active_document_mut().edition().undo()
             }
             Mode::Files => {}
         }
@@ -996,7 +952,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn redo(&mut self) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
-                self.virus.unwrap_active_document_mut().redo()
+                self.virus.unwrap_active_document_mut().edition().redo()
             }
             Mode::Files => {}
         }

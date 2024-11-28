@@ -149,6 +149,10 @@ impl Document {
 
         DocumentMovements { document: self }
     }
+
+    pub fn edition(&mut self) -> DocumentEdition {
+        DocumentEdition { document: self }
+    }
 }
 
 /// Private.
@@ -208,6 +212,33 @@ impl<'document> DocumentMovements<'document> {
         self
     }
 
+    pub fn anchor(&mut self, cursor: Cursor, update: bool) {
+        self.document.selection.anchor = cursor;
+        self.document.anchor_segmentation.to_cursor(cursor);
+
+        if update {
+            self.document
+                .anchor_segmentation
+                .update(self.document.rope.clone());
+        }
+    }
+
+    pub fn head(&mut self, cursor: Cursor, update: bool) {
+        self.document.selection.head = cursor;
+        self.document.head_segmentation.to_cursor(cursor);
+
+        if update {
+            self.document
+                .head_segmentation
+                .update(self.document.rope.clone());
+        }
+    }
+
+    pub fn selection(&mut self, selection: Selection, update: bool) {
+        self.anchor(selection.anchor, update);
+        self.head(selection.head, update);
+    }
+
     pub fn top(&mut self, blank: bool) -> &mut Self {
         self.document.selection.head = Cursor::builder(self.document.rope.slice(..)).at_width(
             blank
@@ -216,9 +247,7 @@ impl<'document> DocumentMovements<'document> {
             self.document.selection.head.width,
         );
 
-        self.document
-            .head_segmentation
-            .to_cursor(self.document.selection.head);
+        self.head(self.document.selection.head, false);
         self
     }
 
@@ -232,9 +261,7 @@ impl<'document> DocumentMovements<'document> {
             self.document.selection.head.width,
         );
 
-        self.document
-            .head_segmentation
-            .to_cursor(self.document.selection.head);
+        self.head(self.document.selection.head, false);
         self
     }
 
@@ -249,9 +276,7 @@ impl<'document> DocumentMovements<'document> {
             self.document.selection.head.width,
         );
 
-        self.document
-            .head_segmentation
-            .to_cursor(self.document.selection.head);
+        self.head(self.document.selection.head, false);
         self
     }
 
@@ -266,9 +291,7 @@ impl<'document> DocumentMovements<'document> {
             self.document.selection.head.width,
         );
 
-        self.document
-            .head_segmentation
-            .to_cursor(self.document.selection.head);
+        self.head(self.document.selection.head, false);
         self
     }
 
@@ -279,7 +302,7 @@ impl<'document> DocumentMovements<'document> {
             self.document.head_segmentation.to_line_first();
         }
 
-        self.document.selection.head = self.document.head_segmentation.cursor();
+        self.head(self.document.head_segmentation.cursor(), false);
         self
     }
 
@@ -290,7 +313,7 @@ impl<'document> DocumentMovements<'document> {
             self.document.head_segmentation.to_line_last();
         }
 
-        self.document.selection.head = self.document.head_segmentation.cursor();
+        self.head(self.document.head_segmentation.cursor(), false);
         self
     }
 
@@ -301,7 +324,7 @@ impl<'document> DocumentMovements<'document> {
             }
         }
 
-        self.document.selection.head = self.document.head_segmentation.cursor();
+        self.head(self.document.head_segmentation.cursor(), false);
         self
     }
 
@@ -312,19 +335,24 @@ impl<'document> DocumentMovements<'document> {
             }
         }
 
-        self.document.selection.head = self.document.head_segmentation.cursor();
+        self.head(self.document.head_segmentation.cursor(), false);
         self
     }
 }
 
-// ────────────────────────────────────────────────────────────────────────────────────────────── //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                        DocumentEdition                                         //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// Edition.
-impl Document {
+pub struct DocumentEdition<'document> {
+    document: &'document mut Document,
+}
+
+impl<'document> DocumentEdition<'document> {
     pub fn edit(&mut self, inserted: Text) {
         let edit = {
-            let selection = self.selection();
-            Edit::edit(&mut self.rope, selection.range(), inserted)
+            let selection = self.document.selection();
+            Edit::edit(&mut self.document.rope, selection.range(), inserted)
         };
 
         if edit.is_noop().unwrap_or_default() {
@@ -333,32 +361,36 @@ impl Document {
 
         let ts_edit = edit.to_ts_edit_applied();
 
-        self.selection = edit.inserted_end().into();
-        self.version += 1;
-        self.is_tree_dirty = true;
-        self.history.push(edit);
-        self.tree.edit(&ts_edit);
+        self.document
+            .movements()
+            .selection(edit.inserted_end().into(), true);
+        self.document.version += 1;
+        self.document.is_tree_dirty = true;
+        self.document.history.push(edit);
+        self.document.tree.edit(&ts_edit);
     }
 
     // TODO: convenient for now but does not feel good
     pub fn backspace(&mut self) {
-        if self.selection.is_empty() {
-            self.movements().left(Boundaries::GRAPHEME, 1, false);
+        if self.document.selection.is_empty() {
+            self.document
+                .movements()
+                .left(Boundaries::GRAPHEME, 1, false);
         }
 
         self.edit(Text::default());
     }
 
     pub fn undo(&mut self) {
-        let Some(edits) = self.history.undo() else {
+        let Some(edits) = self.document.history.undo() else {
             return;
         };
-        let mut anchor = self.selection.anchor;
-        let mut head = self.selection.head;
+        let mut anchor = self.document.selection.anchor;
+        let mut head = self.document.selection.head;
 
         for edit in edits {
-            edit.unapply(&mut self.rope);
-            self.tree.edit(&edit.to_ts_edit_applied());
+            edit.unapply(&mut self.document.rope);
+            self.document.tree.edit(&edit.to_ts_edit_applied());
 
             anchor = anchor
                 .edit(edit.start(), edit.removed_end(), edit.inserted_end())
@@ -368,21 +400,23 @@ impl Document {
                 .unwrap_or(edit.start());
         }
 
-        self.selection = Selection::new(anchor, head);
-        self.version += 1;
-        self.is_tree_dirty = true;
+        self.document
+            .movements()
+            .selection(Selection::new(anchor, head), true);
+        self.document.version += 1;
+        self.document.is_tree_dirty = true;
     }
 
     pub fn redo(&mut self) {
-        let Some(edits) = self.history.redo() else {
+        let Some(edits) = self.document.history.redo() else {
             return;
         };
-        let mut anchor = self.selection.anchor;
-        let mut head = self.selection.head;
+        let mut anchor = self.document.selection.anchor;
+        let mut head = self.document.selection.head;
 
         for edit in edits {
-            edit.apply(&mut self.rope);
-            self.tree.edit(&edit.to_ts_edit_applied());
+            edit.apply(&mut self.document.rope);
+            self.document.tree.edit(&edit.to_ts_edit_applied());
 
             anchor = anchor
                 .edit(edit.start(), edit.removed_end(), edit.inserted_end())
@@ -392,8 +426,10 @@ impl Document {
                 .unwrap_or(edit.start());
         }
 
-        self.selection = Selection::new(anchor, head);
-        self.version += 1;
-        self.is_tree_dirty = true;
+        self.document
+            .movements()
+            .selection(Selection::new(anchor, head), true);
+        self.document.version += 1;
+        self.document.is_tree_dirty = true;
     }
 }

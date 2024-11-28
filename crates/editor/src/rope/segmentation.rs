@@ -368,6 +368,16 @@ impl Segmentation {
         })
     }
 
+    pub fn update(&mut self, rope: Rope) {
+        if Rope::is_instance(&self.rope, &rope) {
+            return;
+        }
+
+        self.rope = rope;
+        self.current_line = self.rope.line(self.line).to_string();
+        self.graphemes = GraphemeCursor::new(self.column, self.current_line.len(), true);
+    }
+
     pub fn to_start(&mut self) {
         self.to_cursor(Cursor::builder(self.rope.slice(..)).at_start())
     }

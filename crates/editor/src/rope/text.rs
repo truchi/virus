@@ -6,7 +6,7 @@ use ropey::{Rope, RopeSlice};
 
 #[derive(Clone, Eq, Debug)]
 pub(super) enum Inner {
-    String(String),
+    String(String), // TODO SmolStr?
     Rope(Rope),
 }
 
