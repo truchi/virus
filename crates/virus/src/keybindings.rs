@@ -355,16 +355,24 @@ actions!(
         blank: (Option<bool>) = false,
     ),
 
-    move_left_word(
-        words: (Option<Number>) = 1,
-        symbols: (Option<bool>) = false,
-        sub: (Option<bool>) = false,
-        end: (Option<bool>) = false,
+    move_left_boundary(
+        boundaries: (Option<Number>) = 1,
+        punctuation_start: (Option<bool>) = false,
+        punctuation_end: (Option<bool>) = false,
+        short_word_start: (Option<bool>) = false,
+        short_word_end: (Option<bool>) = false,
+        long_word_start: (Option<bool>) = false,
+        long_word_end: (Option<bool>) = false,
         wrap: (Option<bool>) = false,
     ),
 
     move_left_char(
         chars: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    move_left_smart(
+        repeat: (Option<Number>) = 1,
         wrap: (Option<bool>) = false,
     ),
 
@@ -374,16 +382,24 @@ actions!(
         blank: (Option<bool>) = false,
     ),
 
-    move_right_word(
-        words: (Option<Number>) = 1,
-        symbols: (Option<bool>) = false,
-        sub: (Option<bool>) = false,
-        end: (Option<bool>) = false,
+    move_right_boundary(
+        boundaries: (Option<Number>) = 1,
+        punctuation_start: (Option<bool>) = false,
+        punctuation_end: (Option<bool>) = false,
+        short_word_start: (Option<bool>) = false,
+        short_word_end: (Option<bool>) = false,
+        long_word_start: (Option<bool>) = false,
+        long_word_end: (Option<bool>) = false,
         wrap: (Option<bool>) = false,
     ),
 
     move_right_char(
         chars: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    move_right_smart(
+        repeat: (Option<Number>) = 1,
         wrap: (Option<bool>) = false,
     ),
 
@@ -1202,6 +1218,7 @@ mod parse {
         type Item = KeybindingsResult<Token<'a>>;
 
         fn next(&mut self) -> Option<Self::Item> {
+            // TODO validate better, or don't
             fn validate_ident(identifier: &str) -> KeybindingsResult<&str> {
                 if identifier.is_empty() {
                     return Err(InvalidIdentifier {
@@ -1209,13 +1226,13 @@ mod parse {
                     });
                 }
 
-                for byte in identifier.bytes() {
-                    if !matches!(byte, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_') {
-                        return Err(InvalidIdentifier {
-                            identifier: identifier.to_smolstr(),
-                        });
-                    }
-                }
+                // for byte in identifier.bytes() {
+                //     if !matches!(byte, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_') {
+                //         return Err(InvalidIdentifier {
+                //             identifier: identifier.to_smolstr(),
+                //         });
+                //     }
+                // }
 
                 Ok(identifier)
             }

@@ -1,12 +1,8 @@
-#![allow(unused)]
-
 use crate::rope::Cursor;
-use bitflags::Flags;
 use ropey::Rope;
-use std::cell::Cell;
 use unicode_properties::{GeneralCategoryGroup, UnicodeGeneralCategory};
 use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
-use unicode_width::UnicodeWidthChar;
+use unicode_width::UnicodeWidthStr;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            Grapheme                                            //
@@ -65,22 +61,52 @@ impl From<&str> for GraphemeCategory {
 //                                           Boundaries                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+// TODO OPENING_PAIR_START OPENING_PAIR_END QUOTE_START QUOTE_END
 bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-    pub struct Boundaries: u32 {
-        const LINE_START        = 0b_0000_0000_0000_0001;
-        const LINE_END          = 0b_0000_0000_0000_0010;
-        const LINE_FIRST        = 0b_0000_0000_0000_0100;
-        const LINE_LAST         = 0b_0000_0000_0000_1000;
-        const PUNCTUATION_START = 0b_0000_0000_0001_0000;
-        const PUNCTUATION_END   = 0b_0000_0000_0010_0000;
-        const SHORT_WORD_START  = 0b_0000_0000_0100_0000;
-        const SHORT_WORD_END    = 0b_0000_0000_1000_0000;
-        const LONG_WORD_START   = 0b_0000_0001_0000_0000;
-        const LONG_WORD_END     = 0b_0000_0010_0000_0000;
+    pub struct Boundaries: u16 {
+        const LINE_START        = 1 << 1;
+        const LINE_END          = 1 << 2;
+        const LINE_FIRST        = 1 << 3;
+        const LINE_LAST         = 1 << 4;
+        const PUNCTUATION_START = 1 << 5;
+        const PUNCTUATION_END   = 1 << 6;
+        const SHORT_WORD_START  = 1 << 7;
+        const SHORT_WORD_END    = 1 << 8;
+        const LONG_WORD_START   = 1 << 9;
+        const LONG_WORD_END     = 1 << 10;
+
+        const GRAPHEME          = 0;
+        const PUNCTUATION       = Self::PUNCTUATION_START.bits() | Self::PUNCTUATION_END.bits();
+        const SHORT_WORD        = Self::SHORT_WORD_START.bits()  | Self::SHORT_WORD_END.bits();
+        const LONG_WORD         = Self::LONG_WORD_START.bits()   | Self::LONG_WORD_END.bits();
+        const WORD              = Self::SHORT_WORD.bits()        | Self::LONG_WORD.bits();
     }
 }
 
+impl Boundaries {
+    pub fn from_bools(
+        punctuation_start: bool,
+        punctuation_end: bool,
+        short_word_start: bool,
+        short_word_end: bool,
+        long_word_start: bool,
+        long_word_end: bool,
+    ) -> Self {
+        let mut boundaries = Boundaries::empty();
+
+        punctuation_start.then(|| boundaries.insert(Self::PUNCTUATION_START));
+        punctuation_end.then(|| boundaries.insert(Self::PUNCTUATION_END));
+        short_word_start.then(|| boundaries.insert(Self::SHORT_WORD_START));
+        short_word_end.then(|| boundaries.insert(Self::SHORT_WORD_END));
+        long_word_start.then(|| boundaries.insert(Self::LONG_WORD_START));
+        long_word_end.then(|| boundaries.insert(Self::LONG_WORD_END));
+
+        boundaries
+    }
+}
+
+#[allow(unreachable_patterns)]
 mod bundaries {
     use super::*;
     use GraphemeCategory::*;
@@ -96,13 +122,6 @@ mod bundaries {
 
     #[rustfmt::skip]
     macro_rules! alphanum { () => { Some(Upper | Lower | Numeric | Symbol) } }
-
-    #[rustfmt::skip]
-    macro_rules! boundaries {
-        ($boundaries:ident, $bool:expr $(,)?) => {
-            if $bool { Boundaries::$boundaries } else { Boundaries::empty() }
-        };
-    }
 
     fn graphemes(
         index: usize,
@@ -246,7 +265,7 @@ mod bundaries {
         pub(super) fn is_long_word_start(index: usize, line: &str) -> bool {
             debug_assert!(index <= line.len());
 
-            let (mut left, mut right) = graphemes(index, line);
+            let (mut left, right) = graphemes(index, line);
 
             match left() {
                 alphanum!() | Some(Separator) => false,
@@ -257,7 +276,7 @@ mod bundaries {
         pub(super) fn is_long_word_end(index: usize, line: &str) -> bool {
             debug_assert!(index <= line.len());
 
-            let (mut left, mut right) = graphemes(index, line);
+            let (left, mut right) = graphemes(index, line);
 
             match right() {
                 alphanum!() | Some(Separator) => false,
@@ -296,21 +315,22 @@ impl Segmentation {
         }
     }
 
-    pub fn index(&self) -> usize {
-        self.index
+    pub fn cursor(&self) -> Cursor {
+        Cursor {
+            index: self.index,
+            line: self.line,
+            column: self.column,
+            width: self.current_line[..self.column].width(),
+        }
     }
 
-    pub fn line(&self) -> usize {
-        self.line
-    }
-
-    pub fn column(&self) -> usize {
-        self.column
+    pub fn current_line(&self) -> &str {
+        &self.current_line
     }
 
     pub fn is_boundaries(&self, boundaries: Boundaries) -> bool {
-        // Could be cached...
         boundaries.iter().any(|boundaries| match () {
+            _ if boundaries == Boundaries::GRAPHEME => true,
             _ if boundaries == Boundaries::LINE_START => {
                 Boundaries::is_line_start(self.column, &self.current_line)
             }
@@ -348,63 +368,76 @@ impl Segmentation {
         })
     }
 
-    pub fn prev_grapheme(&mut self) -> bool {
-        debug_assert_eq!(self.column, self.graphemes.cur_cursor());
-
-        if self.column == 0 {
-            if self.line == 0 {
-                return false;
-            }
-
-            let current_line = self.rope.line(self.line - 1).to_string();
-            self.line -= 1;
-            self.column = current_line.len();
-            self.current_line = current_line;
-            self.graphemes = GraphemeCursor::new(self.column, self.current_line.len(), true);
-        }
-
-        match self.graphemes.prev_boundary(&self.current_line, 0).unwrap() {
-            Some(column) => {
-                let str = &self.current_line[column..self.column];
-                self.index -= str.len();
-                self.column = column;
-
-                true
-            }
-            None => unreachable!(),
-        }
+    pub fn to_start(&mut self) {
+        self.to_cursor(Cursor::builder(self.rope.slice(..)).at_start())
     }
 
-    pub fn next_grapheme(&mut self) -> bool {
-        debug_assert_eq!(self.column, self.graphemes.cur_cursor());
+    pub fn to_end(&mut self) {
+        self.to_cursor(Cursor::builder(self.rope.slice(..)).at_end())
+    }
 
-        match self.graphemes.next_boundary(&self.current_line, 0).unwrap() {
-            Some(column) => {
-                let str = &self.current_line[self.column..column];
-                self.index += str.len();
-                self.column = column;
+    pub fn to_line_start(&mut self) {
+        self.to_column(0);
+    }
 
-                if matches!(str, "\r" | "\n" | "\r\n") {
-                    debug_assert!(self.line < self.rope.len_lines() - 1);
+    pub fn to_line_end(&mut self) {
+        self.to_column(
+            self.current_line
+                .graphemes(true)
+                .rev()
+                .map(|grapheme| (grapheme, GraphemeCategory::from(grapheme)))
+                .take_while(|(_, category)| matches!(category, GraphemeCategory::Break))
+                .map(|(grapheme, _)| grapheme.len())
+                .sum(),
+        );
+    }
 
-                    self.line += 1;
-                    self.column = 0;
-                    self.current_line = self.rope.line(self.line).to_string();
-                    self.graphemes =
-                        GraphemeCursor::new(self.column, self.current_line.len(), true);
-                }
+    pub fn to_line_first(&mut self) {
+        self.to_column(
+            self.current_line
+                .graphemes(true)
+                .map(|grapheme| (grapheme, GraphemeCategory::from(grapheme)))
+                .take_while(|(_, category)| matches!(category, GraphemeCategory::Space))
+                .map(|(grapheme, _)| grapheme.len())
+                .sum(),
+        );
+    }
 
-                true
-            }
-            None => {
-                debug_assert_eq!(self.line, self.rope.len_lines() - 1);
-                false
-            }
+    pub fn to_line_last(&mut self) {
+        self.to_column(
+            self.current_line.len()
+                - self
+                    .current_line
+                    .graphemes(true)
+                    .rev()
+                    .map(|grapheme| (grapheme, GraphemeCategory::from(grapheme)))
+                    .take_while(|(_, category)| {
+                        matches!(category, GraphemeCategory::Break | GraphemeCategory::Space)
+                    })
+                    .map(|(grapheme, _)| grapheme.len())
+                    .sum::<usize>(),
+        );
+    }
+
+    pub fn to_cursor(&mut self, cursor: Cursor) {
+        if self.index == cursor.index {
+            return;
         }
+
+        if self.line != cursor.line {
+            self.current_line = self.rope.line(cursor.line).to_string();
+        }
+
+        (self.index, self.line, self.column, self.graphemes) = (
+            cursor.index,
+            cursor.line,
+            cursor.column,
+            GraphemeCursor::new(cursor.column, self.current_line.len(), true),
+        );
     }
 
     pub fn prev(&mut self, boundaries: Boundaries) -> bool {
-        if boundaries.is_empty() {
+        if boundaries == Boundaries::GRAPHEME {
             return self.prev_grapheme();
         }
 
@@ -434,7 +467,7 @@ impl Segmentation {
     }
 
     pub fn next(&mut self, boundaries: Boundaries) -> bool {
-        if boundaries.is_empty() {
+        if boundaries == Boundaries::GRAPHEME {
             return self.next_grapheme();
         }
 
@@ -464,6 +497,74 @@ impl Segmentation {
     }
 }
 
+/// Private.
+impl Segmentation {
+    fn to_column(&mut self, column: usize) {
+        if self.column == column {
+            return;
+        }
+
+        self.index = self.index - self.column + column;
+        self.column = column;
+        self.graphemes = GraphemeCursor::new(column, self.current_line.len(), true);
+    }
+
+    fn prev_grapheme(&mut self) -> bool {
+        debug_assert_eq!(self.column, self.graphemes.cur_cursor());
+
+        if self.column == 0 {
+            if self.line == 0 {
+                return false;
+            }
+
+            let current_line = self.rope.line(self.line - 1).to_string();
+            self.line -= 1;
+            self.column = current_line.len();
+            self.current_line = current_line;
+            self.graphemes = GraphemeCursor::new(self.column, self.current_line.len(), true);
+        }
+
+        match self.graphemes.prev_boundary(&self.current_line, 0).unwrap() {
+            Some(column) => {
+                let str = &self.current_line[column..self.column];
+                self.index -= str.len();
+                self.column = column;
+
+                true
+            }
+            None => unreachable!(),
+        }
+    }
+
+    fn next_grapheme(&mut self) -> bool {
+        debug_assert_eq!(self.column, self.graphemes.cur_cursor());
+
+        match self.graphemes.next_boundary(&self.current_line, 0).unwrap() {
+            Some(column) => {
+                let str = &self.current_line[self.column..column];
+                self.index += str.len();
+                self.column = column;
+
+                if matches!(str, "\r" | "\n" | "\r\n") {
+                    debug_assert!(self.line < self.rope.len_lines() - 1);
+
+                    self.line += 1;
+                    self.column = 0;
+                    self.current_line = self.rope.line(self.line).to_string();
+                    self.graphemes =
+                        GraphemeCursor::new(self.column, self.current_line.len(), true);
+                }
+
+                true
+            }
+            None => {
+                debug_assert_eq!(self.line, self.rope.len_lines() - 1);
+                false
+            }
+        }
+    }
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Tests                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -478,7 +579,6 @@ mod tests {
     #[test]
     fn graphemes() {
         let str = "\rHello\n  This is {(foo-bar_baz12)}\r\n  !";
-        let start = Cursor::default();
 
         assert_eq!(
             {
@@ -514,8 +614,6 @@ mod tests {
 
     #[test]
     fn boundaries() {
-        const DEBUG: bool = true;
-
         let data = [
             (
                 Boundaries::LINE_START,

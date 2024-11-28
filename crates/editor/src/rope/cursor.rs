@@ -1,7 +1,7 @@
 use crate::rope::{GraphemeCursor, WordClass, WordCursor};
 use ropey::RopeSlice;
 use std::{cell::Cell, cmp::Ordering};
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use unicode_width::UnicodeWidthStr;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Cursor                                             //
@@ -17,6 +17,10 @@ pub struct Cursor {
 }
 
 impl Cursor {
+    pub fn builder(slice: RopeSlice) -> CursorBuilder {
+        CursorBuilder { slice }
+    }
+
     pub fn as_cursor_ref<'rope>(&self, rope: RopeSlice<'rope>) -> CursorRef<'rope> {
         CursorRef::with(rope).at_cursor(*self)
     }
@@ -80,7 +84,7 @@ impl Cursor {
                             index: rope.len_bytes(),
                             line: rope.len_lines() - 1,
                             column: line.len_bytes(),
-                            width: line.chars().flat_map(char::width).sum(),
+                            width: line.chunks().map(str::width).sum(),
                         }
                     });
                 }
@@ -135,7 +139,7 @@ impl<'rope> CursorRef<'rope> {
         if let Some(line) = self.line.get() {
             line
         } else {
-            let line = utils::get_line(self.rope, self.index);
+            let line = utils::line(self.rope, self.index);
             self.line.set(Some(line));
             line
         }
@@ -145,7 +149,7 @@ impl<'rope> CursorRef<'rope> {
         if let Some(column) = self.column.get() {
             column
         } else {
-            let column = utils::get_column(self.rope, self.index, self.line());
+            let column = utils::column(self.rope, self.index, self.line());
             self.column.set(Some(column));
             column
         }
@@ -155,7 +159,7 @@ impl<'rope> CursorRef<'rope> {
         if let Some(width) = self.width.get() {
             width
         } else {
-            let width = utils::get_width(self.rope, self.line(), self.column());
+            let width = utils::width(self.rope, self.line(), self.column());
             self.width.set(Some(width));
             width
         }
@@ -422,9 +426,9 @@ impl<'rope> CursorRefBuilder<'rope> {
     pub fn at_cursor(&self, cursor: Cursor) -> CursorRef<'rope> {
         debug_assert!(cursor.index <= self.rope.len_bytes());
         debug_assert!(utils::is_char_boundary(self.rope, cursor.index));
-        debug_assert!(cursor.line == utils::get_line(self.rope, cursor.index));
-        debug_assert!(cursor.column == utils::get_column(self.rope, cursor.index, cursor.line));
-        debug_assert!(cursor.width == utils::get_width(self.rope, cursor.line, cursor.column));
+        debug_assert!(cursor.line == utils::line(self.rope, cursor.index));
+        debug_assert!(cursor.column == utils::column(self.rope, cursor.index, cursor.line));
+        debug_assert!(cursor.width == utils::width(self.rope, cursor.line, cursor.column));
 
         CursorRef {
             rope: self.rope,
@@ -437,31 +441,149 @@ impl<'rope> CursorRefBuilder<'rope> {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                         CursorBuilder                                          //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+#[derive(Copy, Clone)]
+pub struct CursorBuilder<'rope> {
+    slice: RopeSlice<'rope>,
+}
+
+impl<'rope> CursorBuilder<'rope> {
+    pub fn at_start(self) -> Cursor {
+        Cursor::default()
+    }
+
+    pub fn at_end(self) -> Cursor {
+        let index = self.slice.len_bytes();
+        let line = self.slice.len_lines() - 1;
+        let column = utils::column(self.slice, index, line);
+        let width = utils::width(self.slice, line, column);
+
+        Cursor {
+            index,
+            line,
+            column,
+            width,
+        }
+    }
+
+    pub fn at_index(&self, index: usize) -> Cursor {
+        debug_assert!(index <= self.slice.len_bytes());
+        debug_assert!(utils::is_char_boundary(self.slice, index));
+
+        let line = utils::line(self.slice, index);
+        let column = utils::column(self.slice, index, line);
+        let width = utils::width(self.slice, line, column);
+
+        Cursor {
+            index,
+            line,
+            column,
+            width,
+        }
+    }
+
+    pub fn at_column(&self, line: usize, column: usize) -> Cursor {
+        debug_assert!(line < self.slice.len_lines());
+        debug_assert!(
+            column
+                <= self
+                    .slice
+                    .line(line)
+                    .to_string()
+                    .trim_end_matches('\n')
+                    .trim_end_matches('\r')
+                    .len()
+        );
+
+        let index = self.slice.line_to_byte(line) + column;
+        let width = utils::width(self.slice, line, column);
+
+        Cursor {
+            index,
+            line,
+            column,
+            width,
+        }
+    }
+
+    pub fn at_width(&self, line: usize, width: usize) -> Cursor {
+        debug_assert!(line < self.slice.len_lines());
+
+        let (index, mut graphemes) = {
+            let start = self.slice.line_to_byte(line);
+            let end = self.slice.line_to_byte(line + 1);
+
+            (
+                start,
+                GraphemeCursor::new(self.slice.byte_slice(start..end), 0),
+            )
+        };
+        let mut current_width = 0;
+        let mut current_column = 0;
+
+        while let Some((range, chunks)) = graphemes.next() {
+            let grapheme_width = chunks.map(|(_, str)| str.width()).sum::<usize>();
+
+            if grapheme_width == 0 {
+                continue;
+            }
+
+            current_width += grapheme_width;
+
+            match current_width.cmp(&width) {
+                Ordering::Less => {
+                    current_column = range.end;
+                    continue;
+                }
+                Ordering::Equal => {
+                    current_column = range.end;
+                    break;
+                }
+                Ordering::Greater => {
+                    current_width -= grapheme_width;
+                    break;
+                }
+            }
+        }
+
+        Cursor {
+            index: index + current_column,
+            line,
+            column: current_column,
+            width: current_width,
+        }
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Utils                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 mod utils {
     use super::*;
 
-    pub fn is_char_boundary(rope: RopeSlice, index: usize) -> bool {
-        let (str, offset, _, _) = rope.chunk_at_byte(index);
+    pub fn is_char_boundary(slice: RopeSlice, index: usize) -> bool {
+        let (str, offset, _, _) = slice.chunk_at_byte(index);
 
         str.is_char_boundary(index - offset)
     }
 
-    pub fn get_line(rope: RopeSlice, index: usize) -> usize {
-        rope.byte_to_line(index)
+    pub fn line(slice: RopeSlice, index: usize) -> usize {
+        slice.byte_to_line(index)
     }
 
-    pub fn get_column(rope: RopeSlice, index: usize, line: usize) -> usize {
-        index - rope.line_to_byte(line)
+    pub fn column(slice: RopeSlice, index: usize, line: usize) -> usize {
+        index - slice.line_to_byte(line)
     }
 
-    pub fn get_width(rope: RopeSlice, line: usize, column: usize) -> usize {
-        rope.line(line)
+    pub fn width(slice: RopeSlice, line: usize, column: usize) -> usize {
+        slice
+            .line(line)
             .byte_slice(..column)
-            .chars()
-            .map(|char| char.width().unwrap_or_default())
+            .chunks()
+            .map(|chunk| chunk.width())
             .sum()
     }
 }

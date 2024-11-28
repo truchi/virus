@@ -16,6 +16,7 @@ use virus_editor::{
     add_in_range,
     editor::{Editor, EventLoopMessage},
     fuzzy::Fuzzy,
+    rope::Boundaries,
     sub_in_range,
 };
 use virus_ui::{theme::UiTheme, tween::Tween, ui::Ui};
@@ -594,29 +595,35 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
         }
     }
 
-    // TODO: that could be nice to have:
-    // - symbols=false: ignore non-alphanum words
-    // - sub=false: WORD/longword
-    //
-    // NOTE: that could also be super nice to have a "smart word":
-    // - in normal mode: stop at every boudaries (symbols, sub, start, end)
-    // - in select mode:
-    //   - no symbols, no sub
-    //   - growing selection moves to growing end
-    //   - shriking selection moves to shriking end
-    //   - pairs?
-    // Or syntaxically...
-    fn move_left_word(&mut self, words: usize, symbols: bool, sub: bool, end: bool, wrap: bool) {
+    fn move_left_boundary(
+        &mut self,
+        boundaries: usize,
+        punctuation_start: bool,
+        punctuation_end: bool,
+        short_word_start: bool,
+        short_word_end: bool,
+        long_word_start: bool,
+        long_word_end: bool,
+        wrap: bool,
+    ) {
         match self.virus.mode {
             Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {
                 if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    let mut movements = document.movements();
-                    match (symbols, sub, end) {
-                        (true, true, true) => movements.prev_end_of_subword(words, wrap),
-                        (true, true, false) => movements.prev_start_of_subword(words, wrap),
-                        _ => todo!(),
-                    }
-                    .collapse(self.virus.mode == Mode::Normal);
+                    document
+                        .movements()
+                        .left(
+                            Boundaries::from_bools(
+                                punctuation_start,
+                                punctuation_end,
+                                short_word_start,
+                                short_word_end,
+                                long_word_start,
+                                long_word_end,
+                            ),
+                            boundaries,
+                            wrap,
+                        )
+                        .collapse(self.virus.mode == Mode::Normal);
                     self.virus.ensure_visibility();
                 }
             }
@@ -630,11 +637,39 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 if let Some(document) = self.virus.editor.get_active_document_mut() {
                     document
                         .movements()
-                        .prev_grapheme(chars, wrap)
+                        .left(Boundaries::GRAPHEME, chars, wrap)
                         .collapse(self.virus.mode == Mode::Normal);
                     self.virus.ensure_visibility();
                 }
             }
+            Mode::Files => {}
+        }
+    }
+
+    fn move_left_smart(&mut self, repeat: usize, wrap: bool) {
+        match self.virus.mode {
+            Mode::Normal => {
+                if let Some(document) = self.virus.editor.get_active_document_mut() {
+                    document
+                        .movements()
+                        .left(Boundaries::PUNCTUATION | Boundaries::WORD, repeat, wrap)
+                        .collapse(true);
+                    self.virus.ensure_visibility();
+                }
+            }
+            Mode::Select | Mode::Lines => {
+                if let Some(document) = self.virus.editor.get_active_document_mut() {
+                    document.movements().left(
+                        Boundaries::LONG_WORD_START
+                            | Boundaries::LINE_FIRST
+                            | Boundaries::LINE_LAST,
+                        repeat,
+                        wrap,
+                    );
+                    self.virus.ensure_visibility();
+                }
+            }
+            Mode::Insert => self.move_left_char(repeat, wrap),
             Mode::Files => {}
         }
     }
@@ -659,17 +694,35 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
         }
     }
 
-    fn move_right_word(&mut self, words: usize, symbols: bool, sub: bool, end: bool, wrap: bool) {
+    fn move_right_boundary(
+        &mut self,
+        boundaries: usize,
+        punctuation_start: bool,
+        punctuation_end: bool,
+        short_word_start: bool,
+        short_word_end: bool,
+        long_word_start: bool,
+        long_word_end: bool,
+        wrap: bool,
+    ) {
         match self.virus.mode {
             Mode::Normal | Mode::Select | Mode::Lines | Mode::Insert => {
                 if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    let mut movements = document.movements();
-                    match (symbols, sub, end) {
-                        (true, true, true) => movements.next_end_of_subword(words, wrap),
-                        (true, true, false) => movements.next_start_of_subword(words, wrap),
-                        _ => todo!(),
-                    }
-                    .collapse(self.virus.mode == Mode::Normal);
+                    document
+                        .movements()
+                        .right(
+                            Boundaries::from_bools(
+                                punctuation_start,
+                                punctuation_end,
+                                short_word_start,
+                                short_word_end,
+                                long_word_start,
+                                long_word_end,
+                            ),
+                            boundaries,
+                            wrap,
+                        )
+                        .collapse(self.virus.mode == Mode::Normal);
                     self.virus.ensure_visibility();
                 }
             }
@@ -683,11 +736,37 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 if let Some(document) = self.virus.editor.get_active_document_mut() {
                     document
                         .movements()
-                        .next_grapheme(chars, wrap)
+                        .right(Boundaries::GRAPHEME, chars, wrap)
                         .collapse(self.virus.mode == Mode::Normal);
                     self.virus.ensure_visibility();
                 }
             }
+            Mode::Files => {}
+        }
+    }
+
+    fn move_right_smart(&mut self, repeat: usize, wrap: bool) {
+        match self.virus.mode {
+            Mode::Normal => {
+                if let Some(document) = self.virus.editor.get_active_document_mut() {
+                    document
+                        .movements()
+                        .right(Boundaries::PUNCTUATION | Boundaries::WORD, repeat, wrap)
+                        .collapse(true);
+                    self.virus.ensure_visibility();
+                }
+            }
+            Mode::Select | Mode::Lines => {
+                if let Some(document) = self.virus.editor.get_active_document_mut() {
+                    document.movements().right(
+                        Boundaries::LONG_WORD_END | Boundaries::LINE_LAST | Boundaries::LINE_END,
+                        repeat,
+                        wrap,
+                    );
+                    self.virus.ensure_visibility();
+                }
+            }
+            Mode::Insert => self.move_right_char(repeat, wrap),
             Mode::Files => {}
         }
     }
