@@ -14,6 +14,7 @@ use std::{
 };
 use virus_editor::{
     add_in_range,
+    document::Document,
     editor::{Editor, EventLoopMessage},
     fuzzy::Fuzzy,
     rope::Boundaries,
@@ -227,20 +228,24 @@ impl Virus {
         }
     }
 
+    fn unwrap_active_document(&self) -> &Document {
+        self.editor.get_active_document().unwrap()
+    }
+
+    fn unwrap_active_document_mut(&mut self) -> &mut Document {
+        self.editor.get_active_document_mut().unwrap()
+    }
+
     fn mode(&mut self, mode: Mode) {
-        self.mode = mode;
-        self.keybindings.mode(mode);
+        if self.mode != mode {
+            self.mode = mode;
+            self.keybindings.mode(mode);
+        }
     }
 
     fn ensure_visibility(&mut self) {
-        self.ui.ensure_visibility(
-            self.editor
-                .get_active_document()
-                .unwrap()
-                .selection()
-                .head
-                .line,
-        );
+        self.ui
+            .ensure_visibility(self.unwrap_active_document().selection().head.line);
     }
 }
 
@@ -313,7 +318,7 @@ impl Virus {
         }
 
         // TODO handle that better
-        self.editor.get_active_document_mut().unwrap().parse();
+        self.unwrap_active_document_mut().parse();
 
         // TODO handle that better
         self.ui.window().request_redraw();
@@ -406,7 +411,7 @@ impl Virus {
         let outline_select_mode_colors = &self.ui.theme().outline_select_mode_colors.clone();
         let outline_insert_mode_colors = &self.ui.theme().outline_insert_mode_colors.clone();
         self.ui.render(
-            self.editor.get_active_document_mut().unwrap(),
+            self.editor.get_active_document().unwrap(),
             self.mode.select() == Select::Lines,
             match self.mode {
                 Mode::Normal {
@@ -472,13 +477,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn move_top(&mut self, blank: bool) {
         match self.virus.mode {
             Mode::Normal { select } | Mode::Insert { select } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document
-                        .movements()
-                        .top(blank)
-                        .collapse(select == Select::None);
-                    self.virus.ensure_visibility();
-                }
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .top(blank)
+                    .collapse(select == Select::None);
+                self.virus.ensure_visibility();
             }
             Mode::Files => {
                 let (_, _, _, selected) = self.virus.search.as_mut().unwrap();
@@ -490,15 +494,14 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn move_up_page(&mut self, pages: usize, half: bool, wrap: bool) {
         match self.virus.mode {
             Mode::Normal { select } | Mode::Insert { select } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    let lines = self.virus.ui.screen_height_in_lines() as usize;
-                    let lines = lines / if half { 2 } else { 1 };
-                    document
-                        .movements()
-                        .up(pages * lines, wrap)
-                        .collapse(select == Select::None);
-                    self.virus.ensure_visibility();
-                }
+                let lines = self.virus.ui.screen_height_in_lines() as usize;
+                let lines = lines / if half { 2 } else { 1 };
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .up(pages * lines, wrap)
+                    .collapse(select == Select::None);
+                self.virus.ensure_visibility();
             }
             Mode::Files => {
                 let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
@@ -512,13 +515,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn move_up_line(&mut self, lines: usize, wrap: bool) {
         match self.virus.mode {
             Mode::Normal { select } | Mode::Insert { select } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document
-                        .movements()
-                        .up(lines, wrap)
-                        .collapse(select == Select::None);
-                    self.virus.ensure_visibility();
-                }
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .up(lines, wrap)
+                    .collapse(select == Select::None);
+                self.virus.ensure_visibility();
             }
             Mode::Files => {
                 let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
@@ -532,13 +534,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn move_bottom(&mut self, blank: bool) {
         match self.virus.mode {
             Mode::Normal { select } | Mode::Insert { select } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document
-                        .movements()
-                        .bottom(blank)
-                        .collapse(select == Select::None);
-                    self.virus.ensure_visibility();
-                }
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .bottom(blank)
+                    .collapse(select == Select::None);
+                self.virus.ensure_visibility();
             }
             Mode::Files => {
                 let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
@@ -550,15 +551,14 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn move_down_page(&mut self, pages: usize, half: bool, wrap: bool) {
         match self.virus.mode {
             Mode::Normal { select } | Mode::Insert { select } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    let lines = self.virus.ui.screen_height_in_lines() as usize;
-                    let lines = lines / if half { 2 } else { 1 };
-                    document
-                        .movements()
-                        .down(pages * lines, wrap)
-                        .collapse(select == Select::None);
-                    self.virus.ensure_visibility();
-                }
+                let lines = self.virus.ui.screen_height_in_lines() as usize;
+                let lines = lines / if half { 2 } else { 1 };
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .down(pages * lines, wrap)
+                    .collapse(select == Select::None);
+                self.virus.ensure_visibility();
             }
             Mode::Files => {
                 let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
@@ -572,13 +572,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn move_down_line(&mut self, lines: usize, wrap: bool) {
         match self.virus.mode {
             Mode::Normal { select } | Mode::Insert { select } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document
-                        .movements()
-                        .down(lines, wrap)
-                        .collapse(select == Select::None);
-                    self.virus.ensure_visibility();
-                }
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .down(lines, wrap)
+                    .collapse(select == Select::None);
+                self.virus.ensure_visibility();
             }
             Mode::Files => {
                 let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
@@ -592,13 +591,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn move_start(&mut self, blank: bool) {
         match self.virus.mode {
             Mode::Normal { select } | Mode::Insert { select } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document
-                        .movements()
-                        .start(blank)
-                        .collapse(select == Select::None);
-                    self.virus.ensure_visibility();
-                }
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .start(blank)
+                    .collapse(select == Select::None);
+                self.virus.ensure_visibility();
             }
             Mode::Files => {
                 let (_, _, _, selected) = self.virus.search.as_mut().unwrap();
@@ -620,24 +618,23 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     ) {
         match self.virus.mode {
             Mode::Normal { select } | Mode::Insert { select } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document
-                        .movements()
-                        .left(
-                            Boundaries::from_bools(
-                                punctuation_start,
-                                punctuation_end,
-                                short_word_start,
-                                short_word_end,
-                                long_word_start,
-                                long_word_end,
-                            ),
-                            boundaries,
-                            wrap,
-                        )
-                        .collapse(select == Select::None);
-                    self.virus.ensure_visibility();
-                }
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .left(
+                        Boundaries::from_bools(
+                            punctuation_start,
+                            punctuation_end,
+                            short_word_start,
+                            short_word_end,
+                            long_word_start,
+                            long_word_end,
+                        ),
+                        boundaries,
+                        wrap,
+                    )
+                    .collapse(select == Select::None);
+                self.virus.ensure_visibility();
             }
             Mode::Files => {}
         }
@@ -646,13 +643,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn move_left_char(&mut self, chars: usize, wrap: bool) {
         match self.virus.mode {
             Mode::Normal { select } | Mode::Insert { select } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document
-                        .movements()
-                        .left(Boundaries::GRAPHEME, chars, wrap)
-                        .collapse(select == Select::None);
-                    self.virus.ensure_visibility();
-                }
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .left(Boundaries::GRAPHEME, chars, wrap)
+                    .collapse(select == Select::None);
+                self.virus.ensure_visibility();
             }
             Mode::Files => {}
         }
@@ -666,36 +662,34 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
 
         match self.virus.mode {
             Mode::Normal { select } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document
-                        .movements()
-                        .left(
-                            (select == Select::None)
-                                .then_some(in_normal)
-                                .unwrap_or(in_select),
-                            repeat,
-                            wrap,
-                        )
-                        .collapse(select == Select::None);
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .left(
+                        (select == Select::None)
+                            .then_some(in_normal)
+                            .unwrap_or(in_select),
+                        repeat,
+                        wrap,
+                    )
+                    .collapse(select == Select::None);
 
-                    self.virus.ensure_visibility();
-                }
+                self.virus.ensure_visibility();
             }
             Mode::Insert { select } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document
-                        .movements()
-                        .left(
-                            (select == Select::None)
-                                .then_some(in_insert)
-                                .unwrap_or(in_select),
-                            repeat,
-                            wrap,
-                        )
-                        .collapse(select == Select::None);
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .left(
+                        (select == Select::None)
+                            .then_some(in_insert)
+                            .unwrap_or(in_select),
+                        repeat,
+                        wrap,
+                    )
+                    .collapse(select == Select::None);
 
-                    self.virus.ensure_visibility();
-                }
+                self.virus.ensure_visibility();
             }
             Mode::Files => {}
         }
@@ -706,13 +700,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn move_end(&mut self, blank: bool) {
         match self.virus.mode {
             Mode::Normal { select } | Mode::Insert { select } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document
-                        .movements()
-                        .end(blank)
-                        .collapse(select == Select::None);
-                    self.virus.ensure_visibility();
-                }
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .end(blank)
+                    .collapse(select == Select::None);
+                self.virus.ensure_visibility();
             }
             Mode::Files => {
                 let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
@@ -734,24 +727,23 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     ) {
         match self.virus.mode {
             Mode::Normal { select } | Mode::Insert { select } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document
-                        .movements()
-                        .right(
-                            Boundaries::from_bools(
-                                punctuation_start,
-                                punctuation_end,
-                                short_word_start,
-                                short_word_end,
-                                long_word_start,
-                                long_word_end,
-                            ),
-                            boundaries,
-                            wrap,
-                        )
-                        .collapse(select == Select::None);
-                    self.virus.ensure_visibility();
-                }
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .right(
+                        Boundaries::from_bools(
+                            punctuation_start,
+                            punctuation_end,
+                            short_word_start,
+                            short_word_end,
+                            long_word_start,
+                            long_word_end,
+                        ),
+                        boundaries,
+                        wrap,
+                    )
+                    .collapse(select == Select::None);
+                self.virus.ensure_visibility();
             }
             Mode::Files => {}
         }
@@ -760,13 +752,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn move_right_char(&mut self, chars: usize, wrap: bool) {
         match self.virus.mode {
             Mode::Normal { select } | Mode::Insert { select } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document
-                        .movements()
-                        .right(Boundaries::GRAPHEME, chars, wrap)
-                        .collapse(select == Select::None);
-                    self.virus.ensure_visibility();
-                }
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .right(Boundaries::GRAPHEME, chars, wrap)
+                    .collapse(select == Select::None);
+                self.virus.ensure_visibility();
             }
             Mode::Files => {}
         }
@@ -779,36 +770,34 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
 
         match self.virus.mode {
             Mode::Normal { select } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document
-                        .movements()
-                        .right(
-                            (select == Select::None)
-                                .then_some(in_normal)
-                                .unwrap_or(in_select),
-                            repeat,
-                            wrap,
-                        )
-                        .collapse(select == Select::None);
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .right(
+                        (select == Select::None)
+                            .then_some(in_normal)
+                            .unwrap_or(in_select),
+                        repeat,
+                        wrap,
+                    )
+                    .collapse(select == Select::None);
 
-                    self.virus.ensure_visibility();
-                }
+                self.virus.ensure_visibility();
             }
             Mode::Insert { select } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document
-                        .movements()
-                        .right(
-                            (select == Select::None)
-                                .then_some(in_insert)
-                                .unwrap_or(in_select),
-                            repeat,
-                            wrap,
-                        )
-                        .collapse(select == Select::None);
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .right(
+                        (select == Select::None)
+                            .then_some(in_insert)
+                            .unwrap_or(in_select),
+                        repeat,
+                        wrap,
+                    )
+                    .collapse(select == Select::None);
 
-                    self.virus.ensure_visibility();
-                }
+                self.virus.ensure_visibility();
             }
             Mode::Files => {}
         }
@@ -875,46 +864,29 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     //
 
     fn select(&mut self, lines: bool) {
-        match self.virus.mode {
-            Mode::Normal { .. } => {
-                self.virus.mode = Mode::Normal {
-                    select: if lines { Select::Lines } else { Select::Range },
-                };
-            }
-            Mode::Insert { .. } => {
-                self.virus.mode = Mode::Insert {
-                    select: if lines { Select::Lines } else { Select::Range },
-                };
-            }
+        match &mut self.virus.mode {
+            Mode::Normal { select } => *select = if lines { Select::Lines } else { Select::Range },
+            Mode::Insert { select } => *select = if lines { Select::Lines } else { Select::Range },
             Mode::Files => {}
         }
     }
 
     fn select_smart(&mut self) {
-        let mode = self.virus.mode;
-        let mut smart = |select| match select {
-            Select::None => Select::Range,
-            Select::Range => Select::Lines,
-            Select::Lines => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document.movements().flip(true);
-                    self.virus.ensure_visibility();
-                }
+        match &mut self.virus.mode {
+            Mode::Normal { select } | Mode::Insert { select } => {
+                let flip = *select == Select::Lines;
 
-                Select::Range
-            }
-        };
+                *select = match select {
+                    Select::None => Select::Range,
+                    Select::Range => Select::Lines,
+                    Select::Lines => Select::Range,
+                };
 
-        match mode {
-            Mode::Normal { select } => {
-                self.virus.mode = Mode::Normal {
-                    select: smart(select),
-                };
-            }
-            Mode::Insert { select } => {
-                self.virus.mode = Mode::Insert {
-                    select: smart(select),
-                };
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .flip(flip);
+                self.virus.ensure_visibility();
             }
             Mode::Files => {}
         }
@@ -923,40 +895,62 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn flip_selection(&mut self) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document.movements().flip(true);
-                    self.virus.ensure_visibility();
-                }
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .flip(true);
+                self.virus.ensure_visibility();
             }
             Mode::Files => {}
         }
     }
 
     fn unselect(&mut self, anchor: bool) {
-        match self.virus.mode {
-            Mode::Normal { .. } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document.movements().flip(anchor).collapse(true);
-                    self.virus.ensure_visibility();
-                }
+        match &mut self.virus.mode {
+            Mode::Normal { select } | Mode::Insert { select } => {
+                *select = Select::None;
 
-                self.virus.mode = Mode::Normal {
-                    select: Select::None,
-                };
-            }
-            Mode::Insert { .. } => {
-                if let Some(document) = self.virus.editor.get_active_document_mut() {
-                    document.movements().flip(anchor).collapse(true);
-                    self.virus.ensure_visibility();
-                }
-
-                self.virus.mode = Mode::Insert {
-                    select: Select::None,
-                };
+                self.virus
+                    .unwrap_active_document_mut()
+                    .movements()
+                    .flip(anchor)
+                    .collapse(true);
+                self.virus.ensure_visibility();
             }
             Mode::Files => {}
         }
     }
+
+    //
+    // Modes
+    //
+
+    fn normal(&mut self) {}
+
+    fn insert(&mut self) {}
+
+    fn files(&mut self) {
+        match self.virus.mode {
+            Mode::Normal { .. } | Mode::Insert { .. } => {
+                let files = self
+                    .virus
+                    .editor
+                    .files(true, false)
+                    .filter_map(|file| file.as_os_str().to_str().map(|file| file.to_owned()))
+                    .collect::<Vec<_>>();
+                let haystacks = files
+                    .iter()
+                    .map(|file| (file.to_owned(), 0, Vec::new()))
+                    .collect();
+
+                self.virus.search = Some((String::new(), files, haystacks, 0));
+                self.virus.mode(Mode::Files)
+            }
+            Mode::Files => {}
+        }
+    }
+
+    fn escape(&mut self) {}
 
     //
     //
@@ -979,7 +973,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn undo(&mut self) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
-                self.virus.editor.get_active_document_mut().unwrap().undo()
+                self.virus.unwrap_active_document_mut().undo()
             }
             Mode::Files => {}
         }
@@ -988,28 +982,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn redo(&mut self) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
-                self.virus.editor.get_active_document_mut().unwrap().redo()
-            }
-            Mode::Files => {}
-        }
-    }
-
-    fn files(&mut self) {
-        match self.virus.mode {
-            Mode::Normal { .. } | Mode::Insert { .. } => {
-                let files = self
-                    .virus
-                    .editor
-                    .files(true, false)
-                    .filter_map(|file| file.as_os_str().to_str().map(|file| file.to_owned()))
-                    .collect::<Vec<_>>();
-                let haystacks = files
-                    .iter()
-                    .map(|file| (file.to_owned(), 0, Vec::new()))
-                    .collect();
-
-                self.virus.search = Some((String::new(), files, haystacks, 0));
-                self.virus.mode(Mode::Files)
+                self.virus.unwrap_active_document_mut().redo()
             }
             Mode::Files => {}
         }
@@ -1034,13 +1007,9 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
 
     fn save(&mut self) {
         match self.virus.mode {
-            Mode::Normal { .. } | Mode::Insert { .. } => self
-                .virus
-                .editor
-                .get_active_document_mut()
-                .unwrap()
-                .save()
-                .unwrap(),
+            Mode::Normal { .. } | Mode::Insert { .. } => {
+                self.virus.unwrap_active_document_mut().save().unwrap();
+            }
             Mode::Files => {}
         }
     }

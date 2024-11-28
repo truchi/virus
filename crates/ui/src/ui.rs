@@ -119,7 +119,7 @@ impl Ui {
 
     pub fn render<'a>(
         &mut self,
-        document: &mut Document,
+        document: &Document,
         show_selection_as_lines: bool,
         outline_colors: &[Rgba],
         caret_color: Rgba,

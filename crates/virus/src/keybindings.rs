@@ -458,6 +458,18 @@ actions!(
     ),
 
     //
+    // Modes
+    //
+
+    normal(),
+
+    insert(),
+
+    files(),
+
+    escape(),
+
+    //
     //
     //
 
@@ -468,8 +480,6 @@ actions!(
     undo(),
 
     redo(),
-
-    files(),
 
     open(),
 

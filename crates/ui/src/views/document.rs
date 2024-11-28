@@ -37,7 +37,7 @@ impl DocumentView {
         &mut self,
         context: &mut Context,
         layer: &mut Layer,
-        document: &mut Document,
+        document: &Document,
         scroll_top: u32,
         show_selection_as_lines: bool,
         scrollbar_color: Rgba,
