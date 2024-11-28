@@ -442,6 +442,22 @@ actions!(
     ),
 
     //
+    // Selection
+    //
+
+    select(
+        lines: (Option<bool>) = false,
+    ),
+
+    select_smart(),
+
+    flip_selection(),
+
+    unselect(
+        anchor: (Option<bool>) = false,
+    ),
+
+    //
     //
     //
 
@@ -452,10 +468,6 @@ actions!(
     undo(),
 
     redo(),
-
-    select(),
-
-    unselect(),
 
     files(),
 
@@ -578,8 +590,6 @@ pub struct Keybindings {
     mode: Mode,
     aliases: Aliases,
     normal: Nodes,
-    select: Nodes,
-    lines: Nodes,
     insert: Nodes,
     files: Nodes,
 }
@@ -594,8 +604,6 @@ impl Keybindings {
     pub fn mode(&mut self, mode: Mode) {
         self.mode = mode;
         self.normal.reset();
-        self.select.reset();
-        self.lines.reset();
         self.insert.reset();
         self.files.reset();
     }
@@ -606,10 +614,8 @@ impl Keybindings {
     /// - `Ok(Some(action))` when a binding accepts `event` to trigger `action`
     pub fn handle(&mut self, event: &KeyEvent) -> Result<Option<Action>, ()> {
         match self.mode {
-            Mode::Normal => self.normal.handle(event),
-            Mode::Select => self.select.handle(event),
-            Mode::Lines => self.lines.handle(event),
-            Mode::Insert => self.insert.handle(event),
+            Mode::Normal { .. } => self.normal.handle(event),
+            Mode::Insert { .. } => self.insert.handle(event),
             Mode::Files => self.files.handle(event),
         }
     }
@@ -636,8 +642,6 @@ impl TryFrom<deserialize::Keybindings> for Keybindings {
             })
             .collect::<Result<_, Self::Error>>()?;
         let normal = Nodes::try_from((&aliases, keybindings.normal))?;
-        let select = Nodes::try_from((&aliases, keybindings.select))?;
-        let lines = Nodes::try_from((&aliases, keybindings.lines))?;
         let insert = Nodes::try_from((&aliases, keybindings.insert))?;
         let files = Nodes::try_from((&aliases, keybindings.files))?;
 
@@ -645,8 +649,6 @@ impl TryFrom<deserialize::Keybindings> for Keybindings {
             mode: Default::default(),
             aliases,
             normal,
-            select,
-            lines,
             insert,
             files,
         })
@@ -1130,10 +1132,6 @@ mod deserialize {
         pub aliases: HashMap<String, String>,
         #[serde(default)]
         pub normal: Nodes,
-        #[serde(default)]
-        pub select: Nodes,
-        #[serde(default)]
-        pub lines: Nodes,
         #[serde(default)]
         pub insert: Nodes,
         #[serde(default)]
