@@ -25,6 +25,7 @@ NORMAL:
   f: files
   escape: insert
 
+  x: cut
   c: copy
   v: paste
   z: undo
@@ -44,6 +45,7 @@ INSERT:
   command f: files
   escape: normal
 
+  command x: cut
   command c: copy
   command v: paste
   command z: undo

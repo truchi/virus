@@ -122,12 +122,25 @@ impl Editor {
             })
     }
 
+    pub fn cut(&mut self) {
+        if let Some(edit) = self
+            .get_active_document_mut()
+            .unwrap()
+            .edition()
+            .edit(Text::default())
+        {
+            self.clipboard = Text::from(edit.into_removed_and_inserted().0);
+        }
+    }
+
     pub fn copy(&mut self) {
-        let document = self.get_active_document().unwrap();
-        let range = document.selection().range();
-        let slice = document
-            .rope()
-            .byte_slice(range.start.index..range.end.index);
+        let slice = {
+            let document = self.get_active_document().unwrap();
+            let range = document.selection().range();
+            document
+                .rope()
+                .byte_slice(range.start.index..range.end.index)
+        };
 
         self.clipboard = Text::from(slice);
     }

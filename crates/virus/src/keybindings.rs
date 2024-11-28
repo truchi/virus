@@ -471,6 +471,8 @@ actions!(
     //
     //
 
+    cut(),
+
     copy(),
 
     paste(),

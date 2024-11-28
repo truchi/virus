@@ -57,6 +57,10 @@ impl Edit {
         &self.inserted
     }
 
+    pub fn into_removed_and_inserted(self) -> (Text, Text) {
+        (self.removed, self.inserted)
+    }
+
     /// Returns whether this edit would leave some text unchanged,
     /// or `None` if the edit is larger that `Text::BREAKPOINT`.
     pub fn is_noop(&self) -> Option<bool> {

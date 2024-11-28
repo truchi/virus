@@ -349,36 +349,36 @@ pub struct DocumentEdition<'document> {
 }
 
 impl<'document> DocumentEdition<'document> {
-    pub fn edit(&mut self, inserted: Text) {
+    pub fn edit(&mut self, inserted: Text) -> Option<Edit> {
         let edit = {
             let selection = self.document.selection();
             Edit::edit(&mut self.document.rope, selection.range(), inserted)
         };
 
         if edit.is_noop().unwrap_or_default() {
-            return;
+            return None;
         }
-
-        let ts_edit = edit.to_ts_edit_applied();
 
         self.document
             .movements()
             .selection(edit.inserted_end().into(), true);
         self.document.version += 1;
         self.document.is_tree_dirty = true;
-        self.document.history.push(edit);
-        self.document.tree.edit(&ts_edit);
+        self.document.history.push(edit.clone());
+        self.document.tree.edit(&edit.to_ts_edit_applied());
+
+        Some(edit)
     }
 
     // TODO: convenient for now but does not feel good
-    pub fn backspace(&mut self) {
+    pub fn backspace(&mut self) -> Option<Edit> {
         if self.document.selection.is_empty() {
             self.document
                 .movements()
                 .left(Boundaries::GRAPHEME, 1, false);
         }
 
-        self.edit(Text::default());
+        self.edit(Text::default())
     }
 
     pub fn undo(&mut self) {

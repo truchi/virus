@@ -282,22 +282,29 @@ impl Virus {
             Err(()) => match self.mode {
                 Mode::Normal { .. } => {}
                 Mode::Insert { select } => match event.modded() {
-                    Key::Str(str) => self
-                        .unwrap_active_document_mut()
-                        .edition()
-                        .edit(str.as_str().into()),
-                    Key::Tab => self
-                        .unwrap_active_document_mut()
-                        .edition()
-                        .edit("    ".into()),
-                    Key::Space => self.unwrap_active_document_mut().edition().edit(" ".into()),
-                    Key::Backspace => self.unwrap_active_document_mut().edition().backspace(),
-                    Key::Enter => self
-                        .editor
-                        .get_active_document_mut()
-                        .unwrap()
-                        .edition()
-                        .edit("\n".into()),
+                    Key::Str(str) => {
+                        self.unwrap_active_document_mut()
+                            .edition()
+                            .edit(str.as_str().into());
+                    }
+                    Key::Tab => {
+                        self.unwrap_active_document_mut()
+                            .edition()
+                            .edit("    ".into());
+                    }
+                    Key::Space => {
+                        self.unwrap_active_document_mut().edition().edit(" ".into());
+                    }
+                    Key::Backspace => {
+                        self.unwrap_active_document_mut().edition().backspace();
+                    }
+                    Key::Enter => {
+                        self.editor
+                            .get_active_document_mut()
+                            .unwrap()
+                            .edition()
+                            .edit("\n".into());
+                    }
                     _ => {}
                 },
                 Mode::Files => {
@@ -925,6 +932,13 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     //
     //
     //
+
+    fn cut(&mut self) {
+        match self.virus.mode {
+            Mode::Normal { .. } | Mode::Insert { .. } => self.virus.editor.cut(),
+            Mode::Files => {}
+        }
+    }
 
     fn copy(&mut self) {
         match self.virus.mode {
