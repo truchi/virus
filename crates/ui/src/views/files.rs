@@ -152,7 +152,7 @@ impl<'a> Renderer<'a> {
                 strike: false,
             },
         )
-        .shape(self.context, self.family, self.font_size, None, None);
+        .shape(self.context, self.family, self.font_size);
 
         self.layer
             .draw(None, 0)
@@ -227,7 +227,7 @@ impl<'a> Renderer<'a> {
                 clusters = &mut clusters[start..];
             }
 
-            let line = shaper.shape(self.context, self.family, self.font_size, None, None);
+            let line = shaper.shape(self.context, self.family, self.font_size);
             self.layer
                 .draw(region, 0)
                 .glyphs(self.context, position, &line, self.line_height);

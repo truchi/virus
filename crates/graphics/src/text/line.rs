@@ -2,11 +2,7 @@ use crate::text::{
     Advance, Context, FontFamilyKey, FontKey, FontSize, Glyph, Styles, FEATURES, HINT, SCRIPT,
     SOURCES,
 };
-use std::{
-    collections::HashMap,
-    ops::{Range, RangeInclusive},
-    usize,
-};
+use std::{collections::HashMap, ops::Range, usize};
 use swash::{
     scale::{image::Image, Render},
     shape::Shaper,
@@ -230,15 +226,11 @@ impl LineShaper {
     }
 
     /// Shapes the text with `family` and `font_size`.
-    ///
-    /// No ligaturing will happen in `unligature_1` and `unligature_2`.
     pub fn shape(
         mut self,
         context: &mut Context,
         family: FontFamilyKey,
         font_size: FontSize,
-        unligature_1: Option<RangeInclusive<usize>>,
-        unligature_2: Option<RangeInclusive<usize>>,
     ) -> Line {
         struct Prev<'context> {
             shaper: Shaper<'context>,
@@ -268,28 +260,6 @@ impl LineShaper {
         let (fonts, shape, _) = context.as_muts();
         let emoji = fonts.emoji();
         let emoji_charmap = emoji.as_ref().charmap();
-        let (unligature_1, unligature_2) = if let Some((unligature_1, unligature_2)) =
-            unligature_1.clone().zip(unligature_2.clone())
-        {
-            let first_contains_second_start = unligature_1.contains(unligature_2.start());
-            let first_contains_second_end = unligature_1.contains(unligature_2.end());
-            let second_contains_first_start = unligature_2.contains(unligature_1.start());
-            let second_contains_first_end = unligature_2.contains(unligature_1.end());
-
-            if first_contains_second_start && first_contains_second_end {
-                (Some(unligature_1), None)
-            } else if second_contains_first_start && second_contains_first_end {
-                (Some(unligature_2), None)
-            } else if first_contains_second_start {
-                (Some(*unligature_1.start()..=*unligature_2.end()), None)
-            } else if second_contains_first_start {
-                (Some(*unligature_2.start()..=*unligature_1.end()), None)
-            } else {
-                (Some(unligature_1), Some(unligature_2))
-            }
-        } else {
-            (unligature_1, unligature_2)
-        };
 
         let mut cache = HashMap::new();
         let mut prev = Option::<Prev>::None;
@@ -300,7 +270,6 @@ impl LineShaper {
         };
 
         // Shape the clusters reusing the shaper as long as the font is the same
-        // (or forcing new shaper to unligature)
         for cluster in &mut self.clusters {
             let font = fonts
                 .get((family, cluster.styles.weight, cluster.styles.style))
@@ -326,30 +295,11 @@ impl LineShaper {
                 },
                 Status::Complete => font.key(),
             };
-            let force_flush = {
-                // Assuming clusters align "nicely" with unligature ranges
-                let force_push_1 = {
-                    if let Some(unligature) = unligature_1.clone() {
-                        unligature.contains(&cluster.range().start)
-                    } else {
-                        false
-                    }
-                };
-                let force_push_2 = {
-                    if let Some(unligature) = unligature_2.clone() {
-                        unligature.contains(&cluster.range().start)
-                    } else {
-                        false
-                    }
-                };
-
-                force_push_1 || force_push_2
-            };
 
             prev = Some(Prev {
                 shaper: {
                     let shaper = prev.take().and_then(|prev| {
-                        if !force_flush && prev.font == selected {
+                        if prev.font == selected {
                             Some(prev.shaper)
                         } else {
                             prev.flush(&mut line, self.styles);

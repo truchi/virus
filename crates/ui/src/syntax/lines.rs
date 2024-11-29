@@ -82,12 +82,7 @@ impl Lines {
             .rope()
             .lines_at(range.start)
             .take(range.len())
-            .map(|slice| {
-                (
-                    slice,
-                    Line::shaper(&Cow::from(slice), usize::MAX, theme.syntax.default),
-                )
-            })
+            .map(|slice| Line::shaper(&Cow::from(slice), usize::MAX, theme.syntax.default))
             .collect::<Vec<_>>();
 
         debug_assert!(lines.len() == range.len());
@@ -117,22 +112,22 @@ impl Lines {
             let end_line = capture.end_line - range.start;
 
             if start_line == end_line {
-                let (_, line) = &mut lines[start_line];
+                let line = &mut lines[start_line];
                 let start = find(line.clusters(), capture.start_column);
                 let end = find(&line.clusters()[start..], capture.end_column);
 
                 update(&mut line.clusters_mut()[start..][..end]);
             } else {
-                let (_, line) = &mut lines[start_line];
+                let line = &mut lines[start_line];
                 let start = find(line.clusters(), capture.start_column);
 
                 update(&mut line.clusters_mut()[start..]);
 
-                for (_, line) in &mut lines[start_line..end_line - 1] {
+                for line in &mut lines[start_line..end_line - 1] {
                     update(line.clusters_mut());
                 }
 
-                if let Some((_, line)) = lines.get_mut(end_line) {
+                if let Some(line) = lines.get_mut(end_line) {
                     let end = find(line.clusters(), capture.end_column);
 
                     update(&mut line.clusters_mut()[..end]);
@@ -144,38 +139,7 @@ impl Lines {
 
         lines
             .into_iter()
-            .enumerate()
-            .map(|(_i, (_slice, line))| {
-                // TODO remove?
-                // let word = |index| {
-                //     let (mut cursor, mut start, mut end) =
-                //         (WordCursor::new(slice, index), index, index);
-
-                //     while let Some((range, WordClass::Punctuation(_))) = cursor.prev() {
-                //         start = range.start;
-                //     }
-
-                //     cursor.set_index(index);
-
-                //     while let Some((range, WordClass::Punctuation(_))) = cursor.next() {
-                //         end = range.end;
-                //     }
-
-                //     start..=end
-                // };
-
-                line.shape(
-                    context,
-                    theme.family,
-                    theme.font_size,
-                    // (range.start + i == document.selection().anchor.line)
-                    //     .then(|| word(document.selection().anchor.column)),
-                    // (range.start + i == document.selection().head.line)
-                    //     .then(|| word(document.selection().head.column)),
-                    None,
-                    None,
-                )
-            })
+            .map(|line| line.shape(context, theme.family, theme.font_size))
             .collect()
     }
 }
