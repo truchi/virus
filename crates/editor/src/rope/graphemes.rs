@@ -5,6 +5,7 @@ use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 //                                            Grapheme                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+#[derive(Clone, Debug)]
 pub enum Grapheme<'rope> {
     Str(&'rope str),
     String(String),

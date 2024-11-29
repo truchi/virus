@@ -1,4 +1,4 @@
-use crate::rope::{GraphemeCursor, WordClass, WordCursor};
+use crate::rope::{GraphemeCursor, GraphemesForward, WordClass, WordCursor};
 use ropey::RopeSlice;
 use std::{cell::Cell, cmp::Ordering};
 use unicode_width::UnicodeWidthStr;
@@ -385,14 +385,17 @@ impl<'rope> CursorRefBuilder<'rope> {
 
             (
                 start,
-                GraphemeCursor::new(self.rope.byte_slice(start..end), 0),
+                GraphemesForward::new(self.rope.byte_slice(start..end)),
             )
         };
         let mut current_width = 0;
         let mut current_column = 0;
+        let mut grapheme_end = 0;
 
-        while let Some((range, chunks)) = graphemes.next() {
-            let grapheme_width = chunks.map(|(_, str)| str.width()).sum::<usize>();
+        while let Some(grapheme) = graphemes.next() {
+            grapheme_end += grapheme.as_str().len();
+
+            let grapheme_width = grapheme.as_str().width();
 
             if grapheme_width == 0 {
                 continue;
@@ -402,11 +405,11 @@ impl<'rope> CursorRefBuilder<'rope> {
 
             match current_width.cmp(&width) {
                 Ordering::Less => {
-                    current_column = range.end;
+                    current_column = grapheme_end;
                     continue;
                 }
                 Ordering::Equal => {
-                    current_column = range.end;
+                    current_column = grapheme_end;
                     break;
                 }
                 Ordering::Greater => {
@@ -519,14 +522,17 @@ impl<'rope> CursorBuilder<'rope> {
 
             (
                 start,
-                GraphemeCursor::new(self.slice.byte_slice(start..end), 0),
+                GraphemesForward::new(self.slice.byte_slice(start..end)),
             )
         };
         let mut current_width = 0;
         let mut current_column = 0;
+        let mut grapheme_end = 0;
 
-        while let Some((range, chunks)) = graphemes.next() {
-            let grapheme_width = chunks.map(|(_, str)| str.width()).sum::<usize>();
+        while let Some(grapheme) = graphemes.next() {
+            grapheme_end += grapheme.as_str().len();
+
+            let grapheme_width = grapheme.as_str().width();
 
             if grapheme_width == 0 {
                 continue;
@@ -536,11 +542,11 @@ impl<'rope> CursorBuilder<'rope> {
 
             match current_width.cmp(&width) {
                 Ordering::Less => {
-                    current_column = range.end;
+                    current_column = grapheme_end;
                     continue;
                 }
                 Ordering::Equal => {
-                    current_column = range.end;
+                    current_column = grapheme_end;
                     break;
                 }
                 Ordering::Greater => {
@@ -711,26 +717,16 @@ mod tests {
 
     #[test]
     fn at_line_width() {
-        let rope = Rope::from("\0a\0🦀\0b\0");
-        let rope = rope.slice(..);
+        let str = "\0a\0🦀\0b\0";
+        let rope = Rope::from(str);
+        let cursor = CursorRef::with(rope.slice(..));
 
-        for (i, (index, line, column, width)) in [
-            (0, 0, 0, 0),
-            (2, 0, 2, 1),
-            (2, 0, 2, 1),
-            (7, 0, 7, 3),
-            (9, 0, 9, 4),
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            let cursor = CursorRef::with(rope).at_line_width(line, i);
-
-            assert!(cursor.index() == index);
-            assert!(cursor.line() == line);
-            assert!(cursor.column() == column);
-            assert!(cursor.width() == width);
-        }
+        assert_eq!(&str[..cursor.at_line_width(0, 0).index], "");
+        assert_eq!(&str[..cursor.at_line_width(0, 1).index], "\0a");
+        assert_eq!(&str[..cursor.at_line_width(0, 2).index], "\0a");
+        assert_eq!(&str[..cursor.at_line_width(0, 3).index], "\0a\0🦀");
+        assert_eq!(&str[..cursor.at_line_width(0, 4).index], "\0a\0🦀\0b");
+        assert_eq!(&str[..cursor.at_line_width(0, 5).index], "\0a\0🦀\0b");
     }
 
     #[test]
