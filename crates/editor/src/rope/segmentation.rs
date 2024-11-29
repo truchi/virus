@@ -368,12 +368,12 @@ impl Segmentation {
         })
     }
 
-    pub fn to_start(&mut self) {
-        self.to_cursor(Cursor::builder(self.rope.slice(..)).at_start())
+    pub fn to_text_start(&mut self) {
+        self.to_cursor(Cursor::build(self.rope.slice(..)).at_start())
     }
 
-    pub fn to_end(&mut self) {
-        self.to_cursor(Cursor::builder(self.rope.slice(..)).at_end())
+    pub fn to_text_end(&mut self) {
+        self.to_cursor(Cursor::build(self.rope.slice(..)).at_end())
     }
 
     pub fn to_line_start(&mut self) {
@@ -580,7 +580,6 @@ impl Segmentation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rope::CursorRef;
     use std::collections::HashSet;
     use unicode_segmentation::UnicodeSegmentation;
 
@@ -720,9 +719,7 @@ mod tests {
 
                 for (index, _) in str.grapheme_indices(true).chain([(str.len(), "")]) {
                     let is_expected = {
-                        let cursor = CursorRef::with(rope.clone().slice(..))
-                            .at_index(index)
-                            .as_cursor();
+                        let cursor = Cursor::build(rope.clone().slice(..)).at_index(index);
 
                         Segmentation::new(rope.clone(), cursor.index, cursor.line, cursor.column)
                             .is_boundaries(expected)

@@ -2,7 +2,7 @@ use crate::syntax::ThemeKey;
 use ropey::Rope;
 use std::ops::Range;
 use tree_sitter::{Node, Point, Query, QueryCursor};
-use virus_editor::rope::CursorRef;
+use virus_editor::rope::Cursor;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            Capture                                             //
@@ -28,14 +28,14 @@ impl Capture {
         debug_assert!(lines.end <= rope.len_lines());
 
         let (start, end) = {
-            let cursor = CursorRef::with(rope.slice(..));
+            let cursor = Cursor::build(rope.slice(..));
 
             (
-                cursor.at_line(lines.start),
+                cursor.at_column(lines.start, 0),
                 if lines.end == rope.len_lines() {
                     cursor.at_end()
                 } else {
-                    cursor.at_line(lines.end)
+                    cursor.at_column(lines.end, 0)
                 },
             )
         };
@@ -44,12 +44,12 @@ impl Capture {
             let mut cursor = QueryCursor::new();
             cursor.set_point_range(Range {
                 start: Point {
-                    row: start.line(),
-                    column: start.column(),
+                    row: start.line,
+                    column: start.column,
                 },
                 end: Point {
-                    row: end.line(),
-                    column: end.column(),
+                    row: end.line,
+                    column: end.column,
                 },
             });
             cursor
@@ -72,22 +72,22 @@ impl Capture {
             })
         })
         .flatten()
-        .filter(|capture| start.index() < capture.end_index)
-        .filter(|capture| capture.start_index < end.index())
+        .filter(|capture| start.index < capture.end_index)
+        .filter(|capture| capture.start_index < end.index)
         .map(|capture| {
-            let (start_index, start_line, start_column) = if start.index() <= capture.start_index {
+            let (start_index, start_line, start_column) = if start.index <= capture.start_index {
                 (
                     capture.start_index,
                     capture.start_line,
                     capture.start_column,
                 )
             } else {
-                (start.index(), start.line(), start.column())
+                (start.index, start.line, start.column)
             };
-            let (end_index, end_line, end_column) = if capture.end_index <= end.index() {
+            let (end_index, end_line, end_column) = if capture.end_index <= end.index {
                 (capture.end_index, capture.end_line, capture.end_column)
             } else {
-                (end.index(), end.line(), end.column())
+                (end.index, end.line, end.column)
             };
 
             Capture {

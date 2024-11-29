@@ -1,9 +1,6 @@
 use crate::{syntax::Capture, theme::UiTheme};
 use std::{borrow::Cow, ops::Range};
-use virus_editor::{
-    document::Document,
-    rope::{Selection, WordClass, WordCursor},
-};
+use virus_editor::{document::Document, rope::Selection};
 use virus_graphics::text::{Cluster, Context, Line};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -148,32 +145,35 @@ impl Lines {
         lines
             .into_iter()
             .enumerate()
-            .map(|(i, (slice, line))| {
-                let word = |index| {
-                    let (mut cursor, mut start, mut end) =
-                        (WordCursor::new(slice, index), index, index);
+            .map(|(_i, (_slice, line))| {
+                // TODO remove?
+                // let word = |index| {
+                //     let (mut cursor, mut start, mut end) =
+                //         (WordCursor::new(slice, index), index, index);
 
-                    while let Some((range, WordClass::Punctuation(_))) = cursor.prev() {
-                        start = range.start;
-                    }
+                //     while let Some((range, WordClass::Punctuation(_))) = cursor.prev() {
+                //         start = range.start;
+                //     }
 
-                    cursor.set_index(index);
+                //     cursor.set_index(index);
 
-                    while let Some((range, WordClass::Punctuation(_))) = cursor.next() {
-                        end = range.end;
-                    }
+                //     while let Some((range, WordClass::Punctuation(_))) = cursor.next() {
+                //         end = range.end;
+                //     }
 
-                    start..=end
-                };
+                //     start..=end
+                // };
 
                 line.shape(
                     context,
                     theme.family,
                     theme.font_size,
-                    (range.start + i == document.selection().anchor.line)
-                        .then(|| word(document.selection().anchor.column)),
-                    (range.start + i == document.selection().head.line)
-                        .then(|| word(document.selection().head.column)),
+                    // (range.start + i == document.selection().anchor.line)
+                    //     .then(|| word(document.selection().anchor.column)),
+                    // (range.start + i == document.selection().head.line)
+                    //     .then(|| word(document.selection().head.column)),
+                    None,
+                    None,
                 )
             })
             .collect()

@@ -596,7 +596,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 self.virus
                     .unwrap_active_document_mut()
                     .movements()
-                    .left(
+                    .prev(
                         Boundaries::from_bools(
                             punctuation_start,
                             punctuation_end,
@@ -621,7 +621,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 self.virus
                     .unwrap_active_document_mut()
                     .movements()
-                    .left(Boundaries::GRAPHEME, chars, wrap)
+                    .prev(Boundaries::GRAPHEME, chars, wrap)
                     .collapse(select == Select::None);
                 self.virus.ensure_visibility();
             }
@@ -640,7 +640,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 self.virus
                     .unwrap_active_document_mut()
                     .movements()
-                    .left(
+                    .prev(
                         (select == Select::None)
                             .then_some(in_normal)
                             .unwrap_or(in_select),
@@ -655,7 +655,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 self.virus
                     .unwrap_active_document_mut()
                     .movements()
-                    .left(
+                    .prev(
                         (select == Select::None)
                             .then_some(in_insert)
                             .unwrap_or(in_select),
@@ -705,7 +705,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 self.virus
                     .unwrap_active_document_mut()
                     .movements()
-                    .right(
+                    .next(
                         Boundaries::from_bools(
                             punctuation_start,
                             punctuation_end,
@@ -730,7 +730,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 self.virus
                     .unwrap_active_document_mut()
                     .movements()
-                    .right(Boundaries::GRAPHEME, chars, wrap)
+                    .next(Boundaries::GRAPHEME, chars, wrap)
                     .collapse(select == Select::None);
                 self.virus.ensure_visibility();
             }
@@ -748,7 +748,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 self.virus
                     .unwrap_active_document_mut()
                     .movements()
-                    .right(
+                    .next(
                         (select == Select::None)
                             .then_some(in_normal)
                             .unwrap_or(in_select),
@@ -763,7 +763,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 self.virus
                     .unwrap_active_document_mut()
                     .movements()
-                    .right(
+                    .next(
                         (select == Select::None)
                             .then_some(in_insert)
                             .unwrap_or(in_select),
@@ -1029,13 +1029,13 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                         document
                             .movements()
                             .end(true)
-                            .right(Boundaries::GRAPHEME, 1, false)
+                            .next(Boundaries::GRAPHEME, 1, false)
                             .collapse(true);
                         document.edition().edit(clipboard.text, is_select);
 
                         // Restore the cursor's width
                         let cursor =
-                            Cursor::builder(document.rope().slice(..)).at_width(line + 1, width);
+                            Cursor::build(document.rope().slice(..)).at_width(line + 1, width);
                         document.movements().head(cursor, false).collapse(true);
                     }
                     (Select::None | Select::Lines, Select::Range) => {
@@ -1054,7 +1054,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                         document
                             .movements()
                             .flip(!selection.is_forward())
-                            .left(Boundaries::GRAPHEME, 1, false)
+                            .prev(Boundaries::GRAPHEME, 1, false)
                             .flip(!selection.is_forward());
                     }
                     (Select::Range, Select::None | Select::Range) => {
@@ -1075,7 +1075,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                         document
                             .movements()
                             .flip(!selection.is_forward())
-                            .left(Boundaries::GRAPHEME, 1, false)
+                            .prev(Boundaries::GRAPHEME, 1, false)
                             .flip(!selection.is_forward());
                     }
                 }

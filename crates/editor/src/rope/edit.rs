@@ -1,4 +1,4 @@
-use crate::rope::{Cursor, CursorRef, Inner, Text};
+use crate::rope::{Cursor, Inner, Text};
 use ropey::Rope;
 use std::ops::Range;
 use tree_sitter::{InputEdit, Point};
@@ -119,9 +119,7 @@ impl Edit {
             // Replace
             (true, true) => (
                 Self::replace(rope, start.index..removed_end.index, &inserted).into(),
-                CursorRef::with(rope.slice(..))
-                    .at_index(start.index + inserted.len())
-                    .as_cursor(),
+                Cursor::build(rope.slice(..)).at_index(start.index + inserted.len()),
             ),
             // Insert
             (true, false) => (
@@ -129,9 +127,7 @@ impl Edit {
                     Self::insert(rope, start.index, &inserted);
                     Default::default()
                 },
-                CursorRef::with(rope.slice(..))
-                    .at_index(start.index + inserted.len())
-                    .as_cursor(),
+                Cursor::build(rope.slice(..)).at_index(start.index + inserted.len()),
             ),
             // Remove
             (false, true) => (

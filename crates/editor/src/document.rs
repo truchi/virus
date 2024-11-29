@@ -72,11 +72,11 @@ impl Document {
         let is_last_line = head.line == self.rope.slice(..).len_lines() - 1;
 
         let mut lines_selection = Selection {
-            anchor: Cursor::builder(self.rope.slice(..)).at_column(anchor.line, 0),
+            anchor: Cursor::build(self.rope.slice(..)).at_column(anchor.line, 0),
             head: if is_last_line {
-                Cursor::builder(self.rope.slice(..)).at_end()
+                Cursor::build(self.rope.slice(..)).at_end()
             } else {
-                Cursor::builder(self.rope.slice(..)).at_column(head.line + 1, 0)
+                Cursor::build(self.rope.slice(..)).at_column(head.line + 1, 0)
             },
         };
 
@@ -274,7 +274,7 @@ impl<'document> DocumentMovements<'document> {
     }
 
     pub fn top(&mut self, blank: bool) -> &mut Self {
-        self.document.selection.head = Cursor::builder(self.document.rope.slice(..)).at_width(
+        self.document.selection.head = Cursor::build(self.document.rope.slice(..)).at_width(
             blank
                 .then_some(0)
                 .unwrap_or_else(|| self.document.leading_blank_lines()),
@@ -286,7 +286,7 @@ impl<'document> DocumentMovements<'document> {
     }
 
     pub fn bottom(&mut self, blank: bool) -> &mut Self {
-        self.document.selection.head = Cursor::builder(self.document.rope.slice(..)).at_width(
+        self.document.selection.head = Cursor::build(self.document.rope.slice(..)).at_width(
             self.document.rope.len_lines().saturating_sub(
                 1 + blank
                     .then_some(0)
@@ -300,7 +300,7 @@ impl<'document> DocumentMovements<'document> {
     }
 
     pub fn up(&mut self, lines: usize, wrap: bool) -> &mut Self {
-        self.document.selection.head = Cursor::builder(self.document.rope.slice(..)).at_width(
+        self.document.selection.head = Cursor::build(self.document.rope.slice(..)).at_width(
             sub_in_range(
                 self.document.rope.len_lines(),
                 self.document.selection.head.line,
@@ -315,7 +315,7 @@ impl<'document> DocumentMovements<'document> {
     }
 
     pub fn down(&mut self, lines: usize, wrap: bool) -> &mut Self {
-        self.document.selection.head = Cursor::builder(self.document.rope.slice(..)).at_width(
+        self.document.selection.head = Cursor::build(self.document.rope.slice(..)).at_width(
             add_in_range(
                 self.document.rope.len_lines(),
                 self.document.selection.head.line,
@@ -351,11 +351,11 @@ impl<'document> DocumentMovements<'document> {
         self
     }
 
-    pub fn left(&mut self, boundaries: Boundaries, repeat: usize, wrap: bool) -> &mut Self {
+    pub fn prev(&mut self, boundaries: Boundaries, repeat: usize, wrap: bool) -> &mut Self {
         for _ in 0..repeat {
             if !self.document.head_segmentation.prev(boundaries) {
                 if wrap {
-                    self.document.head_segmentation.to_end();
+                    self.document.head_segmentation.to_text_end();
                 } else {
                     break;
                 }
@@ -366,11 +366,11 @@ impl<'document> DocumentMovements<'document> {
         self
     }
 
-    pub fn right(&mut self, boundaries: Boundaries, repeat: usize, wrap: bool) -> &mut Self {
+    pub fn next(&mut self, boundaries: Boundaries, repeat: usize, wrap: bool) -> &mut Self {
         for _ in 0..repeat {
             if !self.document.head_segmentation.next(boundaries) {
                 if wrap {
-                    self.document.head_segmentation.to_start();
+                    self.document.head_segmentation.to_text_start();
                 } else {
                     break;
                 }
@@ -424,7 +424,7 @@ impl<'document> DocumentEdition<'document> {
         if self.document.selection.is_empty() {
             self.document
                 .movements()
-                .left(Boundaries::GRAPHEME, 1, false);
+                .prev(Boundaries::GRAPHEME, 1, false);
         }
 
         self.edit(Text::default(), false)

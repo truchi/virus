@@ -3,9 +3,6 @@ pub mod editor;
 pub mod fuzzy;
 pub mod rope {
     pub use cursor::*;
-    pub use cursors::chunk::*;
-    pub use cursors::grapheme::*;
-    pub use cursors::word::*;
     pub use edit::*;
     pub use graphemes::*;
     pub use segmentation::*;
@@ -13,11 +10,6 @@ pub mod rope {
     pub use text::*;
 
     mod cursor;
-    mod cursors {
-        pub mod chunk;
-        pub mod grapheme;
-        pub mod word;
-    }
     mod edit;
     mod graphemes;
     mod segmentation;
