@@ -60,6 +60,33 @@ impl Document {
         self.selection
     }
 
+    pub fn lines_selection(&self) -> Selection {
+        let mut range_selection = self.selection;
+
+        if !self.selection.is_forward() {
+            range_selection.flip_mut();
+        }
+
+        let anchor = range_selection.anchor;
+        let head = range_selection.head;
+        let is_last_line = head.line == self.rope.slice(..).len_lines() - 1;
+
+        let mut lines_selection = Selection {
+            anchor: Cursor::builder(self.rope.slice(..)).at_column(anchor.line, 0),
+            head: if is_last_line {
+                Cursor::builder(self.rope.slice(..)).at_end()
+            } else {
+                Cursor::builder(self.rope.slice(..)).at_column(head.line + 1, 0)
+            },
+        };
+
+        if !self.selection.is_forward() {
+            lines_selection.flip_mut();
+        }
+
+        lines_selection
+    }
+
     pub fn tree(&self) -> &Tree {
         &self.tree
     }
@@ -212,31 +239,38 @@ impl<'document> DocumentMovements<'document> {
         self
     }
 
-    pub fn anchor(&mut self, cursor: Cursor, update: bool) {
+    pub fn anchor(&mut self, cursor: Cursor, update: bool) -> &mut Self {
         self.document.selection.anchor = cursor;
-        self.document.anchor_segmentation.to_cursor(cursor);
 
         if update {
             self.document
                 .anchor_segmentation
-                .update(self.document.rope.clone());
+                .update(self.document.rope.clone(), cursor);
+        } else {
+            self.document.anchor_segmentation.to_cursor(cursor);
         }
+
+        self
     }
 
-    pub fn head(&mut self, cursor: Cursor, update: bool) {
+    pub fn head(&mut self, cursor: Cursor, update: bool) -> &mut Self {
         self.document.selection.head = cursor;
-        self.document.head_segmentation.to_cursor(cursor);
 
         if update {
             self.document
                 .head_segmentation
-                .update(self.document.rope.clone());
+                .update(self.document.rope.clone(), cursor);
+        } else {
+            self.document.head_segmentation.to_cursor(cursor);
         }
+
+        self
     }
 
-    pub fn selection(&mut self, selection: Selection, update: bool) {
+    pub fn selection(&mut self, selection: Selection, update: bool) -> &mut Self {
         self.anchor(selection.anchor, update);
         self.head(selection.head, update);
+        self
     }
 
     pub fn top(&mut self, blank: bool) -> &mut Self {
@@ -319,8 +353,12 @@ impl<'document> DocumentMovements<'document> {
 
     pub fn left(&mut self, boundaries: Boundaries, repeat: usize, wrap: bool) -> &mut Self {
         for _ in 0..repeat {
-            if !self.document.head_segmentation.prev(boundaries) && wrap {
-                self.document.head_segmentation.to_end();
+            if !self.document.head_segmentation.prev(boundaries) {
+                if wrap {
+                    self.document.head_segmentation.to_end();
+                } else {
+                    break;
+                }
             }
         }
 
@@ -330,8 +368,12 @@ impl<'document> DocumentMovements<'document> {
 
     pub fn right(&mut self, boundaries: Boundaries, repeat: usize, wrap: bool) -> &mut Self {
         for _ in 0..repeat {
-            if !self.document.head_segmentation.next(boundaries) && wrap {
-                self.document.head_segmentation.to_start();
+            if !self.document.head_segmentation.next(boundaries) {
+                if wrap {
+                    self.document.head_segmentation.to_start();
+                } else {
+                    break;
+                }
             }
         }
 
@@ -349,11 +391,9 @@ pub struct DocumentEdition<'document> {
 }
 
 impl<'document> DocumentEdition<'document> {
-    pub fn edit(&mut self, inserted: Text) -> Option<Edit> {
-        let edit = {
-            let selection = self.document.selection();
-            Edit::edit(&mut self.document.rope, selection.range(), inserted)
-        };
+    pub fn edit(&mut self, inserted: Text, reselect: bool) -> Option<Edit> {
+        let selection = self.document.selection();
+        let edit = Edit::edit(&mut self.document.rope, selection.range(), inserted);
 
         if edit.is_noop().unwrap_or_default() {
             return None;
@@ -361,7 +401,16 @@ impl<'document> DocumentEdition<'document> {
 
         self.document
             .movements()
-            .selection(edit.inserted_end().into(), true);
+            .selection(
+                Selection {
+                    anchor: edit.start(),
+                    head: edit.inserted_end(),
+                },
+                true,
+            )
+            .flip(reselect && !selection.is_forward())
+            .collapse(!reselect);
+
         self.document.version += 1;
         self.document.is_tree_dirty = true;
         self.document.history.push(edit.clone());
@@ -378,7 +427,7 @@ impl<'document> DocumentEdition<'document> {
                 .left(Boundaries::GRAPHEME, 1, false);
         }
 
-        self.edit(Text::default())
+        self.edit(Text::default(), false)
     }
 
     pub fn undo(&mut self) {

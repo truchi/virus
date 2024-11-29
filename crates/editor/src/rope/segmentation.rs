@@ -368,16 +368,6 @@ impl Segmentation {
         })
     }
 
-    pub fn update(&mut self, rope: Rope) {
-        if Rope::is_instance(&self.rope, &rope) {
-            return;
-        }
-
-        self.rope = rope;
-        self.current_line = self.rope.line(self.line).to_string();
-        self.graphemes = GraphemeCursor::new(self.column, self.current_line.len(), true);
-    }
-
     pub fn to_start(&mut self) {
         self.to_cursor(Cursor::builder(self.rope.slice(..)).at_start())
     }
@@ -392,13 +382,15 @@ impl Segmentation {
 
     pub fn to_line_end(&mut self) {
         self.to_column(
-            self.current_line
-                .graphemes(true)
-                .rev()
-                .map(|grapheme| (grapheme, GraphemeCategory::from(grapheme)))
-                .take_while(|(_, category)| matches!(category, GraphemeCategory::Break))
-                .map(|(grapheme, _)| grapheme.len())
-                .sum(),
+            self.current_line.len()
+                - self
+                    .current_line
+                    .graphemes(true)
+                    .rev()
+                    .map(|grapheme| (grapheme, GraphemeCategory::from(grapheme)))
+                    .take_while(|(_, category)| matches!(category, GraphemeCategory::Break))
+                    .map(|(grapheme, _)| grapheme.len())
+                    .sum::<usize>(),
         );
     }
 
@@ -436,14 +428,20 @@ impl Segmentation {
 
         if self.line != cursor.line {
             self.current_line = self.rope.line(cursor.line).to_string();
+            self.graphemes = GraphemeCursor::new(cursor.column, self.current_line.len(), true);
+        } else if self.column != cursor.column {
+            self.graphemes = GraphemeCursor::new(cursor.column, self.current_line.len(), true);
         }
 
-        (self.index, self.line, self.column, self.graphemes) = (
-            cursor.index,
-            cursor.line,
-            cursor.column,
-            GraphemeCursor::new(cursor.column, self.current_line.len(), true),
-        );
+        (self.index, self.line, self.column) = (cursor.index, cursor.line, cursor.column);
+    }
+
+    pub fn update(&mut self, rope: Rope, cursor: Cursor) {
+        if Rope::is_instance(&self.rope, &rope) {
+            self.to_cursor(cursor);
+        } else {
+            *self = Self::new(rope, cursor.index, cursor.line, cursor.column);
+        }
     }
 
     pub fn prev(&mut self, boundaries: Boundaries) -> bool {
@@ -627,7 +625,12 @@ mod tests {
         let data = [
             (
                 Boundaries::LINE_START,
-                vec![Cursor::extract("┃"), Cursor::extract("┃12\r┃34\n┃5\r\n┃")],
+                vec![
+                    //
+                    Cursor::extract("┃"),
+                    Cursor::extract("┃12\r┃34\n┃5\r\n┃"),
+                    // Cursor::extract("12\r  34\n5  \r\n  6\n"), // TODO test cases like this
+                ],
             ),
             (
                 Boundaries::LINE_END,

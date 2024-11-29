@@ -1,4 +1,6 @@
+use crate::rope::{Grapheme, GraphemeCategory, GraphemesBackward};
 use ropey::{Rope, RopeSlice};
+use unicode_segmentation::UnicodeSegmentation;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Inner                                              //
@@ -103,5 +105,37 @@ impl Text {
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    pub fn trailing_line_break(&mut self, bool: bool) {
+        let trailing_line_break_len = match &self.inner {
+            Inner::String(string) => string
+                .as_str()
+                .graphemes(true)
+                .rev()
+                .next()
+                .map(|grapheme| Grapheme::Str(grapheme)),
+            Inner::Rope(rope) => GraphemesBackward::new(rope.slice(..)).next(),
+        }
+        .map(|grapheme| (GraphemeCategory::from(grapheme.as_str()), grapheme));
+
+        if let Some((GraphemeCategory::Break, grapheme)) = trailing_line_break_len {
+            if !bool {
+                let bytes = grapheme.as_str().len();
+                let chars = grapheme.as_str().chars().count();
+
+                match &mut self.inner {
+                    Inner::String(string) => string.truncate(string.len() - bytes),
+                    Inner::Rope(rope) => rope.remove(rope.len_chars() - chars..rope.len_chars()),
+                }
+            }
+        } else {
+            if bool {
+                match &mut self.inner {
+                    Inner::String(string) => string.push_str("\n"),
+                    Inner::Rope(rope) => rope.insert(rope.len_chars(), "\n"),
+                }
+            }
+        }
     }
 }

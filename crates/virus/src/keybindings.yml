@@ -20,10 +20,9 @@ NORMAL:
   ?pages shift $up: scroll_up_page ?pages +half
   ?pages shift $down: scroll_down_page ?pages +half
 
+  escape: insert
   ",": select_smart
   ";": unselect
-  f: files
-  escape: insert
 
   x: cut
   c: copy
@@ -31,8 +30,10 @@ NORMAL:
   z: undo
   Z: redo
 
-  s: save
-  q: close
+  space:
+    f: files
+    s: save
+    q: close
 
 INSERT:
   command $up: move_up_line
@@ -40,10 +41,9 @@ INSERT:
   command $left: move_left_smart
   command $right: move_right_smart
 
+  escape: normal
   command ,: select_smart
   command ;: unselect
-  command f: files
-  escape: normal
 
   command x: cut
   command c: copy
@@ -51,8 +51,10 @@ INSERT:
   command z: undo
   command Z: redo
 
-  command s: save
-  command q: close
+  command space:
+    f: files
+    s: save
+    q: close
 
 FILES:
   command $up: move_up_line +wrap

@@ -116,6 +116,8 @@ impl PartialOrd for Cursor {
 //                                           CursorRef                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+/// TODO REMOVE
+
 /// An `(index , line, column, width)` cursor with a `Rope` reference for cache.
 #[derive(Clone, Eq, Ord)]
 pub struct CursorRef<'rope> {

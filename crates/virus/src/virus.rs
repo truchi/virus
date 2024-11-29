@@ -17,7 +17,7 @@ use virus_editor::{
     document::Document,
     editor::{Editor, EventLoopMessage},
     fuzzy::Fuzzy,
-    rope::Boundaries,
+    rope::{Boundaries, Cursor, Text},
     sub_in_range,
 };
 use virus_ui::{theme::UiTheme, tween::Tween, ui::Ui};
@@ -122,6 +122,14 @@ impl Mode {
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
+#[derive(Clone, Debug)]
+pub struct Clipboard {
+    select: Select,
+    text: Text,
+}
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
 pub struct Virus {
     events: Events,
     editor: Editor,
@@ -135,6 +143,7 @@ pub struct Virus {
         usize,
     )>,
     keybindings: Keybindings,
+    clipboard: Option<Clipboard>,
 }
 
 impl Virus {
@@ -225,6 +234,7 @@ impl Virus {
             last_render: None,
             search: None,
             keybindings: Default::default(),
+            clipboard: None,
         }
     }
 
@@ -285,15 +295,17 @@ impl Virus {
                     Key::Str(str) => {
                         self.unwrap_active_document_mut()
                             .edition()
-                            .edit(str.as_str().into());
+                            .edit(str.as_str().into(), false);
                     }
                     Key::Tab => {
                         self.unwrap_active_document_mut()
                             .edition()
-                            .edit("    ".into());
+                            .edit("    ".into(), false);
                     }
                     Key::Space => {
-                        self.unwrap_active_document_mut().edition().edit(" ".into());
+                        self.unwrap_active_document_mut()
+                            .edition()
+                            .edit(" ".into(), false);
                     }
                     Key::Backspace => {
                         self.unwrap_active_document_mut().edition().backspace();
@@ -303,7 +315,7 @@ impl Virus {
                             .get_active_document_mut()
                             .unwrap()
                             .edition()
-                            .edit("\n".into());
+                            .edit("\n".into(), false);
                     }
                     _ => {}
                 },
@@ -935,21 +947,139 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
 
     fn cut(&mut self) {
         match self.virus.mode {
-            Mode::Normal { .. } | Mode::Insert { .. } => self.virus.editor.cut(),
+            Mode::Normal { select } | Mode::Insert { select } => {
+                let document = self.virus.unwrap_active_document_mut();
+
+                debug_assert!(
+                    select != Select::None
+                        || (select == Select::None && document.selection().is_empty())
+                );
+
+                // Select whole lines if non-range selection
+                match select {
+                    Select::None | Select::Lines => {
+                        let lines = document.lines_selection();
+                        document.movements().selection(lines, false);
+                    }
+                    Select::Range => {}
+                }
+
+                // Cut and save into clipboard
+                if let Some(edit) = document.edition().edit(Text::default(), false) {
+                    self.virus.clipboard = Some(Clipboard {
+                        select,
+                        text: Text::from(edit.into_removed_and_inserted().0),
+                    });
+                }
+            }
             Mode::Files => {}
         }
     }
 
     fn copy(&mut self) {
         match self.virus.mode {
-            Mode::Normal { .. } | Mode::Insert { .. } => self.virus.editor.copy(),
+            Mode::Normal { select } | Mode::Insert { select } => {
+                let document = self.virus.unwrap_active_document_mut();
+
+                debug_assert!(
+                    select != Select::None
+                        || (select == Select::None && document.selection().is_empty())
+                );
+
+                // Select whole lines if non-range selection
+                let range = match select {
+                    Select::None | Select::Lines => document.lines_selection().range(),
+                    Select::Range => document.selection().range(),
+                };
+
+                // Copy into clipboard
+                self.virus.clipboard = Some(Clipboard {
+                    select,
+                    text: Text::from(
+                        document
+                            .rope()
+                            .byte_slice(range.start.index..range.end.index),
+                    ),
+                });
+            }
             Mode::Files => {}
         }
     }
 
     fn paste(&mut self) {
         match self.virus.mode {
-            Mode::Normal { .. } | Mode::Insert { .. } => self.virus.editor.paste(),
+            Mode::Normal { select } | Mode::Insert { select } => {
+                let Some(mut clipboard) = self.virus.clipboard.clone() else {
+                    return;
+                };
+                let document = self.virus.unwrap_active_document_mut();
+                let is_select = select != Select::None;
+
+                debug_assert!(
+                    select != Select::None
+                        || (select == Select::None && document.selection().is_empty())
+                );
+
+                match (clipboard.select, select) {
+                    (Select::None | Select::Lines, Select::None) => {
+                        let line = document.selection().head.line;
+                        let width = document.selection().head.width;
+
+                        // Paste at the start of the next line
+                        document
+                            .movements()
+                            .end(true)
+                            .right(Boundaries::GRAPHEME, 1, false)
+                            .collapse(true);
+                        document.edition().edit(clipboard.text, is_select);
+
+                        // Restore the cursor's width
+                        let cursor =
+                            Cursor::builder(document.rope().slice(..)).at_width(line + 1, width);
+                        document.movements().head(cursor, false).collapse(true);
+                    }
+                    (Select::None | Select::Lines, Select::Range) => {
+                        // Remove the trailing line break
+                        // to fit nicely in the current range selection
+                        clipboard.text.trailing_line_break(false);
+                        document.edition().edit(clipboard.text, is_select);
+                    }
+                    (Select::None | Select::Lines, Select::Lines) => {
+                        // Paste in the whole lines selection
+                        let selection = document.lines_selection();
+                        document.movements().selection(selection, false);
+                        document.edition().edit(clipboard.text, is_select);
+
+                        // Move forward cursor to the end of the last pasted line
+                        document
+                            .movements()
+                            .flip(!selection.is_forward())
+                            .left(Boundaries::GRAPHEME, 1, false)
+                            .flip(!selection.is_forward());
+                    }
+                    (Select::Range, Select::None | Select::Range) => {
+                        // Easy :)
+                        document.edition().edit(clipboard.text, is_select);
+                    }
+                    (Select::Range, Select::Lines) => {
+                        // Ensure a trailing line break
+                        // to fit nicely in the current line selection
+                        clipboard.text.trailing_line_break(true);
+
+                        // Paste in the whole lines selection
+                        let selection = document.lines_selection();
+                        document.movements().selection(selection, false);
+                        document.edition().edit(clipboard.text, is_select);
+
+                        // Move forward cursor to the end of the last pasted line
+                        document
+                            .movements()
+                            .flip(!selection.is_forward())
+                            .left(Boundaries::GRAPHEME, 1, false)
+                            .flip(!selection.is_forward());
+                    }
+                }
+            }
             Mode::Files => {}
         }
     }
@@ -957,7 +1087,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn undo(&mut self) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
-                self.virus.unwrap_active_document_mut().edition().undo()
+                self.virus.unwrap_active_document_mut().edition().undo();
             }
             Mode::Files => {}
         }
@@ -966,7 +1096,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn redo(&mut self) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
-                self.virus.unwrap_active_document_mut().edition().redo()
+                self.virus.unwrap_active_document_mut().edition().redo();
             }
             Mode::Files => {}
         }
