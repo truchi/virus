@@ -1,6 +1,3 @@
-mod byte;
-
-use byte::{Byte, Class};
 use std::ops::Range;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -225,22 +222,47 @@ impl Fuzzy {
     }
 }
 
-// ────────────────────────────────────────────────────────────────────────────────────────────── //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                             Class                                              //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+use Class::*;
 
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
-struct NeedleByte {
-    byte: u8,
-    is_start: bool,
-    is_separator: bool,
-    accepted: Accepted,
+enum Class {
+    /// ASCII uppercase.
+    Uppercase,
+    /// ASCII lowercase.
+    Lowercase,
+    /// ASCII digit.
+    Digit,
+    /// ASCII space, horizontal tab, line feed, vertical tab, form feed, carriage return
+    /// and punctuation.
+    Separator,
+    /// Everything else.
+    #[default]
+    Unknown,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
-struct HaystackByte {
-    index: usize,
-    is_start: bool,
-    accepts: (Accept, Option<Accept>),
+impl From<u8> for Class {
+    fn from(byte: u8) -> Self {
+        match byte {
+            9..=13 => Separator,    // Whitespaces
+            32..=47 => Separator,   // Space and punctuations
+            48..=57 => Digit,       // Digits
+            58..=64 => Separator,   // Punctuations
+            65..=90 => Uppercase,   // Uppercases
+            91..=96 => Separator,   // Punctuations
+            97..=122 => Lowercase,  // Lowercases
+            123..=126 => Separator, // Punctuations
+            _ => Unknown,
+        }
+    }
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                              Byte                                              //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
 struct Accepted {
@@ -251,9 +273,144 @@ struct Accepted {
     space_as_separator_malus: bool,
 }
 
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
 struct Accept {
     byte: u8,
     uppercase_bonus: bool,
     space_as_separator_malus: bool,
+}
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
+#[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
+struct NeedleByte {
+    byte: u8,
+    is_start: bool,
+    is_separator: bool,
+    accepted: Accepted,
+}
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
+#[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
+struct HaystackByte {
+    index: usize,
+    is_start: bool,
+    accepts: (Accept, Option<Accept>),
+}
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
+#[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
+struct Byte {
+    byte: u8,
+    class: Class,
+    accepts: (Accept, Option<Accept>),
+}
+
+impl From<u8> for Byte {
+    fn from(byte: u8) -> Self {
+        let class = Class::from(byte);
+
+        Self {
+            byte,
+            class,
+            accepts: match class {
+                Uppercase => (
+                    Accept {
+                        byte,
+                        uppercase_bonus: true,
+                        space_as_separator_malus: false,
+                    },
+                    Some(Accept {
+                        byte: byte + 32, // Lowercase
+                        uppercase_bonus: false,
+                        space_as_separator_malus: false,
+                    }),
+                ),
+                Lowercase => (
+                    Accept {
+                        byte,
+                        uppercase_bonus: false,
+                        space_as_separator_malus: false,
+                    },
+                    Some(Accept {
+                        byte: byte - 32, // Uppercase
+                        uppercase_bonus: false,
+                        space_as_separator_malus: false,
+                    }),
+                ),
+                Digit => (
+                    Accept {
+                        byte,
+                        uppercase_bonus: false,
+                        space_as_separator_malus: false,
+                    },
+                    None,
+                ),
+                Separator => (
+                    Accept {
+                        byte,
+                        uppercase_bonus: false,
+                        space_as_separator_malus: false,
+                    },
+                    (byte != b' ').then_some(Accept {
+                        byte: b' ',
+                        uppercase_bonus: false,
+                        space_as_separator_malus: true,
+                    }),
+                ),
+                Unknown => (
+                    Accept {
+                        byte,
+                        uppercase_bonus: false,
+                        space_as_separator_malus: false,
+                    },
+                    None,
+                ),
+            },
+        }
+    }
+}
+
+impl Byte {
+    fn parse(str: &str, mut callback: impl FnMut(/* index */ usize, Self, /* is_start */ bool)) {
+        let mut it = str
+            .as_bytes()
+            .iter()
+            .copied()
+            .map(Self::from)
+            .enumerate()
+            .peekable();
+
+        let mut prev_byte = if let Some((_, byte)) = it.next() {
+            callback(0, byte, true);
+            byte
+        } else {
+            return;
+        };
+
+        while let Some((index, byte)) = it.next() {
+            callback(
+                index,
+                byte,
+                match byte.class {
+                    Uppercase => match prev_byte.class {
+                        Uppercase => {
+                            matches!(it.peek(), Some((_, peek)) if peek.class == Lowercase)
+                        }
+                        _ => true,
+                    },
+                    Lowercase => !matches!(prev_byte.class, Uppercase | Lowercase),
+                    Digit => !matches!(prev_byte.class, Digit),
+                    Separator => !matches!(prev_byte.class, Separator),
+                    Unknown => !matches!(prev_byte.class, Unknown),
+                },
+            );
+
+            prev_byte = byte;
+        }
+    }
 }
