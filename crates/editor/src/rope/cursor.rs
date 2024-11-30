@@ -71,19 +71,18 @@ impl Cursor {
 
         loop {
             if let Some((before, after)) = str.split_once('┃') {
-                rope.append(ropey::Rope::from(before));
+                assert!(!(before.ends_with('\r') && after.starts_with('\n')));
 
-                if !(before.ends_with('\r') && after.starts_with('\n')) {
-                    cursors.push({
-                        let line = rope.line(rope.len_lines() - 1);
-                        Self {
-                            index: rope.len_bytes(),
-                            line: rope.len_lines() - 1,
-                            column: line.len_bytes(),
-                            width: line.chunks().map(str::width).sum(),
-                        }
-                    });
-                }
+                rope.append(ropey::Rope::from(before));
+                cursors.push({
+                    let line = rope.line(rope.len_lines() - 1);
+                    Self {
+                        index: rope.len_bytes(),
+                        line: rope.len_lines() - 1,
+                        column: line.len_bytes(),
+                        width: line.chunks().map(str::width).sum(),
+                    }
+                });
                 str = after;
             } else {
                 break;
@@ -269,7 +268,7 @@ mod tests {
     use ropey::Rope;
 
     #[test]
-    fn at_index_at_column_at_end() {
+    fn at_index_at_column_at_width_at_end() {
         let data: &[(&str, &[(usize, usize, usize, usize)])] = &[
             ("", &[(0, 0, 0, 0)]),
             ("\n", &[(0, 0, 0, 0), (1, 1, 0, 0)]),
@@ -292,26 +291,16 @@ mod tests {
             ("ab", &[(0, 0, 0, 0), (1, 0, 1, 1), (2, 0, 2, 2)]),
             ("a\r", &[(0, 0, 0, 0), (1, 0, 1, 1), (2, 1, 0, 0)]),
             ("a\n", &[(0, 0, 0, 0), (1, 0, 1, 1), (2, 1, 0, 0)]),
-            (
-                "a\r\n",
-                &[(0, 0, 0, 0), (1, 0, 1, 1), (2, 0, 2, 1), (3, 1, 0, 0)],
-            ),
+            ("a\r\n", &[(0, 0, 0, 0), (1, 0, 1, 1), (3, 1, 0, 0)]),
             (
                 "a\r\na",
-                &[
-                    (0, 0, 0, 0),
-                    (1, 0, 1, 1),
-                    (2, 0, 2, 1),
-                    (3, 1, 0, 0),
-                    (4, 1, 1, 1),
-                ],
+                &[(0, 0, 0, 0), (1, 0, 1, 1), (3, 1, 0, 0), (4, 1, 1, 1)],
             ),
             (
                 "a\r\na🦀d\n",
                 &[
                     (0, 0, 0, 0),
                     (1, 0, 1, 1),
-                    (2, 0, 2, 1),
                     (3, 1, 0, 0),
                     (4, 1, 1, 1),
                     (8, 1, 5, 3),
@@ -325,12 +314,11 @@ mod tests {
             let rope = Rope::from(str);
             let rope = rope.slice(..);
 
-            assert!(data.len() == str.chars().count() + 1, "Wrong test data");
-
             for (index, line, column, width) in data.iter().copied() {
                 for cursor in [
                     Cursor::build(rope).at_index(index),
                     Cursor::build(rope).at_column(line, column),
+                    Cursor::build(rope).at_width(line, width),
                 ] {
                     assert!(cursor.index == index);
                     assert!(cursor.line == line);
@@ -346,33 +334,6 @@ mod tests {
                     assert!(cursor.column == column);
                     assert!(cursor.width == width);
                 }
-            }
-        }
-    }
-
-    #[test]
-    fn at_column() {
-        let data: &[(&str, &[(usize, usize, usize, usize)])] = &[
-            ("", &[(0, 0, 0, 0)]),
-            ("\n", &[(0, 0, 0, 0), (1, 1, 0, 0)]),
-            ("\n\n", &[(0, 0, 0, 0), (1, 1, 0, 0), (2, 2, 0, 0)]),
-            ("a\r\na", &[(0, 0, 0, 0), (3, 1, 0, 0)]),
-            ("a\r\na🦀b\n", &[(0, 0, 0, 0), (3, 1, 0, 0), (10, 2, 0, 0)]),
-        ];
-
-        for &(str, data) in data {
-            let rope = Rope::from(str);
-            let rope = rope.slice(..);
-
-            assert!(data.len() == rope.len_lines(), "Wrong test data");
-
-            for (i, (index, line, column, width)) in data.iter().copied().enumerate() {
-                let cursor = Cursor::build(rope).at_column(i, 0);
-
-                assert!(cursor.index == index);
-                assert!(cursor.line == line);
-                assert!(cursor.column == column);
-                assert!(cursor.width == width);
             }
         }
     }
