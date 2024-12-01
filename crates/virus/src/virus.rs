@@ -183,48 +183,7 @@ impl Virus {
 
     fn new(window: Window, editor: Editor) -> Self {
         let events = Events::new();
-        let ui = Ui::new(Arc::new(window), {
-            let catppuccin = virus_ui::Catppuccin::default();
-            let normal_mode = catppuccin.blue;
-            let select_mode = catppuccin.pink;
-            let insert_mode = catppuccin.green;
-
-            UiTheme {
-                syntax: virus_ui::syntax::SyntaxTheme::catppuccin(),
-                family: "Victor",
-                font_size: 20,
-                line_height: 25,
-                scrollbar_color: catppuccin.surface1.solid(),
-                scroll_duration: Duration::from_millis(500),
-                scroll_tween: Tween::ExpoOut,
-                outline_normal_mode_colors: vec![
-                    normal_mode.solid().transparent(255 / 4),
-                    normal_mode.solid().transparent(255 / 6),
-                    normal_mode.solid().transparent(255 / 8),
-                    normal_mode.solid().transparent(255 / 10),
-                ],
-                outline_select_mode_colors: vec![
-                    select_mode.solid().transparent(255 / 4),
-                    select_mode.solid().transparent(255 / 6),
-                    select_mode.solid().transparent(255 / 8),
-                    select_mode.solid().transparent(255 / 10),
-                ],
-                outline_insert_mode_colors: vec![
-                    insert_mode.solid().transparent(255 / 4),
-                    insert_mode.solid().transparent(255 / 6),
-                    insert_mode.solid().transparent(255 / 8),
-                    insert_mode.solid().transparent(255 / 10),
-                ],
-                caret_normal_mode_color: normal_mode,
-                caret_select_mode_color: select_mode,
-                caret_insert_mode_color: insert_mode,
-                caret_normal_mode_width: 2,
-                caret_select_mode_width: 2,
-                caret_insert_mode_width: 2,
-                selection_select_mode_color: select_mode.solid().transparent(255 / 2),
-                selection_insert_mode_color: insert_mode.solid().transparent(255 / 2),
-            }
-        });
+        let ui = Ui::new(Arc::new(window));
 
         Self {
             events,

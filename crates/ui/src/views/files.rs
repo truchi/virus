@@ -1,7 +1,9 @@
 #![allow(unused)]
 
 use std::{
+    cell::RefCell,
     ops::{Range, RangeBounds},
+    rc::Rc,
     usize,
 };
 use virus_graphics::{
@@ -11,6 +13,8 @@ use virus_graphics::{
     types::{Position, Rectangle, Rgba},
     wgpu::{Draw, Layer},
 };
+
+use crate::theme::UiTheme;
 
 const MIN_WIDTH: f32 = 0.5;
 
@@ -23,29 +27,20 @@ fn min_width(width: u32) -> u32 {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct FilesView {
+    theme: Rc<RefCell<UiTheme>>,
     needle: String,
     haystack: Vec<(String, Vec<Range<usize>>)>,
     selected: usize,
-    family: FontFamilyKey,
-    font_size: FontSize,
-    line_height: LineHeight,
     background: Rgba,
 }
 
 impl FilesView {
-    pub fn new(
-        family: FontFamilyKey,
-        font_size: FontSize,
-        line_height: LineHeight,
-        background: Rgba,
-    ) -> Self {
+    pub fn new(theme: Rc<RefCell<UiTheme>>, background: Rgba) -> Self {
         Self {
+            theme,
             needle: Default::default(),
             haystack: Default::default(),
             selected: 0,
-            family,
-            font_size,
-            line_height,
             background,
         }
     }
@@ -62,9 +57,9 @@ impl FilesView {
             context,
             layer,
             self.background,
-            self.family,
-            self.font_size,
-            self.line_height,
+            self.theme.borrow().family,
+            self.theme.borrow().font_size,
+            self.theme.borrow().line_height,
             needle,
             haystacks,
             selected,

@@ -30,9 +30,8 @@ macro_rules! ids {
 
         impl $Ids {
             $ids_vis fn id(&mut self) -> $Id {
-                let id = self.0;
                 self.0 += 1;
-                $Id(id)
+                $Id(self.0)
             }
         }
 
@@ -41,6 +40,8 @@ macro_rules! ids {
         $id_vis struct $Id(usize);
 
         impl $Id {
+            $id_vis const NONE: Self = Self(0);
+
             $id_vis fn id(&self) -> usize {
                 self.0
             }
