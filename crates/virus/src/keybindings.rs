@@ -1,7 +1,4 @@
-use crate::{
-    events::{Event, Key, KeyEvent, Mods},
-    virus::Mode,
-};
+use crate::events::{Event, Key, KeyEvent, Mods};
 use serde::Deserialize;
 use smol_str::{SmolStr, ToSmolStr};
 use std::{
@@ -10,6 +7,7 @@ use std::{
     slice::Iter,
     str::Split,
 };
+use virus_editor::mode::Mode;
 
 const UNSTICK: &'static str = "unstick";
 

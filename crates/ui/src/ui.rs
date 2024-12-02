@@ -2,6 +2,7 @@ use crate::{
     panes::{PaneId, Panes},
     syntax::{Lines, SyntaxTheme},
     theme::UiTheme,
+    tween::Tween,
     views::FilesView,
 };
 use std::{
@@ -12,7 +13,10 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use virus_editor::document::{Document, DocumentId};
+use virus_editor::{
+    document::{Document, DocumentId},
+    mode::Mode,
+};
 use virus_graphics::{
     text::{Context, Font, FontStyle, FontWeight, Fonts},
     types::{Rectangle, Rgba},
@@ -41,48 +45,7 @@ impl Ui {
     pub fn new(window: Arc<Window>) -> Self {
         let graphics = Graphics::new(Arc::clone(&window));
         let context = Context::new(fonts());
-        let theme = Rc::new(RefCell::new({
-            let catppuccin = Catppuccin::default();
-            let normal_mode = catppuccin.blue;
-            let select_mode = catppuccin.pink;
-            let insert_mode = catppuccin.green;
-
-            UiTheme {
-                syntax: SyntaxTheme::catppuccin(),
-                family: context.fonts().get("Victor").unwrap().key(),
-                font_size: 20,
-                line_height: 25,
-                scrollbar_color: catppuccin.surface1.solid(),
-                scroll_duration: Duration::from_millis(500),
-                scroll_tween: crate::tween::Tween::ExpoOut,
-                outline_normal_mode_colors: vec![
-                    normal_mode.solid().transparent(255 / 4),
-                    normal_mode.solid().transparent(255 / 6),
-                    normal_mode.solid().transparent(255 / 8),
-                    normal_mode.solid().transparent(255 / 10),
-                ],
-                outline_select_mode_colors: vec![
-                    select_mode.solid().transparent(255 / 4),
-                    select_mode.solid().transparent(255 / 6),
-                    select_mode.solid().transparent(255 / 8),
-                    select_mode.solid().transparent(255 / 10),
-                ],
-                outline_insert_mode_colors: vec![
-                    insert_mode.solid().transparent(255 / 4),
-                    insert_mode.solid().transparent(255 / 6),
-                    insert_mode.solid().transparent(255 / 8),
-                    insert_mode.solid().transparent(255 / 10),
-                ],
-                caret_normal_mode_color: normal_mode,
-                caret_select_mode_color: select_mode,
-                caret_insert_mode_color: insert_mode,
-                caret_normal_mode_width: 2,
-                caret_select_mode_width: 2,
-                caret_insert_mode_width: 2,
-                selection_select_mode_color: select_mode.solid().transparent(255 / 2),
-                selection_insert_mode_color: insert_mode.solid().transparent(255 / 2),
-            }
-        }));
+        let theme = Rc::new(RefCell::new(ui_theme(&context)));
         let lines_cache = Default::default();
         let files = FilesView::new(Rc::downgrade(&theme), Rgba::WHITE);
         let panes = Panes::new(Rc::downgrade(&theme), Rc::downgrade(&lines_cache));
@@ -138,11 +101,8 @@ impl Ui {
     pub fn render<'a>(
         &mut self,
         documents: impl Fn(DocumentId) -> Option<&'a Document>,
-        show_selection_as_lines: bool,
-        outline_colors: &[Rgba],
-        caret_color: Rgba,
-        caret_width: u32,
-        selection_color: Rgba,
+        active_pane_id: PaneId,
+        mode: Mode,
         search: Option<(&'a str, &'a [(String, isize, Vec<Range<usize>>)], usize)>,
     ) {
         // TODO react to document closes
@@ -153,11 +113,8 @@ impl Ui {
             &mut self.context,
             &mut self.graphics,
             documents,
-            show_selection_as_lines,
-            outline_colors,
-            caret_color,
-            caret_width,
-            selection_color,
+            active_pane_id,
+            mode,
         );
 
         if let Some((needle, haystack, selected)) = search {
@@ -276,4 +233,25 @@ fn fonts() -> Fonts {
     }
 
     fonts
+}
+
+fn ui_theme(context: &Context) -> UiTheme {
+    let catppuccin = Catppuccin::default();
+
+    UiTheme {
+        syntax: SyntaxTheme::catppuccin(),
+
+        family: context.fonts().get("Victor").unwrap().key(),
+        font_size: 20,
+        line_height: 25,
+
+        scroll_duration: Duration::from_millis(500),
+        scroll_tween: Tween::ExpoOut,
+        scrollbar_color: catppuccin.surface1.solid(),
+
+        normal_mode_color: catppuccin.blue.solid(),
+        insert_mode_color: catppuccin.pink.solid(),
+
+        caret_width: 2,
+    }
 }

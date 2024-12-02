@@ -3,12 +3,9 @@ use std::{cell::RefCell, rc::Weak, time::Duration};
 use virus_editor::{
     document::{Document, DocumentId},
     ids,
+    mode::{Mode, Select},
 };
-use virus_graphics::{
-    text::Context,
-    types::{Rectangle, Rgba},
-    wgpu::Graphics,
-};
+use virus_graphics::{text::Context, types::Rectangle, wgpu::Graphics};
 
 ids!(
     /// [`PaneId`] generator.
@@ -92,17 +89,15 @@ impl Panes {
         context: &mut Context,
         graphics: &mut Graphics,
         documents: impl Fn(DocumentId) -> Option<&'a Document>,
-        show_selection_as_lines: bool,
-        outline_colors: &[Rgba],
-        caret_color: Rgba,
-        caret_width: u32,
-        selection_color: Rgba,
+        active_pane_id: PaneId,
+        mode: Mode,
     ) {
         let width = (self.region.width as f32 / self.panes.len() as f32).round() as u32;
 
         for (i, pane) in self.panes.iter_mut().enumerate() {
             match pane {
                 Pane::Document {
+                    pane_id,
                     document_id,
                     document_view,
                     ..
@@ -117,17 +112,21 @@ impl Panes {
                         width,
                         height: self.region.height,
                     };
+                    let mode = (*pane_id == active_pane_id)
+                        .then_some(mode)
+                        .unwrap_or_else(|| {
+                            // We want the document to look the same when it will be active again
+                            // Assuming this is the logic:
+                            Mode::Normal {
+                                select: if document.selection().is_empty() {
+                                    Select::None
+                                } else {
+                                    Select::Range
+                                },
+                            }
+                        });
 
-                    document_view.render(
-                        context,
-                        &mut graphics.layer(region, 0),
-                        document,
-                        show_selection_as_lines,
-                        outline_colors,
-                        caret_color,
-                        caret_width,
-                        selection_color,
-                    );
+                    document_view.render(context, &mut graphics.layer(region, 0), document, mode);
                 }
             }
         }

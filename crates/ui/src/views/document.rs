@@ -1,15 +1,19 @@
 use crate::{syntax::Lines, theme::UiTheme, tween::Tweened, ui::LinesCache};
-use std::{cell::RefCell, fmt::Write, rc::Weak, time::Duration};
+use std::{
+    cell::{Ref, RefCell},
+    fmt::Write,
+    rc::Weak,
+    time::Duration,
+};
 use virus_editor::{
     document::Document,
+    mode::{Mode, Select},
     rope::{Cursor, Selection},
 };
 use virus_graphics::{
-    text::{
-        Advance, Context, FontFamilyKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
-    },
+    text::{Advance, Context, FontStyle, FontWeight, Line, Styles},
     types::{Position, Rectangle, Rgba},
-    wgpu::Layer,
+    wgpu::{Draw, Layer},
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -64,12 +68,14 @@ impl DocumentView {
         context: &mut Context,
         layer: &mut Layer,
         document: &Document,
-        show_selection_as_lines: bool,
-        outline_colors: &[Rgba],
-        caret_color: Rgba,
-        caret_width: u32,
-        selection_color: Rgba,
+        mode: Mode,
     ) {
+        debug_assert!(match mode {
+            Mode::Normal { select } | Mode::Insert { select } if select == Select::None =>
+                document.selection().is_empty(),
+            _ => true,
+        });
+
         let theme = self.theme.upgrade().unwrap();
         let theme = theme.borrow();
         let scroll_top = self.scroll_top.current();
@@ -118,24 +124,17 @@ impl DocumentView {
         Renderer {
             context,
             layer,
-            family: theme.family,
-            font_size: theme.font_size,
-            line_height: theme.line_height,
+            theme,
             selection: document.selection(),
+            lines: &lines[..],
             start_line,
             line_numbers_width: (advance * (rope_lines.ilog10() + 3) as Advance).round() as u32,
-            line_numbers_color: theme.syntax.comment.foreground,
-            lines: &lines[..],
             scroll_top,
-            show_selection_as_lines,
             scrollbar_rectangle,
             scrollbar_color,
-            outline_colors,
-            caret_color,
-            caret_width,
-            selection_color,
+            mode,
         }
-        .render()
+        .render();
     }
 }
 
@@ -143,29 +142,22 @@ impl DocumentView {
 //                                            Renderer                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-struct Renderer<'context, 'layer, 'graphics, 'lines, 'outline_colors> {
+struct Renderer<'context, 'layer, 'graphics, 'theme, 'lines> {
     context: &'context mut Context,
     layer: &'layer mut Layer<'graphics>,
-    family: FontFamilyKey,
-    font_size: FontSize,
-    line_height: LineHeight,
+    theme: Ref<'theme, UiTheme>,
     selection: Selection,
     lines: &'lines [Line],
     start_line: usize,
     line_numbers_width: u32,
-    line_numbers_color: Rgba,
     scroll_top: u32,
-    show_selection_as_lines: bool,
     scrollbar_rectangle: Rectangle,
     scrollbar_color: Rgba,
-    outline_colors: &'outline_colors [Rgba],
-    caret_color: Rgba,
-    caret_width: u32,
-    selection_color: Rgba,
+    mode: Mode,
 }
 
-impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
-    Renderer<'context, 'layer, 'graphics, 'lines, 'outline_colors>
+impl<'context, 'layer, 'graphics, 'theme, 'lines>
+    Renderer<'context, 'layer, 'graphics, 'theme, 'lines>
 {
     fn render(&mut self) {
         self.render_line_numbers();
@@ -178,7 +170,7 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
         let styles = Styles {
             weight: FontWeight::Regular,
             style: FontStyle::Normal,
-            foreground: self.line_numbers_color,
+            foreground: self.theme.syntax.comment.foreground,
             background: Rgba::TRANSPARENT,
             underline: false,
             strike: false,
@@ -187,17 +179,17 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
         for number in self.start_line..self.start_line + self.lines.len() {
             let line = Line::shaper(&format!("{} ", number + 1), 0, styles).shape(
                 self.context,
-                self.family,
-                self.font_size,
+                self.theme.family,
+                self.theme.font_size,
             );
-            let top = number as i32 * self.line_height as i32 - self.scroll_top as i32;
+            let top = number as i32 * self.theme.line_height as i32 - self.scroll_top as i32;
             let left = (self.line_numbers_width as Advance - line.advance()).round() as i32;
 
             self.layer.draw(None, 0).glyphs(
                 self.context,
                 Position { top, left },
                 &line,
-                self.line_height,
+                self.theme.line_height,
             );
         }
     }
@@ -206,22 +198,23 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
         let left = self.line_numbers_width as i32;
 
         for (index, line) in self.lines.iter().enumerate() {
-            let top =
-                (self.start_line + index) as i32 * self.line_height as i32 - self.scroll_top as i32;
+            let top = (self.start_line + index) as i32 * self.theme.line_height as i32
+                - self.scroll_top as i32;
 
             self.layer.draw(None, 0).glyphs(
                 self.context,
                 Position { top, left },
                 &line,
-                self.line_height as u32,
+                self.theme.line_height as u32,
             );
         }
     }
 
     fn render_selection(&mut self) {
         let pos = |top, left| Position { top, left };
-        let row =
-            |cursor: Cursor| cursor.line as i32 * self.line_height as i32 - self.scroll_top as i32;
+        let row = |cursor: Cursor| {
+            cursor.line as i32 * self.theme.line_height as i32 - self.scroll_top as i32
+        };
         let column = |cursor: Cursor| -> i32 {
             self.line_numbers_width as i32
                 + if (self.start_line..self.start_line + self.lines.len()).contains(&cursor.line) {
@@ -230,7 +223,7 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
                     line.glyphs()
                         .iter()
                         .find_map(|glyph| {
-                            // TODO: consecutive glyphs may have same range!
+                            // TODO consecutive glyphs may have same range!
                             (glyph.range.end as usize > cursor.column).then_some(glyph.offset)
                         })
                         .unwrap_or_else(|| line.advance())
@@ -240,54 +233,70 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
                 }
         };
 
-        let layer = 1;
         let (selection, is_forward) = (self.selection.range(), self.selection.is_forward());
-        let (width, height) = (self.layer.size().width as i32, self.line_height as i32);
+        let (width, height) = (
+            self.layer.size().width as i32,
+            self.theme.line_height as i32,
+        );
         let top = row(selection.start);
         let bottom = row(selection.end);
         let start = column(selection.start);
         let end = column(selection.end);
+        let draw = &mut self.layer.draw(None, 1);
+        let caret_width = self.theme.caret_width;
+        let color = match self.mode {
+            Mode::Normal { .. } => self.theme.normal_mode_color,
+            Mode::Insert { .. } => self.theme.insert_mode_color,
+            Mode::Files => Default::default(),
+        };
+        let select = match self.mode {
+            Mode::Normal { select } | Mode::Insert { select } => select,
+            Mode::Files => Select::None,
+        };
+        let outline_colors = &[
+            color.transparent(255 / 4),
+            color.transparent(255 / 6),
+            color.transparent(255 / 8),
+            color.transparent(255 / 10),
+        ];
 
-        let render_outline = |renderer: &mut Renderer, top, bottom, left, right| {
-            for (i, color) in renderer.outline_colors.iter().copied().enumerate() {
+        let render_outline = |draw: &mut Draw, top, bottom, left, right| {
+            for (i, color) in outline_colors.iter().copied().enumerate() {
                 let i = i as i32;
 
                 if let Some(top) = top {
                     let i = i + 1; // TODO Why?!
-                    renderer
-                        .layer
-                        .draw(None, layer)
-                        .polyline([(pos(top + i, left), color), (pos(top + i, right), color)]);
+                    draw.polyline([(pos(top + i, left), color), (pos(top + i, right), color)]);
                 }
 
                 if let Some(bottom) = bottom {
-                    renderer.layer.draw(None, layer).polyline([
+                    draw.polyline([
                         (pos(bottom - i, left), color),
                         (pos(bottom - i, right), color),
                     ]);
                 }
             }
         };
-        let render_selection = |renderer: &mut Renderer, top, left, width, height| {
-            renderer.layer.draw(None, layer).rectangle(
+        let render_selection = |draw: &mut Draw, top, left, width, height| {
+            draw.rectangle(
                 Rectangle {
                     top,
                     left,
                     width: width as u32,
                     height: height as u32,
                 },
-                renderer.selection_color,
+                color.transparent(255 / 4),
             );
         };
-        let render_caret = |renderer: &mut Renderer, top, left| {
-            renderer.layer.draw(None, layer).rectangle(
+        let render_caret = |draw: &mut Draw, top, left| {
+            draw.rectangle(
                 Rectangle {
                     top,
-                    left: left - renderer.caret_width as i32 / 2,
-                    width: renderer.caret_width,
+                    left: left - caret_width as i32 / 2,
+                    width: caret_width,
                     height: height as u32,
                 },
-                renderer.caret_color,
+                color.transparent(255),
             );
         };
 
@@ -295,41 +304,41 @@ impl<'context, 'layer, 'graphics, 'lines, 'outline_colors>
         if selection.start == selection.end {
             let bottom = top + height;
 
-            if self.show_selection_as_lines {
-                render_selection(self, top, 0, width, height);
+            if select == Select::Lines {
+                render_selection(draw, top, 0, width, height);
             } else {
-                render_outline(self, Some(top), Some(bottom), 0, width);
+                render_outline(draw, Some(top), Some(bottom), 0, width);
             }
-            render_caret(self, top, start);
+            render_caret(draw, top, start);
         }
         // Single line
         else if selection.start.line == selection.end.line {
             let bottom = top + height;
 
-            if self.show_selection_as_lines {
-                render_selection(self, top, 0, width, height);
+            if select == Select::Lines {
+                render_selection(draw, top, 0, width, height);
             } else {
-                render_outline(self, Some(top), Some(bottom), 0, start);
-                render_outline(self, Some(top), Some(bottom), end, width);
-                render_selection(self, top, start, end - start, height);
+                render_outline(draw, Some(top), Some(bottom), 0, start);
+                render_outline(draw, Some(top), Some(bottom), end, width);
+                render_selection(draw, top, start, end - start, height);
             }
-            render_caret(self, top, if is_forward { end } else { start });
+            render_caret(draw, top, if is_forward { end } else { start });
         }
         // Multiple lines
         else {
             let (top2, bottom2) = (top + height, bottom + height);
 
-            if self.show_selection_as_lines {
-                render_selection(self, top, 0, width, bottom2 - top);
+            if select == Select::Lines {
+                render_selection(draw, top, 0, width, bottom2 - top);
             } else {
-                render_outline(self, Some(top), None, 0, start);
-                render_outline(self, None, Some(bottom2), end, width);
-                render_selection(self, top, start, width - start, height);
-                render_selection(self, top2, 0, width, bottom - top2);
-                render_selection(self, bottom, 0, end, height);
+                render_outline(draw, Some(top), None, 0, start);
+                render_outline(draw, None, Some(bottom2), end, width);
+                render_selection(draw, top, start, width - start, height);
+                render_selection(draw, top2, 0, width, bottom - top2);
+                render_selection(draw, bottom, 0, end, height);
             }
             render_caret(
-                self,
+                draw,
                 if is_forward { bottom } else { top },
                 if is_forward { end } else { start },
             );

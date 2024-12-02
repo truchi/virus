@@ -1,6 +1,7 @@
 pub mod document;
 pub mod editor;
 pub mod fuzzy;
+pub mod mode;
 pub mod rope {
     pub use cursor::*;
     pub use edit::*;

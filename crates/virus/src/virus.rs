@@ -17,6 +17,7 @@ use virus_editor::{
     document::Document,
     editor::{Editor, EventLoopMessage},
     fuzzy::Fuzzy,
+    mode::{Mode, Select},
     rope::{Boundaries, Cursor, Text},
     sub_in_range,
 };
@@ -91,41 +92,6 @@ impl ApplicationHandler<EventLoopMessage> for Handler {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Virus                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-#[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
-pub enum Select {
-    #[default]
-    None,
-    Range,
-    Lines,
-}
-
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum Mode {
-    Normal { select: Select },
-    Insert { select: Select },
-    Files,
-}
-
-impl Default for Mode {
-    fn default() -> Self {
-        Self::Normal {
-            select: Default::default(),
-        }
-    }
-}
-
-impl Mode {
-    pub fn select(&self) -> Select {
-        match self {
-            Mode::Normal { select } => *select,
-            Mode::Insert { select } => *select,
-            Mode::Files => Select::None,
-        }
-    }
-}
-
-// ────────────────────────────────────────────────────────────────────────────────────────────── //
 
 #[derive(Clone, Debug)]
 pub struct Clipboard {
@@ -375,40 +341,10 @@ impl Virus {
 
         self.last_render = Some(now);
         self.ui.update(delta);
-        let outline_normal_mode_colors = &self.ui.theme().outline_normal_mode_colors.clone();
-        let outline_select_mode_colors = &self.ui.theme().outline_select_mode_colors.clone();
-        let outline_insert_mode_colors = &self.ui.theme().outline_insert_mode_colors.clone();
         self.ui.render(
             |id| self.editor.get_document(id),
-            self.mode.select() == Select::Lines,
-            match self.mode {
-                Mode::Normal {
-                    select: Select::None,
-                } => outline_normal_mode_colors,
-                Mode::Insert { .. } => outline_insert_mode_colors,
-                _ => outline_select_mode_colors,
-            },
-            match self.mode {
-                Mode::Normal {
-                    select: Select::None,
-                } => self.ui.theme().caret_normal_mode_color,
-                Mode::Insert { .. } => self.ui.theme().caret_insert_mode_color,
-                _ => self.ui.theme().caret_select_mode_color,
-            },
-            match self.mode {
-                Mode::Normal {
-                    select: Select::None,
-                } => self.ui.theme().caret_normal_mode_width,
-                Mode::Insert { .. } => self.ui.theme().caret_insert_mode_width,
-                _ => self.ui.theme().caret_select_mode_width,
-            },
-            match self.mode {
-                Mode::Normal {
-                    select: Select::None,
-                } => self.ui.theme().selection_select_mode_color,
-                Mode::Insert { .. } => self.ui.theme().selection_insert_mode_color,
-                _ => self.ui.theme().selection_select_mode_color,
-            },
+            self.active_pane_id,
+            self.mode,
             self.search
                 .as_ref()
                 .map(|(needle, _, haystacks, selected)| {
