@@ -28,11 +28,13 @@ pub struct DocumentView {
 
 impl DocumentView {
     pub fn new(theme: Rc<RefCell<UiTheme>>) -> Self {
+        let lines = Lines::new(theme.clone());
+
         Self {
             theme,
             size: Default::default(),
             rope: Default::default(),
-            lines: Default::default(),
+            lines,
             scroll_top: Default::default(),
             scrollbar_alpha: Default::default(),
         }
@@ -150,9 +152,7 @@ impl DocumentView {
                 width: (advance / 4.0).round() as u32,
             }
         };
-        let lines = self
-            .lines
-            .lines(context, document, start_line..end_line, &theme.clone());
+        let lines = self.lines.lines(context, document, start_line..end_line);
 
         Renderer {
             context,
