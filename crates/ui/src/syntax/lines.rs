@@ -1,5 +1,5 @@
 use crate::{syntax::Capture, theme::UiTheme};
-use std::{borrow::Cow, cell::RefCell, ops::Range, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, ops::Range, rc::Weak};
 use virus_editor::document::{Document, DocumentId};
 use virus_graphics::text::{Cluster, Context, Line};
 
@@ -14,11 +14,11 @@ pub struct Lines {
     document_id: DocumentId,
     version: usize,
     lines: Vec<Line>,
-    theme: Rc<RefCell<UiTheme>>,
+    theme: Weak<RefCell<UiTheme>>,
 }
 
 impl Lines {
-    pub fn new(theme: Rc<RefCell<UiTheme>>) -> Self {
+    pub fn new(theme: Weak<RefCell<UiTheme>>) -> Self {
         Self {
             document_id: Default::default(),
             version: Default::default(),
@@ -51,7 +51,8 @@ impl Lines {
 /// Private.
 impl Lines {
     fn shape(&mut self, context: &mut Context, document: &Document) {
-        let theme = self.theme.borrow();
+        let theme = self.theme.upgrade().unwrap();
+        let theme = theme.borrow();
         let range = 0..document.rope().len_lines();
 
         let mut shapers = document

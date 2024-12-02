@@ -3,7 +3,7 @@
 use std::{
     cell::RefCell,
     ops::{Range, RangeBounds},
-    rc::Rc,
+    rc::{Rc, Weak},
     usize,
 };
 use virus_graphics::{
@@ -27,7 +27,7 @@ fn min_width(width: u32) -> u32 {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct FilesView {
-    theme: Rc<RefCell<UiTheme>>,
+    theme: Weak<RefCell<UiTheme>>,
     needle: String,
     haystack: Vec<(String, Vec<Range<usize>>)>,
     selected: usize,
@@ -35,7 +35,7 @@ pub struct FilesView {
 }
 
 impl FilesView {
-    pub fn new(theme: Rc<RefCell<UiTheme>>, background: Rgba) -> Self {
+    pub fn new(theme: Weak<RefCell<UiTheme>>, background: Rgba) -> Self {
         Self {
             theme,
             needle: Default::default(),
@@ -53,13 +53,16 @@ impl FilesView {
         haystacks: &'a [(String, isize, Vec<Range<usize>>)],
         selected: usize,
     ) {
+        let theme = self.theme.upgrade().unwrap();
+        let theme = theme.borrow();
+
         Renderer::new(
             context,
             layer,
             self.background,
-            self.theme.borrow().family,
-            self.theme.borrow().font_size,
-            self.theme.borrow().line_height,
+            theme.family,
+            theme.font_size,
+            theme.line_height,
             needle,
             haystacks,
             selected,

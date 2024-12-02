@@ -20,7 +20,12 @@ use virus_editor::{
     rope::{Boundaries, Cursor, Text},
     sub_in_range,
 };
-use virus_ui::{panes::PaneId, theme::UiTheme, tween::Tween, ui::Ui};
+use virus_ui::{
+    panes::{Pane, PaneId},
+    theme::UiTheme,
+    tween::Tween,
+    ui::Ui,
+};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -197,8 +202,14 @@ impl Virus {
             .panes()
             .panes()
             .iter()
-            .find(|(pane_id, document_id)| self.active_pane_id == *pane_id)
-            .map(|(_, document_id)| self.editor.get_document(*document_id))
+            .find_map(|pane| match pane {
+                Pane::Document {
+                    pane_id,
+                    document_id,
+                    document_view,
+                } => (self.active_pane_id == *pane_id).then_some(*document_id),
+            })
+            .map(|document_id| self.editor.get_document(document_id))
             .flatten()
     }
 
@@ -207,8 +218,14 @@ impl Virus {
             .panes()
             .panes()
             .iter()
-            .find(|(pane_id, document_id)| self.active_pane_id == *pane_id)
-            .map(|(_, document_id)| self.editor.get_document_mut(*document_id))
+            .find_map(|pane| match pane {
+                Pane::Document {
+                    pane_id,
+                    document_id,
+                    document_view,
+                } => (self.active_pane_id == *pane_id).then_some(*document_id),
+            })
+            .map(|document_id| self.editor.get_document_mut(document_id))
             .flatten()
     }
 
@@ -230,8 +247,9 @@ impl Virus {
     }
 
     fn ensure_visibility(&mut self) {
-        self.ui
-            .ensure_visibility(self.unwrap_active_document().selection().head.line);
+        // TODO
+        // self.ui
+        //     .ensure_visibility(self.unwrap_active_document().selection().head.line);
     }
 }
 

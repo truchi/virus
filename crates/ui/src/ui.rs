@@ -1,8 +1,8 @@
 use crate::{
     panes::{PaneId, Panes},
-    syntax::SyntaxTheme,
+    syntax::{Lines, SyntaxTheme},
     theme::UiTheme,
-    views::{DocumentView, FilesView},
+    views::FilesView,
 };
 use std::{
     cell::{Ref, RefCell},
@@ -25,15 +25,16 @@ use winit::window::Window;
 //                                                 Ui                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+pub(crate) type LinesCache = HashMap<DocumentId, Lines>;
+
 pub struct Ui {
     window: Arc<Window>,
     graphics: Graphics,
     context: Context,
     theme: Rc<RefCell<UiTheme>>,
     panes: Panes,
-    document: DocumentId, // TODO remove
-    documents: HashMap<DocumentId, DocumentView>,
     files: FilesView,
+    _lines_cache: Rc<RefCell<LinesCache>>,
 }
 
 impl Ui {
@@ -82,17 +83,18 @@ impl Ui {
                 selection_insert_mode_color: insert_mode.solid().transparent(255 / 2),
             }
         }));
-        let files = FilesView::new(theme.clone(), Rgba::WHITE);
+        let lines_cache = Default::default();
+        let files = FilesView::new(Rc::downgrade(&theme), Rgba::WHITE);
+        let panes = Panes::new(Rc::downgrade(&theme), Rc::downgrade(&lines_cache));
 
         Self {
             window,
             graphics,
             context,
             theme,
-            panes: Default::default(),
-            document: DocumentId::NONE,
-            documents: Default::default(),
+            panes,
             files,
+            _lines_cache: lines_cache,
         }
     }
 
@@ -105,7 +107,7 @@ impl Ui {
     }
 
     pub fn is_animating(&self) -> bool {
-        self.documents.values().any(|view| view.is_animating())
+        self.panes.is_animating()
     }
 
     pub fn screen_height_in_lines(&self) -> u32 {
@@ -124,44 +126,13 @@ impl Ui {
         self.panes.open_pane(document_id)
     }
 
-    pub fn scroll_up(&mut self) {
-        self.documents
-            .get_mut(&self.document)
-            .map(|view| view.scroll_up());
-    }
-
-    pub fn scroll_down(&mut self) {
-        self.documents
-            .get_mut(&self.document)
-            .map(|view| view.scroll_down());
-    }
-
-    pub fn scroll_to(&mut self, top: u32) {
-        self.documents
-            .get_mut(&self.document)
-            .map(|views| views.scroll_to(top));
-    }
-
-    // TODO: have pane ids, drive Virus with that (active_pane_id?), get active document id from Panes here
-    pub fn ensure_visibility(&mut self, line: usize) {
-        self.documents
-            .get_mut(&self.document)
-            .map(|views| views.ensure_visibility(line));
-    }
-
     pub fn resize(&mut self) {
-        let size = self.region().size();
-
         self.graphics.resize(&self.window);
-        self.documents
-            .values_mut()
-            .for_each(|views| views.resize(size));
+        self.panes.resize(self.region());
     }
 
     pub fn update(&mut self, delta: Duration) {
-        self.documents
-            .values_mut()
-            .for_each(|views| views.update(delta));
+        self.panes.update(delta);
     }
 
     pub fn render<'a>(
@@ -177,33 +148,17 @@ impl Ui {
         // TODO react to document closes
 
         let region = self.region();
-        let width = (region.width as f32 / self.panes.panes().len() as f32).round() as u32;
 
-        for (i, &(_, document_id)) in self.panes.panes().iter().enumerate() {
-            let document = documents(document_id).unwrap();
-            let region = Rectangle {
-                top: region.top,
-                left: region.left + i as i32 * width as i32,
-                width,
-                height: region.height,
-            };
-
-            let view = self
-                .documents
-                .entry(document_id)
-                .or_insert_with(|| DocumentView::new(self.theme.clone()));
-            view.resize(region.size());
-            view.render(
-                &mut self.context,
-                &mut self.graphics.layer(region, 0),
-                document,
-                show_selection_as_lines,
-                outline_colors,
-                caret_color,
-                caret_width,
-                selection_color,
-            );
-        }
+        self.panes.render(
+            &mut self.context,
+            &mut self.graphics,
+            documents,
+            show_selection_as_lines,
+            outline_colors,
+            caret_color,
+            caret_width,
+            selection_color,
+        );
 
         if let Some((needle, haystack, selected)) = search {
             self.files.render(

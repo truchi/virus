@@ -1,6 +1,5 @@
-use crate::{syntax::Lines, theme::UiTheme, tween::Tweened};
-use ropey::Rope;
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use crate::{syntax::Lines, theme::UiTheme, tween::Tweened, ui::LinesCache};
+use std::{cell::RefCell, fmt::Write, rc::Weak, time::Duration};
 use virus_editor::{
     document::Document,
     rope::{Cursor, Selection},
@@ -9,7 +8,7 @@ use virus_graphics::{
     text::{
         Advance, Context, FontFamilyKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
     },
-    types::{Position, Rectangle, Rgba, Size},
+    types::{Position, Rectangle, Rgba},
     wgpu::Layer,
 };
 
@@ -18,83 +17,41 @@ use virus_graphics::{
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct DocumentView {
-    theme: Rc<RefCell<UiTheme>>,
-    size: Size,
-    rope: Rope,
-    lines: Lines,
     scroll_top: Tweened<u32>,
     scrollbar_alpha: Tweened<u8>,
+    theme: Weak<RefCell<UiTheme>>,
+    lines_cache: Weak<RefCell<LinesCache>>,
+}
+
+impl std::fmt::Debug for DocumentView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_char('…')
+    }
 }
 
 impl DocumentView {
-    pub fn new(theme: Rc<RefCell<UiTheme>>) -> Self {
-        let lines = Lines::new(theme.clone());
-
+    pub fn new(theme: Weak<RefCell<UiTheme>>, lines_cache: Weak<RefCell<LinesCache>>) -> Self {
         Self {
-            theme,
-            size: Default::default(),
-            rope: Default::default(),
-            lines,
             scroll_top: Default::default(),
             scrollbar_alpha: Default::default(),
+            theme,
+            lines_cache,
         }
-    }
-
-    pub fn rope(&self) -> &Rope {
-        &self.rope
     }
 
     pub fn is_animating(&self) -> bool {
         self.scroll_top.is_animating() || self.scrollbar_alpha.is_animating()
     }
 
-    pub fn scroll_up(&mut self) {
-        let line_height = self.theme.borrow().line_height;
-        let scroll = (self.size.height / line_height) / 2 * line_height;
-        self.scroll_to(self.scroll_top.end().saturating_sub(scroll))
-    }
-
-    pub fn scroll_down(&mut self) {
-        let line_height = self.theme.borrow().line_height;
-        let rope_lines = self.rope.len_lines() as u32;
-        let height_in_lines = self.size.height / line_height;
-
-        if rope_lines > height_in_lines {
-            let end = self.scroll_top.end() + height_in_lines / 2 * line_height;
-            self.scroll_to(end.min((rope_lines - height_in_lines) * line_height));
-        }
-    }
-
     pub fn scroll_to(&mut self, top: u32) {
-        self.scroll_top.to(
-            top,
-            self.theme.borrow().scroll_duration,
-            self.theme.borrow().scroll_tween,
-        );
-        self.scrollbar_alpha = Tweened::with_animation(
-            255,
-            0,
-            self.theme.borrow().scroll_duration,
-            self.theme.borrow().scroll_tween,
-        );
-    }
+        let (duration, tween) = {
+            let theme = self.theme.upgrade().unwrap();
+            let theme = theme.borrow();
+            (theme.scroll_duration, theme.scroll_tween)
+        };
 
-    pub fn ensure_visibility(&mut self, line: usize) {
-        let line_height = self.theme.borrow().line_height;
-        let height_in_lines = self.size.height / line_height;
-        let line = line as u32;
-        let start = self.scroll_top.end() / line_height;
-        let end = start + height_in_lines;
-
-        if line < start {
-            self.scroll_to(line * line_height);
-        } else if line >= end {
-            self.scroll_to((line - height_in_lines + 1) * line_height);
-        }
-    }
-
-    pub fn resize(&mut self, size: Size) {
-        self.size = size;
+        self.scroll_top.to(top, duration, tween);
+        self.scrollbar_alpha = Tweened::with_animation(255, 0, duration, tween);
     }
 
     pub fn update(&mut self, delta: Duration) {
@@ -113,9 +70,8 @@ impl DocumentView {
         caret_width: u32,
         selection_color: Rgba,
     ) {
-        self.rope = document.rope().clone();
-        let theme = self.theme.borrow();
-
+        let theme = self.theme.upgrade().unwrap();
+        let theme = theme.borrow();
         let scroll_top = self.scroll_top.current();
         let scrollbar_color = theme
             .scrollbar_color
@@ -152,7 +108,12 @@ impl DocumentView {
                 width: (advance / 4.0).round() as u32,
             }
         };
-        let lines = self.lines.lines(context, document, start_line..end_line);
+        let lines_cache = self.lines_cache.upgrade().unwrap();
+        let mut lines_cache = lines_cache.borrow_mut();
+        let lines = lines_cache
+            .entry(document.id())
+            .or_insert_with(|| Lines::new(self.theme.clone()));
+        let lines = lines.lines(context, document, start_line..end_line);
 
         Renderer {
             context,
