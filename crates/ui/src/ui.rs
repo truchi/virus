@@ -1,4 +1,5 @@
 use crate::{
+    panes::{PaneId, Panes},
     syntax::SyntaxTheme,
     theme::UiTheme,
     views::{DocumentView, FilesView},
@@ -29,7 +30,8 @@ pub struct Ui {
     graphics: Graphics,
     context: Context,
     theme: Rc<RefCell<UiTheme>>,
-    document: DocumentId,
+    panes: Panes,
+    document: DocumentId, // TODO remove
     documents: HashMap<DocumentId, DocumentView>,
     files: FilesView,
 }
@@ -87,6 +89,7 @@ impl Ui {
             graphics,
             context,
             theme,
+            panes: Default::default(),
             document: DocumentId::NONE,
             documents: Default::default(),
             files,
@@ -109,6 +112,18 @@ impl Ui {
         self.window.inner_size().height / self.theme().line_height
     }
 
+    pub fn panes(&self) -> &Panes {
+        &self.panes
+    }
+
+    pub fn panes_mut(&mut self) -> &mut Panes {
+        &mut self.panes
+    }
+
+    pub fn open_pane(&mut self, document_id: DocumentId) -> PaneId {
+        self.panes.open_pane(document_id)
+    }
+
     pub fn scroll_up(&mut self) {
         self.documents
             .get_mut(&self.document)
@@ -127,6 +142,7 @@ impl Ui {
             .map(|views| views.scroll_to(top));
     }
 
+    // TODO: have pane ids, drive Virus with that (active_pane_id?), get active document id from Panes here
     pub fn ensure_visibility(&mut self, line: usize) {
         self.documents
             .get_mut(&self.document)
@@ -150,7 +166,7 @@ impl Ui {
 
     pub fn render<'a>(
         &mut self,
-        document: &Document,
+        documents: impl Fn(DocumentId) -> Option<&'a Document>,
         show_selection_as_lines: bool,
         outline_colors: &[Rgba],
         caret_color: Rgba,
@@ -158,24 +174,36 @@ impl Ui {
         selection_color: Rgba,
         search: Option<(&'a str, &'a [(String, isize, Vec<Range<usize>>)], usize)>,
     ) {
-        let region = self.region();
+        // TODO react to document closes
 
-        self.document = document.id();
-        let view = self
-            .documents
-            .entry(self.document)
-            .or_insert_with(|| DocumentView::new(self.theme.clone()));
-        view.resize(region.size());
-        view.render(
-            &mut self.context,
-            &mut self.graphics.layer(region, 0),
-            document,
-            show_selection_as_lines,
-            outline_colors,
-            caret_color,
-            caret_width,
-            selection_color,
-        );
+        let region = self.region();
+        let width = (region.width as f32 / self.panes.panes().len() as f32).round() as u32;
+
+        for (i, &(_, document_id)) in self.panes.panes().iter().enumerate() {
+            let document = documents(document_id).unwrap();
+            let region = Rectangle {
+                top: region.top,
+                left: region.left + i as i32 * width as i32,
+                width,
+                height: region.height,
+            };
+
+            let view = self
+                .documents
+                .entry(document_id)
+                .or_insert_with(|| DocumentView::new(self.theme.clone()));
+            view.resize(region.size());
+            view.render(
+                &mut self.context,
+                &mut self.graphics.layer(region, 0),
+                document,
+                show_selection_as_lines,
+                outline_colors,
+                caret_color,
+                caret_width,
+                selection_color,
+            );
+        }
 
         if let Some((needle, haystack, selected)) = search {
             self.files.render(
@@ -193,14 +221,16 @@ impl Ui {
 
 /// Private.
 impl Ui {
+    // TODO goddamn why are we not using f32 in Graphics?
     fn region(&self) -> Rectangle {
         let size = self.window.inner_size();
+        let width = size.width;
         let height = self.screen_height_in_lines() * self.theme().line_height;
 
         Rectangle {
             top: (size.height - height) as i32 / 2,
-            left: 0,
-            width: size.width,
+            left: (size.width - width) as i32 / 2,
+            width,
             height,
         }
     }

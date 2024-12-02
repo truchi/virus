@@ -230,18 +230,12 @@ pub enum Event<T = SmolStr> {
 //                                                Events                                          //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct Events {
     modifiers: Modifiers,
 }
 
 impl Events {
-    pub fn new() -> Self {
-        Self {
-            modifiers: Default::default(),
-        }
-    }
-
     pub fn update(&mut self, event: &WindowEvent) -> Option<Event> {
         Some(match event {
             WindowEvent::Resized(_) => Event::Resized,

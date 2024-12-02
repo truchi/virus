@@ -1,3 +1,4 @@
+pub mod panes;
 pub mod syntax {
     mod capture;
     mod lines;

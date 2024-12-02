@@ -36,7 +36,7 @@ macro_rules! ids {
         }
 
         $(#[$id_doc])?
-        #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+        #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
         $id_vis struct $Id(usize);
 
         impl $Id {

@@ -20,7 +20,7 @@ use virus_editor::{
     rope::{Boundaries, Cursor, Text},
     sub_in_range,
 };
-use virus_ui::{theme::UiTheme, tween::Tween, ui::Ui};
+use virus_ui::{panes::PaneId, theme::UiTheme, tween::Tween, ui::Ui};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -144,6 +144,7 @@ pub struct Virus {
     )>,
     keybindings: Keybindings,
     clipboard: Option<Clipboard>,
+    active_pane_id: PaneId,
 }
 
 impl Virus {
@@ -153,14 +154,10 @@ impl Virus {
             .build()
             .expect("Cannot create event loop");
         let editor = {
-            let file = PathBuf::from(std::env::args().skip(1).next().expect("File argument"));
-            let root = Editor::find_git_root(file.clone())
-                .unwrap_or_else(|| std::env::current_dir().expect("Current directory").into());
-            let mut editor = Editor::new(root);
+            let current_dir = std::env::current_dir().expect("Current directory");
+            let root = Editor::find_git_root(current_dir.clone()).unwrap_or(current_dir);
 
-            editor.open(file).unwrap();
-
-            editor
+            Editor::new(root)
         };
 
         //
@@ -182,27 +179,47 @@ impl Virus {
     const MILLIS_PER_FRAME: u128 = 1000 / Virus::FRAMES_PER_SECOND as u128;
 
     fn new(window: Window, editor: Editor) -> Self {
-        let events = Events::new();
-        let ui = Ui::new(Arc::new(window));
-
         Self {
-            events,
+            events: Default::default(),
             editor,
-            mode: Mode::default(),
-            ui,
-            last_render: None,
-            search: None,
+            mode: Default::default(),
+            ui: Ui::new(Arc::new(window)),
+            last_render: Default::default(),
+            search: Default::default(),
             keybindings: Default::default(),
-            clipboard: None,
+            clipboard: Default::default(),
+            active_pane_id: Default::default(),
         }
     }
 
-    fn unwrap_active_document(&self) -> &Document {
-        self.editor.get_active_document().unwrap()
+    fn get_active_document(&self) -> Option<&Document> {
+        self.ui
+            .panes()
+            .panes()
+            .iter()
+            .find(|(pane_id, document_id)| self.active_pane_id == *pane_id)
+            .map(|(_, document_id)| self.editor.get_document(*document_id))
+            .flatten()
     }
 
+    fn get_active_document_mut(&mut self) -> Option<&mut Document> {
+        self.ui
+            .panes()
+            .panes()
+            .iter()
+            .find(|(pane_id, document_id)| self.active_pane_id == *pane_id)
+            .map(|(_, document_id)| self.editor.get_document_mut(*document_id))
+            .flatten()
+    }
+
+    // TODO ...
+    fn unwrap_active_document(&self) -> &Document {
+        self.get_active_document().unwrap()
+    }
+
+    // TODO ...
     fn unwrap_active_document_mut(&mut self) -> &mut Document {
-        self.editor.get_active_document_mut().unwrap()
+        self.get_active_document_mut().unwrap()
     }
 
     fn mode(&mut self, mode: Mode) {
@@ -270,9 +287,7 @@ impl Virus {
                         self.unwrap_active_document_mut().edition().backspace();
                     }
                     Key::Enter => {
-                        self.editor
-                            .get_active_document_mut()
-                            .unwrap()
+                        self.unwrap_active_document_mut()
                             .edition()
                             .edit("\n".into(), false);
                     }
@@ -314,7 +329,8 @@ impl Virus {
         }
 
         // TODO handle that better
-        self.unwrap_active_document_mut().parse();
+        self.get_active_document_mut()
+            .map(|document| document.parse());
 
         // TODO handle that better
         self.ui.window().request_redraw();
@@ -345,7 +361,7 @@ impl Virus {
         let outline_select_mode_colors = &self.ui.theme().outline_select_mode_colors.clone();
         let outline_insert_mode_colors = &self.ui.theme().outline_insert_mode_colors.clone();
         self.ui.render(
-            self.editor.get_active_document().unwrap(),
+            |id| self.editor.get_document(id),
             self.mode.select() == Select::Lines,
             match self.mode {
                 Mode::Normal {
@@ -1069,7 +1085,8 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let (needle, files, haystacks, selected) = self.virus.search.as_mut().unwrap();
 
                 let path = self.virus.editor.root().join(&haystacks[*selected].0);
-                self.virus.editor.open(path).unwrap();
+                let document_id = self.virus.editor.open(path).unwrap();
+                self.virus.active_pane_id = self.virus.ui.open_pane(document_id);
                 self.virus.search = None;
                 self.virus.mode(Mode::Normal {
                     select: Select::None,

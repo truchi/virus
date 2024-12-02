@@ -20,19 +20,14 @@ pub struct Editor {
     root: PathBuf,
     document_ids: DocumentIds,
     documents: HashMap<DocumentId, Document>,
-    active_document: Option<DocumentId>,
 }
 
 impl Editor {
     pub fn new(root: PathBuf) -> Self {
-        let mut document_ids = DocumentIds::default();
-        let active_document = Some(document_ids.id());
-
         let editor = Self {
             root,
-            document_ids,
+            document_ids: Default::default(),
             documents: Default::default(),
-            active_document,
         };
 
         editor
@@ -42,45 +37,31 @@ impl Editor {
         self.root.as_path()
     }
 
-    pub fn get_document(&self, id: DocumentId) -> Option<&Document> {
-        self.documents.get(&id)
+    pub fn get_document(&self, document_id: DocumentId) -> Option<&Document> {
+        self.documents.get(&document_id)
     }
 
-    pub fn get_document_mut(&mut self, id: DocumentId) -> Option<&mut Document> {
-        self.documents.get_mut(&id)
+    pub fn get_document_mut(&mut self, document_id: DocumentId) -> Option<&mut Document> {
+        self.documents.get_mut(&document_id)
     }
 
-    pub fn active_document(&self) -> Option<DocumentId> {
-        self.active_document
-    }
-
-    pub fn get_active_document(&self) -> Option<&Document> {
-        self.active_document.and_then(|id| self.get_document(id))
-    }
-
-    pub fn get_active_document_mut(&mut self) -> Option<&mut Document> {
-        self.active_document
-            .and_then(|id| self.get_document_mut(id))
-    }
-
-    pub fn open(&mut self, path: PathBuf) -> std::io::Result<()> {
-        if let Some((id, _)) = self
+    pub fn open(&mut self, path: PathBuf) -> std::io::Result<DocumentId> {
+        if let Some((document_id, _)) = self
             .documents
             .iter()
             .find(|(_, document)| document.path() == path)
         {
-            self.active_document = Some(*id);
+            Ok(*document_id)
         } else {
-            let id = self.document_ids.id();
+            let document_id = self.document_ids.id();
 
-            let mut document = Document::open(id, path)?;
+            let mut document = Document::open(document_id, path)?;
             document.parse();
 
-            self.active_document = Some(id);
-            self.documents.insert(id, document);
-        }
+            self.documents.insert(document_id, document);
 
-        Ok(())
+            Ok(document_id)
+        }
     }
 
     pub fn files(&self, hidden: bool, ignored: bool) -> impl '_ + Iterator<Item = PathBuf> {
