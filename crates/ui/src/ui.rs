@@ -94,6 +94,14 @@ impl Ui {
         self.panes.open_pane(document_id)
     }
 
+    pub fn get_active_pane_id(&self) -> Option<PaneId> {
+        self.panes.get_active_pane_id()
+    }
+
+    pub fn set_active_pane_id(&mut self, active_pane_id: Option<PaneId>) {
+        self.panes.set_active_pane_id(active_pane_id);
+    }
+
     pub fn resize(&mut self) {
         let size = self.window.inner_size();
         let size = Size {
@@ -121,7 +129,6 @@ impl Ui {
     pub fn render<'a>(
         &mut self,
         documents: impl Fn(DocumentId) -> Option<&'a Document>,
-        active_pane_id: PaneId,
         mode: Mode,
         search: Option<(&'a str, &'a [(String, isize, Vec<Range<usize>>)], usize)>,
     ) {
@@ -129,13 +136,8 @@ impl Ui {
 
         let region = self.region();
 
-        self.panes.render(
-            &mut self.context,
-            &mut self.graphics,
-            documents,
-            active_pane_id,
-            mode,
-        );
+        self.panes
+            .render(&mut self.context, &mut self.graphics, documents, mode);
 
         if let Some((needle, haystack, selected)) = search {
             self.files.render(
@@ -241,7 +243,7 @@ fn fonts() -> Fonts {
 fn ui_theme(context: &Context) -> UiTheme {
     let catppuccin = Catppuccin::default();
     let family = context.fonts().get("Victor").unwrap().key();
-    let font_size = 20 as FontSize;
+    let font_size = 15 as FontSize;
     let line_height = font_size as LineHeight + font_size as LineHeight / 4;
 
     UiTheme {

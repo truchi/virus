@@ -29,6 +29,8 @@ impl std::fmt::Debug for DocumentView {
 }
 
 impl DocumentView {
+    pub const GUTTER_COLUMNS: u32 = 5;
+
     pub fn new(theme: Weak<RefCell<UiTheme>>, lines_cache: Weak<RefCell<LinesCache>>) -> Self {
         Self {
             scroll_top: Default::default(),
@@ -125,7 +127,7 @@ impl DocumentView {
             selection: document.selection(),
             lines: &lines[..],
             start_line,
-            line_numbers_width: (advance * (rope_lines.ilog10() + 3) as Advance).round() as u32,
+            gutter_width: (advance * Self::GUTTER_COLUMNS as Advance).round() as u32,
             scroll_top,
             scrollbar_rectangle,
             scrollbar_color,
@@ -146,7 +148,7 @@ struct Renderer<'context, 'layer, 'graphics, 'lines> {
     selection: Selection,
     lines: &'lines [Line],
     start_line: usize,
-    line_numbers_width: u32,
+    gutter_width: u32,
     scroll_top: u32,
     scrollbar_rectangle: Rectangle,
     scrollbar_color: Rgba,
@@ -178,7 +180,7 @@ impl<'context, 'layer, 'graphics, 'lines> Renderer<'context, 'layer, 'graphics, 
                 self.theme.font_size,
             );
             let top = number as i32 * self.theme.line_height as i32 - self.scroll_top as i32;
-            let left = (self.line_numbers_width as Advance - line.advance()).round() as i32;
+            let left = (self.gutter_width as Advance - line.advance()).round() as i32;
 
             self.layer.draw(None, 0).glyphs(
                 self.context,
@@ -190,7 +192,7 @@ impl<'context, 'layer, 'graphics, 'lines> Renderer<'context, 'layer, 'graphics, 
     }
 
     fn render_lines(&mut self) {
-        let left = self.line_numbers_width as i32;
+        let left = self.gutter_width as i32;
 
         for (index, line) in self.lines.iter().enumerate() {
             let top = (self.start_line + index) as i32 * self.theme.line_height as i32
@@ -211,7 +213,7 @@ impl<'context, 'layer, 'graphics, 'lines> Renderer<'context, 'layer, 'graphics, 
             cursor.line as i32 * self.theme.line_height as i32 - self.scroll_top as i32
         };
         let column = |cursor: Cursor| -> i32 {
-            self.line_numbers_width as i32
+            self.gutter_width as i32
                 + if (self.start_line..self.start_line + self.lines.len()).contains(&cursor.line) {
                     let line = &self.lines[cursor.line - self.start_line];
 

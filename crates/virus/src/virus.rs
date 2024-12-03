@@ -115,7 +115,6 @@ pub struct Virus {
     )>,
     keybindings: Keybindings,
     clipboard: Option<Clipboard>,
-    active_pane_id: PaneId,
 }
 
 impl Virus {
@@ -159,13 +158,14 @@ impl Virus {
             search: Default::default(),
             keybindings: Default::default(),
             clipboard: Default::default(),
-            active_pane_id: Default::default(),
         }
     }
 
     fn get_active_document(&self) -> Option<(&DocumentPane, &Document)> {
         self.ui
-            .pane(self.active_pane_id)
+            .get_active_pane_id()
+            .map(|active_pane_id| self.ui.pane(active_pane_id))
+            .flatten()
             .map(|pane| match pane {
                 Pane::Document(pane) => (pane, pane.document_id),
             })
@@ -179,7 +179,9 @@ impl Virus {
 
     fn get_active_document_mut(&mut self) -> Option<(&DocumentPane, &mut Document)> {
         self.ui
-            .pane(self.active_pane_id)
+            .get_active_pane_id()
+            .map(|active_pane_id| self.ui.pane(active_pane_id))
+            .flatten()
             .map(|pane| match pane {
                 Pane::Document(pane) => (pane, pane.document_id),
             })
@@ -209,17 +211,14 @@ impl Virus {
     }
 
     fn ensure_visibility(&mut self) {
-        let Some((region, scroll_top, document)) = self
-            .get_active_document()
-            .map(|(pane, document)| (pane.region, pane.document_view.scroll_top(), document))
-        else {
+        let Some((pane, document)) = self.get_active_document() else {
             return;
         };
 
         let line = document.selection().head.line as u32;
         let line_height = self.ui.theme().line_height;
-        let height_in_lines = region.height / line_height;
-        let start = scroll_top / line_height;
+        let height_in_lines = pane.region.height / line_height;
+        let start = pane.document_view.scroll_top() / line_height;
         let end = start + height_in_lines;
 
         let line = if line < start {
@@ -230,7 +229,7 @@ impl Virus {
             return;
         };
 
-        self.ui.scroll_to(self.active_pane_id, line as usize);
+        self.ui.scroll_to(pane.pane_id, line as usize);
     }
 }
 
@@ -358,7 +357,6 @@ impl Virus {
         self.ui.update(delta);
         self.ui.render(
             |id| self.editor.get_document(id),
-            self.active_pane_id,
             self.mode,
             self.search
                 .as_ref()
@@ -1065,7 +1063,9 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
 
                 let path = self.virus.editor.root().join(&haystacks[*selected].0);
                 let document_id = self.virus.editor.open(path).unwrap();
-                self.virus.active_pane_id = self.virus.ui.open_pane(document_id);
+                let pane_id = self.virus.ui.open_pane(document_id);
+
+                self.virus.ui.set_active_pane_id(Some(pane_id));
                 self.virus.search = None;
                 self.virus.mode(Mode::Normal {
                     select: Select::None,
