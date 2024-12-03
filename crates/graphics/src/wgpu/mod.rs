@@ -185,6 +185,7 @@ impl Graphics {
                 resolve_target: None,
                 ops: Operations {
                     load: LoadOp::Clear({
+                        // TODO
                         let color = crate::Catppuccin::default().crust;
                         Color {
                             r: color.r as f64 / 255.0,

@@ -22,7 +22,7 @@ use virus_editor::{
     sub_in_range,
 };
 use virus_ui::{
-    panes::{Pane, PaneId},
+    panes::{DocumentPane, Pane, PaneId},
     theme::UiTheme,
     tween::Tween,
     ui::Ui,
@@ -163,46 +163,42 @@ impl Virus {
         }
     }
 
-    fn get_active_document(&self) -> Option<&Document> {
+    fn get_active_document(&self) -> Option<(&DocumentPane, &Document)> {
         self.ui
-            .panes()
-            .panes()
-            .iter()
-            .find_map(|pane| match pane {
-                Pane::Document {
-                    pane_id,
-                    document_id,
-                    document_view,
-                } => (self.active_pane_id == *pane_id).then_some(*document_id),
+            .pane(self.active_pane_id)
+            .map(|pane| match pane {
+                Pane::Document(pane) => (pane, pane.document_id),
             })
-            .map(|document_id| self.editor.get_document(document_id))
+            .map(|(pane, document_id)| {
+                self.editor
+                    .get_document(document_id)
+                    .map(|document| (pane, document))
+            })
             .flatten()
     }
 
-    fn get_active_document_mut(&mut self) -> Option<&mut Document> {
+    fn get_active_document_mut(&mut self) -> Option<(&DocumentPane, &mut Document)> {
         self.ui
-            .panes()
-            .panes()
-            .iter()
-            .find_map(|pane| match pane {
-                Pane::Document {
-                    pane_id,
-                    document_id,
-                    document_view,
-                } => (self.active_pane_id == *pane_id).then_some(*document_id),
+            .pane(self.active_pane_id)
+            .map(|pane| match pane {
+                Pane::Document(pane) => (pane, pane.document_id),
             })
-            .map(|document_id| self.editor.get_document_mut(document_id))
+            .map(|(pane, document_id)| {
+                self.editor
+                    .get_document_mut(document_id)
+                    .map(|document| (pane, document))
+            })
             .flatten()
     }
 
     // TODO ...
     fn unwrap_active_document(&self) -> &Document {
-        self.get_active_document().unwrap()
+        self.get_active_document().unwrap().1
     }
 
     // TODO ...
     fn unwrap_active_document_mut(&mut self) -> &mut Document {
-        self.get_active_document_mut().unwrap()
+        self.get_active_document_mut().unwrap().1
     }
 
     fn mode(&mut self, mode: Mode) {
@@ -213,9 +209,28 @@ impl Virus {
     }
 
     fn ensure_visibility(&mut self) {
-        // TODO
-        // self.ui
-        //     .ensure_visibility(self.unwrap_active_document().selection().head.line);
+        let Some((region, scroll_top, document)) = self
+            .get_active_document()
+            .map(|(pane, document)| (pane.region, pane.document_view.scroll_top(), document))
+        else {
+            return;
+        };
+
+        let line = document.selection().head.line as u32;
+        let line_height = self.ui.theme().line_height;
+        let height_in_lines = region.height / line_height;
+        let start = scroll_top / line_height;
+        let end = start + height_in_lines;
+
+        let line = if line < start {
+            line
+        } else if line >= end {
+            line + 1 - height_in_lines
+        } else {
+            return;
+        };
+
+        self.ui.scroll_to(self.active_pane_id, line as usize);
     }
 }
 
@@ -314,7 +329,7 @@ impl Virus {
 
         // TODO handle that better
         self.get_active_document_mut()
-            .map(|document| document.parse());
+            .map(|(_, document)| document.parse());
 
         // TODO handle that better
         self.ui.window().request_redraw();
@@ -398,10 +413,15 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn move_up_page(&mut self, pages: usize, half: bool, wrap: bool) {
         match self.virus.mode {
             Mode::Normal { select } | Mode::Insert { select } => {
-                let lines = self.virus.ui.screen_height_in_lines() as usize;
-                let lines = lines / if half { 2 } else { 1 };
-                self.virus
-                    .unwrap_active_document_mut()
+                let theme = self.virus.ui.theme();
+                let Some((pane, document)) = self.virus.get_active_document_mut() else {
+                    return;
+                };
+                let lines = {
+                    let (cells, _) = theme.cells_and_pixels(pane.region.size());
+                    cells.height as usize / if half { 2 } else { 1 }
+                };
+                document
                     .movements()
                     .up(pages * lines, wrap)
                     .collapse(select == Select::None);
@@ -455,10 +475,15 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn move_down_page(&mut self, pages: usize, half: bool, wrap: bool) {
         match self.virus.mode {
             Mode::Normal { select } | Mode::Insert { select } => {
-                let lines = self.virus.ui.screen_height_in_lines() as usize;
-                let lines = lines / if half { 2 } else { 1 };
-                self.virus
-                    .unwrap_active_document_mut()
+                let theme = self.virus.ui.theme();
+                let Some((pane, document)) = self.virus.get_active_document_mut() else {
+                    return;
+                };
+                let lines = {
+                    let (cells, _) = theme.cells_and_pixels(pane.region.size());
+                    cells.height as usize / if half { 2 } else { 1 }
+                };
+                document
                     .movements()
                     .down(pages * lines, wrap)
                     .collapse(select == Select::None);

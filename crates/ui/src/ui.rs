@@ -1,25 +1,18 @@
 use crate::{
-    panes::{PaneId, Panes},
+    panes::{DocumentPane, Pane, PaneId, Panes},
     syntax::{Lines, SyntaxTheme},
     theme::UiTheme,
     tween::Tween,
     views::FilesView,
 };
-use std::{
-    cell::{Ref, RefCell},
-    collections::HashMap,
-    ops::Range,
-    rc::Rc,
-    sync::Arc,
-    time::Duration,
-};
+use std::{cell::RefCell, collections::HashMap, ops::Range, rc::Rc, sync::Arc, time::Duration};
 use virus_editor::{
     document::{Document, DocumentId},
     mode::Mode,
 };
 use virus_graphics::{
-    text::{Context, Font, FontStyle, FontWeight, Fonts},
-    types::{Rectangle, Rgba},
+    text::{Context, Font, FontSize, FontStyle, FontWeight, Fonts, LineHeight},
+    types::{Rectangle, Rgba, Size},
     wgpu::Graphics,
     Catppuccin,
 };
@@ -38,6 +31,8 @@ pub struct Ui {
     theme: Rc<RefCell<UiTheme>>,
     panes: Panes,
     files: FilesView,
+    region: Rectangle,
+    cells: Size,
     _lines_cache: Rc<RefCell<LinesCache>>,
 }
 
@@ -57,6 +52,8 @@ impl Ui {
             theme,
             panes,
             files,
+            region: Default::default(),
+            cells: Default::default(),
             _lines_cache: lines_cache,
         }
     }
@@ -65,24 +62,32 @@ impl Ui {
         &self.window
     }
 
-    pub fn theme(&self) -> Ref<UiTheme> {
-        self.theme.borrow()
+    pub fn theme(&self) -> UiTheme {
+        *self.theme.borrow()
+    }
+
+    pub fn region(&self) -> Rectangle {
+        self.region
+    }
+
+    pub fn cells(&self) -> Size {
+        self.cells
     }
 
     pub fn is_animating(&self) -> bool {
         self.panes.is_animating()
     }
 
-    pub fn screen_height_in_lines(&self) -> u32 {
-        self.window.inner_size().height / self.theme().line_height
+    pub fn pane(&self, pane_id: PaneId) -> Option<&Pane> {
+        self.panes.get(pane_id)
     }
 
-    pub fn panes(&self) -> &Panes {
-        &self.panes
-    }
+    pub fn scroll_to(&mut self, pane_id: PaneId, line: usize) {
+        let top = line as u32 * self.theme().line_height;
 
-    pub fn panes_mut(&mut self) -> &mut Panes {
-        &mut self.panes
+        self.panes.get_mut(pane_id).map(|pane| match pane {
+            Pane::Document(DocumentPane { document_view, .. }) => document_view.scroll_to(top),
+        });
     }
 
     pub fn open_pane(&mut self, document_id: DocumentId) -> PaneId {
@@ -90,8 +95,23 @@ impl Ui {
     }
 
     pub fn resize(&mut self) {
+        let size = self.window.inner_size();
+        let size = Size {
+            width: size.width,
+            height: size.height,
+        };
+        let (cells, pixels) = self.theme().cells_and_pixels(size);
+
+        self.cells = cells;
+        self.region = Rectangle {
+            top: (size.height - pixels.height) as i32 / 2,
+            left: (size.width - pixels.width) as i32 / 2,
+            width: pixels.width,
+            height: pixels.height,
+        };
+
         self.graphics.resize(&self.window);
-        self.panes.resize(self.region());
+        self.panes.resize(self.region);
     }
 
     pub fn update(&mut self, delta: Duration) {
@@ -128,23 +148,6 @@ impl Ui {
         }
 
         self.graphics.render();
-    }
-}
-
-/// Private.
-impl Ui {
-    // TODO goddamn why are we not using f32 in Graphics?
-    fn region(&self) -> Rectangle {
-        let size = self.window.inner_size();
-        let width = size.width;
-        let height = self.screen_height_in_lines() * self.theme().line_height;
-
-        Rectangle {
-            top: (size.height - height) as i32 / 2,
-            left: (size.width - width) as i32 / 2,
-            width,
-            height,
-        }
     }
 }
 
@@ -237,13 +240,21 @@ fn fonts() -> Fonts {
 
 fn ui_theme(context: &Context) -> UiTheme {
     let catppuccin = Catppuccin::default();
+    let family = context.fonts().get("Victor").unwrap().key();
+    let font_size = 20 as FontSize;
+    let line_height = font_size as LineHeight + font_size as LineHeight / 4;
 
     UiTheme {
         syntax: SyntaxTheme::catppuccin(),
 
-        family: context.fonts().get("Victor").unwrap().key(),
-        font_size: 20,
-        line_height: 25,
+        family,
+        font_size,
+        line_height,
+        advance: context
+            .fonts()
+            .get((family, FontWeight::default(), FontStyle::default()))
+            .unwrap()
+            .advance_for_size(font_size),
 
         scroll_duration: Duration::from_millis(500),
         scroll_tween: Tween::ExpoOut,

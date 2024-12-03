@@ -1,10 +1,5 @@
 use crate::{syntax::Lines, theme::UiTheme, tween::Tweened, ui::LinesCache};
-use std::{
-    cell::{Ref, RefCell},
-    fmt::Write,
-    rc::Weak,
-    time::Duration,
-};
+use std::{cell::RefCell, fmt::Write, rc::Weak, time::Duration};
 use virus_editor::{
     document::Document,
     mode::{Mode, Select},
@@ -43,14 +38,17 @@ impl DocumentView {
         }
     }
 
+    pub fn scroll_top(&self) -> u32 {
+        self.scroll_top.end()
+    }
+
     pub fn is_animating(&self) -> bool {
         self.scroll_top.is_animating() || self.scrollbar_alpha.is_animating()
     }
 
     pub fn scroll_to(&mut self, top: u32) {
         let (duration, tween) = {
-            let theme = self.theme.upgrade().unwrap();
-            let theme = theme.borrow();
+            let theme = *self.theme.upgrade().unwrap().borrow();
             (theme.scroll_duration, theme.scroll_tween)
         };
 
@@ -76,8 +74,7 @@ impl DocumentView {
             _ => true,
         });
 
-        let theme = self.theme.upgrade().unwrap();
-        let theme = theme.borrow();
+        let theme = *self.theme.upgrade().unwrap().borrow();
         let scroll_top = self.scroll_top.current();
         let scrollbar_color = theme
             .scrollbar_color
@@ -142,10 +139,10 @@ impl DocumentView {
 //                                            Renderer                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-struct Renderer<'context, 'layer, 'graphics, 'theme, 'lines> {
+struct Renderer<'context, 'layer, 'graphics, 'lines> {
     context: &'context mut Context,
     layer: &'layer mut Layer<'graphics>,
-    theme: Ref<'theme, UiTheme>,
+    theme: UiTheme,
     selection: Selection,
     lines: &'lines [Line],
     start_line: usize,
@@ -156,9 +153,7 @@ struct Renderer<'context, 'layer, 'graphics, 'theme, 'lines> {
     mode: Mode,
 }
 
-impl<'context, 'layer, 'graphics, 'theme, 'lines>
-    Renderer<'context, 'layer, 'graphics, 'theme, 'lines>
-{
+impl<'context, 'layer, 'graphics, 'lines> Renderer<'context, 'layer, 'graphics, 'lines> {
     fn render(&mut self) {
         self.render_line_numbers();
         self.render_lines();

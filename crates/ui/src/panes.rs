@@ -19,12 +19,16 @@ ids!(
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 #[derive(Debug)]
+pub struct DocumentPane {
+    pub pane_id: PaneId,
+    pub region: Rectangle,
+    pub document_id: DocumentId,
+    pub document_view: DocumentView,
+}
+
+#[derive(Debug)]
 pub enum Pane {
-    Document {
-        pane_id: PaneId,
-        document_id: DocumentId,
-        document_view: DocumentView,
-    },
+    Document(DocumentPane),
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -51,24 +55,41 @@ impl Panes {
         }
     }
 
+    pub fn get(&self, pane_id: PaneId) -> Option<&Pane> {
+        let requested_pane_id = pane_id;
+
+        self.panes.iter().find(|pane| match pane {
+            Pane::Document(DocumentPane { pane_id, .. }) => requested_pane_id == *pane_id,
+        })
+    }
+
+    pub fn get_mut(&mut self, pane_id: PaneId) -> Option<&mut Pane> {
+        let requested_pane_id = pane_id;
+
+        self.panes.iter_mut().find(|pane| match pane {
+            Pane::Document(DocumentPane { pane_id, .. }) => requested_pane_id == *pane_id,
+        })
+    }
+
     pub fn panes(&self) -> &[Pane] {
         &self.panes
     }
 
     pub fn open_pane(&mut self, document_id: DocumentId) -> PaneId {
         let pane_id = self.pane_ids.id();
-        self.panes.push(Pane::Document {
+        self.panes.push(Pane::Document(DocumentPane {
             pane_id,
+            region: Default::default(),
             document_id,
             document_view: DocumentView::new(self.theme.clone(), self.lines_cache.clone()),
-        });
+        }));
 
         pane_id
     }
 
     pub fn is_animating(&self) -> bool {
         self.panes.iter().any(|pane| match pane {
-            Pane::Document { document_view, .. } => document_view.is_animating(),
+            Pane::Document(DocumentPane { document_view, .. }) => document_view.is_animating(),
         })
     }
 
@@ -79,7 +100,7 @@ impl Panes {
     pub fn update(&mut self, delta: Duration) {
         for pane in &mut self.panes {
             match pane {
-                Pane::Document { document_view, .. } => document_view.update(delta),
+                Pane::Document(DocumentPane { document_view, .. }) => document_view.update(delta),
             }
         }
     }
@@ -96,17 +117,17 @@ impl Panes {
 
         for (i, pane) in self.panes.iter_mut().enumerate() {
             match pane {
-                Pane::Document {
+                Pane::Document(DocumentPane {
                     pane_id,
+                    region,
                     document_id,
                     document_view,
-                    ..
-                } => {
+                }) => {
                     let Some(document) = documents(*document_id) else {
                         continue;
                     };
 
-                    let region = Rectangle {
+                    *region = Rectangle {
                         top: self.region.top,
                         left: self.region.left + i as i32 * width as i32,
                         width,
@@ -126,7 +147,7 @@ impl Panes {
                             }
                         });
 
-                    document_view.render(context, &mut graphics.layer(region, 0), document, mode);
+                    document_view.render(context, &mut graphics.layer(*region, 0), document, mode);
                 }
             }
         }
