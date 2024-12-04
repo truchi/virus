@@ -6,12 +6,7 @@ use crate::{
     events::{Event, Events, Key, KeyEvent},
     keybindings::{ActionHandler, Keybindings},
 };
-use std::{
-    ops::Range,
-    path::PathBuf,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{ops::Range, sync::Arc, time::Instant};
 use virus_editor::{
     add_in_range,
     document::Document,
@@ -22,9 +17,7 @@ use virus_editor::{
     sub_in_range,
 };
 use virus_ui::{
-    panes::{DocumentPane, Pane, PaneId},
-    theme::UiTheme,
-    tween::Tween,
+    panes::{DocumentPane, Pane},
     ui::Ui,
 };
 use winit::{
@@ -194,11 +187,6 @@ impl Virus {
     }
 
     // TODO ...
-    fn unwrap_active_document(&self) -> &Document {
-        self.get_active_document().unwrap().1
-    }
-
-    // TODO ...
     fn unwrap_active_document_mut(&mut self) -> &mut Document {
         self.get_active_document_mut().unwrap().1
     }
@@ -238,7 +226,7 @@ impl Virus {
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
-        window_id: WindowId,
+        _window_id: WindowId,
         event: WindowEvent,
     ) {
         match self.events.update(&event) {
@@ -251,7 +239,7 @@ impl Virus {
         }
     }
 
-    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: EventLoopMessage) {}
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, _event: EventLoopMessage) {}
 
     fn on_key(&mut self, event: KeyEvent, event_loop: &ActiveEventLoop) {
         match self.keybindings.handle(&event) {
@@ -265,7 +253,7 @@ impl Virus {
             Ok(None) => {}
             Err(()) => match self.mode {
                 Mode::Normal { .. } => {}
-                Mode::Insert { select } => match event.modded() {
+                Mode::Insert { .. } => match event.modded() {
                     Key::Str(str) => {
                         self.unwrap_active_document_mut()
                             .edition()
@@ -1257,7 +1245,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
             Mode::Normal { .. } => {}
             Mode::Insert { .. } => {}
             Mode::Files => {
-                let (needle, files, haystacks, selected) = self.virus.search.as_mut().unwrap();
+                let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
 
                 let path = self.virus.editor.root().join(&haystacks[*selected].0);
                 let document_id = self.virus.editor.open(path).unwrap();
@@ -1286,5 +1274,5 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     }
 
     #[cfg(test)]
-    fn test(&mut self, value: usize) {}
+    fn test(&mut self, _: usize) {}
 }

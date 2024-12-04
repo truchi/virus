@@ -1,7 +1,7 @@
 //! Winit events helper.
 
 use smol_str::SmolStr;
-use std::{fmt::Write, ops::BitOr, str::FromStr};
+use std::{fmt::Write, ops::BitOr};
 use winit::{
     event::{ElementState, Modifiers, WindowEvent},
     keyboard::{Key as WinitKey, ModifiersKeyState, NamedKey},
@@ -21,12 +21,6 @@ pub struct Mods {
 }
 
 impl Mods {
-    pub const NONE: Self = Self::new(false, false, false, false);
-    pub const CONTROL: Self = Self::new(true, false, false, false);
-    pub const SHIFT: Self = Self::new(false, true, false, false);
-    pub const ALT: Self = Self::new(false, false, true, false);
-    pub const COMMAND: Self = Self::new(false, false, false, true);
-
     pub const CONTROL_STR: &'static str = "control";
     pub const SHIFT_STR: &'static str = "shift";
     pub const ALT_STR: &'static str = "alt";
@@ -39,22 +33,6 @@ impl Mods {
             alt,
             command,
         }
-    }
-
-    pub fn control(&self) -> bool {
-        self.control
-    }
-
-    pub fn shift(&self) -> bool {
-        self.shift
-    }
-
-    pub fn alt(&self) -> bool {
-        self.alt
-    }
-
-    pub fn command(&self) -> bool {
-        self.command
     }
 }
 
@@ -133,13 +111,6 @@ macro_rules! key {
                     _ => Self::Str(str),
                 }
             }
-
-            pub fn to_str(self) -> &'a str {
-                match self {
-                    $(Self::$variant => $str,)*
-                    Self::Str(str) => str,
-                }
-            }
         }
 
         impl<'a> TryFrom<WinitKey<&'a str>> for Key {
@@ -180,6 +151,7 @@ pub struct KeyEvent<T = SmolStr> {
 }
 
 impl<T> KeyEvent<T> {
+    #[cfg(test)]
     pub fn new(mods: Mods, modded: Key<T>, unmodded: Key<T>) -> Self {
         Self {
             mods,

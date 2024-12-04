@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 mod events;
 mod keybindings;
 mod virus;

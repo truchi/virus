@@ -1,8 +1,8 @@
-use crate::events::{Event, Key, KeyEvent, Mods};
+use crate::events::{Key, KeyEvent, Mods};
 use serde::Deserialize;
 use smol_str::{SmolStr, ToSmolStr};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     iter::{Filter, Peekable},
     slice::Iter,
     str::Split,
@@ -10,18 +10,6 @@ use std::{
 use virus_editor::mode::Mode;
 
 const UNSTICK: &'static str = "unstick";
-
-const MISSING_TOKEN: &'static str = "Missing token";
-const UNEXPECTED_TOKEN: &'static str = "Unexpected token";
-const UNKNOWN_ACTION: &'static str = "Unknown action";
-const UNKNOWN_ALIAS: &'static str = "Unknown alias";
-const INVALID_IDENTIFIER: &'static str = "Invalid identifier";
-const INVALID_VALUE: &'static str = "Invalid value";
-const INVALID_TOKEN: &'static str = "Invalid token";
-const UNKNOWN_ARGUMENT: &'static str = "Unknown argument";
-const INVALID_ARGUMENT: &'static str = "Invalid argument";
-const CONFLICTING_BINDING: &'static str = "Conflicting binding";
-const UNEXPECTED_UNSTICK: &'static str = "Unexpected unstick";
 
 type NodeId = usize;
 type Number = usize;
@@ -203,6 +191,7 @@ macro_rules! actions {
             )* },
         )* }
 
+        #[allow(unused_doc_comments, reason = "#[cfg(test)]")]
         impl ParsedAction {
             /// Returns the default `action` [`ParsedAction`].
             fn default(action: &str) -> Option<Self> {
@@ -267,6 +256,7 @@ macro_rules! actions {
             )* },
         )* }
 
+        #[allow(unused_doc_comments, reason = "#[cfg(test)]")]
         pub trait ActionHandler {
             /// Handles `action`.
             fn handle(&mut self, action: Action) {
@@ -323,7 +313,7 @@ actions!(
         pages: (Option<Number>) = 1,
         half: (Option<bool>) = false,
         wrap: (Option<bool>) = false,
-        // TODO blank?
+        // TODO blank? margin?
     ),
 
     move_up_line(
@@ -524,6 +514,7 @@ enum ParsedArgument {
     None,
 }
 
+#[allow(unused, reason = "For macro but unused in current actions")]
 impl ParsedArgument {
     fn satisfies_number(self) -> bool {
         matches!(self, Self::Count(Required(_)) | Self::Number(_))
@@ -550,7 +541,7 @@ impl ParsedArgument {
         }
     }
 
-    fn unparse_bool(self, counts: &HashMap<NodeId, Number>) -> bool {
+    fn unparse_bool(self, _counts: &HashMap<NodeId, Number>) -> bool {
         match self {
             ParsedArgument::Count(_) => unreachable!(),
             ParsedArgument::Number(_) => unreachable!(),
@@ -568,7 +559,7 @@ impl ParsedArgument {
         }
     }
 
-    fn unparse_option_bool(self, counts: &HashMap<NodeId, Number>) -> Option<bool> {
+    fn unparse_option_bool(self, _counts: &HashMap<NodeId, Number>) -> Option<bool> {
         match self {
             ParsedArgument::Count(_) => unreachable!(),
             ParsedArgument::Number(_) => unreachable!(),
@@ -590,7 +581,7 @@ impl ParsedArgument {
         }
     }
 
-    fn unparse_option_bool_default(self, counts: &HashMap<NodeId, Number>, default: bool) -> bool {
+    fn unparse_option_bool_default(self, _counts: &HashMap<NodeId, Number>, default: bool) -> bool {
         match self {
             ParsedArgument::Count(_) => unreachable!(),
             ParsedArgument::Number(_) => unreachable!(),
@@ -964,8 +955,8 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                     let parent_id = if let Some(count) = count {
                         let id = *Self::get_children_mut(&mut node)
                             .entry(Count(match count {
-                                Optional(count) => Optional(()),
-                                Required(count) => Required(()),
+                                Optional(_) => Optional(()),
+                                Required(_) => Required(()),
                             }))
                             .or_insert_with(|| {
                                 insert!(
@@ -1441,7 +1432,7 @@ mod parse {
                 OneOrMany::Many(iter) => iter
                     .next()
                     .cloned()
-                    .map(|mut key| ModdedKey::new(key.mods | mods, key.key)),
+                    .map(|key| ModdedKey::new(key.mods | mods, key.key)),
             }),
         ))
     }
@@ -1512,11 +1503,11 @@ mod parse {
 mod tests {
     use super::*;
 
-    const NONE: Mods = Mods::NONE;
-    const CONTROL: Mods = Mods::CONTROL;
-    const SHIFT: Mods = Mods::SHIFT;
-    const ALT: Mods = Mods::ALT;
-    const COMMAND: Mods = Mods::COMMAND;
+    pub const NONE: Mods = Mods::new(false, false, false, false);
+    // pub const CONTROL: Mods = Mods::new(true, false, false, false);
+    pub const SHIFT: Mods = Mods::new(false, true, false, false);
+    // pub const ALT: Mods = Mods::new(false, false, true, false);
+    // pub const COMMAND: Mods = Mods::new(false, false, false, true);
 
     use AssertCurrent::*;
     #[derive(Copy, Clone)]
@@ -1566,7 +1557,7 @@ mod tests {
 
             match assert_current.clone().into() {
                 Some(Root) => assert_eq!(nodes.current, 0),
-                Some(Is(is)) => unreachable!(),
+                Some(Is(_)) => unreachable!(),
                 Some(At(at)) => assert_eq!(nodes.current, *currents.get(at).expect("at")),
                 None => {}
             }
@@ -1866,7 +1857,7 @@ mod tests {
 
     #[test]
     fn alias() {
-        let mut nodes = Keybindings::from_yaml(
+        let nodes = Keybindings::from_yaml(
             r#"
                 ALIASES:
                     up: u, arrow_up
@@ -1891,7 +1882,7 @@ mod tests {
 
     #[test]
     fn sticky() {
-        let mut nodes = Keybindings::from_yaml(
+        let nodes = Keybindings::from_yaml(
             r#"
                 NORMAL:
                     a:
@@ -1962,7 +1953,7 @@ mod tests {
 
     #[test]
     fn count() {
-        let mut nodes = Keybindings::from_yaml(
+        let nodes = Keybindings::from_yaml(
             r#"
                 NORMAL:
                     ?value a: test ?value
@@ -1988,7 +1979,7 @@ mod tests {
 
     #[test]
     fn sticky_count() {
-        let mut nodes = Keybindings::from_yaml(
+        let nodes = Keybindings::from_yaml(
             r#"
                 NORMAL:
                     ?value a:
@@ -2024,7 +2015,7 @@ mod tests {
 
     #[test]
     fn mods() {
-        let mut nodes = Keybindings::from_yaml(
+        let nodes = Keybindings::from_yaml(
             r#"
                 NORMAL:
                     shift a: test value=1
