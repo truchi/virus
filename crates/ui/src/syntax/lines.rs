@@ -11,7 +11,7 @@ use virus_graphics::text::{Cluster, Context, Line};
 
 #[derive(Debug)]
 pub struct Lines {
-    document_id: DocumentId,
+    document_id: Option<DocumentId>,
     version: usize,
     lines: Vec<Line>,
     theme: Weak<RefCell<UiTheme>>,
@@ -35,8 +35,8 @@ impl Lines {
     ) -> &[Line] {
         debug_assert!(range.start <= range.end);
 
-        if !(self.document_id == document.id() && self.version == document.version()) {
-            self.document_id = document.id();
+        if !(self.document_id == Some(document.id()) && self.version == document.version()) {
+            self.document_id = Some(document.id());
             self.version = document.version();
             self.lines.clear();
             self.shape(context, document);
