@@ -1,8 +1,7 @@
 use crate::{
     panes::{DocumentPane, Pane, PaneId, Panes},
-    syntax::{Lines, SyntaxTheme},
+    syntax::Lines,
     theme::UiTheme,
-    tween::Tween,
     views::FilesView,
 };
 use std::{cell::RefCell, collections::HashMap, ops::Range, rc::Rc, sync::Arc, time::Duration};
@@ -13,10 +12,9 @@ use virus_editor::{
     sub_in_range,
 };
 use virus_graphics::{
-    text::{Context, Font, FontSize, FontStyle, FontWeight, Fonts, LineHeight},
+    text::Context,
     types::{Rectangle, Rgba, Size},
     wgpu::Graphics,
-    Catppuccin,
 };
 use winit::window::Window;
 
@@ -39,8 +37,8 @@ pub struct Ui {
 impl Ui {
     pub fn new(window: Arc<Window>) -> Self {
         let graphics = Graphics::new(Arc::clone(&window));
-        let context = Context::new(fonts());
-        let theme = Rc::new(RefCell::new(ui_theme(&context)));
+        let context = Context::new(crate::todo::fonts());
+        let theme = Rc::new(RefCell::new(crate::todo::ui_theme(&context)));
         let lines_cache = Default::default();
         let files = FilesView::new(Rc::downgrade(&theme), Rgba::WHITE);
         let panes = Panes::new(Rc::downgrade(&theme), Rc::downgrade(&lines_cache));
@@ -142,12 +140,10 @@ pub struct UiPanes<'ui> {
 }
 
 impl<'ui> UiPanes<'ui> {
-    pub fn get_active_pane_id(&self) -> Option<PaneId> {
-        self.ui.panes.get_active_pane_id()
-    }
-
     pub fn active(&self) -> Option<&'ui Pane> {
-        self.get_active_pane_id()
+        self.ui
+            .panes
+            .get_active_id()
             .map(|id| self.ui.panes.get(id))
             .flatten()
     }
@@ -166,10 +162,6 @@ pub struct UiPanesMut<'ui> {
 }
 
 impl<'ui> UiPanesMut<'ui> {
-    pub fn set_active_pane_id(&mut self, active_pane_id: Option<PaneId>) {
-        self.ui.panes.set_active_pane_id(active_pane_id);
-    }
-
     pub fn open_first(&mut self, document_id: DocumentId) -> PaneId {
         self.ui.panes.open(0, document_id)
     }
@@ -208,7 +200,7 @@ impl<'ui> UiPanesMut<'ui> {
     pub fn close(&mut self) {
         if let Some(position) = self.ui.panes.active_position() {
             self.ui.panes.panes_mut().remove(position);
-            self.set_active_pane_id(
+            self.ui.panes.set_active_id(
                 position
                     .checked_sub(1)
                     .map(|prev| self.ui.panes.panes()[prev].id())
@@ -229,11 +221,15 @@ impl<'ui> UiPanesMut<'ui> {
     }
 
     pub fn focus_first(&mut self) {
-        self.set_active_pane_id(self.ui.panes.panes().first().map(Pane::id));
+        self.ui
+            .panes
+            .set_active_id(self.ui.panes.panes().first().map(Pane::id));
     }
 
     pub fn focus_last(&mut self) {
-        self.set_active_pane_id(self.ui.panes.panes().last().map(Pane::id));
+        self.ui
+            .panes
+            .set_active_id(self.ui.panes.panes().last().map(Pane::id));
     }
 
     pub fn focus_prev(&mut self, panes: usize, wrap: bool) {
@@ -244,7 +240,9 @@ impl<'ui> UiPanesMut<'ui> {
             wrap,
         );
 
-        self.set_active_pane_id(Some(self.ui.panes.panes()[position].id()));
+        self.ui
+            .panes
+            .set_active_id(Some(self.ui.panes.panes()[position].id()));
     }
 
     pub fn focus_next(&mut self, panes: usize, wrap: bool) {
@@ -258,7 +256,9 @@ impl<'ui> UiPanesMut<'ui> {
             wrap,
         );
 
-        self.set_active_pane_id(Some(self.ui.panes.panes()[position].id()));
+        self.ui
+            .panes
+            .set_active_id(Some(self.ui.panes.panes()[position].id()));
     }
 
     pub fn swap_first(&mut self) {
@@ -294,132 +294,11 @@ impl<'ui> UiPanesMut<'ui> {
         }
     }
 
-    pub fn scroll_to(&mut self, pane_id: PaneId, line: u32) {
+    pub fn scroll(&mut self, pane_id: PaneId, line: u32) {
         let top = line * self.ui.theme().line_height;
 
         self.ui.panes.get_mut(pane_id).map(|pane| match pane {
-            Pane::Document(DocumentPane { view, .. }) => view.scroll_to(top),
+            Pane::Document(DocumentPane { view, .. }) => view.scroll(top),
         });
-    }
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                              TODO                                              //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-fn fonts() -> Fonts {
-    use virus_graphics::text::{FontStyle::*, FontWeight::*};
-
-    const EMOJI: &str = "/System/Library/Fonts/Apple Color Emoji.ttc";
-    const FOLDER: &str = "/Users/romain/Library/Fonts/";
-    const FONTS: &[(&str, &[(&str, FontWeight, FontStyle)])] = &[
-        (
-            "Victor",
-            &[
-                // Normal
-                ("VictorMono-Thin.ttf", Thin, Normal),
-                ("VictorMono-ExtraLight.ttf", ExtraLight, Normal),
-                ("VictorMono-Light.ttf", Light, Normal),
-                ("VictorMono-Regular.ttf", Regular, Normal),
-                ("VictorMono-Medium.ttf", Medium, Normal),
-                ("VictorMono-SemiBold.ttf", SemiBold, Normal),
-                ("VictorMono-Bold.ttf", Bold, Normal),
-                // Italic
-                ("VictorMono-ThinItalic.ttf", Thin, Italic),
-                ("VictorMono-ExtraLightItalic.ttf", ExtraLight, Italic),
-                ("VictorMono-LightItalic.ttf", Light, Italic),
-                ("VictorMono-Italic.ttf", Regular, Italic),
-                ("VictorMono-MediumItalic.ttf", Medium, Italic),
-                ("VictorMono-SemiBoldItalic.ttf", SemiBold, Italic),
-                ("VictorMono-BoldItalic.ttf", Bold, Italic),
-                // Oblique
-                ("VictorMono-ThinOblique.ttf", Thin, Oblique),
-                ("VictorMono-ExtraLightOblique.ttf", ExtraLight, Oblique),
-                ("VictorMono-LightOblique.ttf", Light, Oblique),
-                ("VictorMono-Oblique.ttf", Regular, Oblique),
-                ("VictorMono-MediumOblique.ttf", Medium, Oblique),
-                ("VictorMono-SemiBoldOblique.ttf", SemiBold, Oblique),
-                ("VictorMono-BoldOblique.ttf", Bold, Oblique),
-            ],
-        ),
-        (
-            "JetBrains",
-            &[
-                // Normal
-                ("JetBrainsMonoNerdFont-Thin.ttf", Thin, Normal),
-                ("JetBrainsMonoNerdFont-ExtraLight.ttf", ExtraLight, Normal),
-                ("JetBrainsMonoNerdFont-Light.ttf", Light, Normal),
-                ("JetBrainsMonoNerdFont-Regular.ttf", Regular, Normal),
-                ("JetBrainsMonoNerdFont-Medium.ttf", Medium, Normal),
-                ("JetBrainsMonoNerdFont-SemiBold.ttf", SemiBold, Normal),
-                ("JetBrainsMonoNerdFont-Bold.ttf", Bold, Normal),
-                ("JetBrainsMonoNerdFont-ExtraBold.ttf", ExtraBold, Normal),
-                //
-                ("JetBrainsMonoNerdFont-ThinItalic.ttf", Thin, Italic),
-                (
-                    "JetBrainsMonoNerdFont-ExtraLightItalic.ttf",
-                    ExtraLight,
-                    Italic,
-                ),
-                ("JetBrainsMonoNerdFont-LightItalic.ttf", Light, Italic),
-                ("JetBrainsMonoNerdFont-Italic.ttf", Regular, Italic),
-                ("JetBrainsMonoNerdFont-MediumItalic.ttf", Medium, Italic),
-                ("JetBrainsMonoNerdFont-SemiBoldItalic.ttf", SemiBold, Italic),
-                ("JetBrainsMonoNerdFont-BoldItalic.ttf", Bold, Italic),
-                (
-                    "JetBrainsMonoNerdFont-ExtraBoldItalic.ttf",
-                    ExtraBold,
-                    Italic,
-                ),
-            ],
-        ),
-    ];
-
-    let mut fonts = Fonts::new(Font::from_file(EMOJI).unwrap());
-
-    for (family, faces) in FONTS {
-        let family = fonts.set(String::from(*family)).unwrap();
-
-        for (font, font_weight, font_style) in *faces {
-            let font = fonts
-                .set(Font::from_file(String::from(FOLDER) + font).unwrap())
-                .unwrap();
-
-            fonts
-                .set((family, *font_weight, *font_style, font))
-                .unwrap();
-        }
-    }
-
-    fonts
-}
-
-fn ui_theme(context: &Context) -> UiTheme {
-    let catppuccin = Catppuccin::default();
-    let family = context.fonts().get("Victor").unwrap().key();
-    let font_size = 15 as FontSize;
-    let line_height = font_size as LineHeight + font_size as LineHeight / 4;
-
-    UiTheme {
-        syntax: SyntaxTheme::catppuccin(),
-        background_color: catppuccin.crust.solid(),
-
-        family,
-        font_size,
-        line_height,
-        advance: context
-            .fonts()
-            .get((family, FontWeight::default(), FontStyle::default()))
-            .unwrap()
-            .advance_for_size(font_size),
-
-        scroll_duration: Duration::from_millis(500),
-        scroll_tween: Tween::ExpoOut,
-        scrollbar_color: catppuccin.surface1.solid(),
-
-        normal_mode_color: catppuccin.blue.solid(),
-        insert_mode_color: catppuccin.pink.solid(),
-
-        caret_width: 2,
     }
 }

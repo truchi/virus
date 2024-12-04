@@ -69,7 +69,7 @@ impl DocumentView {
         self.scroll_top.end() / self.theme.upgrade().unwrap().borrow().line_height
     }
 
-    pub fn scroll_to(&mut self, top: u32) {
+    pub fn scroll(&mut self, top: u32) {
         let (duration, tween) = {
             let theme = *self.theme.upgrade().unwrap().borrow();
             (theme.scroll_duration, theme.scroll_tween)

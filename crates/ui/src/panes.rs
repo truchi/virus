@@ -43,20 +43,20 @@ impl Pane {
 
 #[derive(Debug)]
 pub struct Panes {
-    pane_ids: PaneIds,
-    active_pane_id: Option<PaneId>,
+    ids: PaneIds,
+    active_id: Option<PaneId>,
     panes: Vec<Pane>,
     theme: Weak<RefCell<UiTheme>>,
     lines_cache: Weak<RefCell<LinesCache>>,
 }
 
 impl Panes {
-    pub const ACTIVE_PANE_COLUMNS: u32 = 100;
+    pub const ACTIVE_COLUMNS: u32 = 100;
 
     pub fn new(theme: Weak<RefCell<UiTheme>>, lines_cache: Weak<RefCell<LinesCache>>) -> Self {
         Self {
-            pane_ids: Default::default(),
-            active_pane_id: Default::default(),
+            ids: Default::default(),
+            active_id: Default::default(),
             panes: Default::default(),
             theme,
             lines_cache,
@@ -74,31 +74,28 @@ impl Panes {
     }
 
     pub fn active_position(&self) -> Option<usize> {
-        self.active_pane_id.and_then(|active_pane_id| {
-            self.panes
-                .iter()
-                .position(|pane| pane.id() == active_pane_id)
-        })
+        self.active_id
+            .and_then(|active_id| self.panes.iter().position(|pane| pane.id() == active_id))
     }
 
-    pub fn get_active_pane_id(&self) -> Option<PaneId> {
-        debug_assert!(if let Some(active_pane_id) = self.active_pane_id {
-            self.get(active_pane_id).is_some()
+    pub fn get_active_id(&self) -> Option<PaneId> {
+        debug_assert!(if let Some(active_id) = self.active_id {
+            self.get(active_id).is_some()
         } else {
             true
         });
 
-        self.active_pane_id
+        self.active_id
     }
 
-    pub fn set_active_pane_id(&mut self, active_pane_id: Option<PaneId>) {
-        debug_assert!(if let Some(active_pane_id) = active_pane_id {
-            self.get(active_pane_id).is_some()
+    pub fn set_active_id(&mut self, active_id: Option<PaneId>) {
+        debug_assert!(if let Some(active_id) = active_id {
+            self.get(active_id).is_some()
         } else {
             true
         });
 
-        self.active_pane_id = active_pane_id;
+        self.active_id = active_id;
     }
 
     pub fn panes(&self) -> &[Pane] {
@@ -125,12 +122,13 @@ impl Panes {
         debug_assert!(index <= self.panes.len());
 
         let pane = DocumentPane {
-            id: self.pane_ids.id(),
+            id: self.ids.id(),
             view: DocumentView::new(document_id, self.theme.clone(), self.lines_cache.clone()),
         };
         let pane_id = pane.id;
 
         self.panes.insert(index, Pane::Document(pane));
+        self.set_active_id(Some(pane_id));
 
         pane_id
     }
@@ -155,15 +153,14 @@ impl Panes {
 
         let len = self.panes.len() as u32;
         let theme = *self.theme.upgrade().unwrap().borrow();
-        let (active_pane_width, inactive_pane_width) = {
+        let (active_width, inactive_width) = {
             let columns = theme.cells_and_pixels(region.size()).0.width;
-            let active_pane_columns =
-                columns.min(Self::ACTIVE_PANE_COLUMNS + DocumentView::GUTTER_COLUMNS);
-            let inactive_pane_columns = if self.active_pane_id.is_some() {
+            let active_columns = columns.min(Self::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS);
+            let inactive_columns = if self.active_id.is_some() {
                 match len {
                     0 => unreachable!(),
                     1 => 0,
-                    _ => columns.saturating_sub(active_pane_columns) / (len - 1),
+                    _ => columns.saturating_sub(active_columns) / (len - 1),
                 }
             } else {
                 match len {
@@ -173,15 +170,15 @@ impl Panes {
             };
 
             (
-                (active_pane_columns as f32 * theme.advance).ceil() as u32,
-                (inactive_pane_columns as f32 * theme.advance).ceil() as u32,
+                (active_columns as f32 * theme.advance).ceil() as u32,
+                (inactive_columns as f32 * theme.advance).ceil() as u32,
             )
         };
         let mut left = region.left + {
-            let width = if self.active_pane_id.is_some() {
-                active_pane_width + inactive_pane_width * (len - 1)
+            let width = if self.active_id.is_some() {
+                active_width + inactive_width * (len - 1)
             } else {
-                inactive_pane_width * len
+                inactive_width * len
             };
 
             region.width.saturating_sub(width) / 2
@@ -194,9 +191,9 @@ impl Panes {
                         continue;
                     };
                     let region = {
-                        let width = (self.active_pane_id == Some(*id))
-                            .then_some(active_pane_width)
-                            .unwrap_or(inactive_pane_width);
+                        let width = (self.active_id == Some(*id))
+                            .then_some(active_width)
+                            .unwrap_or(inactive_width);
                         let region = Rectangle {
                             top: region.top,
                             left,
@@ -207,7 +204,7 @@ impl Panes {
                         left += width as i32;
                         region
                     };
-                    let mode = (self.active_pane_id == Some(*id))
+                    let mode = (self.active_id == Some(*id))
                         .then_some(mode)
                         .unwrap_or_else(|| {
                             // We want the document to look the same when it will be active again

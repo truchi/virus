@@ -215,7 +215,7 @@ impl Virus {
             return;
         };
 
-        self.ui.panes_mut().scroll_to(pane_id, line);
+        self.ui.panes_mut().scroll(pane_id, line);
     }
 }
 
@@ -732,7 +732,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                     .unwrap_or_else(|| document.leading_blank_lines() as u32);
                 let line = offset;
 
-                self.virus.ui.panes_mut().scroll_to(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line);
             }
             Mode::Files => {}
         }
@@ -760,7 +760,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                     .saturating_sub(pages as u32 * cells.height / if half { 2 } else { 1 });
                 let line = line.max(offset);
 
-                self.virus.ui.panes_mut().scroll_to(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line);
             }
             Mode::Files => {}
         }
@@ -785,7 +785,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let line = pane.view.line().saturating_sub(lines as u32);
                 let line = line.max(offset);
 
-                self.virus.ui.panes_mut().scroll_to(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line);
             }
             Mode::Files => {}
         }
@@ -813,7 +813,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                     .saturating_sub(offset)
                     .saturating_sub(cells.height);
 
-                self.virus.ui.panes_mut().scroll_to(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line);
             }
             Mode::Files => {}
         }
@@ -843,7 +843,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                         .saturating_sub(offset),
                 );
 
-                self.virus.ui.panes_mut().scroll_to(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line);
             }
             Mode::Files => {}
         }
@@ -872,7 +872,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                         .saturating_sub(offset),
                 );
 
-                self.virus.ui.panes_mut().scroll_to(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line);
             }
             Mode::Files => {}
         }
@@ -898,7 +898,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let line =
                     line.min((document.rope().len_lines() as u32).saturating_sub(cells.height));
 
-                self.virus.ui.panes_mut().scroll_to(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line);
             }
             Mode::Files => {}
         }
@@ -922,7 +922,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let line =
                     line.min((document.rope().len_lines() as u32).saturating_sub(cells.height));
 
-                self.virus.ui.panes_mut().scroll_to(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line);
             }
             Mode::Files => {}
         }
@@ -946,7 +946,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let line =
                     line.min((document.rope().len_lines() as u32).saturating_sub(cells.height));
 
-                self.virus.ui.panes_mut().scroll_to(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line);
             }
             Mode::Files => {}
         }
@@ -1024,8 +1024,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
                 let document_id = self.virus.get_active_document().unwrap().1.id();
-                let pane_id = self.virus.ui.panes_mut().open_first(document_id);
-                self.virus.ui.panes_mut().set_active_pane_id(Some(pane_id));
+                self.virus.ui.panes_mut().open_first(document_id);
             }
             Mode::Files => {
                 let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
@@ -1034,8 +1033,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                     .editor
                     .open(self.virus.editor.root().join(&haystacks[*selected].0))
                     .unwrap();
-                let pane_id = self.virus.ui.panes_mut().open_first(document_id);
-                self.virus.ui.panes_mut().set_active_pane_id(Some(pane_id));
+                self.virus.ui.panes_mut().open_first(document_id);
                 self.virus.search = None;
                 self.virus.mode(Mode::Normal {
                     select: Select::None,
@@ -1048,12 +1046,10 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
                 let document_id = self.virus.get_active_document().unwrap().1.id();
-                let pane_id = self
-                    .virus
+                self.virus
                     .ui
                     .panes_mut()
                     .open_prev(document_id, panes, wrap);
-                self.virus.ui.panes_mut().set_active_pane_id(Some(pane_id));
             }
             Mode::Files => {
                 let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
@@ -1062,12 +1058,10 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                     .editor
                     .open(self.virus.editor.root().join(&haystacks[*selected].0))
                     .unwrap();
-                let pane_id = self
-                    .virus
+                self.virus
                     .ui
                     .panes_mut()
                     .open_prev(document_id, panes, wrap);
-                self.virus.ui.panes_mut().set_active_pane_id(Some(pane_id));
                 self.virus.search = None;
                 self.virus.mode(Mode::Normal {
                     select: Select::None,
@@ -1080,12 +1074,10 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
                 let document_id = self.virus.get_active_document().unwrap().1.id();
-                let pane_id = self
-                    .virus
+                self.virus
                     .ui
                     .panes_mut()
                     .open_next(document_id, panes, wrap);
-                self.virus.ui.panes_mut().set_active_pane_id(Some(pane_id));
             }
             Mode::Files => {
                 let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
@@ -1094,12 +1086,10 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                     .editor
                     .open(self.virus.editor.root().join(&haystacks[*selected].0))
                     .unwrap();
-                let pane_id = self
-                    .virus
+                self.virus
                     .ui
                     .panes_mut()
                     .open_next(document_id, panes, wrap);
-                self.virus.ui.panes_mut().set_active_pane_id(Some(pane_id));
                 self.virus.search = None;
                 self.virus.mode(Mode::Normal {
                     select: Select::None,
@@ -1112,8 +1102,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
                 let document_id = self.virus.get_active_document().unwrap().1.id();
-                let pane_id = self.virus.ui.panes_mut().open_last(document_id);
-                self.virus.ui.panes_mut().set_active_pane_id(Some(pane_id));
+                self.virus.ui.panes_mut().open_last(document_id);
             }
             Mode::Files => {
                 let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
@@ -1122,8 +1111,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                     .editor
                     .open(self.virus.editor.root().join(&haystacks[*selected].0))
                     .unwrap();
-                let pane_id = self.virus.ui.panes_mut().open_last(document_id);
-                self.virus.ui.panes_mut().set_active_pane_id(Some(pane_id));
+                self.virus.ui.panes_mut().open_last(document_id);
                 self.virus.search = None;
                 self.virus.mode(Mode::Normal {
                     select: Select::None,
