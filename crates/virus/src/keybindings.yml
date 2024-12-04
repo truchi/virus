@@ -39,6 +39,23 @@ NORMAL:
     s: save
     q: close
 
+  a:
+    $↑: panes_focus_first
+    $↓: panes_focus_last
+    $←: panes_focus_prev +wrap
+    $→: panes_focus_next +wrap
+    command $↑: panes_swap_first
+    command $↓: panes_swap_last
+    command $←: panes_swap_prev +wrap
+    command $→: panes_swap_next +wrap
+    c: panes_close
+    C: panes_close_others
+    o:
+      $↑: panes_open_first
+      $↓: panes_open_last
+      $←: panes_open_prev
+      $→: panes_open_next
+
 INSERT:
   command $↑: move_↑_line
   command $↓: move_↓_line
@@ -63,6 +80,6 @@ INSERT:
 FILES:
   command $↑: move_↑_line +wrap
   command $↓: move_↓_line +wrap
-  command $→: open
+  command $→: panes_open_last
 
   escape: normal

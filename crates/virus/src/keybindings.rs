@@ -443,7 +443,7 @@ actions!(
     ),
 
     //
-    // Selection
+    // SELECTION
     //
 
     select(
@@ -459,7 +459,65 @@ actions!(
     ),
 
     //
-    // Modes
+    // PANES
+    //
+
+    // PANES open
+
+    panes_open_first(),
+
+    panes_open_prev(
+        panes: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    panes_open_next(
+        panes: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    panes_open_last(),
+
+    // PANES close
+
+    panes_close(),
+
+    panes_close_others(),
+
+    // PANES focus
+
+    panes_focus_first(),
+
+    panes_focus_prev(
+        panes: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    panes_focus_next(
+        panes: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    panes_focus_last(),
+
+    // PANES swap
+
+    panes_swap_first(),
+
+    panes_swap_prev(
+        panes: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    panes_swap_next(
+        panes: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    panes_swap_last(),
+
+    //
+    // MODES
     //
 
     normal(),
@@ -481,8 +539,6 @@ actions!(
     undo(),
 
     redo(),
-
-    open(),
 
     save(),
 

@@ -7,8 +7,10 @@ use crate::{
 };
 use std::{cell::RefCell, collections::HashMap, ops::Range, rc::Rc, sync::Arc, time::Duration};
 use virus_editor::{
+    add_in_range,
     document::{Document, DocumentId},
     mode::Mode,
+    sub_in_range,
 };
 use virus_graphics::{
     text::{Context, Font, FontSize, FontStyle, FontWeight, Fonts, LineHeight},
@@ -31,8 +33,6 @@ pub struct Ui {
     theme: Rc<RefCell<UiTheme>>,
     panes: Panes,
     files: FilesView,
-    region: Rectangle,
-    cells: Size,
     _lines_cache: Rc<RefCell<LinesCache>>,
 }
 
@@ -52,10 +52,12 @@ impl Ui {
             theme,
             panes,
             files,
-            region: Default::default(),
-            cells: Default::default(),
             _lines_cache: lines_cache,
         }
+    }
+
+    pub fn is_animating(&self) -> bool {
+        self.panes.is_animating()
     }
 
     pub fn window(&self) -> &Window {
@@ -66,60 +68,19 @@ impl Ui {
         *self.theme.borrow()
     }
 
-    pub fn region(&self) -> Rectangle {
-        self.region
+    pub fn panes(&self) -> UiPanes {
+        UiPanes { ui: self }
     }
 
-    pub fn cells(&self) -> Size {
-        self.cells
+    pub fn panes_mut(&mut self) -> UiPanesMut {
+        UiPanesMut { ui: self }
     }
 
-    pub fn is_animating(&self) -> bool {
-        self.panes.is_animating()
-    }
-
-    pub fn pane(&self, pane_id: PaneId) -> Option<&Pane> {
-        self.panes.get(pane_id)
-    }
-
-    pub fn scroll_to(&mut self, pane_id: PaneId, line: u32) {
-        let top = line * self.theme().line_height;
-
-        self.panes.get_mut(pane_id).map(|pane| match pane {
-            Pane::Document(DocumentPane { document_view, .. }) => document_view.scroll_to(top),
-        });
-    }
-
-    pub fn open_pane(&mut self, document_id: DocumentId) -> PaneId {
-        self.panes.open_pane(document_id)
-    }
-
-    pub fn get_active_pane_id(&self) -> Option<PaneId> {
-        self.panes.get_active_pane_id()
-    }
-
-    pub fn set_active_pane_id(&mut self, active_pane_id: Option<PaneId>) {
-        self.panes.set_active_pane_id(active_pane_id);
-    }
-
+    /// Resizes the graphics canvas.
+    ///
+    /// Does not resizes the views. Views report their last renderd sizes.
     pub fn resize(&mut self) {
-        let size = self.window.inner_size();
-        let size = Size {
-            width: size.width,
-            height: size.height,
-        };
-        let (cells, pixels) = self.theme().cells_and_pixels(size);
-
-        self.cells = cells;
-        self.region = Rectangle {
-            top: (size.height - pixels.height) as i32 / 2,
-            left: (size.width - pixels.width) as i32 / 2,
-            width: pixels.width,
-            height: pixels.height,
-        };
-
         self.graphics.resize(&self.window);
-        self.panes.resize(self.region);
     }
 
     pub fn update(&mut self, delta: Duration) {
@@ -134,10 +95,29 @@ impl Ui {
     ) {
         // TODO react to document closes
 
-        let region = self.region();
+        let region = {
+            let size = self.window.inner_size();
+            let size = Size {
+                width: size.width,
+                height: size.height,
+            };
+            let (_, pixels) = self.theme().cells_and_pixels(size);
 
-        self.panes
-            .render(&mut self.context, &mut self.graphics, documents, mode);
+            Rectangle {
+                top: (size.height - pixels.height) as i32 / 2,
+                left: (size.width - pixels.width) as i32 / 2,
+                width: pixels.width,
+                height: pixels.height,
+            }
+        };
+
+        self.panes.render(
+            &mut self.context,
+            &mut self.graphics,
+            region,
+            documents,
+            mode,
+        );
 
         if let Some((needle, haystack, selected)) = search {
             self.files.render(
@@ -152,6 +132,180 @@ impl Ui {
         self.graphics.render(self.theme().background_color);
     }
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                            UiPanes                                             //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub struct UiPanes<'ui> {
+    ui: &'ui Ui,
+}
+
+impl<'ui> UiPanes<'ui> {
+    pub fn get_active_pane_id(&self) -> Option<PaneId> {
+        self.ui.panes.get_active_pane_id()
+    }
+
+    pub fn active(&self) -> Option<&'ui Pane> {
+        self.get_active_pane_id()
+            .map(|id| self.ui.panes.get(id))
+            .flatten()
+    }
+
+    pub fn get(&self, pane_id: PaneId) -> Option<&'ui Pane> {
+        self.ui.panes.get(pane_id)
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                           UiPanesMut                                           //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub struct UiPanesMut<'ui> {
+    ui: &'ui mut Ui,
+}
+
+impl<'ui> UiPanesMut<'ui> {
+    pub fn set_active_pane_id(&mut self, active_pane_id: Option<PaneId>) {
+        self.ui.panes.set_active_pane_id(active_pane_id);
+    }
+
+    pub fn open_first(&mut self, document_id: DocumentId) -> PaneId {
+        self.ui.panes.open(0, document_id)
+    }
+
+    pub fn open_last(&mut self, document_id: DocumentId) -> PaneId {
+        self.ui.panes.open(self.ui.panes.panes().len(), document_id)
+    }
+
+    pub fn open_prev(&mut self, document_id: DocumentId, panes: usize, wrap: bool) -> PaneId {
+        self.ui.panes.open(
+            sub_in_range(
+                self.ui.panes.panes().len(),
+                self.ui.panes.active_position().unwrap_or_default(),
+                panes,
+                wrap,
+            ),
+            document_id,
+        )
+    }
+
+    pub fn open_next(&mut self, document_id: DocumentId, panes: usize, wrap: bool) -> PaneId {
+        self.ui.panes.open(
+            add_in_range(
+                self.ui.panes.panes().len(),
+                self.ui
+                    .panes
+                    .active_position()
+                    .unwrap_or_else(|| self.ui.panes.panes().len()),
+                panes,
+                wrap,
+            ),
+            document_id,
+        )
+    }
+
+    pub fn close(&mut self) {
+        if let Some(position) = self.ui.panes.active_position() {
+            self.ui.panes.panes_mut().remove(position);
+            self.set_active_pane_id(
+                position
+                    .checked_sub(1)
+                    .map(|prev| self.ui.panes.panes()[prev].id())
+                    .or_else(|| self.ui.panes.panes().get(position).map(Pane::id)),
+            );
+        }
+    }
+
+    pub fn close_others(&mut self) {
+        let active = self
+            .ui
+            .panes
+            .active_position()
+            .map(|position| self.ui.panes.panes_mut().swap_remove(position));
+
+        self.ui.panes.panes_mut().clear();
+        active.map(|active| self.ui.panes.panes_mut().push(active));
+    }
+
+    pub fn focus_first(&mut self) {
+        self.set_active_pane_id(self.ui.panes.panes().first().map(Pane::id));
+    }
+
+    pub fn focus_last(&mut self) {
+        self.set_active_pane_id(self.ui.panes.panes().last().map(Pane::id));
+    }
+
+    pub fn focus_prev(&mut self, panes: usize, wrap: bool) {
+        let position = sub_in_range(
+            self.ui.panes.panes().len(),
+            self.ui.panes.active_position().unwrap_or_default(),
+            panes,
+            wrap,
+        );
+
+        self.set_active_pane_id(Some(self.ui.panes.panes()[position].id()));
+    }
+
+    pub fn focus_next(&mut self, panes: usize, wrap: bool) {
+        let position = add_in_range(
+            self.ui.panes.panes().len(),
+            self.ui
+                .panes
+                .active_position()
+                .unwrap_or_else(|| self.ui.panes.panes().len()),
+            panes,
+            wrap,
+        );
+
+        self.set_active_pane_id(Some(self.ui.panes.panes()[position].id()));
+    }
+
+    pub fn swap_first(&mut self) {
+        if let Some(position) = self.ui.panes.active_position() {
+            self.ui.panes.panes_mut().swap(position, 0);
+        }
+    }
+
+    pub fn swap_last(&mut self) {
+        if let Some(position) = self.ui.panes.active_position() {
+            let len = self.ui.panes.panes().len();
+            self.ui.panes.panes_mut().swap(position, len);
+        }
+    }
+
+    pub fn swap_prev(&mut self, panes: usize, wrap: bool) {
+        if let Some(position) = self.ui.panes.active_position() {
+            let len = self.ui.panes.panes().len();
+            self.ui
+                .panes
+                .panes_mut()
+                .swap(position, sub_in_range(len, position, panes, wrap));
+        }
+    }
+
+    pub fn swap_next(&mut self, panes: usize, wrap: bool) {
+        if let Some(position) = self.ui.panes.active_position() {
+            let len = self.ui.panes.panes().len();
+            self.ui
+                .panes
+                .panes_mut()
+                .swap(position, add_in_range(len, position, panes, wrap));
+        }
+    }
+
+    pub fn scroll_to(&mut self, pane_id: PaneId, line: u32) {
+        let top = line * self.ui.theme().line_height;
+
+        self.ui.panes.get_mut(pane_id).map(|pane| match pane {
+            Pane::Document(DocumentPane { view, .. }) => view.scroll_to(top),
+        });
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                              TODO                                              //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 fn fonts() -> Fonts {
     use virus_graphics::text::{FontStyle::*, FontWeight::*};

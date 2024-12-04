@@ -1,13 +1,13 @@
 use crate::{syntax::Lines, theme::UiTheme, tween::Tweened, ui::LinesCache};
 use std::{cell::RefCell, fmt::Write, rc::Weak, time::Duration};
 use virus_editor::{
-    document::Document,
+    document::{Document, DocumentId},
     mode::{Mode, Select},
     rope::{Cursor, Selection},
 };
 use virus_graphics::{
     text::{Advance, Context, FontStyle, FontWeight, Line, Styles},
-    types::{Position, Rectangle, Rgba},
+    types::{Position, Rectangle, Rgba, Size},
     wgpu::{Draw, Layer},
 };
 
@@ -16,6 +16,8 @@ use virus_graphics::{
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct DocumentView {
+    document_id: DocumentId,
+    size: Size,
     scroll_top: Tweened<u32>,
     scrollbar_alpha: Tweened<u8>,
     theme: Weak<RefCell<UiTheme>>,
@@ -31,8 +33,14 @@ impl std::fmt::Debug for DocumentView {
 impl DocumentView {
     pub const GUTTER_COLUMNS: u32 = 5;
 
-    pub fn new(theme: Weak<RefCell<UiTheme>>, lines_cache: Weak<RefCell<LinesCache>>) -> Self {
+    pub fn new(
+        document_id: DocumentId,
+        theme: Weak<RefCell<UiTheme>>,
+        lines_cache: Weak<RefCell<LinesCache>>,
+    ) -> Self {
         Self {
+            document_id,
+            size: Default::default(),
             scroll_top: Default::default(),
             scrollbar_alpha: Default::default(),
             theme,
@@ -40,12 +48,25 @@ impl DocumentView {
         }
     }
 
-    pub fn scroll_top(&self) -> u32 {
-        self.scroll_top.end()
-    }
-
     pub fn is_animating(&self) -> bool {
         self.scroll_top.is_animating() || self.scrollbar_alpha.is_animating()
+    }
+
+    pub fn document_id(&self) -> DocumentId {
+        self.document_id
+    }
+
+    pub fn cells(&self) -> Size {
+        self.theme
+            .upgrade()
+            .unwrap()
+            .borrow()
+            .cells_and_pixels(self.size)
+            .0
+    }
+
+    pub fn line(&self) -> u32 {
+        self.scroll_top.end() / self.theme.upgrade().unwrap().borrow().line_height
     }
 
     pub fn scroll_to(&mut self, top: u32) {
@@ -75,6 +96,8 @@ impl DocumentView {
                 document.selection().is_empty(),
             _ => true,
         });
+
+        self.size = layer.size();
 
         let theme = *self.theme.upgrade().unwrap().borrow();
         let scroll_top = self.scroll_top.current();
