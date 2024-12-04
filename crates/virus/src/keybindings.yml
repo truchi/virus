@@ -19,6 +19,10 @@ NORMAL:
 
   ?pages shift $up: scroll_up_page ?pages +half
   ?pages shift $down: scroll_down_page ?pages +half
+  e:
+    z: scroll_align_top margin=3
+    e: scroll_align_center
+    r: scroll_align_bottom margin=3
 
   escape: insert
   ",": select_smart

@@ -440,6 +440,18 @@ actions!(
         blank: (Option<bool>) = false,
     ),
 
+    // SCROLL align
+
+    scroll_align_top(
+        margin: (Option<Number>) = 0,
+    ),
+
+    scroll_align_center(),
+
+    scroll_align_bottom(
+        margin: (Option<Number>) = 0,
+    ),
+
     //
     // Selection
     //
