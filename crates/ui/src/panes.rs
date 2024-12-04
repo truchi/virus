@@ -90,10 +90,6 @@ impl Panes {
         })
     }
 
-    pub fn panes(&self) -> &[Pane] {
-        &self.panes
-    }
-
     pub fn open_pane(&mut self, document_id: DocumentId) -> PaneId {
         let pane_id = self.pane_ids.id();
 

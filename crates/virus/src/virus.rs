@@ -229,7 +229,7 @@ impl Virus {
             return;
         };
 
-        self.ui.scroll_to(pane.pane_id, line as usize);
+        self.ui.scroll_to(pane.pane_id, line);
     }
 }
 
@@ -417,19 +417,19 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 };
                 let lines = {
                     let (cells, _) = theme.cells_and_pixels(pane.region.size());
-                    cells.height as usize / if half { 2 } else { 1 }
+                    pages * cells.height as usize / if half { 2 } else { 1 }
                 };
                 document
                     .movements()
-                    .up(pages * lines, wrap)
+                    .up(lines, wrap)
                     .collapse(select == Select::None);
                 self.virus.ensure_visibility();
             }
             Mode::Files => {
                 let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
                 let lines = 10; // TODO: we don't know the height in lines here...
-                let lines = lines / if half { 2 } else { 1 };
-                *selected = sub_in_range(haystacks.len(), *selected, pages * lines, wrap);
+                let lines = pages * lines / if half { 2 } else { 1 };
+                *selected = sub_in_range(haystacks.len(), *selected, lines, wrap);
             }
         }
     }
@@ -479,19 +479,19 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 };
                 let lines = {
                     let (cells, _) = theme.cells_and_pixels(pane.region.size());
-                    cells.height as usize / if half { 2 } else { 1 }
+                    pages * cells.height as usize / if half { 2 } else { 1 }
                 };
                 document
                     .movements()
-                    .down(pages * lines, wrap)
+                    .down(lines, wrap)
                     .collapse(select == Select::None);
                 self.virus.ensure_visibility();
             }
             Mode::Files => {
                 let (_, _, haystacks, selected) = self.virus.search.as_mut().unwrap();
                 let lines = 10; // TODO: we don't know the height in lines here...
-                let lines = lines / if half { 2 } else { 1 };
-                *selected = add_in_range(haystacks.len(), *selected, pages * lines, wrap);
+                let lines = pages * lines / if half { 2 } else { 1 };
+                *selected = add_in_range(haystacks.len(), *selected, lines, wrap);
             }
         }
     }
@@ -738,24 +738,80 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
 
     fn scroll_top(&mut self, blank: bool) {
         match self.virus.mode {
-            Mode::Normal { select } => {}
-            Mode::Insert { select } => {}
+            Mode::Normal { .. } | Mode::Insert { .. } => {
+                let theme = self.virus.ui.theme();
+                let Some((pane, document)) = self.virus.get_active_document_mut() else {
+                    return;
+                };
+                let pane_id = pane.pane_id;
+                let (cells, _) = theme.cells_and_pixels(pane.region.size());
+
+                if document.rope().len_lines() <= cells.height as usize {
+                    return;
+                }
+
+                let offset = blank
+                    .then_some(0)
+                    .unwrap_or_else(|| document.leading_blank_lines() as u32);
+                let line = offset;
+
+                self.virus.ui.scroll_to(pane_id, line);
+            }
             Mode::Files => {}
         }
     }
 
-    fn scroll_up_page(&mut self, pages: usize, half: bool, wrap: bool) {
+    fn scroll_up_page(&mut self, pages: usize, half: bool, blank: bool) {
         match self.virus.mode {
-            Mode::Normal { select } => {}
-            Mode::Insert { select } => {}
+            Mode::Normal { .. } | Mode::Insert { .. } => {
+                let theme = self.virus.ui.theme();
+                let Some((pane, document)) = self.virus.get_active_document_mut() else {
+                    return;
+                };
+                let pane_id = pane.pane_id;
+                let (cells, _) = theme.cells_and_pixels(pane.region.size());
+
+                if document.rope().len_lines() <= cells.height as usize {
+                    return;
+                }
+
+                let offset = blank
+                    .then_some(0)
+                    .unwrap_or_else(|| document.leading_blank_lines() as u32);
+                let line = pane.document_view.scroll_top() / theme.line_height;
+                let line =
+                    line.saturating_sub(pages as u32 * cells.height / if half { 2 } else { 1 });
+                let line = line.max(offset);
+
+                self.virus.ui.scroll_to(pane_id, line);
+            }
             Mode::Files => {}
         }
     }
 
-    fn scroll_up_line(&mut self, lines: usize, wrap: bool) {
+    fn scroll_up_line(&mut self, lines: usize, blank: bool) {
         match self.virus.mode {
-            Mode::Normal { select } => {}
-            Mode::Insert { select } => {}
+            Mode::Normal { .. } | Mode::Insert { .. } => {
+                let theme = self.virus.ui.theme();
+                let Some((pane, document)) = self.virus.get_active_document_mut() else {
+                    return;
+                };
+                let pane_id = pane.pane_id;
+                let (cells, _) = theme.cells_and_pixels(pane.region.size());
+
+                if document.rope().len_lines() <= cells.height as usize {
+                    return;
+                }
+
+                let offset = blank
+                    .then_some(0)
+                    .unwrap_or_else(|| document.leading_blank_lines() as u32);
+                let line = pane.document_view.scroll_top() / theme.line_height;
+                let line = line.saturating_sub(lines as u32);
+                let line = line.max(offset);
+
+                self.virus.ui.scroll_to(pane_id, line);
+            }
             Mode::Files => {}
         }
     }
@@ -764,24 +820,86 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
 
     fn scroll_bottom(&mut self, blank: bool) {
         match self.virus.mode {
-            Mode::Normal { select } => {}
-            Mode::Insert { select } => {}
+            Mode::Normal { .. } | Mode::Insert { .. } => {
+                let theme = self.virus.ui.theme();
+                let Some((pane, document)) = self.virus.get_active_document_mut() else {
+                    return;
+                };
+                let pane_id = pane.pane_id;
+                let (cells, _) = theme.cells_and_pixels(pane.region.size());
+
+                if document.rope().len_lines() <= cells.height as usize {
+                    return;
+                }
+
+                let offset = blank
+                    .then_some(0)
+                    .unwrap_or_else(|| document.trailing_blank_lines() as u32);
+                let line = (document.rope().len_lines() as u32)
+                    .saturating_sub(offset)
+                    .saturating_sub(cells.height);
+
+                self.virus.ui.scroll_to(pane_id, line);
+            }
             Mode::Files => {}
         }
     }
 
-    fn scroll_down_page(&mut self, pages: usize, half: bool, wrap: bool) {
+    fn scroll_down_page(&mut self, pages: usize, half: bool, blank: bool) {
         match self.virus.mode {
-            Mode::Normal { select } => {}
-            Mode::Insert { select } => {}
+            Mode::Normal { .. } | Mode::Insert { .. } => {
+                let theme = self.virus.ui.theme();
+                let Some((pane, document)) = self.virus.get_active_document_mut() else {
+                    return;
+                };
+                let pane_id = pane.pane_id;
+                let (cells, _) = theme.cells_and_pixels(pane.region.size());
+
+                if document.rope().len_lines() <= cells.height as usize {
+                    return;
+                }
+
+                let offset = blank
+                    .then_some(0)
+                    .unwrap_or_else(|| document.trailing_blank_lines() as u32);
+                let line = pane.document_view.scroll_top() / theme.line_height;
+                let line =
+                    line.saturating_add(pages as u32 * cells.height / if half { 2 } else { 1 });
+                let line = line.min(
+                    (document.rope().len_lines() as u32).saturating_sub(cells.height + offset),
+                );
+
+                self.virus.ui.scroll_to(pane_id, line);
+            }
             Mode::Files => {}
         }
     }
 
-    fn scroll_down_line(&mut self, lines: usize, wrap: bool) {
+    fn scroll_down_line(&mut self, lines: usize, blank: bool) {
         match self.virus.mode {
-            Mode::Normal { select } => {}
-            Mode::Insert { select } => {}
+            Mode::Normal { .. } | Mode::Insert { .. } => {
+                let theme = self.virus.ui.theme();
+                let Some((pane, document)) = self.virus.get_active_document_mut() else {
+                    return;
+                };
+                let pane_id = pane.pane_id;
+                let (cells, _) = theme.cells_and_pixels(pane.region.size());
+
+                if document.rope().len_lines() <= cells.height as usize {
+                    return;
+                }
+
+                let offset = blank
+                    .then_some(0)
+                    .unwrap_or_else(|| document.trailing_blank_lines() as u32);
+                let line = pane.document_view.scroll_top() / theme.line_height;
+                let line = line.saturating_add(lines as u32);
+                let line = line.min(
+                    (document.rope().len_lines() as u32).saturating_sub(cells.height + offset),
+                );
+
+                self.virus.ui.scroll_to(pane_id, line);
+            }
             Mode::Files => {}
         }
     }

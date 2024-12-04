@@ -323,6 +323,7 @@ actions!(
         pages: (Option<Number>) = 1,
         half: (Option<bool>) = false,
         wrap: (Option<bool>) = false,
+        // TODO blank?
     ),
 
     move_up_line(
@@ -414,12 +415,12 @@ actions!(
     scroll_up_page(
         pages: (Option<Number>) = 1,
         half: (Option<bool>) = false,
-        wrap: (Option<bool>) = false,
+        blank: (Option<bool>) = false,
     ),
 
     scroll_up_line(
         lines: (Option<Number>) = 1,
-        wrap: (Option<bool>) = false,
+        blank: (Option<bool>) = false,
     ),
 
     // SCROLL down
@@ -431,12 +432,12 @@ actions!(
     scroll_down_page(
         pages: (Option<Number>) = 1,
         half: (Option<bool>) = false,
-        wrap: (Option<bool>) = false,
+        blank: (Option<bool>) = false,
     ),
 
     scroll_down_line(
         lines: (Option<Number>) = 1,
-        wrap: (Option<bool>) = false,
+        blank: (Option<bool>) = false,
     ),
 
     //

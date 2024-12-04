@@ -101,6 +101,20 @@ impl Document {
 }
 
 impl Document {
+    pub fn leading_blank_lines(&self) -> usize {
+        GraphemesForward::new(self.rope.slice(..))
+            .take_while(|grapheme| matches!(grapheme.as_str().into(), GraphemeCategory::Break))
+            .count()
+    }
+
+    pub fn trailing_blank_lines(&self) -> usize {
+        GraphemesBackward::new(self.rope.slice(..))
+            .take_while(|grapheme| matches!(grapheme.as_str().into(), GraphemeCategory::Break))
+            .count()
+    }
+}
+
+impl Document {
     // NOTE:
     // This function is convenient for now.
     // We will need to deal with unsupported languages later.
@@ -194,18 +208,6 @@ impl Document {
                 tree,
             )
             .expect("Cannot parse")
-    }
-
-    fn leading_blank_lines(&self) -> usize {
-        GraphemesForward::new(self.rope.slice(..))
-            .take_while(|grapheme| matches!(grapheme.as_str().into(), GraphemeCategory::Break))
-            .count()
-    }
-
-    fn trailing_blank_lines(&self) -> usize {
-        GraphemesBackward::new(self.rope.slice(..))
-            .take_while(|grapheme| matches!(grapheme.as_str().into(), GraphemeCategory::Break))
-            .count()
     }
 }
 

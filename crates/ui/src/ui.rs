@@ -82,8 +82,8 @@ impl Ui {
         self.panes.get(pane_id)
     }
 
-    pub fn scroll_to(&mut self, pane_id: PaneId, line: usize) {
-        let top = line as u32 * self.theme().line_height;
+    pub fn scroll_to(&mut self, pane_id: PaneId, line: u32) {
+        let top = line * self.theme().line_height;
 
         self.panes.get_mut(pane_id).map(|pane| match pane {
             Pane::Document(DocumentPane { document_view, .. }) => document_view.scroll_to(top),
