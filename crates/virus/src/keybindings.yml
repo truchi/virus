@@ -5,27 +5,27 @@ ALIASES:
   →: l, arrow_right
 
 NORMAL:
-  command shift $↑: move_top
-  command shift $↓: move_bottom
-  ?pages command $↑: move_up_page   ?pages +half
-  ?pages command $↓: move_down_page ?pages +half
-  ?lines $↑: move_up_line   ?lines
-  ?lines $↓: move_down_line ?lines
+  command shift $↑: move_↑↑
+  command shift $↓: move_↓↓
+  ?pages command $↑: move_↑_page ?pages +half
+  ?pages command $↓: move_↓_page ?pages +half
+  ?lines $↑: move_↑_line ?lines
+  ?lines $↓: move_↓_line ?lines
 
   command $←: move_start
   command $→: move_end
-  ?repeat $←: move_left_smart  ?repeat
-  ?repeat $→: move_right_smart ?repeat
+  ?repeat $←: move_←_🧠 ?repeat
+  ?repeat $→: move_→_🧠 ?repeat
 
-  ?pages shift $↑: scroll_up_page   ?pages +half
-  ?pages shift $↓: scroll_down_page ?pages +half
+  ?pages shift $↑: scroll_↑_page ?pages +half
+  ?pages shift $↓: scroll_↓_page ?pages +half
   e:
-    z: scroll_align_top    margin=3
+    z: scroll_align_↑↑ margin=3
     e: scroll_align_center
-    r: scroll_align_bottom margin=3
+    r: scroll_align_↓↓ margin=3
 
   escape: insert
-  ",": select_smart
+  ",": select_🧠
   ";": unselect
 
   x: cut
@@ -40,13 +40,13 @@ NORMAL:
     q: close
 
 INSERT:
-  command $↑: move_up_line
-  command $↓: move_down_line
-  command $←: move_left_smart
-  command $→: move_right_smart
+  command $↑: move_↑_line
+  command $↓: move_↓_line
+  command $←: move_←_🧠
+  command $→: move_→_🧠
 
   escape: normal
-  command ,: select_smart
+  command ,: select_🧠
   command ;: unselect
 
   command x: cut
@@ -61,8 +61,8 @@ INSERT:
     q: close
 
 FILES:
-  command $↑: move_up_line   +wrap
-  command $↓: move_down_line +wrap
+  command $↑: move_↑_line +wrap
+  command $↓: move_↓_line +wrap
   command $→: open
 
   escape: normal

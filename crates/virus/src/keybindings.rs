@@ -1453,7 +1453,16 @@ mod parse {
         };
         let mut action = match tokens.next().transpose()? {
             Some(token) => {
-                let action = token.to_smolstr();
+                let action = token.to_string();
+                let action = action.replace("↑↑", "top");
+                let action = action.replace("↓↓", "bottom");
+                let action = action.replace("↑", "up");
+                let action = action.replace("↓", "down");
+                let action = action.replace("←", "left");
+                let action = action.replace("→", "right");
+                let action = action.replace("🧠", "smart");
+                let action = action.to_smolstr();
+
                 ParsedAction::default(&action).ok_or_else(|| UnknownAction { action })?
             }
             None => return Ok((unstick, None)),
