@@ -149,7 +149,7 @@ impl Ui {
             );
         }
 
-        self.graphics.render();
+        self.graphics.render(self.theme().background_color);
     }
 }
 
@@ -248,6 +248,7 @@ fn ui_theme(context: &Context) -> UiTheme {
 
     UiTheme {
         syntax: SyntaxTheme::catppuccin(),
+        background_color: catppuccin.crust.solid(),
 
         family,
         font_size,

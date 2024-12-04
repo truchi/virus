@@ -8,7 +8,7 @@ mod rectangle;
 use crate::{
     muck::WithAttributes,
     text::{Context, FontSize, Glyph, GlyphKey, Line, LineHeight, LineScaler, Styles},
-    types::{Position, Rectangle, Rgba, Size},
+    types::{Position, Rectangle, Rgb, Rgba, Size},
 };
 use atlas::{Atlas, AtlasError};
 use glyph::Pipeline as GlyphPipeline;
@@ -167,7 +167,7 @@ impl Graphics {
     }
 
     /// Renders to the screen.
-    pub fn render(&mut self) {
+    pub fn render(&mut self, clear: Rgb) {
         // Get output texture from surface
         let output = self.surface.get_current_texture().unwrap();
         let output_texture = output.texture.create_view(&Default::default());
@@ -184,15 +184,11 @@ impl Graphics {
                 view: &output_texture,
                 resolve_target: None,
                 ops: Operations {
-                    load: LoadOp::Clear({
-                        // TODO
-                        let color = crate::Catppuccin::default().crust;
-                        Color {
-                            r: color.r as f64 / 255.0,
-                            g: color.g as f64 / 255.0,
-                            b: color.b as f64 / 255.0,
-                            a: color.a as f64 / 255.0,
-                        }
+                    load: LoadOp::Clear(Color {
+                        r: clear.r as f64 / 255.0,
+                        g: clear.g as f64 / 255.0,
+                        b: clear.b as f64 / 255.0,
+                        a: 255.0,
                     }),
                     store: StoreOp::Store,
                 },

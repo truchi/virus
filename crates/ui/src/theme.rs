@@ -8,6 +8,7 @@ use virus_graphics::{
 #[derive(Copy, Clone, Debug)]
 pub struct UiTheme {
     pub syntax: SyntaxTheme,
+    pub background_color: Rgb,
 
     pub family: FontFamilyKey,
     pub font_size: FontSize,
