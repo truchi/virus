@@ -2,13 +2,14 @@ use crate::{syntax::SyntaxTheme, tween::Tween};
 use std::time::Duration;
 use virus_graphics::{
     text::{Advance, FontFamilyKey, FontSize, LineHeight},
-    types::{Rgb, Size},
+    types::{Rgb, Rgba, Size},
 };
 
 #[derive(Copy, Clone, Debug)]
 pub struct UiTheme {
     pub syntax: SyntaxTheme,
     pub background_color: Rgb,
+    pub inactive_foreground_color: Rgba,
 
     pub family: FontFamilyKey,
     pub font_size: FontSize,

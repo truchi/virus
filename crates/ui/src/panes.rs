@@ -199,10 +199,9 @@ impl Panes {
                     let Some(document) = documents(view.document_id()) else {
                         continue;
                     };
+                    let is_active = self.active_id == Some(*id);
                     let region = {
-                        let width = (self.active_id == Some(*id))
-                            .then_some(active_width)
-                            .unwrap_or(inactive_width);
+                        let width = is_active.then_some(active_width).unwrap_or(inactive_width);
                         let region = Rectangle {
                             top: region.top,
                             left,
@@ -213,21 +212,25 @@ impl Panes {
                         left += width as i32 + margin;
                         region
                     };
-                    let mode = (self.active_id == Some(*id))
-                        .then_some(mode)
-                        .unwrap_or_else(|| {
-                            // We want the document to look the same when it will be active again
-                            // Assuming this is the logic:
-                            Mode::Normal {
-                                select: if document.selection().is_empty() {
-                                    Select::None
-                                } else {
-                                    Select::Range
-                                },
-                            }
-                        });
+                    let mode = is_active.then_some(mode).unwrap_or_else(|| {
+                        // We want the document to look the same when it will be active again
+                        // Assuming this is the logic:
+                        Mode::Normal {
+                            select: if document.selection().is_empty() {
+                                Select::None
+                            } else {
+                                Select::Range
+                            },
+                        }
+                    });
 
-                    view.render(context, &mut graphics.layer(region, 0), document, mode);
+                    view.render(
+                        context,
+                        &mut graphics.layer(region, 0),
+                        document,
+                        mode,
+                        is_active,
+                    );
                 }
             }
         }

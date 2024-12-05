@@ -90,6 +90,7 @@ impl DocumentView {
         layer: &mut Layer,
         document: &Document,
         mode: Mode,
+        is_active: bool,
     ) {
         debug_assert!(match mode {
             Mode::Normal { select } | Mode::Insert { select } if select == Select::None =>
@@ -155,6 +156,7 @@ impl DocumentView {
             scrollbar_rectangle,
             scrollbar_color,
             mode,
+            is_active,
         }
         .render();
     }
@@ -176,14 +178,22 @@ struct Renderer<'context, 'layer, 'graphics, 'lines> {
     scrollbar_rectangle: Rectangle,
     scrollbar_color: Rgba,
     mode: Mode,
+    is_active: bool,
 }
 
 impl<'context, 'layer, 'graphics, 'lines> Renderer<'context, 'layer, 'graphics, 'lines> {
     fn render(&mut self) {
+        self.render_scrollbar();
         self.render_line_numbers();
         self.render_lines();
         self.render_selection();
-        self.render_scrollbar();
+        self.render_foreground();
+    }
+
+    fn render_scrollbar(&mut self) {
+        self.layer
+            .draw(None, 0)
+            .rectangle(self.scrollbar_rectangle, self.scrollbar_color);
     }
 
     fn render_line_numbers(&mut self) {
@@ -365,9 +375,13 @@ impl<'context, 'layer, 'graphics, 'lines> Renderer<'context, 'layer, 'graphics, 
         }
     }
 
-    fn render_scrollbar(&mut self) {
-        self.layer
-            .draw(None, 0)
-            .rectangle(self.scrollbar_rectangle, self.scrollbar_color);
+    fn render_foreground(&mut self) {
+        if !self.is_active {
+            let size = self.layer.size();
+            self.layer.draw(None, 2).rectangle(
+                Rectangle::from((Position::default(), size)),
+                self.theme.inactive_foreground_color,
+            );
+        }
     }
 }

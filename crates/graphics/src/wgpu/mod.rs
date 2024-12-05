@@ -179,15 +179,15 @@ impl Graphics {
 
         // Render pipelines in output texture
         let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-            label: Some("Rectangle render pass"),
+            label: Some("Render pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
                 view: &output_texture,
                 resolve_target: None,
                 ops: Operations {
                     load: LoadOp::Clear(Color {
-                        r: clear.r as f64 / 255.0,
-                        g: clear.g as f64 / 255.0,
-                        b: clear.b as f64 / 255.0,
+                        r: (clear.r as f64 / 255.0).powf(2.2),
+                        g: (clear.g as f64 / 255.0).powf(2.2),
+                        b: (clear.b as f64 / 255.0).powf(2.2),
                         a: 255.0,
                     }),
                     store: StoreOp::Store,

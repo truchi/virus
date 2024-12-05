@@ -132,7 +132,8 @@ mod todo {
 
         UiTheme {
             syntax: SyntaxTheme::catppuccin(),
-            background_color: catppuccin.crust.solid(),
+            background_color: catppuccin.base.solid(),
+            inactive_foreground_color: catppuccin.mantle.solid().transparent(255 / 3),
 
             family,
             font_size,
