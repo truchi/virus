@@ -149,40 +149,49 @@ impl Panes {
         documents: impl Fn(DocumentId) -> Option<&'a Document>,
         mode: Mode,
     ) {
-        // TODO when enough space
-
         let len = self.panes.len() as u32;
         let theme = *self.theme.upgrade().unwrap().borrow();
-        let (active_width, inactive_width) = {
-            let columns = theme.cells_and_pixels(region.size()).0.width;
-            let active_columns = columns.min(Self::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS);
+        let region_columns = theme.cells_and_pixels(region.size()).0.width;
+        let columns_to_pixels = |columns: u32| (columns as f32 * theme.advance).ceil() as u32;
+        let desired_columns = Self::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS;
+
+        let (active_width, inactive_width) = if len * desired_columns < region_columns {
+            (
+                columns_to_pixels(desired_columns),
+                columns_to_pixels(desired_columns),
+            )
+        } else {
+            let active_columns = region_columns.min(desired_columns);
             let inactive_columns = if self.active_id.is_some() {
                 match len {
                     0 => unreachable!(),
                     1 => 0,
-                    _ => columns.saturating_sub(active_columns) / (len - 1),
+                    _ => region_columns.saturating_sub(active_columns) / (len - 1),
                 }
             } else {
                 match len {
                     0 => 0,
-                    _ => columns / len,
+                    _ => region_columns / len,
                 }
             };
 
             (
-                (active_columns as f32 * theme.advance).ceil() as u32,
-                (inactive_columns as f32 * theme.advance).ceil() as u32,
+                columns_to_pixels(active_columns),
+                columns_to_pixels(inactive_columns),
             )
         };
-        let mut left = region.left + {
-            let width = if self.active_id.is_some() {
+        let margin = {
+            let remaining_width = region.width.saturating_sub(if self.active_id.is_some() {
                 active_width + inactive_width * (len - 1)
             } else {
                 inactive_width * len
-            };
+            });
 
-            region.width.saturating_sub(width) / 2
-        } as i32;
+            // Space evenly
+            (remaining_width / (len + 1)) as i32
+        };
+
+        let mut left = region.left + margin as i32;
 
         for pane in &mut self.panes {
             match pane {
@@ -201,7 +210,7 @@ impl Panes {
                             height: region.height,
                         };
 
-                        left += width as i32;
+                        left += width as i32 + margin;
                         region
                     };
                     let mode = (self.active_id == Some(*id))
