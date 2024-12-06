@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Weak, usize};
 use virus_editor::fuzzy::Search;
 use virus_graphics::{
     text::{Context, FontWeight, Line, Styles},
-    types::{Position, Rectangle, Rgba},
+    types::{Position, Rectangle},
     wgpu::Layer,
 };
 
@@ -98,32 +98,51 @@ impl<'a> Renderer<'a> {
 
     fn render_needle(&mut self) {
         let line = Line::shaper(
-            &format!("> {}", self.needle),
+            &self.needle,
             0,
             Styles {
-                weight: Default::default(),
-                style: Default::default(),
-                foreground: Rgba::BLACK,
-                background: Default::default(),
-                underline: false,
-                strike: false,
+                weight: FontWeight::Bold,
+                ..self.theme.syntax.default
             },
         )
         .shape(self.context, self.theme.family, self.theme.font_size);
 
-        let region = {
-            let mut region = self.region;
-            region.top += self.theme.line_height as i32;
-            region.left += self.theme.advance.ceil() as i32;
-            region
-        };
+        self.layer
+            .draw(
+                {
+                    let mut region = self.region;
+                    region.top += self.theme.line_height as i32;
+                    region.left += self.theme.advance.ceil() as i32;
+                    region
+                },
+                0,
+            )
+            .glyphs(
+                self.context,
+                Position::default(),
+                &line,
+                self.theme.line_height,
+            );
 
-        self.layer.draw(region, 0).glyphs(
-            self.context,
-            Position::default(),
-            &line,
-            self.theme.line_height,
-        );
+        self.layer
+            .draw(
+                {
+                    let mut region = self.region;
+                    region.top += self.theme.line_height as i32;
+                    region
+                },
+                0,
+            )
+            .rectangle(
+                Rectangle {
+                    top: 0,
+                    left: (self.theme.advance + line.advance()).ceil() as i32
+                        - self.theme.caret_width as i32 / 2,
+                    width: self.theme.caret_width,
+                    height: self.theme.line_height,
+                },
+                self.theme.insert_mode_color.transparent(255),
+            );
     }
 
     fn render_matches(&mut self) {
@@ -161,11 +180,7 @@ impl<'a> Renderer<'a> {
                 0,
                 Styles {
                     weight,
-                    style: Default::default(),
-                    foreground: Rgba::BLACK,
-                    background: Default::default(),
-                    underline: false,
-                    strike: false,
+                    ..self.theme.syntax.default
                 },
             );
 
@@ -182,11 +197,8 @@ impl<'a> Renderer<'a> {
                 {
                     *cluster.styles_mut() = Styles {
                         weight,
-                        style: Default::default(),
-                        foreground: Rgba::RED,
-                        background: Default::default(),
-                        underline: false,
-                        strike: false,
+                        foreground: self.theme.insert_mode_color.transparent(255),
+                        ..Default::default()
                     };
                     start = i;
                 }
