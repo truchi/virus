@@ -1224,9 +1224,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
         match self.virus.mode {
             Mode::Normal { .. } => {}
             Mode::Insert { select } => self.virus.mode(Mode::Normal { select }),
-            Mode::Files => self.virus.mode(Mode::Normal {
-                select: Select::None,
-            }),
+            Mode::Files => {
+                self.virus.search = None;
+                self.virus.mode(Mode::Normal {
+                    select: Select::None,
+                });
+            }
         }
     }
 
@@ -1234,9 +1237,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
         match self.virus.mode {
             Mode::Normal { select } => self.virus.mode(Mode::Insert { select }),
             Mode::Insert { .. } => {}
-            Mode::Files => self.virus.mode(Mode::Normal {
-                select: Select::None,
-            }),
+            Mode::Files => {
+                self.virus.search = None;
+                self.virus.mode(Mode::Insert {
+                    select: Select::None,
+                });
+            }
         }
     }
 
