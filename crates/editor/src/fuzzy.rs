@@ -70,10 +70,80 @@ impl Config {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                             Search                                             //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+#[derive(Debug)]
+pub struct Match {
+    pub index: usize,
+    pub score: isize,
+    pub indices: Vec<Range<usize>>,
+}
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
+#[derive(Default, Debug)]
+pub struct Search {
+    config: Config,
+    haystack: Vec<String>,
+    matches: Vec<Match>,
+}
+
+impl Search {
+    pub fn new(config: Config) -> Self {
+        Self {
+            config,
+            haystack: Default::default(),
+            matches: Default::default(),
+        }
+    }
+
+    pub fn new_file_search() -> Self {
+        Self::new(Config::FILE_SEARCH)
+    }
+
+    pub fn matches(&self) -> &[Match] {
+        &self.matches
+    }
+
+    pub fn haystack(&self) -> &Vec<String> {
+        &self.haystack
+    }
+
+    pub fn set_haystack(&mut self, haystack: impl Iterator<Item = String>) {
+        self.haystack = haystack.collect();
+        self.reset();
+    }
+
+    pub fn search(&mut self, needle: &str) {
+        self.matches =
+            Fuzzy::new(self.config, needle).scores(self.haystack.iter().map(String::as_str));
+    }
+
+    pub fn reset(&mut self) {
+        self.matches = self
+            .haystack
+            .iter()
+            .enumerate()
+            .map(|(index, _)| Match {
+                index,
+                score: Default::default(),
+                indices: Default::default(),
+            })
+            .collect();
+    }
+
+    pub fn clear(&mut self) {
+        self.haystack.clear();
+        self.matches.clear();
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Fuzzy                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-pub struct Fuzzy {
+struct Fuzzy {
     config: Config,
     needle_set: [bool; 256],
     needle_bytes: Vec<NeedleByte>,
@@ -83,7 +153,7 @@ pub struct Fuzzy {
 }
 
 impl Fuzzy {
-    pub fn new(config: Config, needle: &str) -> Self {
+    fn new(config: Config, needle: &str) -> Self {
         let mut needle_set = [false; 256];
         let mut needle_bytes = Vec::with_capacity(needle.len());
 
@@ -107,11 +177,7 @@ impl Fuzzy {
         }
     }
 
-    pub fn new_file_search(needle: &str) -> Self {
-        Self::new(Config::FILE_SEARCH, needle)
-    }
-
-    pub fn score(&mut self, haystack: &str) -> Option<(isize, &[Range<usize>])> {
+    fn score(&mut self, haystack: &str) -> Option<(isize, &[Range<usize>])> {
         self.haystack_bytes.clear();
 
         Byte::parse(haystack, |index, byte, is_start| {
@@ -145,25 +211,23 @@ impl Fuzzy {
         best_score.map(|score| (score, self.best_ranges.as_slice()))
     }
 
-    pub fn scores<'a>(
-        &mut self,
-        haystacks: impl IntoIterator<Item = &'a str>,
-    ) -> Vec<(String, isize, Vec<Range<usize>>)> {
+    fn scores<'a>(&mut self, haystacks: impl IntoIterator<Item = &'a str>) -> Vec<Match> {
         let mut scores = Vec::new();
 
-        for haystack in haystacks {
+        for (index, haystack) in haystacks.into_iter().enumerate() {
             if let Some((score, indices)) = self.score(haystack) {
-                scores.push((haystack.to_owned(), score, indices.to_owned()));
+                scores.push(Match {
+                    index,
+                    score,
+                    indices: indices.to_owned(),
+                });
             }
         }
 
-        scores.sort_by_key(|(_, score, _)| -score);
+        scores.sort_by_key(|m| -m.score);
         scores
     }
-}
 
-/// Private.
-impl Fuzzy {
     fn emit_matches(
         needle_bytes: &mut [NeedleByte],
         haystack_bytes: &[HaystackByte],

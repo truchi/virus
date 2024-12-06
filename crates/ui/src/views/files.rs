@@ -1,5 +1,6 @@
 use crate::{panes::Panes, theme::UiTheme, views::DocumentView};
-use std::{cell::RefCell, ops::Range, rc::Weak, usize};
+use std::{cell::RefCell, rc::Weak, usize};
+use virus_editor::fuzzy::Search;
 use virus_graphics::{
     text::{Context, FontWeight, Line, Styles},
     types::{Position, Rectangle, Rgba},
@@ -23,13 +24,13 @@ impl FilesView {
         &mut self,
         context: &'a mut Context,
         layer: Layer<'a>,
-        needle: &'a str,
-        haystacks: &'a [(String, isize, Vec<Range<usize>>)],
         selected: usize,
+        needle: &'a str,
+        search: &'a Search,
     ) {
         let theme = *self.theme.upgrade().unwrap().borrow();
 
-        Renderer::new(context, layer, theme, needle, haystacks, selected).render();
+        Renderer::new(context, layer, theme, selected, needle, search).render();
     }
 }
 
@@ -41,9 +42,9 @@ struct Renderer<'a> {
     context: &'a mut Context,
     layer: Layer<'a>,
     theme: UiTheme,
-    needle: &'a str,
-    haystacks: &'a [(String, isize, Vec<Range<usize>>)],
     selected: usize,
+    needle: &'a str,
+    search: &'a Search,
     region: Rectangle,
 }
 
@@ -52,9 +53,9 @@ impl<'a> Renderer<'a> {
         context: &'a mut Context,
         layer: Layer<'a>,
         theme: UiTheme,
-        needle: &'a str,
-        haystacks: &'a [(String, isize, Vec<Range<usize>>)],
         selected: usize,
+        needle: &'a str,
+        search: &'a Search,
     ) -> Self {
         let region = {
             let columns = 2 + Panes::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS;
@@ -73,9 +74,9 @@ impl<'a> Renderer<'a> {
             context,
             layer,
             theme,
-            needle,
-            haystacks,
             selected,
+            needle,
+            search,
             region,
         }
     }
@@ -83,7 +84,7 @@ impl<'a> Renderer<'a> {
     fn render(&mut self) {
         self.render_background();
         self.render_needle();
-        self.render_haystacks();
+        self.render_matches();
     }
 
     fn render_background(&mut self) {
@@ -125,8 +126,8 @@ impl<'a> Renderer<'a> {
         );
     }
 
-    fn render_haystacks(&mut self) {
-        if self.haystacks.is_empty() {
+    fn render_matches(&mut self) {
+        if self.search.matches().is_empty() {
             return;
         }
 
@@ -140,14 +141,14 @@ impl<'a> Renderer<'a> {
             let region_height_in_lines = (region.height / self.theme.line_height) as usize;
 
             if self.selected < region_height_in_lines {
-                0..region_height_in_lines.min(self.haystacks.len())
+                0..region_height_in_lines.min(self.search.matches().len())
             } else {
                 self.selected + 1 - region_height_in_lines..self.selected + 1
             }
         };
         let mut position = Position::default();
 
-        for (index, (haystack, _, indices)) in self.haystacks[range.clone()].iter().enumerate() {
+        for (index, m) in self.search.matches()[range.clone()].iter().enumerate() {
             let index = index + range.start;
 
             let weight = if index == self.selected {
@@ -156,7 +157,7 @@ impl<'a> Renderer<'a> {
                 Default::default()
             };
             let mut shaper = Line::shaper(
-                haystack,
+                &self.search.haystack()[m.index],
                 0,
                 Styles {
                     weight,
@@ -170,7 +171,7 @@ impl<'a> Renderer<'a> {
 
             let mut clusters = shaper.clusters_mut();
 
-            for range in indices {
+            for range in &m.indices {
                 let mut start = 0;
 
                 for (i, cluster) in clusters

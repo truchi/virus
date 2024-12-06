@@ -4,10 +4,11 @@ use crate::{
     theme::UiTheme,
     views::FilesView,
 };
-use std::{cell::RefCell, collections::HashMap, ops::Range, rc::Rc, sync::Arc, time::Duration};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc, time::Duration};
 use virus_editor::{
     add_in_range,
     document::{Document, DocumentId},
+    fuzzy::Search,
     mode::Mode,
     sub_in_range,
 };
@@ -89,7 +90,7 @@ impl Ui {
         &mut self,
         documents: impl Fn(DocumentId) -> Option<&'a Document>,
         mode: Mode,
-        search: Option<(&'a str, &'a [(String, isize, Vec<Range<usize>>)], usize)>,
+        file_search: Option<(usize, &'a str, &Search)>,
     ) {
         // TODO react to document closes
 
@@ -117,7 +118,7 @@ impl Ui {
             mode,
         );
 
-        if let Some((needle, haystack, selected)) = search {
+        if let Some((needle, haystack, selected)) = file_search {
             self.files.render(
                 &mut self.context,
                 self.graphics.layer(region, 1),
