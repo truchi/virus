@@ -13,7 +13,7 @@ use virus_editor::{
 };
 use virus_graphics::{
     text::Context,
-    types::{Rectangle, Rgba, Size},
+    types::{Rectangle, Size},
     wgpu::Graphics,
 };
 use winit::window::Window;
@@ -40,7 +40,7 @@ impl Ui {
         let context = Context::new(crate::todo::fonts());
         let theme = Rc::new(RefCell::new(crate::todo::ui_theme(&context)));
         let lines_cache = Default::default();
-        let files = FilesView::new(Rc::downgrade(&theme), Rgba::WHITE);
+        let files = FilesView::new(Rc::downgrade(&theme));
         let panes = Panes::new(Rc::downgrade(&theme), Rc::downgrade(&lines_cache));
 
         Self {

@@ -1,26 +1,10 @@
-#![allow(unused)]
-
-use std::{
-    cell::RefCell,
-    ops::{Range, RangeBounds},
-    rc::{Rc, Weak},
-    usize,
-};
+use crate::{panes::Panes, theme::UiTheme, views::DocumentView};
+use std::{cell::RefCell, ops::Range, rc::Weak, usize};
 use virus_graphics::{
-    text::{
-        Context, FontFamilyKey, FontKey, FontSize, FontStyle, FontWeight, Line, LineHeight, Styles,
-    },
+    text::{Context, FontWeight, Line, Styles},
     types::{Position, Rectangle, Rgba},
-    wgpu::{Draw, Layer},
+    wgpu::Layer,
 };
-
-use crate::theme::UiTheme;
-
-const MIN_WIDTH: f32 = 0.5;
-
-fn min_width(width: u32) -> u32 {
-    (width as f32 * MIN_WIDTH).round() as u32
-}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           FilesView                                            //
@@ -28,21 +12,11 @@ fn min_width(width: u32) -> u32 {
 
 pub struct FilesView {
     theme: Weak<RefCell<UiTheme>>,
-    needle: String,
-    haystack: Vec<(String, Vec<Range<usize>>)>,
-    selected: usize,
-    background: Rgba,
 }
 
 impl FilesView {
-    pub fn new(theme: Weak<RefCell<UiTheme>>, background: Rgba) -> Self {
-        Self {
-            theme,
-            needle: Default::default(),
-            haystack: Default::default(),
-            selected: 0,
-            background,
-        }
+    pub fn new(theme: Weak<RefCell<UiTheme>>) -> Self {
+        Self { theme }
     }
 
     pub fn render<'a>(
@@ -53,21 +27,9 @@ impl FilesView {
         haystacks: &'a [(String, isize, Vec<Range<usize>>)],
         selected: usize,
     ) {
-        let theme = self.theme.upgrade().unwrap();
-        let theme = theme.borrow();
+        let theme = *self.theme.upgrade().unwrap().borrow();
 
-        Renderer::new(
-            context,
-            layer,
-            self.background,
-            theme.family,
-            theme.font_size,
-            theme.line_height,
-            needle,
-            haystacks,
-            selected,
-        )
-        .render();
+        Renderer::new(context, layer, theme, needle, haystacks, selected).render();
     }
 }
 
@@ -78,52 +40,43 @@ impl FilesView {
 struct Renderer<'a> {
     context: &'a mut Context,
     layer: Layer<'a>,
-    background: Rgba,
-    family: FontFamilyKey,
-    font_size: FontSize,
-    line_height: LineHeight,
-    advance: f32,
+    theme: UiTheme,
     needle: &'a str,
     haystacks: &'a [(String, isize, Vec<Range<usize>>)],
     selected: usize,
+    region: Rectangle,
 }
 
 impl<'a> Renderer<'a> {
     fn new(
         context: &'a mut Context,
         layer: Layer<'a>,
-        background: Rgba,
-        family: FontFamilyKey,
-        font_size: FontSize,
-        line_height: LineHeight,
+        theme: UiTheme,
         needle: &'a str,
         haystacks: &'a [(String, isize, Vec<Range<usize>>)],
         selected: usize,
     ) -> Self {
-        let advance = context
-            .fonts()
-            .get(
-                context
-                    .fonts()
-                    .get(family)
-                    .unwrap()
-                    .best_match_regular_normal()
-                    .unwrap(),
-            )
-            .unwrap()
-            .advance_for_size(font_size);
+        let region = {
+            let columns = 2 + Panes::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS;
+            let width = (columns as f32 * theme.advance).ceil() as u32;
+            let left = (layer.size().width.saturating_sub(width) / 2) as i32;
+
+            Rectangle {
+                top: 0,
+                left,
+                width,
+                height: layer.size().height,
+            }
+        };
 
         Self {
             context,
             layer,
-            background,
-            family,
-            font_size,
-            line_height,
-            advance,
+            theme,
             needle,
             haystacks,
             selected,
+            region,
         }
     }
 
@@ -134,12 +87,17 @@ impl<'a> Renderer<'a> {
     }
 
     fn render_background(&mut self) {
-        self.layer.draw(None, 0).rectangle(None, self.background);
+        self.layer
+            .draw(None, 0)
+            .rectangle(None, self.theme.inactive_foreground_color);
+        self.layer
+            .draw(self.region, 0)
+            .rectangle(None, self.theme.background_color.transparent(255));
     }
 
     fn render_needle(&mut self) {
         let line = Line::shaper(
-            &self.needle,
+            &format!("> {}", self.needle),
             0,
             Styles {
                 weight: Default::default(),
@@ -150,11 +108,21 @@ impl<'a> Renderer<'a> {
                 strike: false,
             },
         )
-        .shape(self.context, self.family, self.font_size);
+        .shape(self.context, self.theme.family, self.theme.font_size);
 
-        self.layer
-            .draw(None, 0)
-            .glyphs(self.context, Position::default(), &line, self.line_height);
+        let region = {
+            let mut region = self.region;
+            region.top += self.theme.line_height as i32;
+            region.left += self.theme.advance.ceil() as i32;
+            region
+        };
+
+        self.layer.draw(region, 0).glyphs(
+            self.context,
+            Position::default(),
+            &line,
+            self.theme.line_height,
+        );
     }
 
     fn render_haystacks(&mut self) {
@@ -162,14 +130,14 @@ impl<'a> Renderer<'a> {
             return;
         }
 
-        let region = Rectangle {
-            top: self.line_height as i32,
-            left: 0,
-            width: self.layer.size().width,
-            height: self.layer.size().height - self.line_height,
+        let region = {
+            let mut region = self.region;
+            region.top += 3 * self.theme.line_height as i32;
+            region.left += self.theme.advance.ceil() as i32;
+            region
         };
         let range = {
-            let region_height_in_lines = (region.height / self.line_height) as usize;
+            let region_height_in_lines = (region.height / self.theme.line_height) as usize;
 
             if self.selected < region_height_in_lines {
                 0..region_height_in_lines.min(self.haystacks.len())
@@ -225,12 +193,15 @@ impl<'a> Renderer<'a> {
                 clusters = &mut clusters[start..];
             }
 
-            let line = shaper.shape(self.context, self.family, self.font_size);
-            self.layer
-                .draw(region, 0)
-                .glyphs(self.context, position, &line, self.line_height);
+            let line = shaper.shape(self.context, self.theme.family, self.theme.font_size);
+            self.layer.draw(region, 0).glyphs(
+                self.context,
+                position,
+                &line,
+                self.theme.line_height,
+            );
 
-            position.top += self.line_height as i32;
+            position.top += self.theme.line_height as i32;
         }
     }
 }
