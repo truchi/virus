@@ -940,7 +940,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                 &mut self,
                 has_sticky: bool,
                 parent: Option<NodeId>,
-                action_str: String,
+                action_str: SmolStr,
             ) -> KeybindingsResult<Node> {
                 let (unstick, action) = parse::action(&action_str, |count| {
                     self.counts
@@ -956,9 +956,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                 })?;
 
                 if unstick && !has_sticky {
-                    return Err(UnexpectedUnstickInAction {
-                        action: action_str.to_smolstr(),
-                    });
+                    return Err(UnexpectedUnstickInAction { action: action_str });
                 }
 
                 Ok(Node::Leaf {
@@ -974,7 +972,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                 parent: Option<NodeId>,
                 node_id: NodeId,
                 sticky: bool,
-                deserialized_children: HashMap<String, deserialize::Node>,
+                deserialized_children: HashMap<SmolStr, deserialize::Node>,
             ) -> KeybindingsResult<Node> {
                 // The node to create
                 let mut node = Node::Node {
@@ -1078,9 +1076,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                     // Check count usage and clean
                     if let Some(count) = count.map(|count| count.to_smol()) {
                         if !self.counts.get(&count).unwrap().1 {
-                            return Err(UnusedCountInBinding {
-                                binding: binding.to_smolstr(),
-                            });
+                            return Err(UnusedCountInBinding { binding });
                         }
 
                         self.counts.remove(&count);
@@ -1088,9 +1084,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
 
                     // Check for conflicts
                     if self.conflicting_bindings(&node) {
-                        return Err(ConflictingBinding {
-                            binding: binding.to_smolstr(),
-                        });
+                        return Err(ConflictingBinding { binding });
                     }
                 }
 
@@ -1189,7 +1183,7 @@ mod deserialize {
     #[serde(deny_unknown_fields)]
     pub struct Keybindings {
         #[serde(default)]
-        pub aliases: HashMap<String, String>,
+        pub aliases: HashMap<SmolStr, SmolStr>,
         #[serde(default)]
         pub normal: Nodes,
         #[serde(default)]
@@ -1201,7 +1195,7 @@ mod deserialize {
     #[derive(Deserialize, Clone, Default, Debug)]
     pub struct Nodes {
         #[serde(flatten)]
-        pub children: HashMap<String, Node>,
+        pub children: HashMap<SmolStr, Node>,
     }
 
     #[derive(Deserialize, Clone, Debug)]
@@ -1211,9 +1205,9 @@ mod deserialize {
             #[serde(default)]
             sticky: bool,
             #[serde(flatten)]
-            children: HashMap<String, Node>,
+            children: HashMap<SmolStr, Node>,
         },
-        Leaf(String),
+        Leaf(SmolStr),
     }
 }
 
