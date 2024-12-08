@@ -925,11 +925,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
 
             /// Constructs the nodes tree recursively.
             fn convert(mut self, nodes: deserialize::Nodes) -> KeybindingsResult<Nodes> {
-                let current = insert!(
-                    self,
-                    id,
-                    self.node(false, None, id, None, false, nodes.children)?
-                );
+                let current = insert!(self, id, self.node(false, None, id, false, nodes.children)?);
 
                 debug_assert_eq!(current, 0);
 
@@ -977,14 +973,12 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                 has_sticky: bool,
                 parent: Option<NodeId>,
                 node_id: NodeId,
-                text: Option<String>,
                 sticky: bool,
                 deserialized_children: HashMap<String, deserialize::Node>,
             ) -> KeybindingsResult<Node> {
                 // The node to create
                 let mut node = Node::Node {
                     parent,
-                    text,
                     sticky,
                     children: Default::default(),
                 };
@@ -1020,7 +1014,6 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                                     id,
                                     Node::Node {
                                         parent: Some(node_id),
-                                        text: Default::default(),
                                         children: [(Count(Optional(())), id)].into_iter().collect(),
                                         sticky: false
                                     }
@@ -1055,11 +1048,8 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                             self,
                             id,
                             match deserialized_child {
-                                deserialize::Node::Node {
-                                    text,
-                                    sticky,
-                                    children,
-                                } => self.node(has_sticky, parent, id, text, sticky, children),
+                                deserialize::Node::Node { sticky, children } =>
+                                    self.node(has_sticky, parent, id, sticky, children),
                                 deserialize::Node::Leaf(action) => {
                                     self.leaf(has_sticky, parent, action)
                                 }
@@ -1175,7 +1165,6 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
 enum Node {
     Node {
         parent: Option<NodeId>,
-        text: Option<String>,
         sticky: bool,
         children: HashMap<CountOrKey, NodeId>,
     },
@@ -1219,9 +1208,6 @@ mod deserialize {
     #[serde(untagged)]
     pub enum Node {
         Node {
-            #[serde(rename = "_text")]
-            text: Option<String>,
-            #[serde(rename = "_sticky")]
             #[serde(default)]
             sticky: bool,
             #[serde(flatten)]
@@ -1493,7 +1479,7 @@ mod parse {
         ))
     }
 
-    /// Parses `_unstick test value=?count` from `action`,
+    /// Parses `unstick test value=?count` from `action`,
     /// resolving count node id with `count_by_name`.
     pub fn action(
         action_str: &str,
@@ -1501,7 +1487,7 @@ mod parse {
     ) -> KeybindingsResult<(bool, Option<ParsedAction>)> {
         let mut tokens = Tokens::new(action_str).peekable();
         let unstick = match tokens.peek() {
-            Some(Ok(Token::Underscore(str))) if *str == UNSTICK => {
+            Some(Ok(Token::Str(str))) if *str == UNSTICK => {
                 tokens.next();
                 true
             }
@@ -1855,7 +1841,7 @@ mod tests {
                 Keybindings::from_yaml(
                     r#"
                         NORMAL:
-                            a: _unstick test
+                            a: unstick test
                     "#,
                 ),
                 Err(UnexpectedUnstickInAction { .. }),
@@ -1951,16 +1937,16 @@ mod tests {
             r#"
                 NORMAL:
                     a:
-                        _sticky: true
+                        sticky: true
                         b: test value=1
-                        c: _unstick test value=2
+                        c: unstick test value=2
                         d:
                             e: test value=3
-                            f: _unstick test value=4
+                            f: unstick test value=4
                             g:
-                                _sticky: true
+                                sticky: true
                                 h: test value=5
-                                i: _unstick test value=6
+                                i: unstick test value=6
             "#,
         )
         .unwrap()
@@ -2048,7 +2034,7 @@ mod tests {
             r#"
                 NORMAL:
                     ?value a:
-                        _sticky: true
+                        sticky: true
                         b:
                             c: test ?value
             "#,
