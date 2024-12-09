@@ -687,6 +687,15 @@ impl Keybindings {
             Mode::Files => self.files.handle(event),
         }
     }
+
+    /// Returns the original bindings (and counts) that led to the current state.
+    pub fn originals(&self) -> impl Iterator<Item = (Option<Number>, &str)> {
+        match self.mode {
+            Mode::Normal { .. } => self.normal.originals(),
+            Mode::Insert { .. } => self.insert.originals(),
+            Mode::Files => self.files.originals(),
+        }
+    }
 }
 
 impl Default for Keybindings {
@@ -733,6 +742,7 @@ struct Nodes {
     nodes: HashMap<NodeId, Node>,
     current: NodeId,
     counts: HashMap<NodeId, Number>,
+    originals: Vec<(NodeId, SmolStr)>,
 }
 
 impl Nodes {
@@ -760,11 +770,17 @@ impl Nodes {
         {
             if let Key::Str(str) = event.modded() {
                 if let Ok(number) = str.parse::<Number>() {
-                    let count = self.counts.entry(*current).or_default();
+                    self.current = *current;
+
+                    match self.originals.last() {
+                        Some((node_id, _)) if self.current == *node_id => {}
+                        _ => self.originals.push((self.current, Default::default())),
+                    }
+
+                    let count = self.counts.entry(self.current).or_default();
                     *count *= (10 as Number).pow(str.len() as u32);
                     *count += number;
 
-                    self.current = *current;
                     return Ok(None);
                 }
             }
@@ -805,6 +821,8 @@ impl Nodes {
         self.current = if let Some(&current) = current {
             current
         } else {
+            // If we did not find anything for unmodded `Escape`,
+            // bind it to escape the current keybinding branch
             if *event.modded() == Key::Escape
                 && !event.control()
                 && !event.shift()
@@ -820,7 +838,12 @@ impl Nodes {
 
         // Return action
         match self.nodes.get(&self.current).unwrap() {
-            Node::Node { .. } => Ok(None),
+            Node::Node { original, .. } => {
+                self.originals.push((self.current, original.clone()));
+
+                Ok(None)
+            }
+
             Node::Leaf { action, .. } => {
                 let action = action.clone().map(|action| action.action(&self.counts));
 
@@ -828,6 +851,13 @@ impl Nodes {
                 Ok(action)
             }
         }
+    }
+
+    /// Returns the original bindings.
+    fn originals(&self) -> impl Iterator<Item = (Option<Number>, &str)> {
+        self.originals
+            .iter()
+            .map(|(node_id, str)| (self.counts.get(node_id).copied(), str.as_str()))
     }
 
     /// Climbs the branch up until unstuck properly, removing counts on the way.
@@ -858,6 +888,16 @@ impl Nodes {
                     break;
                 }
             }
+        }
+
+        if let Some(index) = self
+            .originals
+            .iter()
+            .position(|(node_id, _)| self.current == *node_id)
+        {
+            self.originals.truncate(index + 1);
+        } else {
+            self.originals.clear();
         }
     }
 
@@ -937,6 +977,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                     nodes: self.nodes,
                     current,
                     counts: Default::default(),
+                    originals: Default::default(),
                 })
             }
 
