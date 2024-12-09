@@ -51,6 +51,12 @@ impl BitOr for Mods {
 
 impl std::fmt::Debug for Mods {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}
+
+impl std::fmt::Display for Mods {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (bool, str) in [
             (self.control, Self::CONTROL_STR),
             (self.shift, Self::SHIFT_STR),
@@ -77,15 +83,6 @@ macro_rules! key {
         pub enum Key<T = SmolStr> {
             Str(T),
             $($variant,)*
-        }
-
-        impl<T: std::fmt::Debug> std::fmt::Debug for Key<T> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self {
-                    Key::Str(str) => std::fmt::Debug::fmt(str, f),
-                    $(Key::$variant => f.write_str(stringify!($variant)),)*
-                }
-            }
         }
 
         impl Key<SmolStr> {
@@ -122,6 +119,15 @@ macro_rules! key {
                     WinitKey::Character(str) => Self::Str(SmolStr::new(str)),
                     _ => return Err(()),
                 })
+            }
+        }
+
+        impl<T: std::fmt::Debug> std::fmt::Debug for Key<T> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    Key::Str(str) => std::fmt::Debug::fmt(str, f),
+                    $(Key::$variant => f.write_str(stringify!($variant)),)*
+                }
             }
         }
     };

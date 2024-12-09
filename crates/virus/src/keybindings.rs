@@ -925,7 +925,11 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
 
             /// Constructs the nodes tree recursively.
             fn convert(mut self, nodes: deserialize::Nodes) -> KeybindingsResult<Nodes> {
-                let current = insert!(self, id, self.node(false, None, id, false, nodes.children)?);
+                let current = insert!(
+                    self,
+                    id,
+                    self.node(false, None, id, SmolStr::default(), false, nodes.children)?
+                );
 
                 debug_assert_eq!(current, 0);
 
@@ -971,11 +975,13 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                 has_sticky: bool,
                 parent: Option<NodeId>,
                 node_id: NodeId,
+                original: SmolStr,
                 sticky: bool,
                 deserialized_children: HashMap<SmolStr, deserialize::Node>,
             ) -> KeybindingsResult<Node> {
                 // The node to create
                 let mut node = Node::Node {
+                    original,
                     parent,
                     sticky,
                     children: Default::default(),
@@ -997,7 +1003,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                     //                       \      /
                     //                        action
                     //
-                    let (count, keys) = parse::binding(&binding, self.aliases)?;
+                    let (count, original, keys) = parse::binding(&binding, self.aliases)?;
 
                     // Create the count node
                     let parent_id = if let Some(count) = count {
@@ -1011,6 +1017,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                                     self,
                                     id,
                                     Node::Node {
+                                        original: Default::default(),
                                         parent: Some(node_id),
                                         children: [(Count(Optional(())), id)].into_iter().collect(),
                                         sticky: false
@@ -1039,21 +1046,18 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                     };
 
                     // Create the child node
-                    let child_id = {
+                    let child_id = insert!(self, id, {
                         let parent = parent_id.or(Some(node_id));
 
-                        insert!(
-                            self,
-                            id,
-                            match deserialized_child {
-                                deserialize::Node::Node { sticky, children } =>
-                                    self.node(has_sticky, parent, id, sticky, children),
-                                deserialize::Node::Leaf(action) => {
-                                    self.leaf(has_sticky, parent, action)
-                                }
-                            }?
-                        )
-                    };
+                        match deserialized_child.clone() {
+                            deserialize::Node::Node { sticky, children } => {
+                                self.node(has_sticky, parent, id, original, sticky, children)
+                            }
+                            deserialize::Node::Leaf(action) => {
+                                self.leaf(has_sticky, parent, action)
+                            }
+                        }?
+                    });
 
                     // Attach the child to all keys in the binding
                     for key in keys.map(Key) {
@@ -1158,6 +1162,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
 #[derive(Clone, Eq, PartialEq, Debug)]
 enum Node {
     Node {
+        original: SmolStr,
         parent: Option<NodeId>,
         sticky: bool,
         children: HashMap<CountOrKey, NodeId>,
@@ -1412,7 +1417,11 @@ mod parse {
     pub fn binding<'a>(
         binding: &'a str,
         aliases: &'a Aliases,
-    ) -> KeybindingsResult<(Option<Count<&'a str>>, impl Iterator<Item = ModdedKey> + 'a)> {
+    ) -> KeybindingsResult<(
+        Option<Count<&'a str>>,
+        SmolStr,
+        impl Iterator<Item = ModdedKey> + 'a,
+    )> {
         let mut tokens = Tokens::new(binding).peekable();
         let count = tokens
             .peek()
@@ -1432,10 +1441,10 @@ mod parse {
             Many(Iter<'a, ModdedKey>),
         }
 
-        let mut keys = match tokens.next().transpose()? {
+        let (token, mut keys) = match tokens.next().transpose()? {
             // Resolve aliases
             Some(Token::Dollar(alias)) => match aliases.get(alias) {
-                Some(aliases) => OneOrMany::Many(aliases.iter()),
+                Some(aliases) => (Token::Dollar(alias), OneOrMany::Many(aliases.iter())),
                 None => {
                     return Err(UnknownAlias {
                         alias: alias.to_smolstr(),
@@ -1443,10 +1452,13 @@ mod parse {
                 }
             },
             // NOTE: any other tokens will be parsed as-is, e.g. `Key::Str("_weird")`
-            Some(token) => OneOrMany::One(Some(ModdedKey::new(
-                mods,
-                Key::parse(&token.to_smolstr()).to_smol(),
-            ))),
+            Some(token) => (
+                token,
+                OneOrMany::One(Some(ModdedKey::new(
+                    mods,
+                    Key::parse(&token.to_smolstr()).to_smol(),
+                ))),
+            ),
             None => {
                 return Err(MissingTokenInBinding {
                     binding: binding.to_smolstr(),
@@ -1463,6 +1475,7 @@ mod parse {
 
         Ok((
             count,
+            format!("{mods}{token}").to_smolstr(),
             std::iter::from_fn(move || match &mut keys {
                 OneOrMany::One(option) => option.take(),
                 OneOrMany::Many(iter) => iter
