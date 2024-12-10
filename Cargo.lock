@@ -492,6 +492,7 @@ dependencies = [
  "ignore",
  "ropey",
  "serde_json",
+ "smol_str 0.3.2",
  "tokio",
  "tree-sitter",
  "tree-sitter-rust",

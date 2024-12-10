@@ -17,7 +17,12 @@ pub mod rope {
     mod selection;
     mod text;
 }
+pub mod highlights;
 pub mod history;
+
+use smol_str::SmolStr;
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
 
 #[macro_export]
 macro_rules! ids {
@@ -49,6 +54,8 @@ macro_rules! ids {
     };
 }
 
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
 pub fn add_in_range(end: usize, at: usize, add: usize, wrap: bool) -> usize {
     debug_assert!((0..end).contains(&at));
 
@@ -77,4 +84,23 @@ pub fn sub_in_range(end: usize, at: usize, sub: usize, wrap: bool) -> usize {
 
     debug_assert!((0..end).contains(&result));
     result
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                           StrOrSmol                                            //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum StrOrSmol<'a> {
+    Str(&'a str),
+    Smol(SmolStr),
+}
+
+impl<'a> StrOrSmol<'a> {
+    pub fn as_str(&self) -> &str {
+        match self {
+            StrOrSmol::Str(str) => str,
+            StrOrSmol::Smol(smol) => smol.as_str(),
+        }
+    }
 }
