@@ -1,6 +1,7 @@
 //! Text shaping and scaling.
 
 mod font;
+mod glyphs;
 mod line;
 
 pub use font::*;
