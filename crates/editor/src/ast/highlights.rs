@@ -1,93 +1,9 @@
+use super::HighlightsTag;
 use crate::{rope::Cursor, StrOrSmol};
 use ropey::Rope;
 use smol_str::SmolStrBuilder;
-use std::{cmp::Ordering, ops::Range, str::FromStr};
+use std::{cmp::Ordering, ops::Range};
 use tree_sitter::{Node, Point, Query, QueryCursor};
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                         HighlightsTag                                          //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-macro_rules! tag {
-    ($(#[$meta:meta])* $vis:vis $Enum:ident, [$(($Variant:ident, $str:literal)),* $(,)?]) => {
-        $(#[$meta])*
-        $vis enum $Enum { $(
-            $Variant,
-        )* }
-
-        impl FromStr for $Enum {
-            type Err = ();
-
-            fn from_str(str: &str) -> Result<Self, Self::Err> {
-                Ok(match str {
-                    $($str => Self::$Variant,)*
-                    _ => return Err(()),
-                })
-            }
-        }
-
-        impl TryFrom<u8> for $Enum {
-            type Error = ();
-
-            fn try_from(u8: u8) -> Result<Self, Self::Error> {
-                [$(Self::$Variant,)*]
-                .get(u8 as usize)
-                .copied()
-                .ok_or(())
-            }
-        }
-    };
-}
-
-// TODO write a test that checks tags in all highlights.scm
-tag!(
-    /// Tags found in `highlights.scm` files.
-    #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-    pub HighlightsTag,
-    [
-        (Attribute, "attribute"),
-        (Comment, "comment"),
-        (Constant, "constant"),
-        (ConstantBuiltinBoolean, "constant.builtin.boolean"),
-        (ConstantCharacter, "constant.character"),
-        (ConstantCharacterEscape, "constant.character.escape"),
-        (ConstantNumericFloat, "constant.numeric.float"),
-        (ConstantNumericInteger, "constant.numeric.integer"),
-        (Constructor, "constructor"),
-        (Function, "function"),
-        (FunctionMacro, "function.macro"),
-        (FunctionMethod, "function.method"),
-        (Keyword, "keyword"),
-        (KeywordControl, "keyword.control"),
-        (KeywordControlConditional, "keyword.control.conditional"),
-        (KeywordControlImport, "keyword.control.import"),
-        (KeywordControlRepeat, "keyword.control.repeat"),
-        (KeywordControlReturn, "keyword.control.return"),
-        (KeywordFunction, "keyword.function"),
-        (KeywordOperator, "keyword.operator"),
-        (KeywordSpecial, "keyword.special"),
-        (KeywordStorage, "keyword.storage"),
-        (KeywordStorageModifier, "keyword.storage.modifier"),
-        (KeywordStorageModifierMut, "keyword.storage.modifier.mut"),
-        (KeywordStorageModifierRef, "keyword.storage.modifier.ref"),
-        (KeywordStorageType, "keyword.storage.type"),
-        (Label, "label"),
-        (Namespace, "namespace"),
-        (Operator, "operator"),
-        (PunctuationBracket, "punctuation.bracket"),
-        (PunctuationDelimiter, "punctuation.delimiter"),
-        (Special, "special"),
-        (String, "string"),
-        (Type, "type"),
-        (TypeBuiltin, "type.builtin"),
-        (TypeEnumVariant, "type.enum.variant"),
-        (TypeParameter, "type.parameter"),
-        (Variable, "variable"),
-        (VariableBuiltin, "variable.builtin"),
-        (VariableOtherMember, "variable.other.member"),
-        (VariableParameter, "variable.parameter"),
-    ]
-);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                           Highlights                                           //
@@ -103,7 +19,7 @@ struct Highlight {
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
-/// Syntax highlighting.
+/// Syntax highlighting.                                                                                                           
 #[derive(Debug)]
 pub struct Highlights {
     rope: Rope,
@@ -113,9 +29,9 @@ pub struct Highlights {
 }
 
 impl Highlights {
-    /// Creates a new [`Highlights`] for `rope` and its `root` node with an highlight `query`.
-    ///
-    /// NOTE lower pattern index matches are favored over high pattern index matches.
+    /// Creates a new [`Highlights`] for `rope` and its `root` node with an highlight `query`.                                     
+    ///                                                                                                                            
+    /// NOTE lower pattern index matches are favored over high pattern index matches.                                              
     pub fn new(rope: &Rope, root: Node, lines: Range<usize>, query: &Query) -> Self {
         debug_assert!(lines.start <= lines.end);
         debug_assert!(lines.end <= rope.len_lines());
@@ -125,6 +41,7 @@ impl Highlights {
 
             (
                 cursor.at_column(lines.start, 0),
+                // TODO at line end, to not emit the extra line break
                 if lines.end == rope.len_lines() {
                     cursor.at_end()
                 } else {
@@ -194,12 +111,12 @@ impl Highlights {
         }
     }
 
-    /// Returns an iterator of strings and their highlight tag.
-    ///
-    /// The whole line range of text is covered.
+    /// Returns an iterator of strings and their highlight tag.                                                                    
+    ///                                                                                                                            
+    /// The whole line range of text is covered.                                                                                   
     pub fn highlights(&self) -> impl Iterator<Item = (StrOrSmol, Option<HighlightsTag>)> {
         Self::split(
-            self.rope.byte_slice(self.start..self.end).chunks(),
+            dbg!(self.rope.byte_slice(self.start..self.end)).chunks(),
             self.highlights
                 .iter()
                 .map(|highlight| highlight.end - highlight.start),
@@ -209,12 +126,12 @@ impl Highlights {
     }
 }
 
-/// Private.
+/// Private.                                                                                                                       
 impl Highlights {
-    /// Reorders `unordered` highlights so that:
-    /// - the full range is covered
-    /// - highlights are ordered text-wise
-    /// - lower pattern index highlights are favored
+    /// Reorders `unordered` highlights so that:                                                                                   
+    /// - the full range is covered                                                                                                
+    /// - highlights are ordered text-wise                                                                                         
+    /// - lower pattern index highlights are favored                                                                               
     fn reorder(len: usize, unordered: impl Iterator<Item = Highlight>) -> Vec<Highlight> {
         let mut highlights = vec![Highlight {
             start: 0,
@@ -293,10 +210,10 @@ impl Highlights {
         highlights
     }
 
-    /// Splits `chunks` into new chunks whose length is given by `lens`.
-    ///
-    /// `chunks` and `lens` MUST cover the same range, i.e.:
-    /// `chunks.map(str::len).sum() == lens.sum()`.
+    /// Splits `chunks` into new chunks whose length is given by `lens`.                                                           
+    ///                                                                                                                            
+    /// `chunks` and `lens` MUST cover the same range, i.e.:                                                                       
+    /// `chunks.map(str::len).sum() == lens.sum()`.                                                                                
     fn split<'a>(
         mut chunks: impl Iterator<Item = &'a str>,
         mut lens: impl Iterator<Item = usize>,

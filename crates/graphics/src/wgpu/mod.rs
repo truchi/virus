@@ -7,7 +7,7 @@ mod rectangle;
 
 use crate::{
     muck::WithAttributes,
-    text::{Context, FontSize, Glyph, GlyphKey, Line, LineHeight, LineScaler, Styles},
+    text::{Context, FontSize, Glyph, GlyphKey, Glyphs, LineHeight, Styles},
     types::{Position, Rectangle, Rgb, Rgba, Size},
 };
 use atlas::{Atlas, AtlasError};
@@ -331,7 +331,6 @@ impl<'graphics> Draw<'graphics> {
     pub fn glyph<F: FnOnce() -> Image>(
         &mut self,
         position: Position,
-        font_size: FontSize,
         key: GlyphKey,
         color: Rgba,
         image: F,
@@ -341,7 +340,6 @@ impl<'graphics> Draw<'graphics> {
             self.layer,
             self.region,
             position,
-            font_size,
             key,
             color,
             image,
@@ -353,15 +351,14 @@ impl<'graphics> Draw<'graphics> {
         &mut self,
         context: &mut Context,
         position: Position,
-        line: &Line,
         line_height: LineHeight,
+        glyphs: &Glyphs,
     ) {
         //
         // Add backgrounds
         //
 
-        for (Range { start, end }, _, background) in line.segments(|glyph| glyph.styles.background)
-        {
+        for (Range { start, end }, background) in glyphs.backgrounds() {
             self.rectangle(
                 Rectangle {
                     top: position.top,
@@ -377,15 +374,14 @@ impl<'graphics> Draw<'graphics> {
         // Add glyphs
         //
 
-        let mut scaler = line.scaler(context);
+        let mut scaler = Glyphs::scaler(context);
 
-        for glyph in line.glyphs() {
+        for glyph in glyphs.glyphs() {
             self.glyph(
                 Position {
                     top: position.top,
                     left: position.left + glyph.offset.round() as i32,
                 },
-                line.font_size(),
                 glyph.key(),
                 glyph.styles.foreground,
                 || scaler.render(&glyph),

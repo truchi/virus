@@ -1,56 +1,33 @@
-use super::{
-    Advance, Context, FontFamilyKey, FontKey, FontSize, FontStyle, FontWeight, Fonts, GlyphKey,
-    Styles, FEATURES, HINT, SCRIPT, SOURCES,
-};
+use super::{Advance, Context, FontFamilyKey, FontSize, Fonts, Glyph, Styles};
 use crate::types::Rgba;
 use std::ops::Range;
 use swash::{
-    scale::{image::Image, Render, ScaleContext},
+    scale::{image::Image, Render, ScaleContext, Source, StrikeWith},
     shape::{ShapeContext, Shaper as SwashShaper},
-    text::cluster::{CharCluster, Parser, Status, Token},
-    GlyphId,
+    text::{
+        cluster::{CharCluster, Parser, Status, Token},
+        Script,
+    },
 };
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                             Glyph                                              //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-/// A shaped glyph.
-#[derive(Copy, Clone, Debug)]
-pub struct Glyph {
-    /// Font key.
-    pub font: FontKey,
-    /// Font size.
-    pub size: FontSize,
-    /// Glyph id.
-    pub id: GlyphId,
-    /// Glyph advance offset.
-    pub offset: Advance,
-    /// Glyph advance.
-    pub advance: Advance,
-    /// Start index in the underlying string.
-    pub start: u32,
-    /// End index in the underlying string.
-    pub end: u32,
-    /// Styles tag.
-    pub styles: u16,
-}
-
-impl Glyph {
-    /// Returns the [`GlyphKey`].
-    pub fn key(&self) -> GlyphKey {
-        (self.font, self.size, self.id)
-    }
-}
+const SCRIPT: Script = Script::Unknown;
+const FEATURES: &'static [(&'static str, u16)] = &[("dlig", 1), ("calt", 1)];
+const HINT: bool = true;
+const SOURCES: &[Source] = &[
+    Source::ColorOutline(0),
+    Source::ColorBitmap(StrikeWith::BestFit),
+    Source::Outline,
+    Source::Bitmap(StrikeWith::BestFit),
+];
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Glyphs                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// Lines of [`Glyph`]s.
-#[derive(Clone, Debug)]
+/// A line of [`Glyph`]s.
+#[derive(Clone, Default, Debug)]
 pub struct Glyphs {
-    lines: Vec<Vec<Glyph>>,
+    glyphs: Vec<Glyph>,
 }
 
 impl Glyphs {
@@ -67,8 +44,7 @@ impl Glyphs {
             shape,
             family,
             size,
-            glyphs: Self { lines: Vec::new() },
-            line: 0,
+            glyphs: Self { glyphs: Vec::new() },
             column: 0,
         }
     }
@@ -84,33 +60,42 @@ impl Glyphs {
         }
     }
 
-    /// Returns the lines of [`Glyph`]s.
-    pub fn lines(&self) -> &Vec<Vec<Glyph>> {
-        &self.lines
+    /// Returns the [`Glyph`]s.
+    pub fn glyphs(&self) -> &[Glyph] {
+        &self.glyphs
+    }
+
+    /// Returns the [`Glyph`]s mutably.
+    pub fn glyphs_mut(&mut self) -> &mut [Glyph] {
+        &mut self.glyphs
+    }
+
+    /// Returns the full advance.
+    pub fn advance(&self) -> Advance {
+        self.glyphs
+            .last()
+            .map(|glyph| glyph.offset + glyph.advance)
+            .unwrap_or_default()
     }
 
     /// Returns an iterator of background color ranges.
-    pub fn backgrounds<'a>(
-        line: &'a [Glyph],
-        styles: impl 'a + Fn(u16) -> Styles,
-    ) -> impl 'a + Iterator<Item = (Range<Advance>, Rgba)> {
-        let background = move |glyph: &Glyph| styles(glyph.styles).background;
-        let mut glyphs = line.iter().peekable();
+    pub fn backgrounds<'a>(&'a self) -> impl 'a + Iterator<Item = (Range<Advance>, Rgba)> {
+        let mut glyphs = self.glyphs.iter().peekable();
 
         std::iter::from_fn(move || {
             std::iter::repeat(())
-                .flat_map(|()| glyphs.next_if(|glyph| !background(glyph).is_visible()))
+                .map_while(|()| glyphs.next_if(|glyph| !glyph.styles.background.is_visible()))
                 .count();
 
             let start = glyphs.next()?;
-            let color = background(start);
+            let background = start.styles.background;
             let end = std::iter::repeat(())
-                .flat_map(|_| glyphs.next_if(|glyph| background(glyph) == color))
+                .map_while(|_| glyphs.next_if(|glyph| glyph.styles.background == background))
                 .last()
                 .unwrap_or(start);
 
-            debug_assert!(color.is_visible());
-            return Some((start.offset..end.offset + end.advance, color));
+            debug_assert!(background.is_visible());
+            return Some((start.offset..end.offset + end.advance, background));
         })
     }
 }
@@ -119,65 +104,26 @@ impl Glyphs {
 //                                             Shaper                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// [`Glyph`]'s shaper.
+/// [`Glyphs`] shaper.
 pub struct Shaper<'context> {
     fonts: &'context Fonts,
     shape: &'context mut ShapeContext,
     family: FontFamilyKey,
     size: FontSize,
     glyphs: Glyphs,
-    line: usize,
     column: u32,
 }
 
 impl<'context> Shaper<'context> {
     /// Pushes `str` to the shaper with `weight`, `style` and `styles`.
     ///
-    /// `"\r\n"` MUST NOT be split across `str`s.
-    pub fn push(
-        &mut self,
-        str: impl AsRef<str>,
-        weight: FontWeight,
-        style: FontStyle,
-        styles: u16,
-    ) -> &mut Self {
-        let (str, next_line) = {
-            let str = str.as_ref();
-
-            if str.is_empty() {
-                return self;
-            }
-
-            match str.find(['\r', '\n']) {
-                Some(index) => {
-                    let (left, right) = str.split_at(index);
-
-                    match right.as_bytes()[0] {
-                        b'\r' => {
-                            if right.as_bytes().get(1) == Some(&b'\n') {
-                                (left, Some(&right[2..]))
-                            } else {
-                                (left, Some(&right[1..]))
-                            }
-                        }
-                        b'\n' => (left, Some(&right[1..])),
-                        _ => unreachable!(),
-                    }
-                }
-                None => (str, None),
-            }
-        };
-        let line = {
-            if self.glyphs.lines.get(self.line).is_none() {
-                self.glyphs.lines.push(Vec::new());
-            }
-
-            &mut self.glyphs.lines[self.line]
-        };
+    /// `str` MUST NOT contain line breaks. Cannot shape ligatures across `str`s.
+    pub fn push(&mut self, str: &str, styles: Styles) -> &mut Self {
+        debug_assert!(!str.contains(['\r', '\n']));
 
         let font = self
             .fonts
-            .get((self.family, weight, style))
+            .get((self.family, styles.weight, styles.style))
             .expect("Font not found in font cache");
         let emoji = self.fonts.emoji();
         let font_size = self.size;
@@ -200,7 +146,7 @@ impl<'context> Shaper<'context> {
                     offset: column + i as u32,
                     len: ch.len_utf8() as u8,
                     info: ch.into(),
-                    data: styles as u32,
+                    data: 0,
                 }
             }),
         );
@@ -211,29 +157,22 @@ impl<'context> Shaper<'context> {
             .size(font_size as f32)
             .features(FEATURES)
             .build();
-
-        fn flush(line: &mut Vec<Glyph>, shaper: SwashShaper, font: FontKey, size: FontSize) {
-            let mut offset = line
-                .last()
-                .map(|glyph| glyph.offset + glyph.advance)
-                .unwrap_or_default();
-
+        let mut flush = |shaper: SwashShaper, font, size| {
             shaper.shape_with(|cluster| {
                 for glyph in cluster.glyphs {
-                    line.push(Glyph {
+                    self.glyphs.glyphs.push(Glyph {
                         font,
                         size,
                         id: glyph.id,
-                        offset,
+                        offset: self.glyphs.advance(),
                         advance: glyph.advance,
                         start: cluster.source.start,
                         end: cluster.source.end,
-                        styles: glyph.data as u16,
+                        styles,
                     });
-                    offset += glyph.advance;
                 }
             });
-        }
+        };
 
         while parser.next(&mut cluster) {
             let selected_key = match cluster.map(|char| font_charmap.map(char)) {
@@ -254,7 +193,6 @@ impl<'context> Shaper<'context> {
 
             if current_key != selected_key {
                 flush(
-                    line,
                     shaper,
                     current_key,
                     match () {
@@ -288,7 +226,6 @@ impl<'context> Shaper<'context> {
         }
 
         flush(
-            line,
             shaper,
             current_key,
             match () {
@@ -298,18 +235,13 @@ impl<'context> Shaper<'context> {
             },
         );
 
-        if let Some(str) = next_line {
-            self.line += 1;
-            self.column = 0;
-            self.push(str, weight, style, styles)
-        } else {
-            self
-        }
+        self
     }
 
-    /// Returns the shaped [`Glyphs`].
-    pub fn glyphs(self) -> Glyphs {
-        self.glyphs
+    /// Returns the [`Glyphs`] and resets the shaper.
+    pub fn glyphs(&mut self) -> Glyphs {
+        self.column = 0;
+        std::mem::take(&mut self.glyphs)
     }
 }
 
@@ -317,7 +249,11 @@ impl<'context> Shaper<'context> {
 //                                             Scaler                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// [`Glyph`]'s scaler.
+// TODO
+// - reuse scaler (iterator api)
+// - subpixel
+
+/// [`Glyphs`] scaler.
 pub struct Scaler<'context> {
     fonts: &'context Fonts,
     scale: &'context mut ScaleContext,

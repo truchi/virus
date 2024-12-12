@@ -2,7 +2,7 @@ use crate::{panes::Panes, theme::UiTheme, views::DocumentView};
 use std::{cell::RefCell, rc::Weak, usize};
 use virus_editor::fuzzy::Search;
 use virus_graphics::{
-    text::{Context, FontWeight, Line, Styles},
+    text::{Context, FontWeight, Glyphs, Styles},
     types::{Position, Rectangle},
     wgpu::Layer,
 };
@@ -97,15 +97,15 @@ impl<'a> Renderer<'a> {
     }
 
     fn render_needle(&mut self) {
-        let line = Line::shaper(
-            &self.needle,
-            0,
-            Styles {
-                weight: FontWeight::Bold,
-                ..self.theme.syntax.default
-            },
-        )
-        .shape(self.context, self.theme.family, self.theme.font_size);
+        let glyphs = Glyphs::shaper(self.context, self.theme.family, self.theme.font_size)
+            .push(
+                &self.needle,
+                Styles {
+                    weight: FontWeight::Bold,
+                    ..self.theme.syntax.default
+                },
+            )
+            .glyphs();
 
         self.layer
             .draw(
@@ -120,8 +120,8 @@ impl<'a> Renderer<'a> {
             .glyphs(
                 self.context,
                 Position::default(),
-                &line,
                 self.theme.line_height,
+                &glyphs,
             );
 
         self.layer
@@ -136,7 +136,7 @@ impl<'a> Renderer<'a> {
             .rectangle(
                 Rectangle {
                     top: 0,
-                    left: (self.theme.advance + line.advance()).ceil() as i32
+                    left: (self.theme.advance + glyphs.advance()).ceil() as i32
                         - self.theme.caret_width as i32 / 2,
                     width: self.theme.caret_width,
                     height: self.theme.line_height,
@@ -168,50 +168,45 @@ impl<'a> Renderer<'a> {
         let mut position = Position::default();
 
         for (index, m) in self.search.matches()[range.clone()].iter().enumerate() {
-            let index = index + range.start;
-
-            let weight = if index == self.selected {
-                FontWeight::Bold
-            } else {
-                Default::default()
+            let str = self.search.haystack()[m.index].as_str();
+            let weight = (index + range.start == self.selected)
+                .then_some(FontWeight::Bold)
+                .unwrap_or_default();
+            let styles0 = Styles {
+                weight,
+                ..self.theme.syntax.default
             };
-            let mut shaper = Line::shaper(
-                &self.search.haystack()[m.index],
-                0,
-                Styles {
-                    weight,
-                    ..self.theme.syntax.default
-                },
-            );
+            let styles1 = Styles {
+                weight,
+                foreground: self.theme.insert_mode_color.transparent(255),
+                ..self.theme.syntax.default
+            };
+            let glyphs = {
+                let mut index = 0;
+                let mut shaper =
+                    Glyphs::shaper(self.context, self.theme.family, self.theme.font_size);
 
-            let mut clusters = shaper.clusters_mut();
+                for range in &m.indices {
+                    if index < range.start {
+                        shaper.push(&str[index..range.start], styles0);
+                    }
 
-            for range in &m.indices {
-                let mut start = 0;
-
-                for (i, cluster) in clusters
-                    .iter_mut()
-                    .enumerate()
-                    .skip_while(|(_, cluster)| !cluster.range().contains(&range.start))
-                    .take_while(|(_, cluster)| !cluster.range().contains(&range.end))
-                {
-                    *cluster.styles_mut() = Styles {
-                        weight,
-                        foreground: self.theme.insert_mode_color.transparent(255),
-                        ..Default::default()
-                    };
-                    start = i;
+                    shaper.push(&str[range.clone()], styles1);
+                    index = range.end;
                 }
 
-                clusters = &mut clusters[start..];
-            }
+                if index < str.len() {
+                    shaper.push(&str[index..], styles0);
+                }
 
-            let line = shaper.shape(self.context, self.theme.family, self.theme.font_size);
+                shaper.glyphs()
+            };
+
             self.layer.draw(region, 0).glyphs(
                 self.context,
                 position,
-                &line,
                 self.theme.line_height,
+                &glyphs,
             );
 
             position.top += self.theme.line_height as i32;

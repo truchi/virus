@@ -1,23 +1,29 @@
+pub mod ast {
+    mod highlights;
+    mod queries;
+
+    pub use highlights::*;
+    pub use queries::*;
+}
 pub mod document;
 pub mod editor;
 pub mod fuzzy;
 pub mod mode;
 pub mod rope {
-    pub use cursor::*;
-    pub use edit::*;
-    pub use graphemes::*;
-    pub use segmentation::*;
-    pub use selection::*;
-    pub use text::*;
-
     mod cursor;
     mod edit;
     mod graphemes;
     mod segmentation;
     mod selection;
     mod text;
+
+    pub use cursor::*;
+    pub use edit::*;
+    pub use graphemes::*;
+    pub use segmentation::*;
+    pub use selection::*;
+    pub use text::*;
 }
-pub mod highlights;
 pub mod history;
 
 use smol_str::SmolStr;

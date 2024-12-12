@@ -304,7 +304,6 @@ impl Pipeline {
         layer: u32,
         region: Rectangle,
         position: Position,
-        font_size: FontSize,
         key: GlyphKey,
         color: Rgba,
         image: F,
@@ -362,7 +361,7 @@ impl Pipeline {
         };
 
         // Crop to region
-        let rectangle = Rectangle::from((font_size, *placement)) + position;
+        let rectangle = Rectangle::from((key.1, *placement)) + position; // TODO inline this
         let uv = uv
             - Position {
                 top: rectangle.position().top.min(0),

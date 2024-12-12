@@ -1,5 +1,6 @@
 use crate::{
     add_in_range,
+    ast::RUST_HIGHLIGHTS,
     history::History,
     ids,
     rope::{
@@ -123,14 +124,12 @@ impl Document {
             panic!("File type not supported");
         }
 
-        const HIGHLIGHTS_QUERY: &str = include_str!("../treesitter/rust/highlights.scm");
         let language = tree_sitter_rust::language();
-
         let rope = Rope::from_reader(&mut BufReader::new(File::open(&path)?))?;
         let anchor_segmentation = Segmentation::new(rope.clone(), 0, 0, 0);
         let head_segmentation = anchor_segmentation.clone();
         let highlights =
-            Query::new(&language, HIGHLIGHTS_QUERY).expect("Cannot create highlights query");
+            Query::new(&language, RUST_HIGHLIGHTS).expect("Cannot create highlights query");
         let mut parser = Parser::new();
         parser
             .set_language(&language)

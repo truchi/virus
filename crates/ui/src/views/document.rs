@@ -1,4 +1,4 @@
-use crate::{syntax::Lines, theme::UiTheme, tween::Tweened, ui::LinesCache};
+use crate::{syntax::Highlighted, theme::UiTheme, tween::Tweened, ui::Highlighteds};
 use std::{cell::RefCell, fmt::Write, rc::Weak, time::Duration};
 use virus_editor::{
     document::{Document, DocumentId},
@@ -6,7 +6,7 @@ use virus_editor::{
     rope::{Cursor, Selection},
 };
 use virus_graphics::{
-    text::{Advance, Context, FontStyle, FontWeight, Line, Styles},
+    text::{Advance, Context, FontStyle, FontWeight, Glyphs, Styles},
     types::{Position, Rectangle, Rgba, Size},
     wgpu::{Draw, Layer},
 };
@@ -21,7 +21,7 @@ pub struct DocumentView {
     scroll_top: Tweened<u32>,
     scrollbar_alpha: Tweened<u8>,
     theme: Weak<RefCell<UiTheme>>,
-    lines_cache: Weak<RefCell<LinesCache>>,
+    highlighteds: Weak<RefCell<Highlighteds>>,
 }
 
 impl std::fmt::Debug for DocumentView {
@@ -36,7 +36,7 @@ impl DocumentView {
     pub fn new(
         document_id: DocumentId,
         theme: Weak<RefCell<UiTheme>>,
-        lines_cache: Weak<RefCell<LinesCache>>,
+        highlighteds: Weak<RefCell<Highlighteds>>,
     ) -> Self {
         Self {
             document_id,
@@ -44,7 +44,7 @@ impl DocumentView {
             scroll_top: Default::default(),
             scrollbar_alpha: Default::default(),
             theme,
-            lines_cache,
+            highlighteds,
         }
     }
 
@@ -92,6 +92,7 @@ impl DocumentView {
         mode: Mode,
         is_active: bool,
     ) {
+        debug_assert_eq!(self.document_id, document.id());
         debug_assert!(match mode {
             Mode::Normal { select } | Mode::Insert { select } if select == Select::None =>
                 document.selection().is_empty(),
@@ -137,19 +138,19 @@ impl DocumentView {
                 width: (advance / 4.0).round() as u32,
             }
         };
-        let lines_cache = self.lines_cache.upgrade().unwrap();
-        let mut lines_cache = lines_cache.borrow_mut();
-        let lines = lines_cache
+        let highlighteds = self.highlighteds.upgrade().unwrap();
+        let mut highlighteds = highlighteds.borrow_mut();
+        let highlighted = highlighteds
             .entry(document.id())
-            .or_insert_with(|| Lines::new(self.theme.clone()));
-        let lines = lines.lines(context, document, start_line..end_line);
+            .or_insert_with(|| Highlighted::new(theme, document.id()));
+        let highlighted = highlighted.get(context, theme, document, start_line..end_line);
 
         Renderer {
             context,
             layer,
             theme,
             selection: document.selection(),
-            lines: &lines[..],
+            highlighted,
             start_line,
             gutter_width: (advance * Self::GUTTER_COLUMNS as Advance).round() as u32,
             scroll_top,
@@ -166,12 +167,12 @@ impl DocumentView {
 //                                            Renderer                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-struct Renderer<'context, 'layer, 'graphics, 'lines> {
+struct Renderer<'context, 'layer, 'graphics, 'highlighted> {
     context: &'context mut Context,
     layer: &'layer mut Layer<'graphics>,
     theme: UiTheme,
     selection: Selection,
-    lines: &'lines [Line],
+    highlighted: &'highlighted [Glyphs],
     start_line: usize,
     gutter_width: u32,
     scroll_top: u32,
@@ -181,11 +182,13 @@ struct Renderer<'context, 'layer, 'graphics, 'lines> {
     is_active: bool,
 }
 
-impl<'context, 'layer, 'graphics, 'lines> Renderer<'context, 'layer, 'graphics, 'lines> {
+impl<'context, 'layer, 'graphics, 'highlighted>
+    Renderer<'context, 'layer, 'graphics, 'highlighted>
+{
     fn render(&mut self) {
         self.render_scrollbar();
-        self.render_line_numbers();
-        self.render_lines();
+        self.render_gutter();
+        self.render_text();
         self.render_selection();
         self.render_foreground();
     }
@@ -196,46 +199,41 @@ impl<'context, 'layer, 'graphics, 'lines> Renderer<'context, 'layer, 'graphics, 
             .rectangle(self.scrollbar_rectangle, self.scrollbar_color);
     }
 
-    fn render_line_numbers(&mut self) {
+    fn render_gutter(&mut self) {
         let styles = Styles {
-            weight: FontWeight::Regular,
-            style: FontStyle::Normal,
             foreground: self.theme.syntax.comment.foreground,
-            background: Rgba::TRANSPARENT,
-            underline: false,
-            strike: false,
+            ..Default::default()
         };
 
-        for number in self.start_line..self.start_line + self.lines.len() {
-            let line = Line::shaper(&format!("{} ", number + 1), 0, styles).shape(
-                self.context,
-                self.theme.family,
-                self.theme.font_size,
-            );
-            let top = number as i32 * self.theme.line_height as i32 - self.scroll_top as i32;
-            let left = (self.gutter_width as Advance - line.advance()).round() as i32;
+        for number in self.start_line..self.start_line + self.highlighted.len() {
+            let glyphs = Glyphs::shaper(self.context, self.theme.family, self.theme.font_size)
+                .push(&format!("{} ", number + 1), styles)
+                .glyphs();
 
             self.layer.draw(None, 0).glyphs(
                 self.context,
-                Position { top, left },
-                &line,
+                Position {
+                    top: number as i32 * self.theme.line_height as i32 - self.scroll_top as i32,
+                    left: (self.gutter_width as Advance - glyphs.advance()).round() as i32,
+                },
                 self.theme.line_height,
+                &glyphs,
             );
         }
     }
 
-    fn render_lines(&mut self) {
+    fn render_text(&mut self) {
         let left = self.gutter_width as i32;
 
-        for (index, line) in self.lines.iter().enumerate() {
+        for (index, glyphs) in self.highlighted.iter().enumerate() {
             let top = (self.start_line + index) as i32 * self.theme.line_height as i32
                 - self.scroll_top as i32;
 
             self.layer.draw(None, 0).glyphs(
                 self.context,
                 Position { top, left },
-                &line,
                 self.theme.line_height as u32,
+                &glyphs,
             );
         }
     }
@@ -247,16 +245,19 @@ impl<'context, 'layer, 'graphics, 'lines> Renderer<'context, 'layer, 'graphics, 
         };
         let column = |cursor: Cursor| -> i32 {
             self.gutter_width as i32
-                + if (self.start_line..self.start_line + self.lines.len()).contains(&cursor.line) {
-                    let line = &self.lines[cursor.line - self.start_line];
+                + if (self.start_line..self.start_line + self.highlighted.len())
+                    .contains(&cursor.line)
+                {
+                    let glyphs = &self.highlighted[cursor.line - self.start_line];
 
-                    line.glyphs()
+                    glyphs
+                        .glyphs()
                         .iter()
                         .find_map(|glyph| {
                             // TODO consecutive glyphs may have same range!
-                            (glyph.range.end as usize > cursor.column).then_some(glyph.offset)
+                            (glyph.end as usize > cursor.column).then_some(glyph.offset)
                         })
-                        .unwrap_or_else(|| line.advance())
+                        .unwrap_or_else(|| glyphs.advance())
                         .round() as i32
                 } else {
                     0

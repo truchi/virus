@@ -1302,7 +1302,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
 
                 self.virus.file_search.clear();
                 self.virus.file_search.search.set_haystack(files);
-                self.virus.mode(Mode::Files)
+                self.virus.mode(Mode::Files);
             }
             Mode::Files => {}
         }

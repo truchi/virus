@@ -2,30 +2,12 @@
 
 mod font;
 mod glyphs;
-mod line;
 
 pub use font::*;
-pub use line::*;
+pub use glyphs::*;
 
 use crate::types::Rgba;
-use swash::{
-    scale::{ScaleContext, Source, StrikeWith},
-    shape::ShapeContext,
-    text::{cluster::SourceRange, Script},
-    GlyphId,
-};
-
-// ────────────────────────────────────────────────────────────────────────────────────────────── //
-
-const SCRIPT: Script = Script::Unknown;
-const FEATURES: &'static [(&'static str, u16)] = &[("dlig", 1), ("calt", 1)];
-const HINT: bool = true;
-const SOURCES: &[Source] = &[
-    Source::ColorOutline(0),
-    Source::ColorBitmap(StrikeWith::BestFit),
-    Source::Outline,
-    Source::Bitmap(StrikeWith::BestFit),
-];
+use swash::{scale::ScaleContext, shape::ShapeContext, GlyphId};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             FontSize                                           //
@@ -74,7 +56,7 @@ pub struct Styles {
 //                                               Glyph                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// A shaped glyph.
+/// A glyph.
 #[derive(Copy, Clone, Debug)]
 pub struct Glyph {
     /// Font key.
@@ -87,8 +69,10 @@ pub struct Glyph {
     pub offset: Advance,
     /// Glyph advance.
     pub advance: Advance,
-    /// Range in the underlying string.
-    pub range: SourceRange,
+    /// Start index in the underlying string.
+    pub start: u32,
+    /// End index in the underlying string.
+    pub end: u32,
     /// Glyph styles.
     pub styles: Styles,
 }

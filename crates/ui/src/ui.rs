@@ -1,6 +1,6 @@
 use crate::{
     panes::{DocumentPane, Pane, PaneId, Panes},
-    syntax::Lines,
+    syntax::Highlighted,
     theme::UiTheme,
     views::FilesView,
 };
@@ -23,7 +23,7 @@ use winit::window::Window;
 //                                                 Ui                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-pub(crate) type LinesCache = HashMap<DocumentId, Lines>;
+pub(crate) type Highlighteds = HashMap<DocumentId, Highlighted>;
 
 pub struct Ui {
     window: Arc<Window>,
@@ -32,7 +32,7 @@ pub struct Ui {
     theme: Rc<RefCell<UiTheme>>,
     panes: Panes,
     files: FilesView,
-    _lines_cache: Rc<RefCell<LinesCache>>,
+    _highlighteds: Rc<RefCell<Highlighteds>>,
 }
 
 impl Ui {
@@ -40,9 +40,9 @@ impl Ui {
         let graphics = Graphics::new(Arc::clone(&window));
         let context = Context::new(crate::todo::fonts());
         let theme = Rc::new(RefCell::new(crate::todo::ui_theme(&context)));
-        let lines_cache = Default::default();
+        let highlighteds = Default::default();
         let files = FilesView::new(Rc::downgrade(&theme));
-        let panes = Panes::new(Rc::downgrade(&theme), Rc::downgrade(&lines_cache));
+        let panes = Panes::new(Rc::downgrade(&theme), Rc::downgrade(&highlighteds));
 
         Self {
             window,
@@ -51,7 +51,7 @@ impl Ui {
             theme,
             panes,
             files,
-            _lines_cache: lines_cache,
+            _highlighteds: highlighteds,
         }
     }
 

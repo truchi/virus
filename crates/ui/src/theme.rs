@@ -5,7 +5,7 @@ use virus_graphics::{
     types::{Rgb, Rgba, Size},
 };
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub struct UiTheme {
     pub syntax: SyntaxTheme,
     pub background_color: Rgb,

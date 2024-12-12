@@ -1,4 +1,4 @@
-use crate::{theme::UiTheme, ui::LinesCache, views::DocumentView};
+use crate::{theme::UiTheme, ui::Highlighteds, views::DocumentView};
 use std::{cell::RefCell, rc::Weak, time::Duration};
 use virus_editor::{
     document::{Document, DocumentId},
@@ -47,19 +47,19 @@ pub struct Panes {
     active_id: Option<PaneId>,
     panes: Vec<Pane>,
     theme: Weak<RefCell<UiTheme>>,
-    lines_cache: Weak<RefCell<LinesCache>>,
+    highlighteds: Weak<RefCell<Highlighteds>>,
 }
 
 impl Panes {
     pub const ACTIVE_COLUMNS: u32 = 100;
 
-    pub fn new(theme: Weak<RefCell<UiTheme>>, lines_cache: Weak<RefCell<LinesCache>>) -> Self {
+    pub fn new(theme: Weak<RefCell<UiTheme>>, highlighteds: Weak<RefCell<Highlighteds>>) -> Self {
         Self {
             ids: Default::default(),
             active_id: Default::default(),
             panes: Default::default(),
             theme,
-            lines_cache,
+            highlighteds,
         }
     }
 
@@ -123,7 +123,7 @@ impl Panes {
 
         let pane = DocumentPane {
             id: self.ids.id(),
-            view: DocumentView::new(document_id, self.theme.clone(), self.lines_cache.clone()),
+            view: DocumentView::new(document_id, self.theme.clone(), self.highlighteds.clone()),
         };
         let pane_id = pane.id;
 
