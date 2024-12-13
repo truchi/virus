@@ -864,7 +864,7 @@ impl Nodes {
     fn escape(&mut self) {
         self.counts.remove(&self.current);
 
-        let mut sticky;
+        let mut stick;
         let (mut parent, mut unstick) = match self.nodes.get(&self.current).unwrap() {
             Node::Node { parent, .. } => (*parent, false),
             Node::Leaf {
@@ -876,12 +876,12 @@ impl Nodes {
             self.current = id;
             self.counts.remove(&self.current);
 
-            (parent, sticky) = match self.nodes.get(&self.current).unwrap() {
-                Node::Node { parent, sticky, .. } => (*parent, *sticky),
+            (parent, stick) = match self.nodes.get(&self.current).unwrap() {
+                Node::Node { parent, stick, .. } => (*parent, *stick),
                 Node::Leaf { .. } => unreachable!(),
             };
 
-            if sticky {
+            if stick {
                 if unstick {
                     unstick = false;
                 } else {
@@ -983,7 +983,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
 
             fn leaf(
                 &mut self,
-                has_sticky: bool,
+                has_stick: bool,
                 parent: Option<NodeId>,
                 action_str: SmolStr,
             ) -> KeybindingsResult<Node> {
@@ -1000,7 +1000,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                         })
                 })?;
 
-                if unstick && !has_sticky {
+                if unstick && !has_stick {
                     return Err(UnexpectedUnstickInAction { action: action_str });
                 }
 
@@ -1013,21 +1013,21 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
 
             fn node(
                 &mut self,
-                has_sticky: bool,
+                has_stick: bool,
                 parent: Option<NodeId>,
                 node_id: NodeId,
                 original: SmolStr,
-                sticky: bool,
+                stick: bool,
                 deserialized_children: HashMap<SmolStr, deserialize::Node>,
             ) -> KeybindingsResult<Node> {
                 // The node to create
                 let mut node = Node::Node {
                     original,
                     parent,
-                    sticky,
+                    stick,
                     children: Default::default(),
                 };
-                let has_sticky = has_sticky || sticky;
+                let has_stick = has_stick || stick;
 
                 for (binding, deserialized_child) in deserialized_children {
                     // Here we have the optional count and keys, i.e.:
@@ -1044,7 +1044,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                     //                       \      /
                     //                        action
                     //
-                    let (count, original, keys) = parse::binding(&binding, self.aliases)?;
+                    let (count, keys) = parse::binding(&binding, self.aliases)?;
 
                     // Create the count node
                     let parent_id = if let Some(count) = count {
@@ -1061,7 +1061,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                                         original: Default::default(),
                                         parent: Some(node_id),
                                         children: [(Count(Optional(())), id)].into_iter().collect(),
-                                        sticky: false
+                                        stick: false
                                     }
                                 )
                             });
@@ -1074,7 +1074,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                             || self.counts.get(&Required(count.clone().unwrap())).is_some()
                         {
                             return Err(DuplicatedCountInBinding {
-                                binding: binding.to_smolstr(),
+                                binding: binding.clone(),
                             });
                         }
 
@@ -1091,12 +1091,10 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                         let parent = parent_id.or(Some(node_id));
 
                         match deserialized_child.clone() {
-                            deserialize::Node::Node { sticky, children } => {
-                                self.node(has_sticky, parent, id, original, sticky, children)
+                            deserialize::Node::Node { stick, children } => {
+                                self.node(has_stick, parent, id, binding.clone(), stick, children)
                             }
-                            deserialize::Node::Leaf(action) => {
-                                self.leaf(has_sticky, parent, action)
-                            }
+                            deserialize::Node::Leaf(action) => self.leaf(has_stick, parent, action),
                         }?
                     });
 
@@ -1111,7 +1109,7 @@ impl TryFrom<(&Aliases, deserialize::Nodes)> for Nodes {
                         match children.get(&key) {
                             Some(_) => {
                                 return Err(ConflictingBinding {
-                                    binding: binding.to_smolstr(),
+                                    binding: binding.clone(),
                                 });
                             }
                             None => _ = children.insert(key, child_id),
@@ -1205,7 +1203,7 @@ enum Node {
     Node {
         original: SmolStr,
         parent: Option<NodeId>,
-        sticky: bool,
+        stick: bool,
         children: HashMap<CountOrKey, NodeId>,
     },
     Leaf {
@@ -1249,7 +1247,7 @@ mod deserialize {
     pub enum Node {
         Node {
             #[serde(default)]
-            sticky: bool,
+            stick: bool,
             #[serde(flatten)]
             children: HashMap<SmolStr, Node>,
         },
@@ -1458,11 +1456,7 @@ mod parse {
     pub fn binding<'a>(
         binding: &'a str,
         aliases: &'a Aliases,
-    ) -> KeybindingsResult<(
-        Option<Count<&'a str>>,
-        SmolStr,
-        impl Iterator<Item = ModdedKey> + 'a,
-    )> {
+    ) -> KeybindingsResult<(Option<Count<&'a str>>, impl Iterator<Item = ModdedKey> + 'a)> {
         let mut tokens = Tokens::new(binding).peekable();
         let count = tokens
             .peek()
@@ -1482,10 +1476,10 @@ mod parse {
             Many(Iter<'a, ModdedKey>),
         }
 
-        let (token, mut keys) = match tokens.next().transpose()? {
+        let mut keys = match tokens.next().transpose()? {
             // Resolve aliases
             Some(Token::Dollar(alias)) => match aliases.get(alias) {
-                Some(aliases) => (Token::Dollar(alias), OneOrMany::Many(aliases.iter())),
+                Some(aliases) => OneOrMany::Many(aliases.iter()),
                 None => {
                     return Err(UnknownAlias {
                         alias: alias.to_smolstr(),
@@ -1493,13 +1487,11 @@ mod parse {
                 }
             },
             // NOTE: any other tokens will be parsed as-is, e.g. `Key::Str("_weird")`
-            Some(token) => (
-                token,
-                OneOrMany::One(Some(ModdedKey::new(
-                    mods,
-                    Key::parse(&token.to_smolstr()).to_smol(),
-                ))),
-            ),
+            Some(token) => OneOrMany::One(Some(ModdedKey::new(
+                mods,
+                Key::parse(&token.to_smolstr()).to_smol(),
+            ))),
+
             None => {
                 return Err(MissingTokenInBinding {
                     binding: binding.to_smolstr(),
@@ -1516,7 +1508,6 @@ mod parse {
 
         Ok((
             count,
-            format!("{mods}{token}").to_smolstr(),
             std::iter::from_fn(move || match &mut keys {
                 OneOrMany::One(option) => option.take(),
                 OneOrMany::Many(iter) => iter
@@ -1980,19 +1971,19 @@ mod tests {
     }
 
     #[test]
-    fn sticky() {
+    fn stick() {
         let nodes = Keybindings::from_yaml(
             r#"
                 NORMAL:
                     a:
-                        sticky: true
+                        stick: true
                         b: test value=1
                         c: unstick test value=2
                         d:
                             e: test value=3
                             f: unstick test value=4
                             g:
-                                sticky: true
+                                stick: true
                                 h: test value=5
                                 i: unstick test value=6
             "#,
@@ -2011,7 +2002,7 @@ mod tests {
 
         assert(
             &nodes,
-            &[(NONE, "a", "a", Ok(None), Is("a"))], // (sticky)
+            &[(NONE, "a", "a", Ok(None), Is("a"))], // (stick)
             &[
                 (NONE, "b", "b", Ok(Some(1)), At("a")),     // Stuck in a
                 (NONE, "c", "c", Ok(Some(2)), Root),        // Unstuck to root
@@ -2023,8 +2014,8 @@ mod tests {
         assert(
             &nodes,
             &[
-                (NONE, "a", "a", Ok(None), Is("a")), // (sticky)
-                (NONE, "d", "d", Ok(None), Is("d")), // (not sticky)
+                (NONE, "a", "a", Ok(None), Is("a")), // (stick)
+                (NONE, "d", "d", Ok(None), Is("d")), // (not stick)
             ],
             &[
                 (NONE, "e", "e", Ok(Some(3)), At("a")),        // Stuck in a
@@ -2037,9 +2028,9 @@ mod tests {
         assert(
             &nodes,
             &[
-                (NONE, "a", "a", Ok(None), Is("a")), // (sticky)
-                (NONE, "d", "d", Ok(None), Is("d")), // (not sticky)
-                (NONE, "g", "g", Ok(None), Is("g")), // (sticky)
+                (NONE, "a", "a", Ok(None), Is("a")), // (stick)
+                (NONE, "d", "d", Ok(None), Is("d")), // (not stick)
+                (NONE, "g", "g", Ok(None), Is("g")), // (stick)
             ],
             &[
                 (NONE, "h", "h", Ok(Some(5)), At("g")),        // Stuck in g
@@ -2077,12 +2068,12 @@ mod tests {
     }
 
     #[test]
-    fn sticky_count() {
+    fn stick_count() {
         let nodes = Keybindings::from_yaml(
             r#"
                 NORMAL:
                     ?value a:
-                        sticky: true
+                        stick: true
                         b:
                             c: test ?value
             "#,
