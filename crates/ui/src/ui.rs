@@ -1,6 +1,6 @@
 use crate::{
     panes::{DocumentPane, Pane, PaneId, Panes},
-    views::FilesView,
+    views::{FilesView, StatusView},
     Context,
 };
 use std::{sync::Arc, time::Duration};
@@ -27,6 +27,7 @@ pub struct Ui {
     graphics: Graphics,
     panes: Panes,
     files: FilesView,
+    status: StatusView,
 }
 
 impl Ui {
@@ -44,15 +45,14 @@ impl Ui {
                 highlighteds: Default::default(),
             }
         };
-        let files = FilesView::new();
-        let panes = Panes::new();
 
         Self {
             window,
             context,
             graphics,
-            panes,
-            files,
+            panes: Panes::new(),
+            files: FilesView::new(),
+            status: StatusView::new(),
         }
     }
 
@@ -92,16 +92,18 @@ impl Ui {
         documents: impl Fn(DocumentId) -> Option<&'a Document>,
         mode: Mode,
         file_search: Option<(usize, &'a str, &Search)>,
+        keybindings: &[String],
     ) {
         // TODO react to document closes
 
+        let theme = self.context.theme;
+        let window = self.window.inner_size();
         let region = {
-            let size = self.window.inner_size();
             let size = Size {
-                width: size.width,
-                height: size.height,
+                width: window.width,
+                height: window.height - theme.line_height,
             };
-            let pixels = self.context.theme.pixels(size);
+            let pixels = theme.pixels(size);
 
             Rectangle {
                 top: (size.height - pixels.height) as i32 / 2,
@@ -109,6 +111,12 @@ impl Ui {
                 width: pixels.width,
                 height: pixels.height,
             }
+        };
+        let status_region = Rectangle {
+            top: region.top + region.height as i32,
+            left: 0,
+            width: window.width,
+            height: theme.line_height,
         };
 
         self.panes.render(
@@ -128,6 +136,13 @@ impl Ui {
                 selected,
             );
         }
+
+        self.status.render(
+            &mut self.context,
+            self.graphics.layer(status_region, 0),
+            mode,
+            keybindings,
+        );
 
         self.graphics.render(self.context.theme.background_color);
     }

@@ -369,6 +369,15 @@ impl Virus {
                 &self.file_search.needle,
                 &self.file_search.search,
             )),
+            &self
+                .keybindings
+                .originals()
+                .map(|(count, key)| {
+                    count
+                        .map(|count| count.to_string())
+                        .unwrap_or_else(|| key.to_string())
+                })
+                .collect::<Vec<_>>(),
         );
 
         if self.ui.is_animating() {

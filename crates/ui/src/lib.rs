@@ -6,9 +6,11 @@ pub mod ui;
 pub mod views {
     mod document;
     mod files;
+    mod status;
 
     pub use document::*;
     pub use files::*;
+    pub use status::*;
 }
 
 use highlighteds::Highlighted;
@@ -189,6 +191,9 @@ mod todo {
             insert_mode_color: catppuccin.pink.solid(),
 
             caret_width: 2,
+
+            status_foreground: catppuccin.base.solid(),
+            status_background: catppuccin.crust.solid(),
         }
     }
 

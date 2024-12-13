@@ -29,6 +29,9 @@ pub struct UiTheme {
     pub insert_mode_color: Rgb,
 
     pub caret_width: u32,
+
+    pub status_foreground: Rgb,
+    pub status_background: Rgb,
 }
 
 impl UiTheme {
