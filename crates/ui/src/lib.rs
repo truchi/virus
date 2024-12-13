@@ -1,11 +1,5 @@
+mod highlighteds;
 pub mod panes;
-pub mod syntax {
-    mod highlighteds;
-    mod theme;
-
-    pub use highlighteds::*;
-    pub use theme::*;
-}
 pub mod theme;
 pub mod tween;
 pub mod ui;
@@ -17,9 +11,9 @@ pub mod views {
     pub use files::*;
 }
 
+use highlighteds::Highlighted;
 use std::collections::HashMap;
 use swash::{scale::ScaleContext, shape::ShapeContext};
-use syntax::Highlighted;
 use theme::UiTheme;
 use virus_editor::document::DocumentId;
 use virus_graphics::text::Fonts;
@@ -68,7 +62,10 @@ pub struct ContextMut<'a> {
 
 #[allow(unused)]
 mod todo {
-    use crate::{syntax::SyntaxTheme, theme::UiTheme, tween::Tween};
+    use crate::{
+        theme::{SyntaxTheme, UiTheme},
+        tween::Tween,
+    };
     use std::time::Duration;
     use virus_graphics::{
         text::{

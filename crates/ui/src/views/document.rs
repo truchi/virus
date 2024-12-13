@@ -1,5 +1,5 @@
 use crate::{
-    syntax::Highlighted,
+    highlighteds::Highlighted,
     theme::UiTheme,
     tween::{Tween, Tweened},
     Context,
