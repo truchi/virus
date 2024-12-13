@@ -7,7 +7,7 @@ mod rectangle;
 
 use crate::{
     muck::WithAttributes,
-    text::{Context, FontSize, Glyph, GlyphKey, Glyphs, LineHeight, Styles},
+    text::{FontSize, Fonts, Glyph, GlyphKey, Glyphs, LineHeight, Styles},
     types::{Position, Rectangle, Rgb, Rgba, Size},
 };
 use atlas::{Atlas, AtlasError};
@@ -22,7 +22,10 @@ use std::{
     time::Duration,
 };
 use swash::{
-    scale::image::{Content, Image},
+    scale::{
+        image::{Content, Image},
+        ScaleContext,
+    },
     zeno::Placement,
 };
 use wgpu::{
@@ -349,7 +352,8 @@ impl<'graphics> Draw<'graphics> {
     /// Draws glyphs.
     pub fn glyphs(
         &mut self,
-        context: &mut Context,
+        fonts: &Fonts,
+        scale: &mut ScaleContext,
         position: Position,
         line_height: LineHeight,
         glyphs: &Glyphs,
@@ -374,7 +378,7 @@ impl<'graphics> Draw<'graphics> {
         // Add glyphs
         //
 
-        let mut scaler = Glyphs::scaler(context);
+        let mut scaler = Glyphs::scaler(fonts, scale);
 
         for glyph in glyphs.glyphs() {
             self.glyph(

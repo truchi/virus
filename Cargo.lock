@@ -2000,6 +2000,7 @@ version = "0.1.0"
 dependencies = [
  "editor",
  "graphics",
+ "swash",
  "tween",
  "winit",
 ]

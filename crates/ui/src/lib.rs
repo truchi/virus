@@ -17,6 +17,51 @@ pub mod views {
     pub use files::*;
 }
 
+use std::collections::HashMap;
+use swash::{scale::ScaleContext, shape::ShapeContext};
+use syntax::Highlighted;
+use theme::UiTheme;
+use virus_editor::document::DocumentId;
+use virus_graphics::text::Fonts;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                            Context                                             //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+/// Rendering context.
+pub struct Context {
+    /// Font cache.
+    pub fonts: Fonts,
+    /// Shape context.
+    pub shape: ShapeContext,
+    /// Scale context.
+    pub scale: ScaleContext,
+    /// UI theme.
+    pub theme: UiTheme,
+    /// Highlighted documents cache.
+    pub highlighteds: HashMap<DocumentId, Highlighted>,
+}
+
+impl Context {
+    pub fn as_mut(&mut self) -> ContextMut {
+        ContextMut {
+            fonts: &mut self.fonts,
+            shape: &mut self.shape,
+            scale: &mut self.scale,
+            theme: &mut self.theme,
+            highlighteds: &mut self.highlighteds,
+        }
+    }
+}
+
+pub struct ContextMut<'a> {
+    pub fonts: &'a Fonts,
+    pub shape: &'a mut ShapeContext,
+    pub scale: &'a mut ScaleContext,
+    pub theme: &'a UiTheme,
+    pub highlighteds: &'a mut HashMap<DocumentId, Highlighted>,
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              TODO                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -27,7 +72,7 @@ mod todo {
     use std::time::Duration;
     use virus_graphics::{
         text::{
-            Context, Font, FontSize,
+            Font, FontSize,
             FontStyle::{self, *},
             FontWeight::{self, *},
             Fonts, LineHeight, Styles,
@@ -120,9 +165,9 @@ mod todo {
         fonts
     }
 
-    pub fn ui_theme(context: &Context) -> UiTheme {
+    pub fn ui_theme(fonts: &Fonts) -> UiTheme {
         let catppuccin = Catppuccin::latte();
-        let family = context.fonts().get("Victor").unwrap().key();
+        let family = fonts.get("Victor").unwrap().key();
         let font_size = 15 as FontSize;
         let line_height = font_size as LineHeight + font_size as LineHeight / 4;
 
@@ -134,8 +179,7 @@ mod todo {
             family,
             font_size,
             line_height,
-            advance: context
-                .fonts()
+            advance: fonts
                 .get((family, FontWeight::default(), FontStyle::default()))
                 .unwrap()
                 .advance_for_size(font_size),

@@ -1,10 +1,11 @@
 use crate::theme::UiTheme;
 use std::ops::Range;
+use swash::shape::ShapeContext;
 use virus_editor::{
     ast::Highlights,
     document::{Document, DocumentId},
 };
-use virus_graphics::text::{Context, Glyphs};
+use virus_graphics::text::{Fonts, Glyphs};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                          Highlighted                                           //
@@ -32,7 +33,8 @@ impl Highlighted {
 
     pub fn get(
         &mut self,
-        context: &mut Context,
+        fonts: &Fonts,
+        shape: &mut ShapeContext,
         theme: UiTheme,
         document: &Document,
         range: Range<usize>,
@@ -46,7 +48,7 @@ impl Highlighted {
             self.theme = theme;
             self.version = document.version();
             self.lines.clear();
-            self.shape(context, document);
+            self.shape(fonts, shape, document);
         }
 
         &self.lines[range]
@@ -55,7 +57,7 @@ impl Highlighted {
 
 /// Private.
 impl Highlighted {
-    fn shape(&mut self, context: &mut Context, document: &Document) {
+    fn shape(&mut self, fonts: &Fonts, shape: &mut ShapeContext, document: &Document) {
         let range = 0..document.rope().len_lines();
 
         let highlights = Highlights::new(
@@ -65,7 +67,7 @@ impl Highlighted {
             document.highlights(),
         );
 
-        let mut shaper = Glyphs::shaper(context, self.theme.family, self.theme.font_size);
+        let mut shaper = Glyphs::shaper(fonts, shape, self.theme.family, self.theme.font_size);
 
         self.lines.clear();
 

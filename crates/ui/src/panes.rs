@@ -1,11 +1,11 @@
-use crate::{theme::UiTheme, ui::Highlighteds, views::DocumentView};
-use std::{cell::RefCell, rc::Weak, time::Duration};
+use crate::{views::DocumentView, Context};
+use std::time::Duration;
 use virus_editor::{
     document::{Document, DocumentId},
     ids,
     mode::{Mode, Select},
 };
-use virus_graphics::{text::Context, types::Rectangle, wgpu::Graphics};
+use virus_graphics::{types::Rectangle, wgpu::Graphics};
 
 ids!(
     /// [`PaneId`] generator.
@@ -46,20 +46,16 @@ pub struct Panes {
     ids: PaneIds,
     active_id: Option<PaneId>,
     panes: Vec<Pane>,
-    theme: Weak<RefCell<UiTheme>>,
-    highlighteds: Weak<RefCell<Highlighteds>>,
 }
 
 impl Panes {
     pub const ACTIVE_COLUMNS: u32 = 100;
 
-    pub fn new(theme: Weak<RefCell<UiTheme>>, highlighteds: Weak<RefCell<Highlighteds>>) -> Self {
+    pub fn new() -> Self {
         Self {
             ids: Default::default(),
             active_id: Default::default(),
             panes: Default::default(),
-            theme,
-            highlighteds,
         }
     }
 
@@ -123,7 +119,7 @@ impl Panes {
 
         let pane = DocumentPane {
             id: self.ids.id(),
-            view: DocumentView::new(document_id, self.theme.clone(), self.highlighteds.clone()),
+            view: DocumentView::new(document_id),
         };
         let pane_id = pane.id;
 
@@ -150,8 +146,8 @@ impl Panes {
         mode: Mode,
     ) {
         let len = self.panes.len() as u32;
-        let theme = *self.theme.upgrade().unwrap().borrow();
-        let region_columns = theme.cells_and_pixels(region.size()).0.width;
+        let theme = context.theme;
+        let region_columns = theme.cells(region.size()).width;
         let columns_to_pixels = |columns: u32| (columns as f32 * theme.advance).ceil() as u32;
         let desired_columns = Self::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS;
 
@@ -226,7 +222,7 @@ impl Panes {
 
                     view.render(
                         context,
-                        &mut graphics.layer(region, 0),
+                        graphics.layer(region, 0),
                         document,
                         mode,
                         is_active,

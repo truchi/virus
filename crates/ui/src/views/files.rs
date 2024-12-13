@@ -1,8 +1,8 @@
-use crate::{panes::Panes, theme::UiTheme, views::DocumentView};
-use std::{cell::RefCell, rc::Weak, usize};
+use crate::{panes::Panes, theme::UiTheme, views::DocumentView, Context};
+use swash::{scale::ScaleContext, shape::ShapeContext};
 use virus_editor::fuzzy::Search;
 use virus_graphics::{
-    text::{Context, FontWeight, Glyphs, Styles},
+    text::{FontWeight, Fonts, Glyphs, Styles},
     types::{Position, Rectangle},
     wgpu::Layer,
 };
@@ -11,55 +11,25 @@ use virus_graphics::{
 //                                           FilesView                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-pub struct FilesView {
-    theme: Weak<RefCell<UiTheme>>,
-}
+pub struct FilesView {}
 
 impl FilesView {
-    pub fn new(theme: Weak<RefCell<UiTheme>>) -> Self {
-        Self { theme }
+    pub fn new() -> Self {
+        Self {}
     }
 
-    pub fn render<'a>(
+    pub fn render(
         &mut self,
-        context: &'a mut Context,
-        layer: Layer<'a>,
+        context: &mut Context,
+        layer: Layer,
         selected: usize,
-        needle: &'a str,
-        search: &'a Search,
+        needle: &str,
+        search: &Search,
     ) {
-        let theme = *self.theme.upgrade().unwrap().borrow();
-
-        Renderer::new(context, layer, theme, selected, needle, search).render();
-    }
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                            Renderer                                            //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-struct Renderer<'a> {
-    context: &'a mut Context,
-    layer: Layer<'a>,
-    theme: UiTheme,
-    selected: usize,
-    needle: &'a str,
-    search: &'a Search,
-    region: Rectangle,
-}
-
-impl<'a> Renderer<'a> {
-    fn new(
-        context: &'a mut Context,
-        layer: Layer<'a>,
-        theme: UiTheme,
-        selected: usize,
-        needle: &'a str,
-        search: &'a Search,
-    ) -> Self {
+        let context = context.as_mut();
         let region = {
             let columns = 2 + Panes::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS;
-            let width = (columns as f32 * theme.advance).ceil() as u32;
+            let width = (columns as f32 * context.theme.advance).ceil() as u32;
             let left = (layer.size().width.saturating_sub(width) / 2) as i32;
 
             Rectangle {
@@ -70,42 +40,66 @@ impl<'a> Renderer<'a> {
             }
         };
 
-        Self {
-            context,
+        Renderer {
+            fonts: context.fonts,
+            shape: context.shape,
+            scale: context.scale,
+            theme: context.theme,
             layer,
-            theme,
             selected,
             needle,
             search,
             region,
         }
+        .background()
+        .needle()
+        .matches();
     }
+}
 
-    fn render(&mut self) {
-        self.render_background();
-        self.render_needle();
-        self.render_matches();
-    }
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                            Renderer                                            //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-    fn render_background(&mut self) {
+struct Renderer<'a> {
+    fonts: &'a Fonts,
+    shape: &'a mut ShapeContext,
+    scale: &'a mut ScaleContext,
+    theme: &'a UiTheme,
+    layer: Layer<'a>,
+    selected: usize,
+    needle: &'a str,
+    search: &'a Search,
+    region: Rectangle,
+}
+
+impl<'a> Renderer<'a> {
+    fn background(&mut self) -> &mut Self {
         self.layer
             .draw(None, 0)
             .rectangle(None, self.theme.inactive_foreground_color);
         self.layer
             .draw(self.region, 0)
             .rectangle(None, self.theme.background_color.transparent(255));
+
+        self
     }
 
-    fn render_needle(&mut self) {
-        let glyphs = Glyphs::shaper(self.context, self.theme.family, self.theme.font_size)
-            .push(
-                &self.needle,
-                Styles {
-                    weight: FontWeight::Bold,
-                    ..self.theme.syntax.default
-                },
-            )
-            .glyphs();
+    fn needle(&mut self) -> &mut Self {
+        let glyphs = Glyphs::shaper(
+            self.fonts,
+            self.shape,
+            self.theme.family,
+            self.theme.font_size,
+        )
+        .push(
+            &self.needle,
+            Styles {
+                weight: FontWeight::Bold,
+                ..self.theme.syntax.default
+            },
+        )
+        .glyphs();
 
         self.layer
             .draw(
@@ -118,7 +112,8 @@ impl<'a> Renderer<'a> {
                 0,
             )
             .glyphs(
-                self.context,
+                self.fonts,
+                self.scale,
                 Position::default(),
                 self.theme.line_height,
                 &glyphs,
@@ -143,11 +138,13 @@ impl<'a> Renderer<'a> {
                 },
                 self.theme.insert_mode_color.transparent(255),
             );
+
+        self
     }
 
-    fn render_matches(&mut self) {
+    fn matches(&mut self) -> &mut Self {
         if self.search.matches().is_empty() {
-            return;
+            return self;
         }
 
         let region = {
@@ -183,8 +180,12 @@ impl<'a> Renderer<'a> {
             };
             let glyphs = {
                 let mut index = 0;
-                let mut shaper =
-                    Glyphs::shaper(self.context, self.theme.family, self.theme.font_size);
+                let mut shaper = Glyphs::shaper(
+                    self.fonts,
+                    self.shape,
+                    self.theme.family,
+                    self.theme.font_size,
+                );
 
                 for range in &m.indices {
                     if index < range.start {
@@ -203,7 +204,8 @@ impl<'a> Renderer<'a> {
             };
 
             self.layer.draw(region, 0).glyphs(
-                self.context,
+                self.fonts,
+                self.scale,
                 position,
                 self.theme.line_height,
                 &glyphs,
@@ -211,5 +213,7 @@ impl<'a> Renderer<'a> {
 
             position.top += self.theme.line_height as i32;
         }
+
+        self
     }
 }

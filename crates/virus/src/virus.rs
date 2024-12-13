@@ -229,10 +229,11 @@ impl Virus {
             return;
         };
 
+        let theme = self.ui.context().theme;
         let pane_id = pane.id;
         let line = document.selection().head.line as u32;
-        let height_in_lines = pane.view.cells().height;
-        let start = pane.view.line();
+        let height_in_lines = theme.cells(pane.view.size()).height;
+        let start = pane.view.scroll_top().end() / theme.line_height;
         let end = start + height_in_lines;
 
         let line = if line < start {
@@ -415,10 +416,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn move_up_page(&mut self, pages: usize, half: bool, wrap: bool) {
         match self.virus.mode {
             Mode::Normal { select } | Mode::Insert { select } => {
+                let theme = self.virus.ui.context().theme;
                 let Some((pane, document)) = self.virus.get_active_document_mut() else {
                     return;
                 };
-                let lines = pages * pane.view.cells().height as usize / if half { 2 } else { 1 };
+                let lines = pages * theme.cells(pane.view.size()).height as usize
+                    / if half { 2 } else { 1 };
                 document
                     .movements()
                     .up(lines, wrap)
@@ -487,10 +490,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn move_down_page(&mut self, pages: usize, half: bool, wrap: bool) {
         match self.virus.mode {
             Mode::Normal { select } | Mode::Insert { select } => {
+                let theme = self.virus.ui.context().theme;
                 let Some((pane, document)) = self.virus.get_active_document_mut() else {
                     return;
                 };
-                let lines = pages * pane.view.cells().height as usize / if half { 2 } else { 1 };
+                let lines = pages * theme.cells(pane.view.size()).height as usize
+                    / if half { 2 } else { 1 };
                 document
                     .movements()
                     .down(lines, wrap)
@@ -752,11 +757,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn scroll_top(&mut self, blank: bool) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
+                let theme = self.virus.ui.context().theme;
                 let Some((pane, document)) = self.virus.get_active_document_mut() else {
                     return;
                 };
                 let pane_id = pane.id;
-                let cells = pane.view.cells();
+                let cells = theme.cells(pane.view.size());
 
                 if document.rope().len_lines() <= cells.height as usize {
                     return;
@@ -776,11 +782,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn scroll_up_page(&mut self, pages: usize, half: bool, blank: bool) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
+                let theme = self.virus.ui.context().theme;
                 let Some((pane, document)) = self.virus.get_active_document_mut() else {
                     return;
                 };
                 let pane_id = pane.id;
-                let cells = pane.view.cells();
+                let cells = theme.cells(pane.view.size());
 
                 if document.rope().len_lines() <= cells.height as usize {
                     return;
@@ -789,10 +796,9 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let offset = blank
                     .then_some(0)
                     .unwrap_or_else(|| document.leading_blank_lines() as u32);
-                let line = pane
-                    .view
-                    .line()
-                    .saturating_sub(pages as u32 * cells.height / if half { 2 } else { 1 });
+                let line = pane.view.scroll_top().end() / theme.line_height;
+                let line =
+                    line.saturating_sub(pages as u32 * cells.height / if half { 2 } else { 1 });
                 let line = line.max(offset);
 
                 self.virus.ui.panes_mut().scroll(pane_id, line);
@@ -804,11 +810,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn scroll_up_line(&mut self, lines: usize, blank: bool) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
+                let theme = self.virus.ui.context().theme;
                 let Some((pane, document)) = self.virus.get_active_document_mut() else {
                     return;
                 };
                 let pane_id = pane.id;
-                let cells = pane.view.cells();
+                let cells = theme.cells(pane.view.size());
 
                 if document.rope().len_lines() <= cells.height as usize {
                     return;
@@ -817,7 +824,8 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let offset = blank
                     .then_some(0)
                     .unwrap_or_else(|| document.leading_blank_lines() as u32);
-                let line = pane.view.line().saturating_sub(lines as u32);
+                let line = pane.view.scroll_top().end() / theme.line_height;
+                let line = line.saturating_sub(lines as u32);
                 let line = line.max(offset);
 
                 self.virus.ui.panes_mut().scroll(pane_id, line);
@@ -831,11 +839,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn scroll_bottom(&mut self, blank: bool) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
+                let theme = self.virus.ui.context().theme;
                 let Some((pane, document)) = self.virus.get_active_document_mut() else {
                     return;
                 };
                 let pane_id = pane.id;
-                let cells = pane.view.cells();
+                let cells = theme.cells(pane.view.size());
 
                 if document.rope().len_lines() <= cells.height as usize {
                     return;
@@ -857,11 +866,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn scroll_down_page(&mut self, pages: usize, half: bool, blank: bool) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
+                let theme = self.virus.ui.context().theme;
                 let Some((pane, document)) = self.virus.get_active_document_mut() else {
                     return;
                 };
                 let pane_id = pane.id;
-                let cells = pane.view.cells();
+                let cells = theme.cells(pane.view.size());
 
                 if document.rope().len_lines() <= cells.height as usize {
                     return;
@@ -870,8 +880,8 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let offset = blank
                     .then_some(0)
                     .unwrap_or_else(|| document.trailing_blank_lines() as u32);
-                let line =
-                    pane.view.line() + pages as u32 * cells.height / if half { 2 } else { 1 };
+                let line = pane.view.scroll_top().end() / theme.line_height;
+                let line = line + pages as u32 * cells.height / if half { 2 } else { 1 };
                 let line = line.min(
                     (document.rope().len_lines() as u32)
                         .saturating_sub(cells.height)
@@ -887,11 +897,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn scroll_down_line(&mut self, lines: usize, blank: bool) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
+                let theme = self.virus.ui.context().theme;
                 let Some((pane, document)) = self.virus.get_active_document_mut() else {
                     return;
                 };
                 let pane_id = pane.id;
-                let cells = pane.view.cells();
+                let cells = theme.cells(pane.view.size());
 
                 if document.rope().len_lines() <= cells.height as usize {
                     return;
@@ -900,7 +911,8 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let offset = blank
                     .then_some(0)
                     .unwrap_or_else(|| document.trailing_blank_lines() as u32);
-                let line = pane.view.line() + lines as u32;
+                let line = pane.view.scroll_top().end() / theme.line_height;
+                let line = line + lines as u32;
                 let line = line.min(
                     (document.rope().len_lines() as u32)
                         .saturating_sub(cells.height)
@@ -918,11 +930,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn scroll_align_top(&mut self, margin: usize) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
+                let theme = self.virus.ui.context().theme;
                 let Some((pane, document)) = self.virus.get_active_document_mut() else {
                     return;
                 };
                 let pane_id = pane.id;
-                let cells = pane.view.cells();
+                let cells = theme.cells(pane.view.size());
 
                 if document.rope().len_lines() <= cells.height as usize {
                     return;
@@ -942,11 +955,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn scroll_align_center(&mut self) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
+                let theme = self.virus.ui.context().theme;
                 let Some((pane, document)) = self.virus.get_active_document_mut() else {
                     return;
                 };
                 let pane_id = pane.id;
-                let cells = pane.view.cells();
+                let cells = theme.cells(pane.view.size());
 
                 if document.rope().len_lines() <= cells.height as usize {
                     return;
@@ -966,11 +980,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn scroll_align_bottom(&mut self, margin: usize) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
+                let theme = self.virus.ui.context().theme;
                 let Some((pane, document)) = self.virus.get_active_document_mut() else {
                     return;
                 };
                 let pane_id = pane.id;
-                let cells = pane.view.cells();
+                let cells = theme.cells(pane.view.size());
 
                 if document.rope().len_lines() <= cells.height as usize {
                     return;

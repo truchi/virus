@@ -1,12 +1,18 @@
-use crate::{syntax::Highlighted, theme::UiTheme, tween::Tweened, ui::Highlighteds};
-use std::{cell::RefCell, fmt::Write, rc::Weak, time::Duration};
+use crate::{
+    syntax::Highlighted,
+    theme::UiTheme,
+    tween::{Tween, Tweened},
+    Context,
+};
+use std::{fmt::Write, time::Duration};
+use swash::{scale::ScaleContext, shape::ShapeContext};
 use virus_editor::{
     document::{Document, DocumentId},
     mode::{Mode, Select},
     rope::{Cursor, Selection},
 };
 use virus_graphics::{
-    text::{Advance, Context, FontStyle, FontWeight, Glyphs, Styles},
+    text::{Advance, FontStyle, FontWeight, Fonts, Glyphs, Styles},
     types::{Position, Rectangle, Rgba, Size},
     wgpu::{Draw, Layer},
 };
@@ -20,8 +26,6 @@ pub struct DocumentView {
     size: Size,
     scroll_top: Tweened<u32>,
     scrollbar_alpha: Tweened<u8>,
-    theme: Weak<RefCell<UiTheme>>,
-    highlighteds: Weak<RefCell<Highlighteds>>,
 }
 
 impl std::fmt::Debug for DocumentView {
@@ -33,18 +37,12 @@ impl std::fmt::Debug for DocumentView {
 impl DocumentView {
     pub const GUTTER_COLUMNS: u32 = 5;
 
-    pub fn new(
-        document_id: DocumentId,
-        theme: Weak<RefCell<UiTheme>>,
-        highlighteds: Weak<RefCell<Highlighteds>>,
-    ) -> Self {
+    pub fn new(document_id: DocumentId) -> Self {
         Self {
             document_id,
             size: Default::default(),
             scroll_top: Default::default(),
             scrollbar_alpha: Default::default(),
-            theme,
-            highlighteds,
         }
     }
 
@@ -56,25 +54,15 @@ impl DocumentView {
         self.document_id
     }
 
-    pub fn cells(&self) -> Size {
-        self.theme
-            .upgrade()
-            .unwrap()
-            .borrow()
-            .cells_and_pixels(self.size)
-            .0
+    pub fn size(&self) -> Size {
+        self.size
     }
 
-    pub fn line(&self) -> u32 {
-        self.scroll_top.end() / self.theme.upgrade().unwrap().borrow().line_height
+    pub fn scroll_top(&self) -> Tweened<u32> {
+        self.scroll_top
     }
 
-    pub fn scroll(&mut self, top: u32) {
-        let (duration, tween) = {
-            let theme = *self.theme.upgrade().unwrap().borrow();
-            (theme.scroll_duration, theme.scroll_tween)
-        };
-
+    pub fn scroll(&mut self, top: u32, tween: Tween, duration: Duration) {
         self.scroll_top.to(top, duration, tween);
         self.scrollbar_alpha = Tweened::with_animation(255, 0, duration, tween);
     }
@@ -87,12 +75,11 @@ impl DocumentView {
     pub fn render(
         &mut self,
         context: &mut Context,
-        layer: &mut Layer,
+        layer: Layer,
         document: &Document,
         mode: Mode,
         is_active: bool,
     ) {
-        debug_assert_eq!(self.document_id, document.id());
         debug_assert!(match mode {
             Mode::Normal { select } | Mode::Insert { select } if select == Select::None =>
                 document.selection().is_empty(),
@@ -101,7 +88,8 @@ impl DocumentView {
 
         self.size = layer.size();
 
-        let theme = *self.theme.upgrade().unwrap().borrow();
+        let context = context.as_mut();
+        let theme = *context.theme;
         let scroll_top = self.scroll_top.current();
         let scrollbar_color = theme
             .scrollbar_color
@@ -120,7 +108,7 @@ impl DocumentView {
             (start, end)
         };
         let advance = context
-            .fonts()
+            .fonts
             .get((theme.family, FontWeight::Regular, FontStyle::Normal))
             .unwrap()
             .advance_for_size(theme.font_size);
@@ -138,17 +126,24 @@ impl DocumentView {
                 width: (advance / 4.0).round() as u32,
             }
         };
-        let highlighteds = self.highlighteds.upgrade().unwrap();
-        let mut highlighteds = highlighteds.borrow_mut();
-        let highlighted = highlighteds
+        let highlighted = context
+            .highlighteds
             .entry(document.id())
             .or_insert_with(|| Highlighted::new(theme, document.id()));
-        let highlighted = highlighted.get(context, theme, document, start_line..end_line);
+        let highlighted = highlighted.get(
+            context.fonts,
+            context.shape,
+            theme,
+            document,
+            start_line..end_line,
+        );
 
         Renderer {
-            context,
+            fonts: context.fonts,
+            shape: context.shape,
+            scale: context.scale,
+            theme: context.theme,
             layer,
-            theme,
             selection: document.selection(),
             highlighted,
             start_line,
@@ -159,7 +154,11 @@ impl DocumentView {
             mode,
             is_active,
         }
-        .render();
+        .scrollbar()
+        .gutter()
+        .text()
+        .selection()
+        .foreground();
     }
 }
 
@@ -167,12 +166,14 @@ impl DocumentView {
 //                                            Renderer                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-struct Renderer<'context, 'layer, 'graphics, 'highlighted> {
-    context: &'context mut Context,
-    layer: &'layer mut Layer<'graphics>,
-    theme: UiTheme,
+struct Renderer<'a> {
+    fonts: &'a Fonts,
+    shape: &'a mut ShapeContext,
+    scale: &'a mut ScaleContext,
+    theme: &'a UiTheme,
+    layer: Layer<'a>,
     selection: Selection,
-    highlighted: &'highlighted [Glyphs],
+    highlighted: &'a [Glyphs],
     start_line: usize,
     gutter_width: u32,
     scroll_top: u32,
@@ -182,36 +183,34 @@ struct Renderer<'context, 'layer, 'graphics, 'highlighted> {
     is_active: bool,
 }
 
-impl<'context, 'layer, 'graphics, 'highlighted>
-    Renderer<'context, 'layer, 'graphics, 'highlighted>
-{
-    fn render(&mut self) {
-        self.render_scrollbar();
-        self.render_gutter();
-        self.render_text();
-        self.render_selection();
-        self.render_foreground();
-    }
-
-    fn render_scrollbar(&mut self) {
+impl<'a> Renderer<'a> {
+    fn scrollbar(&mut self) -> &mut Self {
         self.layer
             .draw(None, 0)
             .rectangle(self.scrollbar_rectangle, self.scrollbar_color);
+
+        self
     }
 
-    fn render_gutter(&mut self) {
+    fn gutter(&mut self) -> &mut Self {
         let styles = Styles {
             foreground: self.theme.syntax.comment.foreground,
             ..Default::default()
         };
 
         for number in self.start_line..self.start_line + self.highlighted.len() {
-            let glyphs = Glyphs::shaper(self.context, self.theme.family, self.theme.font_size)
-                .push(&format!("{} ", number + 1), styles)
-                .glyphs();
+            let glyphs = Glyphs::shaper(
+                self.fonts,
+                self.shape,
+                self.theme.family,
+                self.theme.font_size,
+            )
+            .push(&format!("{} ", number + 1), styles)
+            .glyphs();
 
             self.layer.draw(None, 0).glyphs(
-                self.context,
+                self.fonts,
+                self.scale,
                 Position {
                     top: number as i32 * self.theme.line_height as i32 - self.scroll_top as i32,
                     left: (self.gutter_width as Advance - glyphs.advance()).round() as i32,
@@ -220,9 +219,11 @@ impl<'context, 'layer, 'graphics, 'highlighted>
                 &glyphs,
             );
         }
+
+        self
     }
 
-    fn render_text(&mut self) {
+    fn text(&mut self) -> &mut Self {
         let left = self.gutter_width as i32;
 
         for (index, glyphs) in self.highlighted.iter().enumerate() {
@@ -230,15 +231,18 @@ impl<'context, 'layer, 'graphics, 'highlighted>
                 - self.scroll_top as i32;
 
             self.layer.draw(None, 0).glyphs(
-                self.context,
+                self.fonts,
+                self.scale,
                 Position { top, left },
                 self.theme.line_height as u32,
-                &glyphs,
+                glyphs,
             );
         }
+
+        self
     }
 
-    fn render_selection(&mut self) {
+    fn selection(&mut self) -> &mut Self {
         let pos = |top, left| Position { top, left };
         let row = |cursor: Cursor| {
             cursor.line as i32 * self.theme.line_height as i32 - self.scroll_top as i32
@@ -374,9 +378,11 @@ impl<'context, 'layer, 'graphics, 'highlighted>
                 if is_forward { end } else { start },
             );
         }
+
+        self
     }
 
-    fn render_foreground(&mut self) {
+    fn foreground(&mut self) -> &mut Self {
         if !self.is_active {
             let size = self.layer.size();
             self.layer.draw(None, 2).rectangle(
@@ -384,5 +390,7 @@ impl<'context, 'layer, 'graphics, 'highlighted>
                 self.theme.inactive_foreground_color,
             );
         }
+
+        self
     }
 }

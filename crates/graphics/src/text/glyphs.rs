@@ -1,4 +1,4 @@
-use super::{Advance, Context, FontFamilyKey, FontSize, Fonts, Glyph, Styles};
+use super::{Advance, FontFamilyKey, FontSize, Fonts, Glyph, Styles};
 use crate::types::Rgba;
 use std::ops::Range;
 use swash::{
@@ -32,13 +32,12 @@ pub struct Glyphs {
 
 impl Glyphs {
     /// Returns a [`Shaper`] for `family` at `size`.
-    pub fn shaper<'context>(
-        context: &'context mut Context,
+    pub fn shaper<'a>(
+        fonts: &'a Fonts,
+        shape: &'a mut ShapeContext,
         family: FontFamilyKey,
         size: FontSize,
-    ) -> Shaper<'context> {
-        let (fonts, shape, _) = context.as_muts();
-
+    ) -> Shaper<'a> {
         Shaper {
             fonts,
             shape,
@@ -50,9 +49,7 @@ impl Glyphs {
     }
 
     /// Returns a [`Scaler`].
-    pub fn scaler<'context>(context: &'context mut Context) -> Scaler<'context> {
-        let (fonts, _, scale) = context.as_muts();
-
+    pub fn scaler<'a>(fonts: &'a Fonts, scale: &'a mut ScaleContext) -> Scaler<'a> {
         Scaler {
             fonts,
             scale,
@@ -105,16 +102,16 @@ impl Glyphs {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// [`Glyphs`] shaper.
-pub struct Shaper<'context> {
-    fonts: &'context Fonts,
-    shape: &'context mut ShapeContext,
+pub struct Shaper<'a> {
+    fonts: &'a Fonts,
+    shape: &'a mut ShapeContext,
     family: FontFamilyKey,
     size: FontSize,
     glyphs: Glyphs,
     column: u32,
 }
 
-impl<'context> Shaper<'context> {
+impl<'a> Shaper<'a> {
     /// Pushes `str` to the shaper with `weight`, `style` and `styles`.
     ///
     /// `str` MUST NOT contain line breaks. Cannot shape ligatures across `str`s.
@@ -254,13 +251,13 @@ impl<'context> Shaper<'context> {
 // - subpixel
 
 /// [`Glyphs`] scaler.
-pub struct Scaler<'context> {
-    fonts: &'context Fonts,
-    scale: &'context mut ScaleContext,
+pub struct Scaler<'a> {
+    fonts: &'a Fonts,
+    scale: &'a mut ScaleContext,
     render: Render<'static>,
 }
 
-impl<'context> Scaler<'context> {
+impl<'a> Scaler<'a> {
     /// Renders `glyph`.
     pub fn render(&mut self, glyph: &Glyph) -> Image {
         let font = self

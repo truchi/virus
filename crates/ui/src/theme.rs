@@ -27,16 +27,20 @@ pub struct UiTheme {
 }
 
 impl UiTheme {
-    pub fn cells_and_pixels(&self, size: Size) -> (Size, Size) {
-        let cells = Size {
+    /// Returns the size in cells according to advance and line height.
+    pub fn cells(&self, size: Size) -> Size {
+        Size {
             width: (size.width as f32 / self.advance).floor() as u32,
             height: size.height / self.line_height,
-        };
-        let pixels = Size {
+        }
+    }
+
+    /// Returns the cells size in pixels according to advance and line height.
+    pub fn pixels(&self, size: Size) -> Size {
+        let cells = self.cells(size);
+        Size {
             width: (cells.width as f32 * self.advance).ceil() as u32,
             height: cells.height * self.line_height,
-        };
-
-        (cells, pixels)
+        }
     }
 }

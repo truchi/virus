@@ -1,10 +1,9 @@
 use crate::{
     panes::{DocumentPane, Pane, PaneId, Panes},
-    syntax::Highlighted,
-    theme::UiTheme,
     views::FilesView,
+    Context,
 };
-use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use virus_editor::{
     add_in_range,
     document::{Document, DocumentId},
@@ -13,7 +12,6 @@ use virus_editor::{
     sub_in_range,
 };
 use virus_graphics::{
-    text::Context,
     types::{Rectangle, Size},
     wgpu::Graphics,
 };
@@ -23,35 +21,38 @@ use winit::window::Window;
 //                                                 Ui                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-pub(crate) type Highlighteds = HashMap<DocumentId, Highlighted>;
-
 pub struct Ui {
     window: Arc<Window>,
-    graphics: Graphics,
     context: Context,
-    theme: Rc<RefCell<UiTheme>>,
+    graphics: Graphics,
     panes: Panes,
     files: FilesView,
-    _highlighteds: Rc<RefCell<Highlighteds>>,
 }
 
 impl Ui {
     pub fn new(window: Arc<Window>) -> Self {
         let graphics = Graphics::new(Arc::clone(&window));
-        let context = Context::new(crate::todo::fonts());
-        let theme = Rc::new(RefCell::new(crate::todo::ui_theme(&context)));
-        let highlighteds = Default::default();
-        let files = FilesView::new(Rc::downgrade(&theme));
-        let panes = Panes::new(Rc::downgrade(&theme), Rc::downgrade(&highlighteds));
+        let context = {
+            let fonts = crate::todo::fonts();
+            let theme = crate::todo::ui_theme(&fonts);
+
+            Context {
+                fonts,
+                shape: Default::default(),
+                scale: Default::default(),
+                theme,
+                highlighteds: Default::default(),
+            }
+        };
+        let files = FilesView::new();
+        let panes = Panes::new();
 
         Self {
             window,
-            graphics,
             context,
-            theme,
+            graphics,
             panes,
             files,
-            _highlighteds: highlighteds,
         }
     }
 
@@ -63,8 +64,8 @@ impl Ui {
         &self.window
     }
 
-    pub fn theme(&self) -> UiTheme {
-        *self.theme.borrow()
+    pub fn context(&self) -> &Context {
+        &self.context
     }
 
     pub fn panes(&self) -> UiPanes {
@@ -100,7 +101,7 @@ impl Ui {
                 width: size.width,
                 height: size.height,
             };
-            let (_, pixels) = self.theme().cells_and_pixels(size);
+            let pixels = self.context.theme.pixels(size);
 
             Rectangle {
                 top: (size.height - pixels.height) as i32 / 2,
@@ -128,7 +129,7 @@ impl Ui {
             );
         }
 
-        self.graphics.render(self.theme().background_color);
+        self.graphics.render(self.context.theme.background_color);
     }
 }
 
@@ -296,10 +297,12 @@ impl<'ui> UiPanesMut<'ui> {
     }
 
     pub fn scroll(&mut self, pane_id: PaneId, line: u32) {
-        let top = line * self.ui.theme().line_height;
+        let top = line * self.ui.context.theme.line_height;
+        let tween = self.ui.context.theme.scroll_tween;
+        let duration = self.ui.context.theme.scroll_duration;
 
         self.ui.panes.get_mut(pane_id).map(|pane| match pane {
-            Pane::Document(DocumentPane { view, .. }) => view.scroll(top),
+            Pane::Document(DocumentPane { view, .. }) => view.scroll(top, tween, duration),
         });
     }
 }
