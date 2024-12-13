@@ -1,5 +1,4 @@
 use crate::{
-    highlighteds::Highlighted,
     theme::UiTheme,
     tween::{Tween, Tweened},
     Context,
@@ -126,10 +125,7 @@ impl DocumentView {
                 width: (advance / 4.0).round() as u32,
             }
         };
-        let highlighted = context
-            .highlighteds
-            .entry(document.id())
-            .or_insert_with(|| Highlighted::new(theme, document.id()));
+        let highlighted = context.highlighteds.entry(document.id()).or_default();
         let highlighted = highlighted.get(
             context.fonts,
             context.shape,

@@ -116,7 +116,7 @@ impl Highlights {
     /// The whole line range of text is covered.                                                                                   
     pub fn highlights(&self) -> impl Iterator<Item = (StrOrSmol, Option<HighlightsTag>)> {
         Self::split(
-            dbg!(self.rope.byte_slice(self.start..self.end)).chunks(),
+            self.rope.byte_slice(self.start..self.end).chunks(),
             self.highlights
                 .iter()
                 .map(|highlight| highlight.end - highlight.start),

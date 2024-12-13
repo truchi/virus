@@ -13,24 +13,15 @@ use virus_graphics::text::{Fonts, Glyphs};
 
 // TODO optimizations!?
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct Highlighted {
-    theme: UiTheme,
-    document_id: DocumentId,
+    theme: Option<UiTheme>,
+    document_id: Option<DocumentId>,
     version: usize,
     lines: Vec<Glyphs>,
 }
 
 impl Highlighted {
-    pub fn new(theme: UiTheme, document_id: DocumentId) -> Self {
-        Self {
-            theme,
-            document_id,
-            version: Default::default(),
-            lines: Default::default(),
-        }
-    }
-
     pub fn get(
         &mut self,
         fonts: &Fonts,
@@ -39,13 +30,19 @@ impl Highlighted {
         document: &Document,
         range: Range<usize>,
     ) -> &[Glyphs] {
-        assert_eq!(self.document_id, document.id());
+        assert!(
+            self.document_id
+                .map(|document_id| document_id == document.id())
+                .unwrap_or(true),
+            "Use the same document here",
+        );
+        self.document_id = Some(document.id());
 
         debug_assert!(range.start <= range.end);
         debug_assert!(range.end <= document.rope().len_lines());
 
-        if !(self.version == document.version() && self.theme == theme) {
-            self.theme = theme;
+        if !(self.version == document.version() && self.theme == Some(theme)) {
+            self.theme = Some(theme);
             self.version = document.version();
             self.lines.clear();
             self.shape(fonts, shape, document);
@@ -58,6 +55,7 @@ impl Highlighted {
 /// Private.
 impl Highlighted {
     fn shape(&mut self, fonts: &Fonts, shape: &mut ShapeContext, document: &Document) {
+        let theme = self.theme.unwrap();
         let range = 0..document.rope().len_lines();
 
         let highlights = Highlights::new(
@@ -67,13 +65,13 @@ impl Highlighted {
             document.highlights(),
         );
 
-        let mut shaper = Glyphs::shaper(fonts, shape, self.theme.family, self.theme.font_size);
+        let mut shaper = Glyphs::shaper(fonts, shape, theme.family, theme.font_size);
 
         self.lines.clear();
 
         // TODO ensure line break detection across highlights
         for (str, tag) in highlights.highlights() {
-            let styles = self.theme.syntax[tag];
+            let styles = theme.syntax[tag];
             let mut str = str.as_str();
 
             loop {
