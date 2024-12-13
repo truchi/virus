@@ -192,8 +192,9 @@ mod todo {
 
             caret_width: 2,
 
-            status_foreground: catppuccin.base.solid(),
-            status_background: catppuccin.crust.solid(),
+            status_background_color: catppuccin.crust.solid(),
+            status_mode_foreground_color: catppuccin.base.solid(),
+            status_file_foreground_color: catppuccin.text.solid(),
         }
     }
 

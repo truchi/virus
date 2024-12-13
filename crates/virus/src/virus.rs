@@ -378,6 +378,14 @@ impl Virus {
                         .unwrap_or_else(|| key.to_string())
                 })
                 .collect::<Vec<_>>(),
+            self.get_active_document().map(|(_, document)| {
+                document
+                    .path()
+                    .strip_prefix(self.editor.root())
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned()
+            }),
         );
 
         if self.ui.is_animating() {

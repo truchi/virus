@@ -23,6 +23,7 @@ impl StatusView {
         layer: Layer<'a>,
         mode: Mode,
         keybindings: &'a [String],
+        file_name: Option<String>,
     ) {
         let context = context.as_mut();
         Renderer {
@@ -33,6 +34,7 @@ impl StatusView {
             mode,
             layer,
             keybindings,
+            file_name,
         }
         .render();
     }
@@ -50,6 +52,7 @@ struct Renderer<'a> {
     layer: Layer<'a>,
     mode: Mode,
     keybindings: &'a [String],
+    file_name: Option<String>,
 }
 
 impl<'a> Renderer<'a> {
@@ -70,7 +73,7 @@ impl<'a> Renderer<'a> {
         shaper.push(
             &string,
             Styles {
-                foreground: self.theme.status_foreground.transparent(255),
+                foreground: self.theme.status_mode_foreground_color.transparent(255),
                 background: background.transparent(255),
                 weight: FontWeight::Bold,
                 ..self.theme.syntax.default
@@ -83,16 +86,27 @@ impl<'a> Renderer<'a> {
             shaper.push(
                 &format!("{space}{key} "),
                 Styles {
-                    foreground: self.theme.status_foreground.transparent(255),
+                    foreground: self.theme.status_mode_foreground_color.transparent(255),
                     background: background.transparent(255 / 2),
                     ..self.theme.syntax.default
                 },
             );
         }
 
+        if let Some(file_name) = &self.file_name {
+            shaper.push(
+                &format!(" {file_name} "),
+                Styles {
+                    foreground: self.theme.status_file_foreground_color.transparent(255),
+                    weight: FontWeight::Bold,
+                    ..Default::default()
+                },
+            );
+        }
+
         self.layer
             .draw(None, 0)
-            .rectangle(None, self.theme.status_background.transparent(255));
+            .rectangle(None, self.theme.status_background_color.transparent(255));
 
         self.layer.draw(None, 0).glyphs(
             self.fonts,

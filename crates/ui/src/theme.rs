@@ -30,8 +30,9 @@ pub struct UiTheme {
 
     pub caret_width: u32,
 
-    pub status_foreground: Rgb,
-    pub status_background: Rgb,
+    pub status_background_color: Rgb,
+    pub status_mode_foreground_color: Rgb,
+    pub status_file_foreground_color: Rgb,
 }
 
 impl UiTheme {

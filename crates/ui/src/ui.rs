@@ -93,6 +93,7 @@ impl Ui {
         mode: Mode,
         file_search: Option<(usize, &'a str, &Search)>,
         keybindings: &[String],
+        file_name: Option<String>,
     ) {
         // TODO react to document closes
 
@@ -142,6 +143,7 @@ impl Ui {
             self.graphics.layer(status_region, 0),
             mode,
             keybindings,
+            file_name,
         );
 
         self.graphics.render(self.context.theme.background_color);
