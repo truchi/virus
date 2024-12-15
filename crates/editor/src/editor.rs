@@ -1,36 +1,33 @@
-use crate::document::{Document, DocumentId, DocumentIds};
+use crate::{
+    document::{Document, DocumentId, DocumentIds},
+    watcher::WatcherClient,
+};
 use ignore::WalkBuilder;
+use notify::Event;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
 
-// ────────────────────────────────────────────────────────────────────────────────────────────── //
-
-#[derive(Debug)]
-pub enum EventLoopMessage {}
-
-// ────────────────────────────────────────────────────────────────────────────────────────────── //
-
-pub type EventLoopSender = Box<dyn Fn(EventLoopMessage) + Send>;
-
-// ────────────────────────────────────────────────────────────────────────────────────────────── //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                             Editor                                             //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct Editor {
     root: PathBuf,
     document_ids: DocumentIds,
     documents: HashMap<DocumentId, Document>,
+    watcher: WatcherClient,
 }
 
 impl Editor {
-    pub fn new(root: PathBuf) -> Self {
-        let editor = Self {
+    pub fn new(root: PathBuf, watcher: WatcherClient) -> Self {
+        Self {
             root,
             document_ids: Default::default(),
             documents: Default::default(),
-        };
-
-        editor
+            watcher,
+        }
     }
 
     pub fn root(&self) -> &Path {
@@ -55,10 +52,11 @@ impl Editor {
         } else {
             let document_id = self.document_ids.id();
 
-            let mut document = Document::open(document_id, path)?;
+            let mut document = Document::open(document_id, path.clone())?;
             document.parse();
 
             self.documents.insert(document_id, document);
+            self.watcher.watch(path);
 
             Ok(document_id)
         }
@@ -98,7 +96,11 @@ impl Editor {
             })
     }
 
-    pub fn find_git_root(path: PathBuf) -> Option<PathBuf> {
+    pub fn handle_watcher_event(&mut self, event: Event) {
+        dbg!(&event);
+    }
+
+    pub fn find_git_root(path: &Path) -> Option<PathBuf> {
         let mut current = match std::fs::canonicalize(path) {
             Ok(path) => Some(path),
             Err(_) => return None,

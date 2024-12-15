@@ -25,6 +25,7 @@ pub mod rope {
     pub use text::*;
 }
 pub mod history;
+pub mod watcher;
 
 use smol_str::SmolStr;
 

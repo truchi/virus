@@ -10,11 +10,12 @@ use std::{sync::Arc, time::Instant};
 use virus_editor::{
     add_in_range,
     document::Document,
-    editor::{Editor, EventLoopMessage},
+    editor::Editor,
     fuzzy::Search,
     mode::{Mode, Select},
     rope::{Boundaries, Cursor, Text},
     sub_in_range,
+    watcher::{WatcherActor, WatcherEvent},
 };
 use virus_ui::{
     panes::{DocumentPane, Pane},
@@ -31,12 +32,17 @@ use winit::{
 //                                            Handler                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+#[derive(Debug)]
+enum EventLoopEvent {
+    Watcher(WatcherEvent),
+}
+
 enum Handler {
     Uninitialized { editor: Option<Editor> },
     Initialized { virus: Virus },
 }
 
-impl ApplicationHandler<EventLoopMessage> for Handler {
+impl ApplicationHandler<EventLoopEvent> for Handler {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let editor = match self {
             Handler::Uninitialized { editor } => editor,
@@ -72,7 +78,7 @@ impl ApplicationHandler<EventLoopMessage> for Handler {
         virus.window_event(event_loop, window_id, event);
     }
 
-    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: EventLoopMessage) {
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: EventLoopEvent) {
         let virus = match self {
             Handler::Uninitialized { .. } => panic!("Not initialized"),
             Handler::Initialized { virus } => virus,
@@ -141,25 +147,55 @@ pub struct Virus {
 impl Virus {
     /// Runs `virus`.
     pub fn run() {
-        let event_loop = EventLoop::<EventLoopMessage>::with_user_event()
-            .build()
-            .expect("Cannot create event loop");
-        let editor = {
-            let current_dir = std::env::current_dir().expect("Current directory");
-            let root = Editor::find_git_root(current_dir.clone()).unwrap_or(current_dir);
+        let event_loop = EventLoop::with_user_event().build().expect("event loop");
+        let event_loop_proxy = event_loop.create_proxy();
 
-            Editor::new(root)
+        let (watcher_client, mut watcher_actor) = WatcherActor::new();
+        let editor = {
+            let current_dir = std::env::current_dir().expect("current directory");
+
+            Editor::new(
+                Editor::find_git_root(&current_dir).unwrap_or(current_dir),
+                watcher_client,
+            )
         };
 
-        //
-        // Run
-        //
+        let (async_runtime_exit_sender, async_runtime_exit_receiver) =
+            tokio::sync::oneshot::channel();
+        let async_runtime = std::thread::spawn(move || {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .expect("tokio runtime")
+                .block_on(async {
+                    let watcher_handle = tokio::spawn(async move {
+                        watcher_actor
+                            .run(move |event| {
+                                event_loop_proxy
+                                    .send_event(EventLoopEvent::Watcher(event))
+                                    .expect("send to event loop");
+                            })
+                            .await
+                    });
+
+                    tokio::select! {
+                        _ = watcher_handle => unreachable!(),
+                        _ = async_runtime_exit_receiver => {}
+                    }
+                })
+        });
 
         let mut handler = Handler::Uninitialized {
             editor: Some(editor),
         };
         event_loop.set_control_flow(ControlFlow::Wait);
-        event_loop.run_app(&mut handler).unwrap();
+        event_loop.run_app(&mut handler).expect("run event loop");
+
+        async_runtime_exit_sender
+            .send(())
+            .expect("send exit to async runtime");
+        async_runtime.join().expect("join async runtime");
+        drop(handler);
     }
 }
 
@@ -266,7 +302,11 @@ impl Virus {
         }
     }
 
-    fn user_event(&mut self, _event_loop: &ActiveEventLoop, _event: EventLoopMessage) {}
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: EventLoopEvent) {
+        match event {
+            EventLoopEvent::Watcher(event) => self.editor.handle_watcher_event(event),
+        }
+    }
 
     fn on_key(&mut self, event: KeyEvent, event_loop: &ActiveEventLoop) {
         match self.keybindings.handle(&event) {
