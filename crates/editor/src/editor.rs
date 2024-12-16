@@ -1,13 +1,18 @@
-use crate::{
-    document::{Document, DocumentId, DocumentIds},
-    watcher::WatcherClient,
-};
+use crate::document::{Document, DocumentId, DocumentIds};
 use ignore::WalkBuilder;
-use notify::Event;
+use notify::{recommended_watcher, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
+pub type WatcherEvent = notify::Event;
+
+pub trait EventLoopProxy: Send + 'static {
+    fn watcher(&self, event: WatcherEvent);
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Editor                                             //
@@ -17,16 +22,20 @@ pub struct Editor {
     root: PathBuf,
     document_ids: DocumentIds,
     documents: HashMap<DocumentId, Document>,
-    watcher: WatcherClient,
+    watcher: RecommendedWatcher,
 }
 
 impl Editor {
-    pub fn new(root: PathBuf, watcher: WatcherClient) -> Self {
+    pub fn new<T: EventLoopProxy>(root: PathBuf, event_loop_proxy: T) -> Self {
         Self {
             root,
             document_ids: Default::default(),
             documents: Default::default(),
-            watcher,
+            watcher: recommended_watcher(move |event| match event {
+                Ok(event) => event_loop_proxy.watcher(event),
+                Err(err) => debug_assert!(false, "{err:#?}"),
+            })
+            .expect("recommended watcher"),
         }
     }
 
@@ -56,7 +65,9 @@ impl Editor {
             document.parse();
 
             self.documents.insert(document_id, document);
-            self.watcher.watch(path);
+            self.watcher
+                .watch(&path, RecursiveMode::NonRecursive)
+                .expect("watch");
 
             Ok(document_id)
         }
@@ -96,7 +107,7 @@ impl Editor {
             })
     }
 
-    pub fn handle_watcher_event(&mut self, event: Event) {
+    pub fn handle_watcher_event(&mut self, event: WatcherEvent) {
         dbg!(&event);
     }
 

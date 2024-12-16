@@ -9,7 +9,6 @@ serde.workspace = true
 serde_yaml.workspace = true
 smol_str.workspace = true
 thiserror.workspace = true
-tokio.workspace = true
 virus-editor.workspace = true
 virus-ui.workspace = true
 winit.workspace = true

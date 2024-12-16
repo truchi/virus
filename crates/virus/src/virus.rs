@@ -10,12 +10,11 @@ use std::{sync::Arc, time::Instant};
 use virus_editor::{
     add_in_range,
     document::Document,
-    editor::Editor,
+    editor::{Editor, WatcherEvent},
     fuzzy::Search,
     mode::{Mode, Select},
     rope::{Boundaries, Cursor, Text},
     sub_in_range,
-    watcher::{WatcherActor, WatcherEvent},
 };
 use virus_ui::{
     panes::{DocumentPane, Pane},
@@ -36,6 +35,20 @@ use winit::{
 enum EventLoopEvent {
     Watcher(WatcherEvent),
 }
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
+struct EventLoopProxy(winit::event_loop::EventLoopProxy<EventLoopEvent>);
+
+impl virus_editor::editor::EventLoopProxy for EventLoopProxy {
+    fn watcher(&self, event: WatcherEvent) {
+        self.0
+            .send_event(EventLoopEvent::Watcher(event))
+            .expect("send to event loop");
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
 
 enum Handler {
     Uninitialized { editor: Option<Editor> },
@@ -148,54 +161,22 @@ impl Virus {
     /// Runs `virus`.
     pub fn run() {
         let event_loop = EventLoop::with_user_event().build().expect("event loop");
-        let event_loop_proxy = event_loop.create_proxy();
+        let event_loop_proxy = EventLoopProxy(event_loop.create_proxy());
 
-        let (watcher_client, mut watcher_actor) = WatcherActor::new();
         let editor = {
             let current_dir = std::env::current_dir().expect("current directory");
 
             Editor::new(
                 Editor::find_git_root(&current_dir).unwrap_or(current_dir),
-                watcher_client,
+                event_loop_proxy,
             )
         };
-
-        let (async_runtime_exit_sender, async_runtime_exit_receiver) =
-            tokio::sync::oneshot::channel();
-        let async_runtime = std::thread::spawn(move || {
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .build()
-                .expect("tokio runtime")
-                .block_on(async {
-                    let watcher_handle = tokio::spawn(async move {
-                        watcher_actor
-                            .run(move |event| {
-                                event_loop_proxy
-                                    .send_event(EventLoopEvent::Watcher(event))
-                                    .expect("send to event loop");
-                            })
-                            .await
-                    });
-
-                    tokio::select! {
-                        _ = watcher_handle => unreachable!(),
-                        _ = async_runtime_exit_receiver => {}
-                    }
-                })
-        });
 
         let mut handler = Handler::Uninitialized {
             editor: Some(editor),
         };
         event_loop.set_control_flow(ControlFlow::Wait);
         event_loop.run_app(&mut handler).expect("run event loop");
-
-        async_runtime_exit_sender
-            .send(())
-            .expect("send exit to async runtime");
-        async_runtime.join().expect("join async runtime");
-        drop(handler);
     }
 }
 
