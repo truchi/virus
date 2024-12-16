@@ -1,9 +1,14 @@
 use crate::document::{Document, DocumentId, DocumentIds};
 use ignore::WalkBuilder;
-use notify::{recommended_watcher, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{
+    event::ModifyKind, recommended_watcher, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
+};
 use std::{
+    cmp::Ordering,
     collections::HashMap,
+    fs::File,
     path::{Path, PathBuf},
+    time::SystemTime,
 };
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
@@ -116,7 +121,33 @@ impl Editor {
     }
 
     pub fn handle_watcher_event(&mut self, event: WatcherEvent) {
-        dbg!(&event);
+        if !matches!(event.kind, EventKind::Modify(ModifyKind::Data(_))) {
+            return;
+        }
+
+        for path in event.paths {
+            let Some(document) = self
+                .documents
+                .values()
+                .find(|document| document.path() == path)
+            else {
+                continue;
+            };
+
+            let file = File::open(path).unwrap();
+            let modified = file
+                .metadata()
+                .and_then(|metadata| metadata.modified())
+                .unwrap_or_else(|_| SystemTime::now());
+
+            match document.on_disk_modified().cmp(&modified) {
+                Ordering::Less => {
+                    println!("New!");
+                }
+                Ordering::Equal => {} // We just saved it
+                Ordering::Greater => debug_assert!(false),
+            }
+        }
     }
 
     pub fn find_git_root(path: &Path) -> Option<PathBuf> {

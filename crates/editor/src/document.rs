@@ -14,6 +14,7 @@ use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Write},
     path::{Path, PathBuf},
+    time::SystemTime,
 };
 use tree_sitter::{Parser, Query, Tree};
 
@@ -41,6 +42,9 @@ pub struct Document {
     is_tree_dirty: bool,
     version: usize,
     history: History,
+    on_disk_content: Rope,
+    on_disk_modified: SystemTime,
+    on_disk_is_dirty: bool,
 }
 
 /// Getters.
@@ -99,6 +103,18 @@ impl Document {
     pub fn version(&self) -> usize {
         self.version
     }
+
+    pub fn on_disk_content(&self) -> &Rope {
+        &self.on_disk_content
+    }
+
+    pub fn on_disk_modified(&self) -> SystemTime {
+        self.on_disk_modified
+    }
+
+    pub fn on_disk_is_dirty(&self) -> bool {
+        self.on_disk_is_dirty
+    }
 }
 
 impl Document {
@@ -125,7 +141,8 @@ impl Document {
         }
 
         let language = tree_sitter_rust::language();
-        let rope = Rope::from_reader(&mut BufReader::new(File::open(&path)?))?;
+        let file = File::open(&path)?;
+        let rope = Rope::from_reader(&mut BufReader::new(&file))?;
         let anchor_segmentation = Segmentation::new(rope.clone(), 0, 0, 0);
         let head_segmentation = anchor_segmentation.clone();
         let highlights =
@@ -139,7 +156,7 @@ impl Document {
         let document = Self {
             id,
             path,
-            rope,
+            rope: rope.clone(),
             selection: Selection::default(),
             anchor_segmentation,
             head_segmentation,
@@ -149,25 +166,44 @@ impl Document {
             is_tree_dirty: false,
             version: 0,
             history: History::default(),
+            on_disk_modified: file
+                .metadata()
+                .and_then(|metadata| metadata.modified())
+                .unwrap_or_else(|_| SystemTime::now()),
+            on_disk_is_dirty: false,
+            on_disk_content: rope,
         };
 
         Ok(document)
     }
 
     // NOTE: good enough for now
+    // TODO: atomic write, links, async?, ...
+    // https://github.com/helix-editor/helix/blob/e14c346ee74a44051b2c07c2255a6ab80142dbe7/helix-view/src/document.rs#L858
     pub fn save(&mut self) -> std::io::Result<()> {
-        let mut writer = BufWriter::new(
-            OpenOptions::new()
-                .write(true)
-                .truncate(true)
-                .open(&self.path)?,
-        );
+        if !self.on_disk_is_dirty {
+            return Ok(());
+        }
+
+        let file = OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(&self.path)?;
+        let mut writer = BufWriter::new(&file);
 
         for chunk in self.rope.chunks() {
             writer.write(chunk.as_bytes())?;
         }
 
         writer.flush()?;
+        file.sync_all()?;
+
+        self.on_disk_modified = file
+            .metadata()
+            .and_then(|metadata| metadata.modified())
+            .unwrap_or_else(|_| SystemTime::now());
+        self.on_disk_is_dirty = false;
+
         Ok(())
     }
 
@@ -414,6 +450,7 @@ impl<'document> DocumentEdition<'document> {
 
         self.document.version += 1;
         self.document.is_tree_dirty = true;
+        self.document.on_disk_is_dirty = true;
         self.document.history.push(edit.clone());
         self.document.tree.edit(&edit.to_ts_edit_applied());
 
@@ -455,6 +492,7 @@ impl<'document> DocumentEdition<'document> {
             .selection(Selection::new(anchor, head), true);
         self.document.version += 1;
         self.document.is_tree_dirty = true;
+        self.document.on_disk_is_dirty = true;
     }
 
     pub fn redo(&mut self) {
@@ -481,5 +519,6 @@ impl<'document> DocumentEdition<'document> {
             .selection(Selection::new(anchor, head), true);
         self.document.version += 1;
         self.document.is_tree_dirty = true;
+        self.document.on_disk_is_dirty = true;
     }
 }
