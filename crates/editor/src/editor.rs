@@ -4,18 +4,17 @@ use notify::{
     event::ModifyKind, recommended_watcher, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
 };
 use std::{
-    cmp::Ordering,
     collections::HashMap,
-    fs::File,
     path::{Path, PathBuf},
-    time::SystemTime,
 };
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
 pub type WatcherEvent = notify::Event;
 
-pub trait EventLoopProxy: Send + 'static {
+pub trait EventLoopProxy: Clone + Send + 'static {
+    fn redraw(&self);
+
     fn watcher(&self, event: WatcherEvent);
 }
 
@@ -23,24 +22,30 @@ pub trait EventLoopProxy: Send + 'static {
 //                                             Editor                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-pub struct Editor {
+pub struct Editor<T: EventLoopProxy> {
     root: PathBuf,
     document_ids: DocumentIds,
     documents: HashMap<DocumentId, Document>,
     watcher: RecommendedWatcher,
+    event_loop_proxy: T,
 }
 
-impl Editor {
-    pub fn new<T: EventLoopProxy>(root: PathBuf, event_loop_proxy: T) -> Self {
+impl<T: EventLoopProxy> Editor<T> {
+    pub fn new(root: PathBuf, event_loop_proxy: T) -> Self {
         Self {
             root,
             document_ids: Default::default(),
             documents: Default::default(),
-            watcher: recommended_watcher(move |event| match event {
-                Ok(event) => event_loop_proxy.watcher(event),
-                Err(err) => debug_assert!(false, "{err:#?}"),
+            watcher: recommended_watcher({
+                let event_loop_proxy = event_loop_proxy.clone();
+
+                move |event| match event {
+                    Ok(event) => event_loop_proxy.watcher(event),
+                    Err(err) => debug_assert!(false, "{err:#?}"),
+                }
             })
             .expect("recommended watcher"),
+            event_loop_proxy,
         }
     }
 
@@ -128,24 +133,15 @@ impl Editor {
         for path in event.paths {
             let Some(document) = self
                 .documents
-                .values()
+                .values_mut()
                 .find(|document| document.path() == path)
             else {
                 continue;
             };
 
-            let file = File::open(path).unwrap();
-            let modified = file
-                .metadata()
-                .and_then(|metadata| metadata.modified())
-                .unwrap_or_else(|_| SystemTime::now());
-
-            match document.on_disk_modified().cmp(&modified) {
-                Ordering::Less => {
-                    println!("New!");
-                }
-                Ordering::Equal => {} // We just saved it
-                Ordering::Greater => debug_assert!(false),
+            if document.reload_if_newer(std::fs::metadata(path)).unwrap() {
+                document.parse();
+                self.event_loop_proxy.redraw();
             }
         }
     }

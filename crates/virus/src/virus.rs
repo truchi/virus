@@ -10,7 +10,7 @@ use std::{sync::Arc, time::Instant};
 use virus_editor::{
     add_in_range,
     document::Document,
-    editor::{Editor, WatcherEvent},
+    editor::WatcherEvent,
     fuzzy::Search,
     mode::{Mode, Select},
     rope::{Boundaries, Cursor, Text},
@@ -31,16 +31,28 @@ use winit::{
 //                                            Handler                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+type Editor = virus_editor::editor::Editor<EventLoopProxy>;
+
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
 #[derive(Debug)]
 enum EventLoopEvent {
+    Redraw,
     Watcher(WatcherEvent),
 }
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
+#[derive(Clone)]
 struct EventLoopProxy(winit::event_loop::EventLoopProxy<EventLoopEvent>);
 
 impl virus_editor::editor::EventLoopProxy for EventLoopProxy {
+    fn redraw(&self) {
+        self.0
+            .send_event(EventLoopEvent::Redraw)
+            .expect("send to event loop");
+    }
+
     fn watcher(&self, event: WatcherEvent) {
         self.0
             .send_event(EventLoopEvent::Watcher(event))
@@ -283,8 +295,9 @@ impl Virus {
         }
     }
 
-    fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: EventLoopEvent) {
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: EventLoopEvent) {
         match event {
+            EventLoopEvent::Redraw => self.on_redraw(event_loop),
             EventLoopEvent::Watcher(event) => self.editor.handle_watcher_event(event),
         }
     }

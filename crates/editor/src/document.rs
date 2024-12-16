@@ -11,11 +11,14 @@ use crate::{
 };
 use ropey::Rope;
 use std::{
-    fs::{File, OpenOptions},
+    cmp::Ordering,
+    fs::{File, Metadata},
     io::{BufReader, BufWriter, Write},
     path::{Path, PathBuf},
+    process::{Command, Stdio},
     time::SystemTime,
 };
+use tempfile::TempDir;
 use tree_sitter::{Parser, Query, Tree};
 
 ids!(
@@ -32,6 +35,7 @@ ids!(
 pub struct Document {
     id: DocumentId,
     path: PathBuf,
+    version: usize,
     rope: Rope,
     selection: Selection,
     anchor_segmentation: Segmentation,
@@ -39,12 +43,11 @@ pub struct Document {
     highlights: Query,
     parser: Parser,
     tree: Tree,
-    is_tree_dirty: bool,
-    version: usize,
+    tree_version: usize,
     history: History,
     on_disk_content: Rope,
     on_disk_modified: SystemTime,
-    on_disk_is_dirty: bool,
+    on_disk_version: usize,
 }
 
 /// Getters.
@@ -55,6 +58,10 @@ impl Document {
 
     pub fn path(&self) -> &Path {
         self.path.as_path()
+    }
+
+    pub fn version(&self) -> usize {
+        self.version
     }
 
     pub fn rope(&self) -> &Rope {
@@ -100,20 +107,9 @@ impl Document {
         &self.highlights
     }
 
-    pub fn version(&self) -> usize {
-        self.version
-    }
-
-    pub fn on_disk_content(&self) -> &Rope {
-        &self.on_disk_content
-    }
-
-    pub fn on_disk_modified(&self) -> SystemTime {
-        self.on_disk_modified
-    }
-
-    pub fn on_disk_is_dirty(&self) -> bool {
-        self.on_disk_is_dirty
+    pub fn is_dirty(&self) -> bool {
+        debug_assert!(self.on_disk_version <= self.version);
+        self.on_disk_version < self.version
     }
 }
 
@@ -156,6 +152,7 @@ impl Document {
         let document = Self {
             id,
             path,
+            version: 0,
             rope: rope.clone(),
             selection: Selection::default(),
             anchor_segmentation,
@@ -163,32 +160,124 @@ impl Document {
             highlights,
             parser,
             tree,
-            is_tree_dirty: false,
-            version: 0,
+            tree_version: 0,
             history: History::default(),
+            on_disk_content: rope,
             on_disk_modified: file
                 .metadata()
                 .and_then(|metadata| metadata.modified())
                 .unwrap_or_else(|_| SystemTime::now()),
-            on_disk_is_dirty: false,
-            on_disk_content: rope,
+            on_disk_version: 0,
         };
 
         Ok(document)
+    }
+
+    pub fn reload_if_newer(
+        &mut self,
+        metadata: std::io::Result<Metadata>,
+    ) -> std::io::Result<bool> {
+        let modified = metadata
+            .and_then(|metadata| metadata.modified())
+            .unwrap_or_else(|_| SystemTime::now());
+
+        match self.on_disk_modified.cmp(&modified) {
+            Ordering::Less => return self.reload().map(|_| true),
+            Ordering::Equal => {}
+            Ordering::Greater => debug_assert!(false),
+        }
+
+        Ok(false)
+    }
+
+    // TODO diff, history, tree
+    pub fn reload(&mut self) -> std::io::Result<()> {
+        if self.is_dirty() {
+            let temp_dir = TempDir::with_prefix("virus.").unwrap();
+            let create = |name: &str, rope: &Rope| {
+                let mut path = temp_dir.path().to_owned();
+                path.push(name);
+                let file = File::create(&path)?;
+                let mut writer = BufWriter::new(&file);
+
+                for chunk in rope.chunks() {
+                    writer.write(chunk.as_bytes())?;
+                }
+
+                writer.flush()?;
+                file.sync_all()?;
+
+                std::io::Result::Ok(path)
+            };
+
+            let current = create("current", &self.rope)?;
+            let base = create("base", &self.on_disk_content)?;
+            let other = &self.path;
+            let mut child = Command::new("git")
+                .envs([
+                    ("GIT_CONFIG_SYSTEM", "/dev/null"),
+                    ("GIT_CONFIG_GLOBAL", "/dev/null"),
+                ])
+                .args([
+                    "merge-file",
+                    &current.as_os_str().to_string_lossy(),
+                    &base.as_os_str().to_string_lossy(),
+                    &other.as_os_str().to_string_lossy(),
+                    "-p",
+                    "--diff3",
+                    "-L",
+                    "VIRUS",
+                    "-L",
+                    "ORIGINAL",
+                    "-L",
+                    "DISK",
+                ])
+                .stdout(Stdio::piped())
+                .spawn()?;
+            let stdout = child
+                .stdout
+                .take()
+                .ok_or_else(|| std::io::Error::other(""))?;
+
+            self.rope = Rope::from_reader(&mut BufReader::new(stdout))?;
+
+            if child.wait().map(|status| status.success()).ok() == Some(true) {
+                self.save()?;
+                self.on_disk_version = self.version + 1;
+            }
+        } else {
+            let file = File::open(&self.path)?;
+
+            self.rope = Rope::from_reader(&mut BufReader::new(&file))?;
+            self.on_disk_content = self.rope.clone();
+            self.on_disk_modified = file
+                .metadata()
+                .and_then(|metadata| metadata.modified())
+                .unwrap_or_else(|_| SystemTime::now());
+            self.on_disk_version = self.version + 1;
+        }
+
+        self.selection = Default::default();
+        self.anchor_segmentation = Segmentation::new(self.rope.clone(), 0, 0, 0);
+        self.head_segmentation = self.anchor_segmentation.clone();
+        self.tree = Self::parse_with(&self.rope, &mut self.parser, None); // TODO with edits, dont parse
+        self.version += 1;
+        self.tree_version = self.version; // TODO without parse that would be unchanged
+
+        // self.history = todo!();
+
+        Ok(())
     }
 
     // NOTE: good enough for now
     // TODO: atomic write, links, async?, ...
     // https://github.com/helix-editor/helix/blob/e14c346ee74a44051b2c07c2255a6ab80142dbe7/helix-view/src/document.rs#L858
     pub fn save(&mut self) -> std::io::Result<()> {
-        if !self.on_disk_is_dirty {
+        if !self.is_dirty() {
             return Ok(());
         }
 
-        let file = OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .open(&self.path)?;
+        let file = File::create(&self.path)?;
         let mut writer = BufWriter::new(&file);
 
         for chunk in self.rope.chunks() {
@@ -198,11 +287,12 @@ impl Document {
         writer.flush()?;
         file.sync_all()?;
 
+        self.on_disk_content = self.rope.clone();
         self.on_disk_modified = file
             .metadata()
             .and_then(|metadata| metadata.modified())
             .unwrap_or_else(|_| SystemTime::now());
-        self.on_disk_is_dirty = false;
+        self.on_disk_version = self.version;
 
         Ok(())
     }
@@ -211,9 +301,11 @@ impl Document {
     ///
     /// Call this function after your edits to the document to update the AST.
     pub fn parse(&mut self) {
-        if self.is_tree_dirty {
+        debug_assert!(self.tree_version <= self.version);
+
+        if self.tree_version < self.version {
             self.tree = Self::parse_with(&self.rope, &mut self.parser, Some(&self.tree));
-            self.is_tree_dirty = false;
+            self.tree_version = self.version;
         }
     }
 
@@ -449,8 +541,6 @@ impl<'document> DocumentEdition<'document> {
             .collapse(!reselect);
 
         self.document.version += 1;
-        self.document.is_tree_dirty = true;
-        self.document.on_disk_is_dirty = true;
         self.document.history.push(edit.clone());
         self.document.tree.edit(&edit.to_ts_edit_applied());
 
@@ -491,8 +581,6 @@ impl<'document> DocumentEdition<'document> {
             .movements()
             .selection(Selection::new(anchor, head), true);
         self.document.version += 1;
-        self.document.is_tree_dirty = true;
-        self.document.on_disk_is_dirty = true;
     }
 
     pub fn redo(&mut self) {
@@ -518,7 +606,5 @@ impl<'document> DocumentEdition<'document> {
             .movements()
             .selection(Selection::new(anchor, head), true);
         self.document.version += 1;
-        self.document.is_tree_dirty = true;
-        self.document.on_disk_is_dirty = true;
     }
 }
