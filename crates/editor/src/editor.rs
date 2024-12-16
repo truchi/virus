@@ -61,16 +61,24 @@ impl Editor {
         } else {
             let document_id = self.document_ids.id();
 
-            let mut document = Document::open(document_id, path.clone())?;
+            let mut document = Document::open(document_id, path)?;
             document.parse();
 
-            self.documents.insert(document_id, document);
             self.watcher
-                .watch(&path, RecursiveMode::NonRecursive)
+                .watch(document.path(), RecursiveMode::NonRecursive)
                 .expect("watch");
+            self.documents.insert(document_id, document);
 
             Ok(document_id)
         }
+    }
+
+    pub fn close(&mut self, document_id: DocumentId) {
+        let Some(document) = self.documents.remove(&document_id) else {
+            return;
+        };
+
+        self.watcher.unwatch(document.path()).expect("unwatch");
     }
 
     pub fn files(&self, hidden: bool, ignored: bool) -> impl '_ + Iterator<Item = PathBuf> {

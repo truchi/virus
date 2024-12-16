@@ -1532,7 +1532,24 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     }
 
     fn close(&mut self) {
-        self.event_loop.exit();
+        match self.virus.mode {
+            Mode::Normal { .. } | Mode::Insert { .. } => {
+                let Some(pane) = self.virus.ui.panes().active() else {
+                    self.event_loop.exit();
+                    return;
+                };
+                let document_id = match pane {
+                    Pane::Document(pane) => pane.view.document_id(),
+                };
+
+                self.virus.ui.panes_mut().close();
+
+                if self.virus.ui.panes().get_document(document_id).is_none() {
+                    self.virus.editor.close(document_id);
+                }
+            }
+            Mode::Files => self.normal(),
+        }
     }
 
     #[cfg(test)]

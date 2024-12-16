@@ -95,8 +95,6 @@ impl Ui {
         keybindings: &[String],
         file_name: Option<String>,
     ) {
-        // TODO react to document closes
-
         let theme = self.context.theme;
         let window = self.window.inner_size();
         let region = {
@@ -169,6 +167,13 @@ impl<'ui> UiPanes<'ui> {
 
     pub fn get(&self, pane_id: PaneId) -> Option<&'ui Pane> {
         self.ui.panes.get(pane_id)
+    }
+
+    pub fn get_document(&self, document_id: DocumentId) -> Option<&'ui DocumentPane> {
+        self.ui.panes.panes().iter().find_map(|pane| match pane {
+            Pane::Document(pane) if pane.view.document_id() == document_id => Some(pane),
+            _ => None,
+        })
     }
 }
 
