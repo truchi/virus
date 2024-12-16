@@ -93,7 +93,7 @@ impl Ui {
         mode: Mode,
         file_search: Option<(usize, &'a str, &Search)>,
         keybindings: &[String],
-        file_name: Option<String>,
+        file_name: Option<(String, bool)>,
     ) {
         let theme = self.context.theme;
         let window = self.window.inner_size();

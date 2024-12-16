@@ -23,7 +23,7 @@ impl StatusView {
         layer: Layer<'a>,
         mode: Mode,
         keybindings: &'a [String],
-        file_name: Option<String>,
+        file_name: Option<(String, bool)>,
     ) {
         let context = context.as_mut();
         Renderer {
@@ -52,7 +52,7 @@ struct Renderer<'a> {
     layer: Layer<'a>,
     mode: Mode,
     keybindings: &'a [String],
-    file_name: Option<String>,
+    file_name: Option<(String, bool)>,
 }
 
 impl<'a> Renderer<'a> {
@@ -93,12 +93,12 @@ impl<'a> Renderer<'a> {
             );
         }
 
-        if let Some(file_name) = &self.file_name {
+        if let Some((file_name, is_dirty)) = &self.file_name {
             shaper.push(
                 &format!(" {file_name} "),
                 Styles {
                     foreground: self.theme.status_file_foreground_color.transparent(255),
-                    weight: FontWeight::Bold,
+                    weight: is_dirty.then_some(FontWeight::Bold).unwrap_or_default(),
                     ..Default::default()
                 },
             );

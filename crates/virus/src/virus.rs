@@ -413,12 +413,15 @@ impl Virus {
                 })
                 .collect::<Vec<_>>(),
             self.get_active_document().map(|(_, document)| {
-                document
-                    .path()
-                    .strip_prefix(self.editor.root())
-                    .unwrap()
-                    .to_string_lossy()
-                    .into_owned()
+                (
+                    document
+                        .path()
+                        .strip_prefix(self.editor.root())
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned(),
+                    document.is_dirty(),
+                )
             }),
         );
 
