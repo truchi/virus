@@ -21,6 +21,7 @@ impl Cursor {
         CursorBuilder { slice }
     }
 
+    // TODO tests
     pub fn edit(&self, start: Self, removed_end: Self, inserted_end: Self) -> Option<Self> {
         if self.index <= start.index {
             return Some(*self);

@@ -375,3 +375,101 @@ impl Edit {
         }
     }
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                             Tests                                              //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn apply_unapply() {
+        fn cursor(index: usize, line: usize, column: usize) -> Cursor {
+            Cursor {
+                index,
+                line,
+                column,
+                width: column,
+            }
+        }
+        fn to_text_string(str: &str) -> Text {
+            Text {
+                inner: Inner::String(str.into()),
+            }
+        }
+        fn to_text_rope(str: &str) -> Text {
+            Text {
+                inner: Inner::Rope(str.into()),
+            }
+        }
+
+        for (old, new, start, removed_end, inserted_end, removed, inserted) in [
+            ("", "123", 0, 0, 3, "", "123"),
+            ("abcdef", "abc123def", 3, 3, 6, "", "123"),
+            ("123", "", 0, 3, 0, "123", ""),
+            ("abc123def", "abcdef", 3, 6, 3, "123", ""),
+            ("abc123def", "abcXYZdef", 3, 6, 6, "123", "XYZ"),
+        ] {
+            let start = cursor(start, 0, start);
+            let removed_end = cursor(removed_end, 0, removed_end);
+            let inserted_end = cursor(inserted_end, 0, inserted_end);
+
+            for to_text in [to_text_string, to_text_rope] {
+                let mut rope = Rope::from(old);
+                let edit = Edit::edit(&mut rope, start..removed_end, to_text(inserted));
+
+                assert_eq!(edit.start, start);
+                assert_eq!(edit.removed_end, removed_end);
+                assert_eq!(edit.inserted_end, inserted_end);
+                assert_eq!(edit.removed, removed.into());
+                assert_eq!(edit.inserted, inserted.into());
+                assert_eq!(rope, Rope::from(new));
+
+                edit.unapply(&mut rope);
+                assert_eq!(rope, Rope::from(old));
+
+                edit.apply(&mut rope);
+                assert_eq!(rope, Rope::from(new));
+            }
+        }
+    }
+
+    #[test]
+    fn diff() {
+        let line_breaks = ["\n", "\r\n"];
+        let algorithms = [Algorithm::Myers, Algorithm::Patience, Algorithm::Lcs];
+
+        for br in line_breaks {
+            for algorithm in algorithms {
+                for (old, new) in [
+                    (format!(""), format!("b")),
+                    (format!("a"), format!("")),
+                    (format!("a"), format!("b")),
+                    (format!("a{br}"), format!("b")),
+                    (format!("a"), format!("b{br}")),
+                    (format!(" *   / b ! c ? "), format!(" * a /   ! d ? ")),
+                    (
+                        format!(" fn add ( a : u8 , b : u8 ) -> u8 {{ }} "),
+                        format!("fn sub(c: u16, d: u16) -> u16 {{}}"),
+                    ),
+                    (
+                        format!("Hello,{br}world!{br}I love Virus"),
+                        format!("Salut,{br}tout le monde !{br}J'💖 🦀"),
+                    ),
+                ] {
+                    assert_eq!(
+                        Edit::diff(old.as_str(), new.as_str(), Some(algorithm), None)
+                            .into_iter()
+                            .fold(Rope::from(old.as_str()), |mut rope, edit| {
+                                edit.apply(&mut rope);
+                                rope
+                            }),
+                        new,
+                    );
+                }
+            }
+        }
+    }
+}
