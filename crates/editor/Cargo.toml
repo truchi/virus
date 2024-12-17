@@ -10,6 +10,7 @@ ignore.workspace = true
 notify.workspace = true
 ropey.workspace = true
 serde_json.workspace = true
+similar.workspace = true
 smol_str.workspace = true
 tempfile.workspace = true
 tree-sitter-rust.workspace = true

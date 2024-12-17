@@ -1,13 +1,27 @@
 use crate::rope::{Cursor, Inner, Text};
 use ropey::Rope;
-use std::ops::Range;
+use similar::{Algorithm, DiffOp, TextDiff};
+use std::{ops::Range, time::Duration};
 use tree_sitter::{InputEdit, Point};
+use unicode_width::UnicodeWidthStr;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Edit                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// Describes an edit in a document.
+///
+/// ```
+///                   inserted
+///                   vvvvvvvvv
+/// OLD: aaabbbcccddd|XXXXXXXXX|eeefffggg
+///  |               ^         ^ removed_end
+///  | Edit          start
+///  v               v                  v inserted_end
+/// NEW: aaabbbcccddd|YYYYYYYYYYYYYYYYYY|eeefffggg
+///                   ^^^^^^^^^^^^^^^^^^
+///                   removed
+/// ```
 #[derive(Clone, Debug)]
 pub struct Edit {
     start: Cursor,
@@ -52,6 +66,124 @@ impl Edit {
         };
 
         Self::new(start, removed_end, inserted_end, removed, inserted)
+    }
+
+    pub fn diff<'a>(
+        old: &'a str,
+        new: &'a str,
+        algorithm: Option<Algorithm>,
+        timeout: Option<Duration>,
+    ) -> impl 'a + Iterator<Item = Self> {
+        fn update(mut cursor: Cursor, slices: &[&str]) -> Cursor {
+            let mut len = 0;
+            let mut lines = 0;
+            let mut line_break = None;
+
+            for (i, str) in slices.iter().copied().enumerate() {
+                len += str.len();
+
+                for (j, byte) in str.as_bytes().iter().copied().enumerate() {
+                    if byte == b'\n' {
+                        lines += 1;
+                        line_break = Some((i, j));
+                    }
+                }
+            }
+
+            cursor.index += len;
+            cursor.line += lines;
+
+            if let Some((i, j)) = line_break {
+                let last_line = &slices[i][j + 1..];
+                cursor.column = last_line.len();
+                cursor.width = last_line.width();
+            } else {
+                cursor.column += len;
+                cursor.width += slices.iter().copied().map(str::width).sum::<usize>();
+            }
+
+            cursor
+        }
+
+        let diff = &mut TextDiff::configure();
+        let diff = if let Some(algorithm) = algorithm {
+            diff.algorithm(algorithm)
+        } else {
+            diff
+        };
+        let diff = if let Some(timeout) = timeout {
+            diff.timeout(timeout)
+        } else {
+            diff
+        };
+        let diff = diff.diff_words(old, new);
+        let mut index = 0;
+        let mut start = Cursor::default();
+
+        std::iter::from_fn(move || {
+            let mut ops = diff.ops()[index..].iter();
+
+            let edit = loop {
+                let op = *ops.next()?;
+                index += 1;
+
+                match op {
+                    DiffOp::Equal { new_index, len, .. } => {
+                        start = update(start, &diff.new_slices()[new_index..][..len]);
+                    }
+                    DiffOp::Delete {
+                        old_index, old_len, ..
+                    } => {
+                        let olds = &diff.old_slices()[old_index..][..old_len];
+                        let removed_end = update(start, olds);
+
+                        break Self::new(
+                            start,
+                            removed_end,
+                            start,
+                            Text::from(olds.iter().copied().collect::<String>()),
+                            Text::default(),
+                        );
+                    }
+                    DiffOp::Insert {
+                        new_index, new_len, ..
+                    } => {
+                        let news = &diff.new_slices()[new_index..][..new_len];
+                        let inserted_end = update(start, news);
+
+                        break Self::new(
+                            start,
+                            start,
+                            inserted_end,
+                            Text::default(),
+                            Text::from(news.iter().copied().collect::<String>()),
+                        );
+                    }
+                    DiffOp::Replace {
+                        old_index,
+                        old_len,
+                        new_index,
+                        new_len,
+                    } => {
+                        let olds = &diff.old_slices()[old_index..][..old_len];
+                        let news = &diff.new_slices()[new_index..][..new_len];
+                        let removed_end = update(start, olds);
+                        let inserted_end = update(start, news);
+
+                        break Self::new(
+                            start,
+                            removed_end,
+                            inserted_end,
+                            Text::from(olds.iter().copied().collect::<String>()),
+                            Text::from(news.iter().copied().collect::<String>()),
+                        );
+                    }
+                }
+            };
+
+            start = edit.inserted_end;
+            Some(edit)
+        })
     }
 
     pub fn apply(&self, rope: &mut Rope) -> InputEdit {
