@@ -131,17 +131,15 @@ impl<T: EventLoopProxy> Editor<T> {
         }
 
         for path in event.paths {
-            let Some(document) = self
+            if let Some(document) = self
                 .documents
                 .values_mut()
                 .find(|document| document.path() == path)
-            else {
-                continue;
-            };
-
-            if document.reload_if_newer(std::fs::metadata(path)).unwrap() {
-                document.parse();
-                self.event_loop_proxy.redraw();
+            {
+                if document.reload().unwrap() {
+                    document.parse();
+                    self.event_loop_proxy.redraw();
+                }
             }
         }
     }

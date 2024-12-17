@@ -12,7 +12,7 @@ use crate::{
 use ropey::Rope;
 use std::{
     cmp::Ordering,
-    fs::{File, Metadata},
+    fs::File,
     io::{BufReader, BufWriter, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -173,25 +173,20 @@ impl Document {
         Ok(document)
     }
 
-    pub fn reload_if_newer(
-        &mut self,
-        metadata: std::io::Result<Metadata>,
-    ) -> std::io::Result<bool> {
-        let modified = metadata
+    // TODO diff, history, tree
+    pub fn reload(&mut self) -> std::io::Result<bool> {
+        let file = File::open(&self.path)?;
+        let modified = file
+            .metadata()
             .and_then(|metadata| metadata.modified())
             .unwrap_or_else(|_| SystemTime::now());
 
         match self.on_disk_modified.cmp(&modified) {
-            Ordering::Less => return self.reload().map(|_| true),
-            Ordering::Equal => {}
+            Ordering::Less => {}
+            Ordering::Equal => return Ok(false),
             Ordering::Greater => debug_assert!(false),
         }
 
-        Ok(false)
-    }
-
-    // TODO diff, history, tree
-    pub fn reload(&mut self) -> std::io::Result<()> {
         if self.is_dirty() {
             let temp_dir = TempDir::with_prefix("virus.").unwrap();
             let create = |name: &str, rope: &Rope| {
@@ -246,8 +241,6 @@ impl Document {
                 self.on_disk_version = self.version + 1;
             }
         } else {
-            let file = File::open(&self.path)?;
-
             self.rope = Rope::from_reader(&mut BufReader::new(&file))?;
             self.on_disk_content = self.rope.clone();
             self.on_disk_modified = file
@@ -266,7 +259,7 @@ impl Document {
 
         // self.history = todo!();
 
-        Ok(())
+        Ok(true)
     }
 
     // NOTE: good enough for now
