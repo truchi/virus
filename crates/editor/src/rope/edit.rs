@@ -18,93 +18,6 @@ pub struct Edit {
 }
 
 impl Edit {
-    pub fn new(
-        start: Cursor,
-        removed_end: Cursor,
-        inserted_end: Cursor,
-        removed: Text,
-        inserted: Text,
-    ) -> Self {
-        debug_assert!(removed.len() == (start.index..removed_end.index).len());
-        debug_assert!(inserted.len() == (start.index..inserted_end.index).len());
-
-        Self {
-            start,
-            removed_end,
-            inserted_end,
-            removed,
-            inserted,
-        }
-    }
-
-    pub fn start(&self) -> Cursor {
-        self.start
-    }
-
-    pub fn removed_end(&self) -> Cursor {
-        self.removed_end
-    }
-
-    pub fn inserted_end(&self) -> Cursor {
-        self.inserted_end
-    }
-
-    pub fn removed(&self) -> &Text {
-        &self.removed
-    }
-
-    pub fn inserted(&self) -> &Text {
-        &self.inserted
-    }
-
-    pub fn into_removed_and_inserted(self) -> (Text, Text) {
-        (self.removed, self.inserted)
-    }
-
-    /// Returns whether this edit would leave some text unchanged,
-    /// or `None` if the edit is larger that `Text::BREAKPOINT`.
-    pub fn is_noop(&self) -> Option<bool> {
-        if self.removed.len() != self.inserted.len() {
-            return Some(false);
-        }
-
-        if self.removed.len() > Text::BREAKPOINT {
-            return None;
-        }
-
-        Some(self.removed == self.inserted)
-    }
-
-    pub fn to_ts_edit_applied(&self) -> InputEdit {
-        Self::to_input_edit_impl(self.start, self.removed_end, self.inserted_end)
-    }
-
-    pub fn to_ts_edit_unapplied(&self) -> InputEdit {
-        Self::to_input_edit_impl(self.start, self.inserted_end, self.removed_end)
-    }
-
-    pub fn apply(&self, rope: &mut Rope) -> InputEdit {
-        Self::apply_impl(
-            rope,
-            self.start,
-            self.removed_end,
-            self.inserted_end,
-            &self.removed,
-            &self.inserted,
-        )
-    }
-
-    pub fn unapply(&self, rope: &mut Rope) -> InputEdit {
-        Self::apply_impl(
-            rope,
-            self.start,
-            self.inserted_end,
-            self.removed_end,
-            &self.inserted,
-            &self.removed,
-        )
-    }
-
     pub fn edit(rope: &mut Rope, range: Range<Cursor>, inserted: Text) -> Self {
         debug_assert!(range.start <= range.end);
 
@@ -140,10 +53,97 @@ impl Edit {
 
         Self::new(start, removed_end, inserted_end, removed, inserted)
     }
+
+    pub fn apply(&self, rope: &mut Rope) -> InputEdit {
+        Self::apply_impl(
+            rope,
+            self.start,
+            self.removed_end,
+            self.inserted_end,
+            &self.removed,
+            &self.inserted,
+        )
+    }
+
+    pub fn unapply(&self, rope: &mut Rope) -> InputEdit {
+        Self::apply_impl(
+            rope,
+            self.start,
+            self.inserted_end,
+            self.removed_end,
+            &self.inserted,
+            &self.removed,
+        )
+    }
+
+    /// Returns whether this edit would leave some text unchanged,
+    /// or `None` if the edit is larger that `Text::BREAKPOINT`.
+    pub fn is_noop(&self) -> Option<bool> {
+        if self.removed.len() != self.inserted.len() {
+            return Some(false);
+        }
+
+        if self.removed.len() > Text::BREAKPOINT {
+            return None;
+        }
+
+        Some(self.removed == self.inserted)
+    }
+
+    pub fn start(&self) -> Cursor {
+        self.start
+    }
+
+    pub fn removed_end(&self) -> Cursor {
+        self.removed_end
+    }
+
+    pub fn inserted_end(&self) -> Cursor {
+        self.inserted_end
+    }
+
+    pub fn removed(&self) -> &Text {
+        &self.removed
+    }
+
+    pub fn inserted(&self) -> &Text {
+        &self.inserted
+    }
+
+    pub fn to_input_edit_applied(&self) -> InputEdit {
+        Self::to_input_edit_impl(self.start, self.removed_end, self.inserted_end)
+    }
+
+    pub fn to_input_edit_unapplied(&self) -> InputEdit {
+        Self::to_input_edit_impl(self.start, self.inserted_end, self.removed_end)
+    }
+
+    pub fn into_removed_and_inserted(self) -> (Text, Text) {
+        (self.removed, self.inserted)
+    }
 }
 
 /// Private.
 impl Edit {
+    fn new(
+        start: Cursor,
+        removed_end: Cursor,
+        inserted_end: Cursor,
+        removed: Text,
+        inserted: Text,
+    ) -> Self {
+        debug_assert!(removed.len() == (start.index..removed_end.index).len());
+        debug_assert!(inserted.len() == (start.index..inserted_end.index).len());
+
+        Self {
+            start,
+            removed_end,
+            inserted_end,
+            removed,
+            inserted,
+        }
+    }
+
     fn remove(rope: &mut Rope, range: Range<usize>) -> Rope {
         debug_assert!(!range.is_empty());
         debug_assert!(rope.char_to_byte(rope.byte_to_char(range.start)) == range.start);

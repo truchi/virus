@@ -535,7 +535,7 @@ impl<'document> DocumentEdition<'document> {
 
         self.document.version += 1;
         self.document.history.push(edit.clone());
-        self.document.tree.edit(&edit.to_ts_edit_applied());
+        self.document.tree.edit(&edit.to_input_edit_applied());
 
         Some(edit)
     }
@@ -560,7 +560,7 @@ impl<'document> DocumentEdition<'document> {
 
         for edit in edits {
             edit.unapply(&mut self.document.rope);
-            self.document.tree.edit(&edit.to_ts_edit_applied());
+            self.document.tree.edit(&edit.to_input_edit_applied());
 
             anchor = anchor
                 .edit(edit.start(), edit.removed_end(), edit.inserted_end())
@@ -585,7 +585,7 @@ impl<'document> DocumentEdition<'document> {
 
         for edit in edits {
             edit.apply(&mut self.document.rope);
-            self.document.tree.edit(&edit.to_ts_edit_applied());
+            self.document.tree.edit(&edit.to_input_edit_applied());
 
             anchor = anchor
                 .edit(edit.start(), edit.removed_end(), edit.inserted_end())
