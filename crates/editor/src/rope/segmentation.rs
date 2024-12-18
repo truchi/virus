@@ -626,83 +626,90 @@ mod tests {
                 Boundaries::LINE_START,
                 vec![
                     //
-                    Cursor::extract("┃"),
-                    Cursor::extract("┃12\r┃34\n┃5\r\n┃"),
+                    Cursor::extract_all("┃"),
+                    Cursor::extract_all("┃12\r┃34\n┃5\r\n┃"),
                     // Cursor::extract("12\r  34\n5  \r\n  6\n"), // TODO test cases like this
                 ],
             ),
             (
                 Boundaries::LINE_END,
-                vec![Cursor::extract("┃"), Cursor::extract("12┃\r34┃\n5┃\r\n┃")],
+                vec![
+                    Cursor::extract_all("┃"),
+                    Cursor::extract_all("12┃\r34┃\n5┃\r\n┃"),
+                ],
             ),
             (
                 Boundaries::LINE_FIRST,
                 vec![
-                    Cursor::extract(""),
-                    Cursor::extract("┃12\r┃34\n┃5\r\n"),
-                    Cursor::extract(" ┃12\r ┃34\n ┃5\r\n"),
+                    Cursor::extract_all(""),
+                    Cursor::extract_all("┃12\r┃34\n┃5\r\n"),
+                    Cursor::extract_all(" ┃12\r ┃34\n ┃5\r\n"),
                 ],
             ),
             (
                 Boundaries::LINE_LAST,
                 vec![
-                    Cursor::extract(""),
-                    Cursor::extract("12┃\r34┃\n5┃\r\n"),
-                    Cursor::extract("12┃ \r34┃ \n5┃ \r\n"),
+                    Cursor::extract_all(""),
+                    Cursor::extract_all("12┃\r34┃\n5┃\r\n"),
+                    Cursor::extract_all("12┃ \r34┃ \n5┃ \r\n"),
                 ],
             ),
             (
                 Boundaries::PUNCTUATION_START,
                 vec![
-                    Cursor::extract(""),
-                    Cursor::extract("┃__  ┃__--__  ┃--  ┃--__--"),
-                    Cursor::extract("┃(ab┃) ┃(__ab__┃) ┃(__--ab--__┃) ┃(--ab--┃) ┃(--__ab__--┃)"),
-                    Cursor::extract("ab12CDEf_-_-ij🚀🦀kl"),
+                    Cursor::extract_all(""),
+                    Cursor::extract_all("┃__  ┃__--__  ┃--  ┃--__--"),
+                    Cursor::extract_all(
+                        "┃(ab┃) ┃(__ab__┃) ┃(__--ab--__┃) ┃(--ab--┃) ┃(--__ab__--┃)",
+                    ),
+                    Cursor::extract_all("ab12CDEf_-_-ij🚀🦀kl"),
                 ],
             ),
             (
                 Boundaries::PUNCTUATION_END,
                 vec![
-                    Cursor::extract(""),
-                    Cursor::extract("__┃  __--__┃  --┃  --__--┃"),
-                    Cursor::extract("(┃ab)┃ (┃__ab__)┃ (┃__--ab--__)┃ (┃--ab--)┃ (┃--__ab__--)┃"),
-                    Cursor::extract("ab12CDEf_-_-ij🚀🦀kl"),
+                    Cursor::extract_all(""),
+                    Cursor::extract_all("__┃  __--__┃  --┃  --__--┃"),
+                    Cursor::extract_all(
+                        "(┃ab)┃ (┃__ab__)┃ (┃__--ab--__)┃ (┃--ab--)┃ (┃--__ab__--)┃",
+                    ),
+                    Cursor::extract_all("ab12CDEf_-_-ij🚀🦀kl"),
                 ],
             ),
             (
                 Boundaries::SHORT_WORD_START,
                 vec![
-                    Cursor::extract(""),
-                    Cursor::extract("__  __--__  --  --__--"),
-                    Cursor::extract("(┃ab) (__┃ab__) (__--┃ab--__) (--┃ab--) (--__┃ab__--)"),
-                    Cursor::extract("┃ab┃12┃CD┃Ef_-_-┃ij┃🚀🦀┃kl"),
+                    Cursor::extract_all(""),
+                    Cursor::extract_all("__  __--__  --  --__--"),
+                    Cursor::extract_all("(┃ab) (__┃ab__) (__--┃ab--__) (--┃ab--) (--__┃ab__--)"),
+                    Cursor::extract_all("┃ab┃12┃CD┃Ef_-_-┃ij┃🚀🦀┃kl"),
                 ],
             ),
             (
                 Boundaries::SHORT_WORD_END,
                 vec![
-                    Cursor::extract(""),
-                    Cursor::extract("__  __--__  --  --__--"),
-                    Cursor::extract("(ab┃) (__ab┃__) (__--ab┃--__) (--ab┃--) (--__ab┃__--)"),
-                    Cursor::extract("ab┃12┃CD┃Ef┃_-_-ij┃🚀🦀┃kl┃"),
+                    Cursor::extract_all(""),
+                    Cursor::extract_all("__  __--__  --  --__--"),
+                    Cursor::extract_all("(ab┃) (__ab┃__) (__--ab┃--__) (--ab┃--) (--__ab┃__--)"),
+                    Cursor::extract_all("ab┃12┃CD┃Ef┃_-_-ij┃🚀🦀┃kl┃"),
                 ],
             ),
             (
                 Boundaries::LONG_WORD_START,
                 vec![
-                    Cursor::extract(""),
-                    Cursor::extract("__  __--__  --  --__--"),
-                    Cursor::extract("(┃ab) (┃__ab__) (┃__--ab--__) (┃--ab--) (┃--__ab__--)"),
-                    Cursor::extract("┃ab12CDEf_-_-ij🚀🦀kl"),
+                    Cursor::extract_all(""),
+                    Cursor::extract_all("__  __--__  --  --__--"),
+                    Cursor::extract_all("(┃ab) (┃__ab__) (┃__--ab--__) (┃--ab--) (┃--__ab__--)"),
+                    Cursor::extract_all("┃ab12CDEf_-_-ij🚀🦀kl"),
                 ],
             ),
             (
                 Boundaries::LONG_WORD_END,
                 vec![
-                    Cursor::extract(""),
-                    Cursor::extract("__  __--__  --  --__--"),
-                    Cursor::extract("(ab┃) (__ab__┃) (__--ab--__┃) (--ab--┃) (--__ab__--┃)"),
-                    Cursor::extract("ab12CDEf_-_-ij🚀🦀kl┃"),
+                    Cursor::extract_all(""),
+                    Cursor::extract_all("__  __--__  --  --__--"),
+                    Cursor::extract_all("(ab┃) (__ab__┃) (__--ab--__┃) (--ab--┃) (--__ab__--┃)"),
+                    Cursor::extract_all("ab12CDEf_-_-ij🚀🦀kl┃"),
                 ],
             ),
         ];

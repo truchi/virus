@@ -264,6 +264,8 @@ impl Edit {
         removed: Text,
         inserted: Text,
     ) -> Self {
+        debug_assert!(start <= removed_end);
+        debug_assert!(start <= inserted_end);
         debug_assert!(removed.len() == (start.index..removed_end.index).len());
         debug_assert!(inserted.len() == (start.index..inserted_end.index).len());
 

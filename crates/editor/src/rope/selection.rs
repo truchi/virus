@@ -63,4 +63,14 @@ impl Selection {
     pub fn flip_mut(&mut self) {
         *self = self.flip();
     }
+
+    /// Extracts one or two `┃`s as selection in the rope.
+    #[cfg(test)]
+    pub(crate) fn extract(str: &str) -> (ropey::Rope, Self) {
+        let (rope, cursors) = Cursor::extract_all(str);
+        let anchor = cursors.get(0).copied().unwrap();
+        let head = cursors.get(1).copied().unwrap_or(anchor);
+
+        (rope, Self::new(anchor, head))
+    }
 }

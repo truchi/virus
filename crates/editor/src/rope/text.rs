@@ -27,7 +27,7 @@ impl PartialEq for Inner {
 //                                              Text                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Text {
     pub(super) inner: Inner,
 }
@@ -137,5 +137,18 @@ impl Text {
                 }
             }
         }
+    }
+}
+
+impl std::fmt::Debug for Text {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "\"{}\"",
+            match &self.inner {
+                Inner::String(string) => string.clone(),
+                Inner::Rope(rope) => rope.to_string(),
+            },
+        )
     }
 }
