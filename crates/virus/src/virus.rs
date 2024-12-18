@@ -1404,7 +1404,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 if let Some(edit) = document.edition().edit(Text::default(), false) {
                     self.virus.clipboard = Some(Clipboard {
                         select,
-                        text: Text::from(edit.into_removed_and_inserted().0),
+                        text: edit.into_removed_and_inserted().0,
                     });
                 }
             }

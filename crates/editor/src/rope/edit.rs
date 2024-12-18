@@ -1,9 +1,134 @@
-use crate::rope::{Cursor, Inner, Text};
-use ropey::Rope;
+use crate::rope::{Cursor, Grapheme, GraphemeCategory, GraphemesBackward};
+use ropey::{Rope, RopeSlice};
 use similar::{Algorithm, DiffOp, TextDiff};
 use std::{ops::Range, time::Duration};
-use tree_sitter::{InputEdit, Point};
+use tree_sitter::{InputEdit, Point, Tree};
+use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                              Text                                              //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+#[derive(Clone, Eq)]
+pub enum Text {
+    String(String),
+    Rope(Rope),
+}
+
+impl PartialEq for Text {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::String(a), Self::String(b)) => a == b,
+            (Self::String(a), Self::Rope(b)) => a == b,
+            (Self::Rope(a), Self::String(b)) => a == b,
+            (Self::Rope(a), Self::Rope(b)) => a == b,
+        }
+    }
+}
+
+impl Default for Text {
+    fn default() -> Self {
+        Self::String(String::new())
+    }
+}
+
+impl<'a> From<&'a str> for Text {
+    fn from(str: &'a str) -> Self {
+        Self::String(str.into())
+    }
+}
+
+impl<'a> From<String> for Text {
+    fn from(string: String) -> Self {
+        Self::String(string)
+    }
+}
+
+impl<'a> From<RopeSlice<'a>> for Text {
+    fn from(slice: RopeSlice<'a>) -> Self {
+        if slice.len_bytes() <= Self::BREAKPOINT {
+            Self::String(slice.into())
+        } else {
+            Self::Rope(slice.into())
+        }
+    }
+}
+
+impl<'a> From<Rope> for Text {
+    fn from(rope: Rope) -> Self {
+        if rope.len_bytes() <= Self::BREAKPOINT {
+            Self::String(rope.into())
+        } else {
+            Self::Rope(rope)
+        }
+    }
+}
+
+impl Text {
+    /// Ropes greater than this breakpoint will be stored as is.
+    /// Smaller ropes will be converted into strings.
+    /// About 6 chunks.
+    ///
+    /// @see [`Rope::try_insert()`] comments.
+    pub const BREAKPOINT: usize = 6 * 984;
+
+    pub fn len(&self) -> usize {
+        match self {
+            Self::String(string) => string.len(),
+            Self::Rope(rope) => rope.len_bytes(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn trailing_line_break(&mut self, bool: bool) {
+        let trailing_line_break_len = match self {
+            Self::String(string) => string
+                .as_str()
+                .graphemes(true)
+                .rev()
+                .next()
+                .map(|grapheme| Grapheme::Str(grapheme)),
+            Self::Rope(rope) => GraphemesBackward::new(rope.slice(..)).next(),
+        }
+        .map(|grapheme| (GraphemeCategory::from(grapheme.as_str()), grapheme));
+
+        if let Some((GraphemeCategory::Break, grapheme)) = trailing_line_break_len {
+            if !bool {
+                let bytes = grapheme.as_str().len();
+                let chars = grapheme.as_str().chars().count();
+
+                match self {
+                    Self::String(string) => string.truncate(string.len() - bytes),
+                    Self::Rope(rope) => rope.remove(rope.len_chars() - chars..rope.len_chars()),
+                }
+            }
+        } else {
+            if bool {
+                match self {
+                    Self::String(string) => string.push_str("\n"),
+                    Self::Rope(rope) => rope.insert(rope.len_chars(), "\n"),
+                }
+            }
+        }
+    }
+}
+
+impl std::fmt::Debug for Text {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "\"{}\"",
+            match self {
+                Self::String(string) => string.clone(),
+                Self::Rope(rope) => rope.to_string(),
+            },
+        )
+    }
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Edit                                              //
@@ -192,26 +317,28 @@ impl Edit {
         })
     }
 
-    pub fn apply(&self, rope: &mut Rope) -> InputEdit {
-        Self::apply_impl(
-            rope,
-            self.start,
-            self.removed_end,
-            self.inserted_end,
-            &self.removed,
-            &self.inserted,
-        )
+    pub fn apply_rope(&self, rope: &mut Rope) {
+        Self::apply_rope_impl(rope, self.start, &self.removed, &self.inserted);
     }
 
-    pub fn unapply(&self, rope: &mut Rope) -> InputEdit {
-        Self::apply_impl(
-            rope,
-            self.start,
-            self.inserted_end,
-            self.removed_end,
-            &self.inserted,
-            &self.removed,
-        )
+    pub fn unapply_rope(&self, rope: &mut Rope) {
+        Self::apply_rope_impl(rope, self.start, &self.inserted, &self.removed);
+    }
+
+    pub fn apply_cursor(&self, cursor: Cursor) -> Option<Cursor> {
+        Self::apply_cursor_impl(cursor, self.start, self.removed_end, self.inserted_end)
+    }
+
+    pub fn unapply_cursor(&self, cursor: Cursor) -> Option<Cursor> {
+        Self::apply_cursor_impl(cursor, self.start, self.inserted_end, self.removed_end)
+    }
+
+    pub fn apply_tree(&self, tree: &mut Tree) {
+        Self::apply_tree_impl(tree, self.start, self.removed_end, self.inserted_end);
+    }
+
+    pub fn unapply_tree(&self, tree: &mut Tree) {
+        Self::apply_tree_impl(tree, self.start, self.inserted_end, self.removed_end);
     }
 
     /// Returns whether this edit would leave some text unchanged,
@@ -246,14 +373,6 @@ impl Edit {
 
     pub fn inserted(&self) -> &Text {
         &self.inserted
-    }
-
-    pub fn to_input_edit_applied(&self) -> InputEdit {
-        Self::to_input_edit_impl(self.start, self.removed_end, self.inserted_end)
-    }
-
-    pub fn to_input_edit_unapplied(&self) -> InputEdit {
-        Self::to_input_edit_impl(self.start, self.inserted_end, self.removed_end)
     }
 
     pub fn into_removed_and_inserted(self) -> (Text, Text) {
@@ -305,9 +424,9 @@ impl Edit {
 
         let index = rope.byte_to_char(index);
 
-        match &inserted.inner {
-            Inner::String(inserted) => rope.insert(index, inserted),
-            Inner::Rope(inserted) => {
+        match inserted {
+            Text::String(inserted) => rope.insert(index, inserted),
+            Text::Rope(inserted) => {
                 let right = rope.split_off(index);
                 rope.append(inserted.clone());
                 rope.append(right);
@@ -327,44 +446,78 @@ impl Edit {
         let right = rope.split_off(end);
         let removed = rope.split_off(start);
 
-        match &inserted.inner {
-            Inner::String(text) => rope.insert(start, text),
-            Inner::Rope(text) => rope.append(text.clone()),
+        match inserted {
+            Text::String(text) => rope.insert(start, text),
+            Text::Rope(text) => rope.append(text.clone()),
         };
 
         rope.append(right);
         removed
     }
 
-    fn apply_impl(
-        rope: &mut Rope,
-        start: Cursor,
-        removed_end: Cursor,
-        inserted_end: Cursor,
-        removed: &Text,
-        inserted: &Text,
-    ) -> InputEdit {
+    fn apply_rope_impl(rope: &mut Rope, start: Cursor, removed: &Text, inserted: &Text) {
         let index = start.index;
         let range = index..index + removed.len();
 
         match (removed.is_empty(), inserted.is_empty()) {
             (true, true) => {}
-            (true, false) => {
-                Self::insert(rope, index, inserted);
-            }
-            (false, true) => {
-                Self::remove(rope, range);
-            }
-            (false, false) => {
-                Self::replace(rope, range, inserted);
-            }
+            (true, false) => Self::insert(rope, index, inserted),
+            (false, true) => drop(Self::remove(rope, range)),
+            (false, false) => drop(Self::replace(rope, range, inserted)),
         }
-
-        Self::to_input_edit_impl(start, removed_end, inserted_end)
     }
 
-    fn to_input_edit_impl(start: Cursor, removed_end: Cursor, inserted_end: Cursor) -> InputEdit {
-        InputEdit {
+    fn apply_cursor_impl(
+        cursor: Cursor,
+        start: Cursor,
+        removed_end: Cursor,
+        inserted_end: Cursor,
+    ) -> Option<Cursor> {
+        // Before edit
+        if cursor.index <= start.index {
+            return Some(cursor);
+        }
+
+        // Inside edit
+        if start.index < cursor.index && cursor.index < removed_end.index {
+            return None;
+        }
+
+        debug_assert!(removed_end.line <= cursor.line);
+
+        let (index, line) = (
+            cursor.index - (removed_end.index - start.index) + (inserted_end.index - start.index),
+            cursor.line - (removed_end.line - start.line) + (inserted_end.line - start.line),
+        );
+
+        // Below edit
+        if removed_end.line < cursor.line {
+            return Some(Cursor {
+                index,
+                line,
+                column: cursor.column,
+                width: cursor.width,
+            });
+        }
+
+        debug_assert!(removed_end.line == cursor.line);
+
+        let (column, width) = (
+            cursor.column - removed_end.column + inserted_end.column,
+            cursor.width - removed_end.width + inserted_end.width,
+        );
+
+        // On edit's last line
+        Some(Cursor {
+            index,
+            line,
+            column,
+            width,
+        })
+    }
+
+    fn apply_tree_impl(tree: &mut Tree, start: Cursor, removed_end: Cursor, inserted_end: Cursor) {
+        tree.edit(&InputEdit {
             start_byte: start.index,
             old_end_byte: removed_end.index,
             new_end_byte: inserted_end.index,
@@ -380,7 +533,7 @@ impl Edit {
                 row: inserted_end.line,
                 column: inserted_end.column,
             },
-        }
+        });
     }
 }
 
@@ -391,9 +544,10 @@ impl Edit {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::rope::Selection;
 
     #[test]
-    fn apply_unapply() {
+    fn rope() {
         fn cursor(index: usize, line: usize, column: usize) -> Cursor {
             Cursor {
                 index,
@@ -403,14 +557,10 @@ mod tests {
             }
         }
         fn to_text_string(str: &str) -> Text {
-            Text {
-                inner: Inner::String(str.into()),
-            }
+            Text::String(str.into())
         }
         fn to_text_rope(str: &str) -> Text {
-            Text {
-                inner: Inner::Rope(str.into()),
-            }
+            Text::Rope(str.into())
         }
 
         for (old, new, start, removed_end, inserted_end, removed, inserted) in [
@@ -435,11 +585,79 @@ mod tests {
                 assert_eq!(edit.inserted, inserted.into());
                 assert_eq!(rope, Rope::from(new));
 
-                edit.unapply(&mut rope);
+                edit.unapply_rope(&mut rope);
                 assert_eq!(rope, Rope::from(old));
 
-                edit.apply(&mut rope);
+                edit.apply_rope(&mut rope);
                 assert_eq!(rope, Rope::from(new));
+            }
+        }
+    }
+
+    #[test]
+    fn cursor() {
+        for (removed, inserted, data) in [
+            (
+                "a┃bc┃d",
+                "a┃123┃d",
+                vec![
+                    ("┃abcd", "┃a123d"),
+                    ("a┃bcd", "a┃123d"),
+                    ("ab┃cd", "a123d"),
+                    ("abc┃d", "a123┃d"),
+                    ("abcd┃", "a123d┃"),
+                ],
+            ),
+            (
+                "1┃234\n567┃8\n90",
+                "1┃ab\ncd┃8\n90",
+                vec![
+                    ("┃1234\n5678\n90", "┃1ab\ncd8\n90"),
+                    ("1┃234\n5678\n90", "1┃ab\ncd8\n90"),
+                    ("12┃34\n5678\n90", "1ab\ncd8\n90"),
+                    ("123┃4\n5678\n90", "1ab\ncd8\n90"),
+                    ("1234┃\n5678\n90", "1ab\ncd8\n90"),
+                    ("1234\n┃5678\n90", "1ab\ncd8\n90"),
+                    ("1234\n5┃678\n90", "1ab\ncd8\n90"),
+                    ("1234\n56┃78\n90", "1ab\ncd8\n90"),
+                    ("1234\n567┃8\n90", "1ab\ncd┃8\n90"),
+                    ("1234\n5678┃\n90", "1ab\ncd8┃\n90"),
+                    ("1234\n5678\n┃90", "1ab\ncd8\n┃90"),
+                    ("1234\n5678\n9┃0", "1ab\ncd8\n9┃0"),
+                    ("1234\n5678\n90┃", "1ab\ncd8\n90┃"),
+                ],
+            ),
+        ] {
+            for (old, new) in data {
+                let (old_rope, old_cursor) = Cursor::extract(old);
+                let (new_rope, new_cursor) = Cursor::extract_optional(new);
+                let (removed_rope, removed_selection) = Selection::extract(removed);
+                let (inserted_rope, inserted_selection) = Selection::extract(inserted);
+
+                // Assert test data is valid
+                assert_eq!(old_rope, removed_rope);
+                assert_eq!(removed_selection.anchor, inserted_selection.anchor);
+                assert_eq!(inserted_rope, new_rope);
+
+                let applied_cursor = Edit::apply_cursor_impl(
+                    old_cursor,
+                    removed_selection.anchor,
+                    removed_selection.head,
+                    inserted_selection.head,
+                );
+
+                assert_eq!(applied_cursor, new_cursor);
+
+                if let Some(applied_cursor) = applied_cursor {
+                    let unapplied_cursor = Edit::apply_cursor_impl(
+                        applied_cursor,
+                        removed_selection.anchor,
+                        inserted_selection.head,
+                        removed_selection.head,
+                    );
+
+                    assert_eq!(unapplied_cursor, Some(old_cursor));
+                }
             }
         }
     }
@@ -471,7 +689,7 @@ mod tests {
                         Edit::diff(old.as_str(), new.as_str(), Some(algorithm), None)
                             .into_iter()
                             .fold(Rope::from(old.as_str()), |mut rope, edit| {
-                                edit.apply(&mut rope);
+                                edit.apply_rope(&mut rope);
                                 rope
                             }),
                         new,

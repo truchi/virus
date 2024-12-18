@@ -15,14 +15,12 @@ pub mod rope {
     mod graphemes;
     mod segmentation;
     mod selection;
-    mod text;
 
     pub use cursor::*;
     pub use edit::*;
     pub use graphemes::*;
     pub use segmentation::*;
     pub use selection::*;
-    pub use text::*;
 }
 pub mod history;
 

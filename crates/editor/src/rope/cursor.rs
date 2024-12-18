@@ -21,53 +21,6 @@ impl Cursor {
         CursorBuilder { slice }
     }
 
-    pub fn edit(&self, start: Self, removed_end: Self, inserted_end: Self) -> Option<Self> {
-        debug_assert!(start <= removed_end);
-        debug_assert!(start <= inserted_end);
-
-        // Before edit
-        if self.index <= start.index {
-            return Some(*self);
-        }
-
-        // Inside edit
-        if start.index < self.index && self.index < removed_end.index {
-            return None;
-        }
-
-        debug_assert!(removed_end.line <= self.line);
-
-        let (index, line) = (
-            self.index - (removed_end.index - start.index) + (inserted_end.index - start.index),
-            self.line - (removed_end.line - start.line) + (inserted_end.line - start.line),
-        );
-
-        // Below edit
-        if removed_end.line < self.line {
-            return Some(Self {
-                index,
-                line,
-                column: self.column,
-                width: self.width,
-            });
-        }
-
-        debug_assert!(removed_end.line == self.line);
-
-        let (column, width) = (
-            self.column - removed_end.column + inserted_end.column,
-            self.width - removed_end.width + inserted_end.width,
-        );
-
-        // On edit's last line
-        Some(Self {
-            index,
-            line,
-            column,
-            width,
-        })
-    }
-
     /// Extracts `┃` as cursor in the rope.
     #[cfg(test)]
     pub(crate) fn extract(str: &str) -> (ropey::Rope, Self) {
@@ -319,7 +272,6 @@ mod utils {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rope::Selection;
     use ropey::Rope;
 
     #[test]
@@ -405,63 +357,5 @@ mod tests {
         assert_eq!(&str[..cursor.at_width(0, 3).index], "\0a\0🦀");
         assert_eq!(&str[..cursor.at_width(0, 4).index], "\0a\0🦀\0b");
         assert_eq!(&str[..cursor.at_width(0, 5).index], "\0a\0🦀\0b");
-    }
-
-    #[test]
-    fn edit() {
-        for (removed, inserted, data) in [
-            (
-                "a┃bc┃d",
-                "a┃123┃d",
-                vec![
-                    ("┃abcd", "┃a123d"),
-                    ("a┃bcd", "a┃123d"),
-                    ("ab┃cd", "a123d"),
-                    ("abc┃d", "a123┃d"),
-                    ("abcd┃", "a123d┃"),
-                ],
-            ),
-            (
-                "1┃234\n567┃8\n90",
-                "1┃ab\ncd┃8\n90",
-                vec![
-                    ("┃1234\n5678\n90", "┃1ab\ncd8\n90"),
-                    ("1┃234\n5678\n90", "1┃ab\ncd8\n90"),
-                    ("12┃34\n5678\n90", "1ab\ncd8\n90"),
-                    ("123┃4\n5678\n90", "1ab\ncd8\n90"),
-                    ("1234┃\n5678\n90", "1ab\ncd8\n90"),
-                    ("1234\n┃5678\n90", "1ab\ncd8\n90"),
-                    ("1234\n5┃678\n90", "1ab\ncd8\n90"),
-                    ("1234\n56┃78\n90", "1ab\ncd8\n90"),
-                    ("1234\n567┃8\n90", "1ab\ncd┃8\n90"),
-                    ("1234\n5678┃\n90", "1ab\ncd8┃\n90"),
-                    ("1234\n5678\n┃90", "1ab\ncd8\n┃90"),
-                    ("1234\n5678\n9┃0", "1ab\ncd8\n9┃0"),
-                    ("1234\n5678\n90┃", "1ab\ncd8\n90┃"),
-                ],
-            ),
-        ] {
-            for (old, new) in data {
-                let (old_rope, old_cursor) = Cursor::extract(old);
-                let (new_rope, new_cursor) = Cursor::extract_optional(new);
-                let (removed_rope, removed_selection) = Selection::extract(removed);
-                let (inserted_rope, inserted_selection) = Selection::extract(inserted);
-
-                // Assert test data is valid
-                assert_eq!(old_rope, removed_rope);
-                assert_eq!(removed_selection.anchor, inserted_selection.anchor);
-                assert_eq!(inserted_rope, new_rope);
-
-                // Assert `Cursor::edit()`
-                assert_eq!(
-                    old_cursor.edit(
-                        removed_selection.anchor,
-                        removed_selection.head,
-                        inserted_selection.head,
-                    ),
-                    new_cursor,
-                );
-            }
-        }
     }
 }
