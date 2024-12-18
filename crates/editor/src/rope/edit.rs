@@ -94,9 +94,13 @@ impl Edit {
             cursor.line += lines;
 
             if let Some((i, j)) = line_break {
-                let last_line = &slices[i][j + 1..];
-                cursor.column = last_line.len();
-                cursor.width = last_line.width();
+                cursor.column = slices[i][j + 1..].len();
+                cursor.width = slices[i][j + 1..].width();
+
+                for line in &slices[i + 1..] {
+                    cursor.column += line.len();
+                    cursor.width += line.width();
+                }
             } else {
                 cursor.column += len;
                 cursor.width += slices.iter().copied().map(str::width).sum::<usize>();
@@ -129,6 +133,10 @@ impl Edit {
 
                 match op {
                     DiffOp::Equal { new_index, len, .. } => {
+                        if index == diff.ops().len() {
+                            return None;
+                        }
+
                         start = update(start, &diff.new_slices()[new_index..][..len]);
                     }
                     DiffOp::Delete {
