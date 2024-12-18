@@ -74,6 +74,8 @@ impl Edit {
         algorithm: Option<Algorithm>,
         timeout: Option<Duration>,
     ) -> impl 'a + Iterator<Item = Self> {
+        const ALGORITHM: Algorithm = Algorithm::Myers;
+
         fn update(mut cursor: Cursor, slices: &[&str]) -> Cursor {
             let mut len = 0;
             let mut lines = 0;
@@ -110,17 +112,13 @@ impl Edit {
         }
 
         let diff = &mut TextDiff::configure();
-        let diff = if let Some(algorithm) = algorithm {
-            diff.algorithm(algorithm)
-        } else {
-            diff
-        };
+        let diff = diff.algorithm(algorithm.unwrap_or(ALGORITHM));
         let diff = if let Some(timeout) = timeout {
             diff.timeout(timeout)
         } else {
             diff
         };
-        let diff = diff.diff_words(old, new);
+        let diff = diff.diff_chars(old, new);
         let mut index = 0;
         let mut start = Cursor::default();
 
