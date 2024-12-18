@@ -13,7 +13,7 @@ use ropey::Rope;
 use std::{
     cmp::Ordering,
     fs::File,
-    io::{BufReader, BufWriter, Write},
+    io::{BufReader, BufWriter, Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     time::SystemTime,
@@ -173,13 +173,18 @@ impl Document {
         Ok(document)
     }
 
-    // TODO diff, history, tree
     pub fn reload(&mut self) -> std::io::Result<bool> {
         let file = File::open(&self.path)?;
-        let modified = file
-            .metadata()
-            .and_then(|metadata| metadata.modified())
-            .unwrap_or_else(|_| SystemTime::now());
+        let metadata = file.metadata();
+        let len = metadata
+            .as_ref()
+            .ok()
+            .map(|metadata| metadata.len() as usize);
+        let modified = metadata
+            .as_ref()
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+            .unwrap_or_else(|| SystemTime::now());
 
         match self.on_disk_modified.cmp(&modified) {
             Ordering::Less => {}
@@ -229,37 +234,62 @@ impl Document {
                 ])
                 .stdout(Stdio::piped())
                 .spawn()?;
+            let status = child.wait()?;
             let stdout = child
                 .stdout
                 .take()
                 .ok_or_else(|| std::io::Error::other(""))?;
 
+            // TODO diff, history, tree
+
             self.rope = Rope::from_reader(&mut BufReader::new(stdout))?;
 
-            if child.wait().map(|status| status.success()).ok() == Some(true) {
+            if status.success() {
                 self.save()?;
-                self.on_disk_version = self.version + 1;
+                self.version += 1;
+                self.on_disk_version = self.version;
             }
+
+            Ok(true)
         } else {
-            self.rope = Rope::from_reader(&mut BufReader::new(&file))?;
-            self.on_disk_content = self.rope.clone();
-            self.on_disk_modified = file
-                .metadata()
-                .and_then(|metadata| metadata.modified())
-                .unwrap_or_else(|_| SystemTime::now());
-            self.on_disk_version = self.version + 1;
+            let old = self.rope.to_string();
+            let new = {
+                let mut string = String::with_capacity(len.unwrap_or_else(|| old.len()));
+                BufReader::new(&file).read_to_string(&mut string)?;
+                string
+            };
+            let edits = Edit::diff(&old, &new, None, None).collect::<Vec<_>>();
+
+            if edits.is_empty() {
+                Ok(false)
+            } else {
+                let mut selection = self.selection;
+
+                for edit in &edits {
+                    edit.apply(&mut self.rope);
+                    self.tree.edit(&edit.to_input_edit_applied());
+
+                    selection.anchor = selection
+                        .anchor
+                        .edit(edit.start(), edit.removed_end(), edit.inserted_end())
+                        .unwrap_or_else(|| edit.inserted_end());
+                    selection.head = selection
+                        .head
+                        .edit(edit.start(), edit.removed_end(), edit.inserted_end())
+                        .unwrap_or_else(|| edit.inserted_end());
+                }
+
+                self.movements().selection(selection, true);
+                self.history.push_bulk(edits);
+
+                self.version += 1;
+                self.on_disk_content = self.rope.clone();
+                self.on_disk_modified = modified;
+                self.on_disk_version = self.version;
+
+                Ok(true)
+            }
         }
-
-        self.selection = Default::default();
-        self.anchor_segmentation = Segmentation::new(self.rope.clone(), 0, 0, 0);
-        self.head_segmentation = self.anchor_segmentation.clone();
-        self.tree = Self::parse_with(&self.rope, &mut self.parser, None); // TODO with edits, dont parse
-        self.version += 1;
-        self.tree_version = self.version; // TODO without parse that would be unchanged
-
-        // self.history = todo!();
-
-        Ok(true)
     }
 
     // NOTE: good enough for now
@@ -532,7 +562,6 @@ impl<'document> DocumentEdition<'document> {
             )
             .flip(reselect && !selection.is_forward())
             .collapse(!reselect);
-
         self.document.version += 1;
         self.document.history.push(edit.clone());
         self.document.tree.edit(&edit.to_input_edit_applied());
@@ -555,24 +584,23 @@ impl<'document> DocumentEdition<'document> {
         let Some(edits) = self.document.history.undo() else {
             return;
         };
-        let mut anchor = self.document.selection.anchor;
-        let mut head = self.document.selection.head;
+        let mut selection = self.document.selection;
 
         for edit in edits {
             edit.unapply(&mut self.document.rope);
             self.document.tree.edit(&edit.to_input_edit_applied());
 
-            anchor = anchor
+            selection.anchor = selection
+                .anchor
                 .edit(edit.start(), edit.removed_end(), edit.inserted_end())
                 .unwrap_or(edit.start());
-            head = head
+            selection.head = selection
+                .head
                 .edit(edit.start(), edit.removed_end(), edit.inserted_end())
                 .unwrap_or(edit.start());
         }
 
-        self.document
-            .movements()
-            .selection(Selection::new(anchor, head), true);
+        self.document.movements().selection(selection, true);
         self.document.version += 1;
     }
 
@@ -580,24 +608,23 @@ impl<'document> DocumentEdition<'document> {
         let Some(edits) = self.document.history.redo() else {
             return;
         };
-        let mut anchor = self.document.selection.anchor;
-        let mut head = self.document.selection.head;
+        let mut selection = self.document.selection;
 
         for edit in edits {
             edit.apply(&mut self.document.rope);
             self.document.tree.edit(&edit.to_input_edit_applied());
 
-            anchor = anchor
+            selection.anchor = selection
+                .anchor
                 .edit(edit.start(), edit.removed_end(), edit.inserted_end())
                 .unwrap_or(edit.start());
-            head = head
+            selection.head = selection
+                .head
                 .edit(edit.start(), edit.removed_end(), edit.inserted_end())
                 .unwrap_or(edit.start());
         }
 
-        self.document
-            .movements()
-            .selection(Selection::new(anchor, head), true);
+        self.document.movements().selection(selection, true);
         self.document.version += 1;
     }
 }
