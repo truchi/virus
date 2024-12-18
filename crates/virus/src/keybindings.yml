@@ -32,7 +32,7 @@ NORMAL:
   c: copy
   v: paste
   z: undo
-  Z: redo
+  command z: redo
 
   space:
     f: files

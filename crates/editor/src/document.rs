@@ -575,18 +575,18 @@ impl<'document> DocumentEdition<'document> {
         };
         let mut selection = self.document.selection;
 
-        for edit in edits {
+        for edit in edits.iter().rev() {
             edit.unapply(&mut self.document.rope);
-            self.document.tree.edit(&edit.to_input_edit_applied());
+            self.document.tree.edit(&edit.to_input_edit_unapplied());
 
             selection.anchor = selection
                 .anchor
-                .edit(edit.start(), edit.removed_end(), edit.inserted_end())
-                .unwrap_or(edit.start());
+                .edit(edit.start(), edit.inserted_end(), edit.removed_end())
+                .unwrap_or_else(|| edit.inserted_end());
             selection.head = selection
                 .head
-                .edit(edit.start(), edit.removed_end(), edit.inserted_end())
-                .unwrap_or(edit.start());
+                .edit(edit.start(), edit.inserted_end(), edit.removed_end())
+                .unwrap_or_else(|| edit.inserted_end());
         }
 
         self.document.movements().selection(selection, true);
@@ -606,11 +606,11 @@ impl<'document> DocumentEdition<'document> {
             selection.anchor = selection
                 .anchor
                 .edit(edit.start(), edit.removed_end(), edit.inserted_end())
-                .unwrap_or(edit.start());
+                .unwrap_or_else(|| edit.inserted_end());
             selection.head = selection
                 .head
                 .edit(edit.start(), edit.removed_end(), edit.inserted_end())
-                .unwrap_or(edit.start());
+                .unwrap_or_else(|| edit.inserted_end());
         }
 
         self.document.movements().selection(selection, true);
