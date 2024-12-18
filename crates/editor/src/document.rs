@@ -174,17 +174,47 @@ impl Document {
     }
 
     pub fn reload(&mut self) -> std::io::Result<bool> {
+        fn create(temp_dir: &TempDir, name: &str, rope: &Rope) -> std::io::Result<PathBuf> {
+            let mut path = temp_dir.path().to_owned();
+            path.push(name);
+            let file = File::create(&path)?;
+            let mut writer = BufWriter::new(&file);
+
+            for chunk in rope.chunks() {
+                writer.write(chunk.as_bytes())?;
+            }
+
+            writer.flush()?;
+            file.sync_all()?;
+
+            std::io::Result::Ok(path)
+        }
+        fn apply(document: &mut Document, edits: Vec<Edit>) {
+            let mut selection = document.selection;
+
+            for edit in &edits {
+                edit.apply(&mut document.rope);
+                document.tree.edit(&edit.to_input_edit_applied());
+
+                selection.anchor = selection
+                    .anchor
+                    .edit(edit.start(), edit.removed_end(), edit.inserted_end())
+                    .unwrap_or_else(|| edit.inserted_end());
+                selection.head = selection
+                    .head
+                    .edit(edit.start(), edit.removed_end(), edit.inserted_end())
+                    .unwrap_or_else(|| edit.inserted_end());
+            }
+
+            document.movements().selection(selection, true);
+            document.history.push_bulk(edits);
+            document.version += 1;
+        }
+
         let file = File::open(&self.path)?;
-        let metadata = file.metadata();
-        let len = metadata
-            .as_ref()
-            .ok()
-            .map(|metadata| metadata.len() as usize);
-        let modified = metadata
-            .as_ref()
-            .ok()
-            .and_then(|metadata| metadata.modified().ok())
-            .unwrap_or_else(|| SystemTime::now());
+        let metadata = file.metadata()?;
+        let len = metadata.len() as usize;
+        let modified = metadata.modified().unwrap_or_else(|_| SystemTime::now());
 
         match self.on_disk_modified.cmp(&modified) {
             Ordering::Less => {}
@@ -193,68 +223,43 @@ impl Document {
         }
 
         if self.is_dirty() {
-            let temp_dir = TempDir::with_prefix("virus.").unwrap();
-            let create = |name: &str, rope: &Rope| {
-                let mut path = temp_dir.path().to_owned();
-                path.push(name);
-                let file = File::create(&path)?;
-                let mut writer = BufWriter::new(&file);
-
-                for chunk in rope.chunks() {
-                    writer.write(chunk.as_bytes())?;
-                }
-
-                writer.flush()?;
-                file.sync_all()?;
-
-                std::io::Result::Ok(path)
-            };
-
-            let current = create("current", &self.rope)?;
-            let base = create("base", &self.on_disk_content)?;
+            let temp_dir = TempDir::with_prefix("virus.")?;
+            let current = &create(&temp_dir, "current", &self.rope)?;
+            let base = &create(&temp_dir, "base", &self.on_disk_content)?;
             let other = &self.path;
-            let mut child = Command::new("git")
-                .envs([
-                    ("GIT_CONFIG_SYSTEM", "/dev/null"),
-                    ("GIT_CONFIG_GLOBAL", "/dev/null"),
-                ])
-                .args([
-                    "merge-file",
-                    &current.as_os_str().to_string_lossy(),
-                    &base.as_os_str().to_string_lossy(),
-                    &other.as_os_str().to_string_lossy(),
-                    "-p",
-                    "--diff3",
-                    "-L",
-                    "VIRUS",
-                    "-L",
-                    "ORIGINAL",
-                    "-L",
-                    "DISK",
-                ])
+            let child = Command::new("git")
+                .env("GIT_CONFIG_SYSTEM", "/dev/null")
+                .env("GIT_CONFIG_GLOBAL", "/dev/null")
+                .arg("merge-file")
+                .args([current, base, other])
+                .args(["-L", "VIRUS", "-L", "ORIGINAL", "-L", "DISK"])
+                .args(["-p", "--diff3"])
                 .stdout(Stdio::piped())
                 .spawn()?;
-            let status = child.wait()?;
-            let stdout = child
-                .stdout
-                .take()
-                .ok_or_else(|| std::io::Error::other(""))?;
+            let old = self.rope.to_string();
+            let new = {
+                let mut stdout = child.stdout.ok_or_else(|| std::io::Error::other(""))?;
+                let mut string = String::with_capacity(len);
+                BufReader::new(&mut stdout).read_to_string(&mut string)?;
+                string
+            };
+            let edits = Edit::diff(&old, &new, None, None).collect::<Vec<_>>();
 
-            // TODO diff, history, tree
-
-            self.rope = Rope::from_reader(&mut BufReader::new(stdout))?;
-
-            if status.success() {
-                self.save()?;
-                self.version += 1;
+            if edits.is_empty() {
+                self.on_disk_content = self.rope.clone();
+                self.on_disk_modified = modified;
                 self.on_disk_version = self.version;
-            }
 
-            Ok(true)
+                Ok(false)
+            } else {
+                apply(self, edits);
+
+                Ok(true)
+            }
         } else {
             let old = self.rope.to_string();
             let new = {
-                let mut string = String::with_capacity(len.unwrap_or_else(|| old.len()));
+                let mut string = String::with_capacity(len);
                 BufReader::new(&file).read_to_string(&mut string)?;
                 string
             };
@@ -263,29 +268,13 @@ impl Document {
             if edits.is_empty() {
                 Ok(false)
             } else {
-                let mut selection = self.selection;
+                apply(self, edits);
 
-                for edit in &edits {
-                    edit.apply(&mut self.rope);
-                    self.tree.edit(&edit.to_input_edit_applied());
-
-                    selection.anchor = selection
-                        .anchor
-                        .edit(edit.start(), edit.removed_end(), edit.inserted_end())
-                        .unwrap_or_else(|| edit.inserted_end());
-                    selection.head = selection
-                        .head
-                        .edit(edit.start(), edit.removed_end(), edit.inserted_end())
-                        .unwrap_or_else(|| edit.inserted_end());
-                }
-
-                self.movements().selection(selection, true);
-                self.history.push_bulk(edits);
-
-                self.version += 1;
                 self.on_disk_content = self.rope.clone();
                 self.on_disk_modified = modified;
                 self.on_disk_version = self.version;
+
+                debug_assert!(std::fs::read_to_string(&self.path).unwrap() == self.rope);
 
                 Ok(true)
             }
