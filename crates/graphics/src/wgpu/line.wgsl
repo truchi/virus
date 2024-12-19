@@ -20,11 +20,11 @@ fn to_clip(position: vec2f) -> vec4f {
 
 struct Vertex {
     // Region `(top, left)` position.
-    @location(0) region_position: vec2i,
+    @location(0) region_position: vec2f,
     // Region `(width, height)` size.
-    @location(1) region_size: vec2u,
+    @location(1) region_size: vec2f,
     // Point `(top, left)` position.
-    @location(2) position: vec2i,
+    @location(2) position: vec2f,
     // Point sRGBA color.
     @location(3) color: vec4u,
 }
@@ -36,10 +36,10 @@ fn color(color: vec4u) -> vec4f {
 @vertex
 fn vertex(vertex: Vertex) -> Fragment {
     var fragment: Fragment;
-    fragment.position = to_clip(vec2f(vertex.region_position.yx + vertex.position.yx));
+    fragment.position = to_clip(vertex.region_position.yx + vertex.position.yx);
     fragment.color = color(vertex.color);
-    fragment.min = vec2f(vertex.region_position.yx);
-    fragment.max = vec2f(vertex.region_position.yx) + vec2f(vertex.region_size);
+    fragment.min = vertex.region_position.yx;
+    fragment.max = vertex.region_position.yx + vertex.region_size;
 
     return fragment;
 }

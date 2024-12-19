@@ -31,7 +31,7 @@ impl Type {
 //                                            Instance                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-crate::muck!(unsafe Instance => Instance: [Type, PositionI32, SizeU32, PositionI32, Rgba]);
+crate::muck!(unsafe Instance => Instance: [Type, Position, Size, Position, Rgba]);
 
 /// Instance.
 #[repr(C)]
@@ -40,11 +40,11 @@ struct Instance {
     /// Glyph type.
     ty: Type,
     /// Glyph position.
-    position: PositionI32,
+    position: Position,
     /// Glyph size.
-    size: SizeU32,
+    size: Size,
     /// Glyph uv.
-    uv: PositionI32,
+    uv: Position,
     /// Glyph color.
     color: Rgba,
 }
@@ -302,16 +302,16 @@ impl Pipeline {
         &mut self,
         queue: &Queue,
         layer: u32,
-        region: RectangleI32U32,
-        position: PositionI32,
+        region: Rectangle,
+        position: Position,
         key: GlyphKey,
         color: Rgba,
         image: F,
     ) {
         // Early return for invisible glyphs
         if !color.is_visible()
-            || matches!(u32::try_from(position.top), Ok(top) if region.size().height <= top)
-            || matches!(u32::try_from(position.left), Ok(left) if region.size().width <= left)
+            || region.size().height <= position.top
+            || region.size().width <= position.left
         {
             return;
         }
@@ -344,7 +344,7 @@ impl Pipeline {
                 queue,
                 key,
                 image.placement,
-                SizeU32 {
+                Size {
                     width: image.placement.width,
                     height: image.placement.height,
                 },
@@ -361,18 +361,16 @@ impl Pipeline {
         };
 
         // Crop to region
-        let rectangle = RectangleI32U32 {
+        let rectangle = Rectangle {
             // Swash image placement has vertical upward from baseline
-            top: key.1 as i32 - placement.top,
-            left: placement.left,
-            width: placement.width,
-            height: placement.height,
+            top: key.1 as f32 - placement.top as f32,
+            left: placement.left as f32,
+            width: placement.width as f32,
+            height: placement.height as f32,
         } + position;
-        let uv = uv
-            - PositionI32 {
-                top: rectangle.position().top.min(0),
-                left: rectangle.position().left.min(0),
-            };
+        // Makes no sense but fixes top line when scrolling (up/down, weird in many ways)
+        let uv = Position::new(uv.top as f32, uv.left as f32)
+            - Position::new(rectangle.top.min(0.0), rectangle.left.min(0.0));
 
         let Some(rectangle) = rectangle.region(region) else {
             return;

@@ -3,7 +3,7 @@ use swash::{scale::ScaleContext, shape::ShapeContext};
 use virus_editor::fuzzy::Search;
 use virus_graphics::{
     text::{FontWeight, Fonts, Glyphs, Styles},
-    types::{PositionI32, RectangleI32U32},
+    types::{Position, Rectangle},
     wgpu::Layer,
 };
 
@@ -29,11 +29,11 @@ impl FilesView {
         let context = context.as_mut();
         let region = {
             let columns = 2 + Panes::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS;
-            let width = (columns as f32 * context.theme.advance).ceil() as u32;
-            let left = (layer.size().width.saturating_sub(width) / 2) as i32;
+            let width = columns as f32 * context.theme.advance;
+            let left = (layer.size().width - width) / 2.0;
 
-            RectangleI32U32 {
-                top: 0,
+            Rectangle {
+                top: 0.0,
                 left,
                 width,
                 height: layer.size().height,
@@ -70,7 +70,7 @@ struct Renderer<'a> {
     selected: usize,
     needle: &'a str,
     search: &'a Search,
-    region: RectangleI32U32,
+    region: Rectangle,
 }
 
 impl<'a> Renderer<'a> {
@@ -106,8 +106,8 @@ impl<'a> Renderer<'a> {
             .draw(
                 {
                     let mut region = self.region;
-                    region.top += self.theme.line_height as i32;
-                    region.left += self.theme.advance.ceil() as i32;
+                    region.top += self.theme.line_height;
+                    region.left += self.theme.advance;
                     region
                 },
                 0,
@@ -115,7 +115,7 @@ impl<'a> Renderer<'a> {
             .glyphs(
                 self.fonts,
                 self.scale,
-                PositionI32::default(),
+                Position::default(),
                 self.theme.line_height,
                 &glyphs,
             );
@@ -125,16 +125,15 @@ impl<'a> Renderer<'a> {
             .draw(
                 {
                     let mut region = self.region;
-                    region.top += self.theme.line_height as i32;
+                    region.top += self.theme.line_height;
                     region
                 },
                 0,
             )
             .rectangle(
-                RectangleI32U32 {
-                    top: 0,
-                    left: (self.theme.advance + glyphs.advance()).ceil() as i32
-                        - self.theme.caret_width as i32 / 2,
+                Rectangle {
+                    top: 0.0,
+                    left: self.theme.advance + glyphs.advance() - self.theme.caret_width / 2.0,
                     width: self.theme.caret_width,
                     height: self.theme.line_height,
                 },
@@ -151,9 +150,9 @@ impl<'a> Renderer<'a> {
 
         let region = {
             let mut region = self.region;
-            region.top += 3 * self.theme.line_height as i32;
-            region.left += self.theme.advance.ceil() as i32;
-            region.height -= 3 * self.theme.line_height;
+            region.top += 3.0 * self.theme.line_height;
+            region.left += self.theme.advance;
+            region.height -= 3.0 * self.theme.line_height;
             region
         };
         let range = {
@@ -165,7 +164,7 @@ impl<'a> Renderer<'a> {
                 self.selected + 1 - region_height_in_lines..self.selected + 1
             }
         };
-        let mut position = PositionI32::default();
+        let mut position = Position::default();
 
         for (index, m) in self.search.matches()[range.clone()].iter().enumerate() {
             let str = self.search.haystack()[m.index].as_str();
@@ -214,7 +213,7 @@ impl<'a> Renderer<'a> {
                 &glyphs,
             );
 
-            position.top += self.theme.line_height as i32;
+            position.top += self.theme.line_height;
         }
 
         self

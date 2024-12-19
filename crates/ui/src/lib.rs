@@ -74,7 +74,7 @@ mod todo {
             Font, FontSize,
             FontStyle::{self, *},
             FontWeight::{self, *},
-            Fonts, LineHeight, Styles,
+            Fonts, Styles,
         },
         types::Rgba,
     };
@@ -168,7 +168,7 @@ mod todo {
         let catppuccin = Catppuccin::latte();
         let family = fonts.get("Victor").unwrap().key();
         let font_size = 15 as FontSize;
-        let line_height = font_size as LineHeight + font_size as LineHeight / 4;
+        let line_height = font_size as f32 + font_size as f32 / 4.0;
 
         UiTheme {
             syntax: catppuccin.syntax_theme(),
@@ -190,7 +190,7 @@ mod todo {
             normal_mode_color: catppuccin.blue.solid(),
             insert_mode_color: catppuccin.pink.solid(),
 
-            caret_width: 2,
+            caret_width: 2.0,
 
             status_background_color: catppuccin.crust.solid(),
             status_mode_foreground_color: catppuccin.base.solid(),

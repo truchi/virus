@@ -260,15 +260,15 @@ impl Virus {
 
         let theme = self.ui.context().theme;
         let pane_id = pane.id;
-        let line = document.selection().head.line as u32;
-        let height_in_lines = theme.cells(pane.view.size()).height;
+        let line = document.selection().head.line as f32;
+        let height_in_lines = theme.cells(pane.view.size()).height as f32;
         let start = pane.view.scroll_top().end() / theme.line_height;
         let end = start + height_in_lines;
 
         let line = if line < start {
             line
         } else if line >= end {
-            line + 1 - height_in_lines
+            line + 1.0 - height_in_lines
         } else {
             return;
         };
@@ -824,10 +824,10 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
 
                 let offset = blank
                     .then_some(0)
-                    .unwrap_or_else(|| document.leading_blank_lines() as u32);
+                    .unwrap_or_else(|| document.leading_blank_lines());
                 let line = offset;
 
-                self.virus.ui.panes_mut().scroll(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line as f32);
             }
             Mode::Files => {}
         }
@@ -849,13 +849,13 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
 
                 let offset = blank
                     .then_some(0)
-                    .unwrap_or_else(|| document.leading_blank_lines() as u32);
-                let line = pane.view.scroll_top().end() / theme.line_height;
+                    .unwrap_or_else(|| document.leading_blank_lines());
+                let line = (pane.view.scroll_top().end() / theme.line_height).floor() as usize;
                 let line =
-                    line.saturating_sub(pages as u32 * cells.height / if half { 2 } else { 1 });
+                    line.saturating_sub(pages * cells.height as usize / if half { 2 } else { 1 });
                 let line = line.max(offset);
 
-                self.virus.ui.panes_mut().scroll(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line as f32);
             }
             Mode::Files => {}
         }
@@ -877,12 +877,12 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
 
                 let offset = blank
                     .then_some(0)
-                    .unwrap_or_else(|| document.leading_blank_lines() as u32);
-                let line = pane.view.scroll_top().end() / theme.line_height;
-                let line = line.saturating_sub(lines as u32);
+                    .unwrap_or_else(|| document.leading_blank_lines());
+                let line = (pane.view.scroll_top().end() / theme.line_height).floor() as usize;
+                let line = line.saturating_sub(lines);
                 let line = line.max(offset);
 
-                self.virus.ui.panes_mut().scroll(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line as f32);
             }
             Mode::Files => {}
         }
@@ -906,12 +906,14 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
 
                 let offset = blank
                     .then_some(0)
-                    .unwrap_or_else(|| document.trailing_blank_lines() as u32);
-                let line = (document.rope().len_lines() as u32)
+                    .unwrap_or_else(|| document.trailing_blank_lines());
+                let line = document
+                    .rope()
+                    .len_lines()
                     .saturating_sub(offset)
-                    .saturating_sub(cells.height);
+                    .saturating_sub(cells.height as usize);
 
-                self.virus.ui.panes_mut().scroll(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line as f32);
             }
             Mode::Files => {}
         }
@@ -933,16 +935,18 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
 
                 let offset = blank
                     .then_some(0)
-                    .unwrap_or_else(|| document.trailing_blank_lines() as u32);
-                let line = pane.view.scroll_top().end() / theme.line_height;
-                let line = line + pages as u32 * cells.height / if half { 2 } else { 1 };
+                    .unwrap_or_else(|| document.trailing_blank_lines());
+                let line = (pane.view.scroll_top().end() / theme.line_height).floor() as usize;
+                let line = line + pages * cells.height as usize / if half { 2 } else { 1 };
                 let line = line.min(
-                    (document.rope().len_lines() as u32)
-                        .saturating_sub(cells.height)
+                    document
+                        .rope()
+                        .len_lines()
+                        .saturating_sub(cells.height as usize)
                         .saturating_sub(offset),
                 );
 
-                self.virus.ui.panes_mut().scroll(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line as f32);
             }
             Mode::Files => {}
         }
@@ -964,16 +968,18 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
 
                 let offset = blank
                     .then_some(0)
-                    .unwrap_or_else(|| document.trailing_blank_lines() as u32);
-                let line = pane.view.scroll_top().end() / theme.line_height;
-                let line = line + lines as u32;
+                    .unwrap_or_else(|| document.trailing_blank_lines());
+                let line = (pane.view.scroll_top().end() / theme.line_height).floor() as usize;
+                let line = line + lines;
                 let line = line.min(
-                    (document.rope().len_lines() as u32)
-                        .saturating_sub(cells.height)
+                    document
+                        .rope()
+                        .len_lines()
+                        .saturating_sub(cells.height as usize)
                         .saturating_sub(offset),
                 );
 
-                self.virus.ui.panes_mut().scroll(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line as f32);
             }
             Mode::Files => {}
         }
@@ -995,12 +1001,16 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                     return;
                 }
 
-                let line = document.selection().head.line as u32;
-                let line = line.saturating_sub(margin as u32);
-                let line =
-                    line.min((document.rope().len_lines() as u32).saturating_sub(cells.height));
+                let line = document.selection().head.line;
+                let line = line.saturating_sub(margin);
+                let line = line.min(
+                    document
+                        .rope()
+                        .len_lines()
+                        .saturating_sub(cells.height as usize),
+                );
 
-                self.virus.ui.panes_mut().scroll(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line as f32);
             }
             Mode::Files => {}
         }
@@ -1020,12 +1030,16 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                     return;
                 }
 
-                let line = document.selection().head.line as u32;
-                let line = line.saturating_sub(cells.height / 2);
-                let line =
-                    line.min((document.rope().len_lines() as u32).saturating_sub(cells.height));
+                let line = document.selection().head.line;
+                let line = line.saturating_sub(cells.height as usize / 2);
+                let line = line.min(
+                    document
+                        .rope()
+                        .len_lines()
+                        .saturating_sub(cells.height as usize),
+                );
 
-                self.virus.ui.panes_mut().scroll(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line as f32);
             }
             Mode::Files => {}
         }
@@ -1045,12 +1059,16 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                     return;
                 }
 
-                let line = document.selection().head.line as u32;
-                let line = line.saturating_sub(cells.height.saturating_sub(1 + margin as u32));
-                let line =
-                    line.min((document.rope().len_lines() as u32).saturating_sub(cells.height));
+                let line = document.selection().head.line;
+                let line = line.saturating_sub((cells.height as usize).saturating_sub(margin + 1));
+                let line = line.min(
+                    document
+                        .rope()
+                        .len_lines()
+                        .saturating_sub(cells.height as usize),
+                );
 
-                self.virus.ui.panes_mut().scroll(pane_id, line);
+                self.virus.ui.panes_mut().scroll(pane_id, line as f32);
             }
             Mode::Files => {}
         }

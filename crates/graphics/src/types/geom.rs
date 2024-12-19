@@ -12,17 +12,11 @@ fn panicking_partial_max<T: PartialOrd>(a: T, b: T) -> T {
 //                                            Position                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-crate::muck!(unsafe PositionF32 => Float32x2);
-crate::muck!(unsafe PositionI32 => Sint32x2);
-crate::muck!(unsafe PositionU32 => Uint32x2);
-
-pub type PositionF32 = Position<f32>;
-pub type PositionI32 = Position<i32>;
-pub type PositionU32 = Position<u32>;
+crate::muck!(unsafe Position => Float32x2);
 
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
-pub struct Position<T> {
+pub struct Position<T = f32> {
     pub top: T,
     pub left: T,
 }
@@ -62,17 +56,11 @@ impl<T: Sub<U>, U> Sub<Position<U>> for Position<T> {
 //                                               Size                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-crate::muck!(unsafe SizeF32 => Float32x2);
-crate::muck!(unsafe SizeI32 => Sint32x2);
-crate::muck!(unsafe SizeU32 => Uint32x2);
-
-pub type SizeF32 = Size<f32>;
-pub type SizeI32 = Size<i32>;
-pub type SizeU32 = Size<u32>;
+crate::muck!(unsafe Size => Float32x2);
 
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
-pub struct Size<T> {
+pub struct Size<T = f32> {
     pub width: T,
     pub height: T,
 }
@@ -123,12 +111,8 @@ impl<T: Sub<U>, U> Sub<Size<U>> for Size<T> {
 //                                           Rectangle                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-pub type RectangleF32 = Rectangle<f32, f32>;
-pub type RectangleI32U32 = Rectangle<i32, u32>;
-pub type RectangleU32U32 = Rectangle<u32, u32>;
-
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
-pub struct Rectangle<T, U> {
+pub struct Rectangle<T = f32, U = f32> {
     pub top: T,
     pub left: T,
     pub width: U,

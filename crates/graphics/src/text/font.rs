@@ -1,4 +1,4 @@
-use super::{Advance, FontSize};
+use super::FontSize;
 use std::{collections::HashMap, path::Path};
 use swash::{CacheKey, FontDataRef, FontRef};
 
@@ -150,17 +150,17 @@ impl Font {
     }
 
     /// Returns the advance given `size`.
-    pub fn advance_for_size(&self, size: FontSize) -> Advance {
+    pub fn advance_for_size(&self, size: FontSize) -> f32 {
         let metrics = self.as_ref().metrics(&[]);
 
-        size as Advance * metrics.max_width / metrics.units_per_em as Advance
+        size as f32 * metrics.max_width / metrics.units_per_em as f32
     }
 
     /// Returns the size given `advance`.
-    pub fn size_for_advance(&self, advance: Advance) -> FontSize {
+    pub fn size_for_advance(&self, advance: f32) -> FontSize {
         let metrics = self.as_ref().metrics(&[]);
 
-        (advance * metrics.units_per_em as Advance / metrics.max_width).round() as FontSize
+        (advance * metrics.units_per_em as f32 / metrics.max_width).round() as FontSize
     }
 }
 

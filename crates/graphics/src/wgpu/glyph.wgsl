@@ -38,20 +38,20 @@ struct Instance {
     // Glyph type (0: mask, 1: color).
     @location(0) ty: u32,
     // Glyph `(top, left)` position.
-    @location(1) position: vec2i,
+    @location(1) position: vec2f,
     // Glyph `(width, height)` size.
-    @location(2) size: vec2u,
+    @location(2) size: vec2f,
     // Texture `(x, y)` position.
-    @location(3) uv: vec2i,
+    @location(3) uv: vec2f,
     // Glyph sRGBA color.
     @location(4) color: vec4u,
 }
 
-fn position(index: u32, position: vec2i, size: vec2u) -> vec2f {
-    let width = f32(size.x);
-    let height = f32(size.y);
-    let top = f32(position.x);
-    let left = f32(position.y);
+fn position(index: u32, position: vec2f, size: vec2f) -> vec2f {
+    let width = size.x;
+    let height = size.y;
+    let top = position.x;
+    let left = position.y;
     let bottom = top + height;
     let right = left + width;
 

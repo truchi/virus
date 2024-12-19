@@ -1,4 +1,4 @@
-use super::{Advance, FontFamilyKey, FontSize, Fonts, Glyph, Styles};
+use super::{FontFamilyKey, FontSize, Fonts, Glyph, Styles};
 use crate::types::Rgba;
 use std::ops::Range;
 use swash::{
@@ -68,7 +68,7 @@ impl Glyphs {
     }
 
     /// Returns the full advance.
-    pub fn advance(&self) -> Advance {
+    pub fn advance(&self) -> f32 {
         self.glyphs
             .last()
             .map(|glyph| glyph.offset + glyph.advance)
@@ -76,7 +76,7 @@ impl Glyphs {
     }
 
     /// Returns an iterator of background color ranges.
-    pub fn backgrounds<'a>(&'a self) -> impl 'a + Iterator<Item = (Range<Advance>, Rgba)> {
+    pub fn backgrounds<'a>(&'a self) -> impl 'a + Iterator<Item = (Range<f32>, Rgba)> {
         let mut glyphs = self.glyphs.iter().peekable();
 
         std::iter::from_fn(move || {

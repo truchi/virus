@@ -17,13 +17,10 @@ struct Item<V> {
 
 impl<V> Item<V> {
     /// Returns the position of the item.
-    fn position(&self) -> PositionI32 {
-        debug_assert!(i32::try_from(self.top).is_ok());
-        debug_assert!(i32::try_from(self.left).is_ok());
-
-        PositionI32 {
-            top: self.top as i32,
-            left: self.left as i32,
+    fn position(&self) -> Position<u32> {
+        Position {
+            top: self.top,
+            left: self.left,
         }
     }
 }
@@ -86,7 +83,7 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
     }
 
     /// Returns the position and value of the item for `key`.
-    pub fn get(&self, key: &K) -> Option<(PositionI32, &V)> {
+    pub fn get(&self, key: &K) -> Option<(Position<u32>, &V)> {
         self.items
             .get(&key)
             .map(|item| (item.position(), &item.value))
@@ -101,17 +98,19 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
         queue: &Queue,
         key: K,
         value: V,
-        size: SizeU32,
+        size: Size<u32>,
         bytes: &[u8],
-    ) -> Result<(PositionI32, &V), AtlasError> {
+    ) -> Result<(Position<u32>, &V), AtlasError> {
         if self.items.contains_key(&key) {
             return Err(AtlasError::KeyExists);
         }
 
-        self.try_insert(&key, value, size)?;
+        let item = {
+            self.try_insert(&key, value, size)?;
+            self.items.get(&key).unwrap()
+        };
 
-        let item = self.items.get(&key).unwrap();
-        self.write(queue, RectangleI32U32::new(item.position(), size), bytes);
+        self.write(queue, Rectangle::new(item.position(), size), bytes);
 
         Ok((item.position(), &item.value))
     }
@@ -137,7 +136,7 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
         &mut self,
         key: &K,
         value: V,
-        SizeU32 { width, height }: SizeU32,
+        Size { width, height }: Size<u32>,
     ) -> Result<(), AtlasError> {
         if !((width <= self.bin_width) && (height <= self.texture.height())) {
             return Err(AtlasError::WontFit);
@@ -227,21 +226,14 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
     }
 
     /// Writes `data` in texture.
-    fn write(&self, queue: &Queue, rectangle: RectangleI32U32, data: &[u8]) {
-        let RectangleI32U32 {
-            top,
-            left,
-            width,
-            height,
-        } = rectangle;
-
+    fn write(&self, queue: &Queue, rectangle: Rectangle<u32, u32>, data: &[u8]) {
         queue.write_texture(
             ImageCopyTexture {
                 texture: &self.texture,
                 mip_level: 0,
                 origin: Origin3d {
-                    x: left as u32,
-                    y: top as u32,
+                    x: rectangle.left,
+                    y: rectangle.top,
                     z: 0,
                 },
                 aspect: TextureAspect::All,
@@ -249,12 +241,12 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
             &data,
             ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(self.texture.format().components() as u32 * width),
-                rows_per_image: Some(height),
+                bytes_per_row: Some(self.texture.format().components() as u32 * rectangle.width),
+                rows_per_image: Some(rectangle.height),
             },
             Extent3d {
-                width,
-                height,
+                width: rectangle.width,
+                height: rectangle.height,
                 depth_or_array_layers: 1,
             },
         );

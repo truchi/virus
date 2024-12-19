@@ -85,9 +85,9 @@ impl Tween {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// Tweenable values.
-pub trait Tweenable: TweenValue + Ord {}
+pub trait Tweenable: TweenValue + PartialOrd {}
 
-impl<T: TweenValue + Ord> Tweenable for T {}
+impl<T: TweenValue + PartialOrd> Tweenable for T {}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                              Tweened                                           //

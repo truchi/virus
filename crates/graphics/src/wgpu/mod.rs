@@ -5,8 +5,8 @@ mod rectangle;
 
 use crate::{
     muck::WithAttributes,
-    text::{Fonts, GlyphKey, Glyphs, LineHeight},
-    types::{PositionI32, RectangleI32U32, Rgb, Rgba, SizeU32},
+    text::{Fonts, GlyphKey, Glyphs},
+    types::{Position, Rectangle, Rgb, Rgba, Size},
 };
 use atlas::{Atlas, AtlasError};
 use glyph::Pipeline as GlyphPipeline;
@@ -157,7 +157,7 @@ impl Graphics {
     }
 
     /// Returns the `Layer`ing API.
-    pub fn layer(&mut self, region: RectangleI32U32, layer: u16) -> Layer {
+    pub fn layer(&mut self, region: Rectangle, layer: u16) -> Layer {
         Layer {
             graphics: self,
             region,
@@ -274,18 +274,18 @@ impl Graphics {
 
 pub struct Layer<'graphics> {
     graphics: &'graphics mut Graphics,
-    region: RectangleI32U32,
+    region: Rectangle,
     layer: u32,
 }
 
 impl<'graphics> Layer<'graphics> {
     /// Returns the size.
-    pub fn size(&self) -> SizeU32 {
+    pub fn size(&self) -> Size {
         self.region.size()
     }
 
     /// Returns the `Draw`ing API.
-    pub fn draw(&mut self, region: impl Into<Option<RectangleI32U32>>, layer: u16) -> Draw {
+    pub fn draw(&mut self, region: impl Into<Option<Rectangle>>, layer: u16) -> Draw {
         let region = region
             .into()
             .map(|rectangle| rectangle.region(self.region).unwrap_or_default())
@@ -305,21 +305,21 @@ impl<'graphics> Layer<'graphics> {
 
 pub struct Draw<'graphics> {
     graphics: &'graphics mut Graphics,
-    region: RectangleI32U32,
+    region: Rectangle,
     layer: u32,
 }
 
 impl<'graphics> Draw<'graphics> {
     /// Returns the size.
-    pub fn size(&self) -> SizeU32 {
+    pub fn size(&self) -> Size {
         self.region.size()
     }
 
     /// Draws a rectange.
-    pub fn rectangle(&mut self, rectangle: impl Into<Option<RectangleI32U32>>, color: Rgba) {
+    pub fn rectangle(&mut self, rectangle: impl Into<Option<Rectangle>>, color: Rgba) {
         let rectangle = rectangle
             .into()
-            .unwrap_or_else(|| RectangleI32U32::new(PositionI32::default(), self.size()));
+            .unwrap_or_else(|| Rectangle::new(Position::default(), self.size()));
 
         self.graphics
             .rectangle
@@ -329,7 +329,7 @@ impl<'graphics> Draw<'graphics> {
     /// Draws a glyph.
     pub fn glyph<F: FnOnce() -> Image>(
         &mut self,
-        position: PositionI32,
+        position: Position,
         key: GlyphKey,
         color: Rgba,
         image: F,
@@ -350,8 +350,8 @@ impl<'graphics> Draw<'graphics> {
         &mut self,
         fonts: &Fonts,
         scale: &mut ScaleContext,
-        position: PositionI32,
-        line_height: LineHeight,
+        position: Position,
+        line_height: f32,
         glyphs: &Glyphs,
     ) {
         //
@@ -360,10 +360,10 @@ impl<'graphics> Draw<'graphics> {
 
         for (Range { start, end }, background) in glyphs.backgrounds() {
             self.rectangle(
-                RectangleI32U32 {
+                Rectangle {
                     top: position.top,
-                    left: position.left + start as i32,
-                    width: (end - start) as u32,
+                    left: position.left + start,
+                    width: end - start,
                     height: line_height,
                 },
                 background,
@@ -378,9 +378,9 @@ impl<'graphics> Draw<'graphics> {
 
         for glyph in glyphs.glyphs() {
             self.glyph(
-                PositionI32 {
+                Position {
                     top: position.top,
-                    left: position.left + glyph.offset.round() as i32,
+                    left: position.left + glyph.offset,
                 },
                 glyph.key(),
                 glyph.styles.foreground,
@@ -390,14 +390,14 @@ impl<'graphics> Draw<'graphics> {
     }
 
     /// Draws a polyline.
-    pub fn polyline<T: IntoIterator<Item = (PositionI32, Rgba)>>(&mut self, points: T) {
+    pub fn polyline<T: IntoIterator<Item = (Position, Rgba)>>(&mut self, points: T) {
         self.graphics
             .line
             .push(self.layer, self.region, points, false);
     }
 
     /// Draws a polygon.
-    pub fn polygon<T: IntoIterator<Item = (PositionI32, Rgba)>>(&mut self, points: T) {
+    pub fn polygon<T: IntoIterator<Item = (Position, Rgba)>>(&mut self, points: T) {
         self.graphics
             .line
             .push(self.layer, self.region, points, true);

@@ -5,7 +5,7 @@ use virus_editor::{
     ids,
     mode::{Mode, Select},
 };
-use virus_graphics::{types::RectangleI32U32, wgpu::Graphics};
+use virus_graphics::{types::Rectangle, wgpu::Graphics};
 
 ids!(
     /// [`PaneId`] generator.
@@ -141,53 +141,53 @@ impl Panes {
         &mut self,
         context: &mut Context,
         graphics: &mut Graphics,
-        region: RectangleI32U32,
+        region: Rectangle,
         documents: impl Fn(DocumentId) -> Option<&'a Document>,
         mode: Mode,
     ) {
-        let len = self.panes.len() as u32;
+        let len = self.panes.len() as f32;
         let theme = context.theme;
-        let region_columns = theme.cells(region.size()).width;
-        let columns_to_pixels = |columns: u32| (columns as f32 * theme.advance).ceil() as u32;
-        let desired_columns = Self::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS;
+        let region_columns = theme.cells(region.size()).width as f32;
+        let desired_columns = Self::ACTIVE_COLUMNS as f32 + DocumentView::GUTTER_COLUMNS as f32;
 
         let (active_width, inactive_width) = if len * desired_columns < region_columns {
             (
-                columns_to_pixels(desired_columns),
-                columns_to_pixels(desired_columns),
+                desired_columns * theme.advance,
+                desired_columns * theme.advance,
             )
         } else {
             let active_columns = region_columns.min(desired_columns);
             let inactive_columns = if self.active_id.is_some() {
-                match len {
+                match self.panes().len() {
                     0 => unreachable!(),
-                    1 => 0,
-                    _ => region_columns.saturating_sub(active_columns) / (len - 1),
+                    1 => 0.0,
+                    _ => (region_columns - active_columns) / (len - 1.0),
                 }
             } else {
-                match len {
-                    0 => 0,
+                match self.panes.len() {
+                    0 => 0.0,
                     _ => region_columns / len,
                 }
             };
 
             (
-                columns_to_pixels(active_columns),
-                columns_to_pixels(inactive_columns),
+                active_columns * theme.advance,
+                inactive_columns * theme.advance,
             )
         };
         let margin = {
-            let remaining_width = region.width.saturating_sub(if self.active_id.is_some() {
-                active_width + inactive_width * (len - 1)
-            } else {
-                inactive_width * len
-            });
+            let remaining_width = region.width
+                - if self.active_id.is_some() {
+                    active_width + inactive_width * (len - 1.0)
+                } else {
+                    inactive_width * len
+                };
 
             // Space evenly
-            (remaining_width / (len + 1)) as i32
+            remaining_width / (len + 1.0)
         };
 
-        let mut left = region.left + margin as i32;
+        let mut left = region.left + margin;
 
         for pane in &mut self.panes {
             match pane {
@@ -198,14 +198,14 @@ impl Panes {
                     let is_active = self.active_id == Some(*id);
                     let region = {
                         let width = is_active.then_some(active_width).unwrap_or(inactive_width);
-                        let region = RectangleI32U32 {
+                        let region = Rectangle {
                             top: region.top,
                             left,
                             width,
                             height: region.height,
                         };
 
-                        left += width as i32 + margin;
+                        left += width + margin;
                         region
                     };
                     let mode = is_active.then_some(mode).unwrap_or_else(|| {

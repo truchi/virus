@@ -21,18 +21,18 @@ fn to_clip(position: vec2f) -> vec4f {
 struct Instance {
     @builtin(vertex_index) index: u32,
     // Rectangle `(top, left)` position.
-    @location(0) position: vec2i,
+    @location(0) position: vec2f,
     // Rectangle `(width, height)` size.
-    @location(1) size: vec2u,
+    @location(1) size: vec2f,
     // Rectangle sRGBA color.
     @location(2) color: vec4u,
 }
 
-fn position(index: u32, position: vec2i, size: vec2u) -> vec2f {
-    let width = f32(size.x);
-    let height = f32(size.y);
-    let top = f32(position.x);
-    let left = f32(position.y);
+fn position(index: u32, position: vec2f, size: vec2f) -> vec2f {
+    let width = size.x;
+    let height = size.y;
+    let top = position.x;
+    let left = position.y;
     let bottom = top + height;
     let right = left + width;
 

@@ -12,7 +12,7 @@ use virus_editor::{
     sub_in_range,
 };
 use virus_graphics::{
-    types::{RectangleI32U32, SizeU32},
+    types::{Rectangle, Size},
     wgpu::Graphics,
 };
 use winit::window::Window;
@@ -96,24 +96,27 @@ impl Ui {
         file_name: Option<(String, bool)>,
     ) {
         let theme = self.context.theme;
-        let window = self.window.inner_size();
+        let window = {
+            let window = self.window.inner_size();
+            Size::new(window.width as f32, window.height as f32)
+        };
         let region = {
-            let size = SizeU32 {
+            let size = Size {
                 width: window.width,
                 height: window.height - theme.line_height,
             };
             let pixels = theme.pixels(size);
 
-            RectangleI32U32 {
-                top: (size.height - pixels.height) as i32 / 2,
-                left: (size.width - pixels.width) as i32 / 2,
+            Rectangle {
+                top: (size.height - pixels.height) / 2.0,
+                left: (size.width - pixels.width) / 2.0,
                 width: pixels.width,
                 height: pixels.height,
             }
         };
-        let status_region = RectangleI32U32 {
-            top: region.top + region.height as i32,
-            left: 0,
+        let status_region = Rectangle {
+            top: region.top + region.height,
+            left: 0.0,
             width: window.width,
             height: theme.line_height,
         };
@@ -318,7 +321,7 @@ impl<'ui> UiPanesMut<'ui> {
         }
     }
 
-    pub fn scroll(&mut self, pane_id: PaneId, line: u32) {
+    pub fn scroll(&mut self, pane_id: PaneId, line: f32) {
         let top = line * self.ui.context.theme.line_height;
         let tween = self.ui.context.theme.scroll_tween;
         let duration = self.ui.context.theme.scroll_duration;
