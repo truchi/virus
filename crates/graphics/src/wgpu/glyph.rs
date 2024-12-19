@@ -393,12 +393,7 @@ impl Pipeline {
     }
 
     /// Renders `layer`.
-    pub fn render<'pass>(
-        &'pass self,
-        layer: u32,
-        queue: &Queue,
-        render_pass: &mut RenderPass<'pass>,
-    ) {
+    pub fn render<'pass>(&'pass self, layer: u32, render_pass: &mut RenderPass<'pass>) {
         let constants = self.constants.as_array();
         let (instances, range) = match self.layers.get(&layer) {
             Some((instances, range)) if !instances.is_empty() => (instances, range.clone()),

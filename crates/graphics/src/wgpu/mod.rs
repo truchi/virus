@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 mod atlas;
 mod glyph;
 mod line;
@@ -7,7 +5,7 @@ mod rectangle;
 
 use crate::{
     muck::WithAttributes,
-    text::{FontSize, Fonts, Glyph, GlyphKey, Glyphs, LineHeight, Styles},
+    text::{Fonts, GlyphKey, Glyphs, LineHeight},
     types::{Position, Rectangle, Rgb, Rgba, Size},
 };
 use atlas::{Atlas, AtlasError};
@@ -19,7 +17,6 @@ use std::{
     hash::Hash,
     ops::Range,
     sync::Arc,
-    time::Duration,
 };
 use swash::{
     scale::{
@@ -29,20 +26,19 @@ use swash::{
     zeno::Placement,
 };
 use wgpu::{
-    include_wgsl, vertex_attr_array, BindGroup, BindGroupDescriptor, BindGroupEntry,
-    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
-    BlendState, Buffer, BufferAddress, BufferDescriptor, BufferUsages, Color, ColorTargetState,
-    ColorWrites, CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Extent3d,
-    Features, FragmentState, ImageCopyTexture, ImageDataLayout, IndexFormat, Instance, Limits,
-    LoadOp, Operations, Origin3d, PipelineLayout, PipelineLayoutDescriptor, PresentMode,
-    PrimitiveState, PrimitiveTopology, PushConstantRange, Queue, RenderPass,
-    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
-    RequestAdapterOptions, SamplerBindingType, ShaderModule, ShaderStages, StoreOp, Surface,
-    SurfaceConfiguration, Texture, TextureAspect, TextureDescriptor, TextureDimension,
-    TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDimension,
-    VertexAttribute, VertexBufferLayout, VertexState, VertexStepMode,
+    include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
+    BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, BlendState,
+    Buffer, BufferAddress, BufferDescriptor, BufferUsages, Color, ColorTargetState, ColorWrites,
+    CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Extent3d, Features,
+    FragmentState, ImageCopyTexture, ImageDataLayout, Instance, Limits, LoadOp, Operations,
+    Origin3d, PipelineLayoutDescriptor, PresentMode, PrimitiveState, PrimitiveTopology,
+    PushConstantRange, Queue, RenderPass, RenderPassColorAttachment, RenderPassDescriptor,
+    RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions, SamplerBindingType,
+    ShaderModule, ShaderStages, StoreOp, Surface, SurfaceConfiguration, Texture, TextureAspect,
+    TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages,
+    TextureViewDimension, VertexState,
 };
-use winit::{dpi::PhysicalSize, window::Window};
+use winit::window::Window;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            Constants                                           //
@@ -155,9 +151,9 @@ impl Graphics {
         self.config.height = size.height;
 
         self.surface.configure(&self.device, &self.config);
-        self.rectangle.resize(&self.device, &self.config);
+        self.rectangle.resize(&self.config);
         self.glyph.resize(&self.device, &self.config);
-        self.line.resize(&self.device, &self.config);
+        self.line.resize(&self.config);
     }
 
     /// Returns the `Layer`ing API.
@@ -239,7 +235,7 @@ impl Graphics {
                     None
                 }
             })
-        };
+        }
 
         // Pre render
         self.rectangle.pre_render(&self.queue);
@@ -254,9 +250,9 @@ impl Graphics {
         ) {
             use ToRender::*;
             match layer {
-                Rectange(layer) => self.rectangle.render(layer, &self.queue, &mut render_pass),
-                Glyph(layer) => self.glyph.render(layer, &self.queue, &mut render_pass),
-                Line(layer) => self.line.render(layer, &self.queue, &mut render_pass),
+                Rectange(layer) => self.rectangle.render(layer, &mut render_pass),
+                Glyph(layer) => self.glyph.render(layer, &mut render_pass),
+                Line(layer) => self.line.render(layer, &mut render_pass),
             }
         }
 
