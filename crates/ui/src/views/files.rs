@@ -101,6 +101,7 @@ impl<'a> Renderer<'a> {
         )
         .glyphs();
 
+        // Needle
         self.layer
             .draw(
                 {
@@ -119,6 +120,7 @@ impl<'a> Renderer<'a> {
                 &glyphs,
             );
 
+        // Caret
         self.layer
             .draw(
                 {
@@ -151,6 +153,7 @@ impl<'a> Renderer<'a> {
             let mut region = self.region;
             region.top += 3 * self.theme.line_height as i32;
             region.left += self.theme.advance.ceil() as i32;
+            region.height -= 3 * self.theme.line_height;
             region
         };
         let range = {

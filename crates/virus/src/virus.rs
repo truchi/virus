@@ -487,7 +487,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let lines = pages * lines / if half { 2 } else { 1 };
 
                 self.virus.file_search.selected = sub_in_range(
-                    self.virus.file_search.search.haystack().len(),
+                    self.virus.file_search.search.matches().len(),
                     self.virus.file_search.selected,
                     lines,
                     wrap,
@@ -508,7 +508,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
             }
             Mode::Files => {
                 self.virus.file_search.selected = sub_in_range(
-                    self.virus.file_search.search.haystack().len(),
+                    self.virus.file_search.search.matches().len(),
                     self.virus.file_search.selected,
                     lines,
                     wrap,
@@ -534,7 +534,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                     .virus
                     .file_search
                     .search
-                    .haystack()
+                    .matches()
                     .len()
                     .saturating_sub(1);
             }
@@ -561,7 +561,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let lines = pages * lines / if half { 2 } else { 1 };
 
                 self.virus.file_search.selected = add_in_range(
-                    self.virus.file_search.search.haystack().len(),
+                    self.virus.file_search.search.matches().len(),
                     self.virus.file_search.selected,
                     lines,
                     wrap,
@@ -582,7 +582,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
             }
             Mode::Files => {
                 self.virus.file_search.selected = add_in_range(
-                    self.virus.file_search.search.haystack().len(),
+                    self.virus.file_search.search.matches().len(),
                     self.virus.file_search.selected,
                     lines,
                     wrap,
