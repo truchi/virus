@@ -31,7 +31,7 @@ impl Type {
 //                                            Instance                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-crate::muck!(unsafe Instance => Instance: [Type, Position, Size, Position, Rgba]);
+crate::muck!(unsafe Instance => Instance: [Type, PositionI32, SizeU32, PositionI32, Rgba]);
 
 /// Instance.
 #[repr(C)]
@@ -40,11 +40,11 @@ struct Instance {
     /// Glyph type.
     ty: Type,
     /// Glyph position.
-    position: Position,
+    position: PositionI32,
     /// Glyph size.
-    size: Size,
+    size: SizeU32,
     /// Glyph uv.
-    uv: Position,
+    uv: PositionI32,
     /// Glyph color.
     color: Rgba,
 }
@@ -302,8 +302,8 @@ impl Pipeline {
         &mut self,
         queue: &Queue,
         layer: u32,
-        region: Rectangle,
-        position: Position,
+        region: RectangleI32U32,
+        position: PositionI32,
         key: GlyphKey,
         color: Rgba,
         image: F,
@@ -344,7 +344,7 @@ impl Pipeline {
                 queue,
                 key,
                 image.placement,
-                Size {
+                SizeU32 {
                     width: image.placement.width,
                     height: image.placement.height,
                 },
@@ -361,12 +361,19 @@ impl Pipeline {
         };
 
         // Crop to region
-        let rectangle = Rectangle::from((key.1, *placement)) + position; // TODO inline this
+        let rectangle = RectangleI32U32 {
+            // Swash image placement has vertical upward from baseline
+            top: key.1 as i32 - placement.top,
+            left: placement.left,
+            width: placement.width,
+            height: placement.height,
+        } + position;
         let uv = uv
-            - Position {
+            - PositionI32 {
                 top: rectangle.position().top.min(0),
                 left: rectangle.position().left.min(0),
             };
+
         let Some(rectangle) = rectangle.region(region) else {
             return;
         };

@@ -5,7 +5,7 @@ use virus_editor::{
     ids,
     mode::{Mode, Select},
 };
-use virus_graphics::{types::Rectangle, wgpu::Graphics};
+use virus_graphics::{types::RectangleI32U32, wgpu::Graphics};
 
 ids!(
     /// [`PaneId`] generator.
@@ -141,7 +141,7 @@ impl Panes {
         &mut self,
         context: &mut Context,
         graphics: &mut Graphics,
-        region: Rectangle,
+        region: RectangleI32U32,
         documents: impl Fn(DocumentId) -> Option<&'a Document>,
         mode: Mode,
     ) {
@@ -198,7 +198,7 @@ impl Panes {
                     let is_active = self.active_id == Some(*id);
                     let region = {
                         let width = is_active.then_some(active_width).unwrap_or(inactive_width);
-                        let region = Rectangle {
+                        let region = RectangleI32U32 {
                             top: region.top,
                             left,
                             width,

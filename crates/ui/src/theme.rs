@@ -3,7 +3,7 @@ use std::{ops::Index, time::Duration};
 use virus_editor::ast::HighlightsTag;
 use virus_graphics::{
     text::{Advance, FontFamilyKey, FontSize, LineHeight, Styles},
-    types::{Rgb, Rgba, Size},
+    types::{Rgb, Rgba, SizeU32},
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -37,17 +37,17 @@ pub struct UiTheme {
 
 impl UiTheme {
     /// Returns the size in cells according to advance and line height.
-    pub fn cells(&self, size: Size) -> Size {
-        Size {
+    pub fn cells(&self, size: SizeU32) -> SizeU32 {
+        SizeU32 {
             width: (size.width as f32 / self.advance).floor() as u32,
             height: size.height / self.line_height,
         }
     }
 
     /// Returns the cells size in pixels according to advance and line height.
-    pub fn pixels(&self, size: Size) -> Size {
+    pub fn pixels(&self, size: SizeU32) -> SizeU32 {
         let cells = self.cells(size);
-        Size {
+        SizeU32 {
             width: (cells.width as f32 * self.advance).ceil() as u32,
             height: cells.height * self.line_height,
         }

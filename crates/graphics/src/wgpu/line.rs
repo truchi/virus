@@ -10,18 +10,18 @@ macro_rules! label {
 //                                             Vertex                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-crate::muck!(unsafe Vertex => Vertex: [Position, Size, Position, Rgba]);
+crate::muck!(unsafe Vertex => Vertex: [PositionI32, SizeU32, PositionI32, Rgba]);
 
 /// Vertex.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct Vertex {
     /// Region position.
-    region_position: Position,
+    region_position: PositionI32,
     /// Region size.
-    region_size: Size,
+    region_size: SizeU32,
     /// Point position.
-    position: Position,
+    position: PositionI32,
     /// Point color.
     color: Rgba,
 }
@@ -156,10 +156,10 @@ impl Pipeline {
     }
 
     /// Pushes `points` to be rendered for `layer` in `region`.
-    pub fn push<T: IntoIterator<Item = (Position, Rgba)>>(
+    pub fn push<T: IntoIterator<Item = (PositionI32, Rgba)>>(
         &mut self,
         layer: u32,
-        region: Rectangle,
+        region: RectangleI32U32,
         points: T,
         closed: bool,
     ) {

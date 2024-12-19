@@ -12,7 +12,7 @@ use virus_editor::{
     sub_in_range,
 };
 use virus_graphics::{
-    types::{Rectangle, Size},
+    types::{RectangleI32U32, SizeU32},
     wgpu::Graphics,
 };
 use winit::window::Window;
@@ -98,20 +98,20 @@ impl Ui {
         let theme = self.context.theme;
         let window = self.window.inner_size();
         let region = {
-            let size = Size {
+            let size = SizeU32 {
                 width: window.width,
                 height: window.height - theme.line_height,
             };
             let pixels = theme.pixels(size);
 
-            Rectangle {
+            RectangleI32U32 {
                 top: (size.height - pixels.height) as i32 / 2,
                 left: (size.width - pixels.width) as i32 / 2,
                 width: pixels.width,
                 height: pixels.height,
             }
         };
-        let status_region = Rectangle {
+        let status_region = RectangleI32U32 {
             top: region.top + region.height as i32,
             left: 0,
             width: window.width,

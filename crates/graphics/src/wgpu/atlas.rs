@@ -17,11 +17,11 @@ struct Item<V> {
 
 impl<V> Item<V> {
     /// Returns the position of the item.
-    fn position(&self) -> Position {
+    fn position(&self) -> PositionI32 {
         debug_assert!(i32::try_from(self.top).is_ok());
         debug_assert!(i32::try_from(self.left).is_ok());
 
-        Position {
+        PositionI32 {
             top: self.top as i32,
             left: self.left as i32,
         }
@@ -86,7 +86,7 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
     }
 
     /// Returns the position and value of the item for `key`.
-    pub fn get(&self, key: &K) -> Option<(Position, &V)> {
+    pub fn get(&self, key: &K) -> Option<(PositionI32, &V)> {
         self.items
             .get(&key)
             .map(|item| (item.position(), &item.value))
@@ -101,9 +101,9 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
         queue: &Queue,
         key: K,
         value: V,
-        size: Size,
+        size: SizeU32,
         bytes: &[u8],
-    ) -> Result<(Position, &V), AtlasError> {
+    ) -> Result<(PositionI32, &V), AtlasError> {
         if self.items.contains_key(&key) {
             return Err(AtlasError::KeyExists);
         }
@@ -111,7 +111,7 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
         self.try_insert(&key, value, size)?;
 
         let item = self.items.get(&key).unwrap();
-        self.write(queue, (item.position(), size).into(), bytes);
+        self.write(queue, RectangleI32U32::new(item.position(), size), bytes);
 
         Ok((item.position(), &item.value))
     }
@@ -137,7 +137,7 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
         &mut self,
         key: &K,
         value: V,
-        Size { width, height }: Size,
+        SizeU32 { width, height }: SizeU32,
     ) -> Result<(), AtlasError> {
         if !((width <= self.bin_width) && (height <= self.texture.height())) {
             return Err(AtlasError::WontFit);
@@ -227,8 +227,8 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
     }
 
     /// Writes `data` in texture.
-    fn write(&self, queue: &Queue, rectangle: Rectangle, data: &[u8]) {
-        let Rectangle {
+    fn write(&self, queue: &Queue, rectangle: RectangleI32U32, data: &[u8]) {
+        let RectangleI32U32 {
             top,
             left,
             width,

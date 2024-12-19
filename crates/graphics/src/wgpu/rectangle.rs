@@ -10,16 +10,16 @@ macro_rules! label {
 //                                            Instance                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-crate::muck!(unsafe Instance => Instance: [Position, Size, Rgba]);
+crate::muck!(unsafe Instance => Instance: [PositionI32, SizeU32, Rgba]);
 
 /// Instance.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct Instance {
     /// Rectangle position.
-    position: Position,
+    position: PositionI32,
     /// Rectangle size.
-    size: Size,
+    size: SizeU32,
     /// Rectangle color.
     color: Rgba,
 }
@@ -154,7 +154,13 @@ impl Pipeline {
     }
 
     /// Pushes a `rectangle` to be rendered for `layer` in `region` with `color`.
-    pub fn push(&mut self, layer: u32, region: Rectangle, rectangle: Rectangle, color: Rgba) {
+    pub fn push(
+        &mut self,
+        layer: u32,
+        region: RectangleI32U32,
+        rectangle: RectangleI32U32,
+        color: Rgba,
+    ) {
         if !color.is_visible() {
             return;
         }

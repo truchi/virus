@@ -12,7 +12,7 @@ use virus_editor::{
 };
 use virus_graphics::{
     text::{Advance, FontStyle, FontWeight, Fonts, Glyphs, Styles},
-    types::{Position, Rectangle, Rgba, Size},
+    types::{PositionI32, RectangleI32U32, Rgba, SizeU32},
     wgpu::{Draw, Layer},
 };
 
@@ -22,7 +22,7 @@ use virus_graphics::{
 
 pub struct DocumentView {
     document_id: DocumentId,
-    size: Size,
+    size: SizeU32,
     scroll_top: Tweened<u32>,
     scrollbar_alpha: Tweened<u8>,
 }
@@ -53,7 +53,7 @@ impl DocumentView {
         self.document_id
     }
 
-    pub fn size(&self) -> Size {
+    pub fn size(&self) -> SizeU32 {
         self.size
     }
 
@@ -112,13 +112,13 @@ impl DocumentView {
             .unwrap()
             .advance_for_size(theme.font_size);
         let scrollbar_rectangle = if rope_lines <= region_height_in_lines as usize {
-            Rectangle::default()
+            RectangleI32U32::default()
         } else {
             let top = scroll_top_in_lines / rope_lines as f32;
             let height = region_height_in_lines / rope_lines as f32;
             let region_height = layer.size().height as f32;
 
-            Rectangle {
+            RectangleI32U32 {
                 top: (top * region_height).round() as i32,
                 height: (height * region_height).round() as u32,
                 left: (advance / 2.0).round() as i32,
@@ -173,7 +173,7 @@ struct Renderer<'a> {
     start_line: usize,
     gutter_width: u32,
     scroll_top: u32,
-    scrollbar_rectangle: Rectangle,
+    scrollbar_rectangle: RectangleI32U32,
     scrollbar_color: Rgba,
     mode: Mode,
     is_active: bool,
@@ -207,7 +207,7 @@ impl<'a> Renderer<'a> {
             self.layer.draw(None, 0).glyphs(
                 self.fonts,
                 self.scale,
-                Position {
+                PositionI32 {
                     top: number as i32 * self.theme.line_height as i32 - self.scroll_top as i32,
                     left: (self.gutter_width as Advance - glyphs.advance()).round() as i32,
                 },
@@ -229,7 +229,7 @@ impl<'a> Renderer<'a> {
             self.layer.draw(None, 0).glyphs(
                 self.fonts,
                 self.scale,
-                Position { top, left },
+                PositionI32 { top, left },
                 self.theme.line_height as u32,
                 glyphs,
             );
@@ -239,7 +239,7 @@ impl<'a> Renderer<'a> {
     }
 
     fn selection(&mut self) -> &mut Self {
-        let pos = |top, left| Position { top, left };
+        let pos = |top, left| PositionI32 { top, left };
         let row = |cursor: Cursor| {
             cursor.line as i32 * self.theme.line_height as i32 - self.scroll_top as i32
         };
@@ -310,7 +310,7 @@ impl<'a> Renderer<'a> {
         };
         let render_selection = |draw: &mut Draw, top, left, width, height| {
             draw.rectangle(
-                Rectangle {
+                RectangleI32U32 {
                     top,
                     left,
                     width: width as u32,
@@ -321,7 +321,7 @@ impl<'a> Renderer<'a> {
         };
         let render_caret = |draw: &mut Draw, top, left| {
             draw.rectangle(
-                Rectangle {
+                RectangleI32U32 {
                     top,
                     left: left - caret_width as i32 / 2,
                     width: caret_width,
@@ -382,7 +382,7 @@ impl<'a> Renderer<'a> {
         if !self.is_active {
             let size = self.layer.size();
             self.layer.draw(None, 2).rectangle(
-                Rectangle::from((Position::default(), size)),
+                RectangleI32U32::new(PositionI32::default(), size),
                 self.theme.inactive_foreground_color,
             );
         }
