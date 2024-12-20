@@ -168,7 +168,9 @@ mod todo {
         let catppuccin = Catppuccin::latte();
         let family = fonts.get("Victor").unwrap().key();
         let font_size = 15 as FontSize;
-        let line_height = font_size as f32 + font_size as f32 / 4.0;
+
+        // NOTE: line height must be round or scroll ondulates.
+        let line_height = (font_size as f32 * 5.0 / 4.0).round();
 
         UiTheme {
             syntax: catppuccin.syntax_theme(),

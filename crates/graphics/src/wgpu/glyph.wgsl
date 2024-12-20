@@ -41,7 +41,7 @@ struct Instance {
     @location(1) position: vec2f,
     // Glyph `(width, height)` size.
     @location(2) size: vec2f,
-    // Texture `(x, y)` position.
+    // Texture `(top, left)` position.
     @location(3) uv: vec2f,
     // Glyph sRGBA color.
     @location(4) color: vec4u,
