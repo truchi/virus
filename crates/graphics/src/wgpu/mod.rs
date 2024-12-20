@@ -107,6 +107,7 @@ impl Graphics {
                     max_push_constant_size: 128,
                     ..Default::default()
                 },
+                memory_hints: Default::default(),
             },
             None,
         ))

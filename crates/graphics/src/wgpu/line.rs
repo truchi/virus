@@ -78,7 +78,7 @@ impl<'a> Init<'a> {
             layout: Some(&pipeline_layout),
             vertex: VertexState {
                 module: &module,
-                entry_point: "vertex",
+                entry_point: None,
                 compilation_options: Default::default(),
                 buffers: &[Vertex::buffer_layout()],
             },
@@ -90,7 +90,7 @@ impl<'a> Init<'a> {
             multisample: Default::default(),
             fragment: Some(FragmentState {
                 module: &module,
-                entry_point: "fragment",
+                entry_point: None,
                 compilation_options: Default::default(),
                 targets: &[Some(ColorTargetState {
                     format: config.format,
@@ -99,6 +99,7 @@ impl<'a> Init<'a> {
                 })],
             }),
             multiview: None,
+            cache: None,
         })
     }
 }

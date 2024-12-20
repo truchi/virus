@@ -37,7 +37,7 @@ unicode-properties = "0.1"
 unicode-segmentation = "1.12"
 unicode-width = "0.1"
 url = "2.5"
-wgpu = "0.20"
+wgpu = "23.0"
 winit = "0.30"
 
 [profile.dev]
