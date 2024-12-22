@@ -27,12 +27,14 @@ NORMAL:
   escape: insert
   ",": select_🧠
   ";": unselect
+  ?repeat :: select_forward ?repeat +wrap
+  ?repeat shift :: select_backward ?repeat +wrap
 
   x: cut
   c: copy
   v: paste
   z: undo
-  command z: redo
+  Z: redo
 
   space:
     f: files
@@ -65,6 +67,8 @@ INSERT:
   escape: normal
   command ,: select_🧠
   command ;: unselect
+  ?repeat command :: select_forward ?repeat +wrap
+  ?repeat command shift :: select_backward ?repeat +wrap
 
   command x: cut
   command c: copy

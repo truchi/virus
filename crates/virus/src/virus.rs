@@ -1107,6 +1107,32 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
         }
     }
 
+    fn select_forward(&mut self, repeat: usize, wrap: bool) {
+        match self.virus.mode {
+            Mode::Normal { .. } | Mode::Insert { .. } => {
+                self.virus
+                    .unwrap_active_document_mut()
+                    .search()
+                    .forward(repeat, wrap);
+                self.virus.ensure_visibility();
+            }
+            Mode::Files => {}
+        }
+    }
+
+    fn select_backward(&mut self, repeat: usize, wrap: bool) {
+        match self.virus.mode {
+            Mode::Normal { .. } | Mode::Insert { .. } => {
+                self.virus
+                    .unwrap_active_document_mut()
+                    .search()
+                    .backward(repeat, wrap);
+                self.virus.ensure_visibility();
+            }
+            Mode::Files => {}
+        }
+    }
+
     fn flip_selection(&mut self) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {

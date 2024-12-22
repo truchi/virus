@@ -5,7 +5,7 @@ use crate::{
     ids,
     rope::{
         Boundaries, Cursor, Edit, GraphemeCategory, GraphemesBackward, GraphemesForward,
-        Segmentation, Selection, Text,
+        SearchBackward, SearchForward, Segmentation, Selection, Text,
     },
     sub_in_range,
 };
@@ -331,6 +331,10 @@ impl Document {
     pub fn edition(&mut self) -> DocumentEdition {
         DocumentEdition { document: self }
     }
+
+    pub fn search(&mut self) -> DocumentSearch {
+        DocumentSearch { document: self }
+    }
 }
 
 /// Private.
@@ -609,5 +613,93 @@ impl<'document> DocumentEdition<'document> {
 
         self.document.movements().selection(selection, true);
         self.document.version += 1;
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                         DocumentSearch                                         //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+pub struct DocumentSearch<'document> {
+    document: &'document mut Document,
+}
+
+impl<'document> DocumentSearch<'document> {
+    pub fn forward(&mut self, repeat: usize, wrap: bool) -> &mut Self {
+        let rope = &self.document.rope;
+        let selection = self.document.selection;
+        let start = selection.range().start.index;
+        let end = selection.range().end.index;
+
+        let mut repeat = repeat;
+        let mut index = start;
+        let mut offset = end;
+        let mut search = SearchForward::new(rope.byte_slice(start..end), rope.byte_slice(end..));
+
+        while repeat != 0 {
+            if let Some(i) = search.next() {
+                index = offset + i;
+                repeat -= 1;
+            } else if wrap {
+                offset = 0;
+                search = SearchForward::new(rope.byte_slice(start..end), rope.byte_slice(..));
+            } else {
+                break;
+            }
+        }
+
+        if index != start {
+            debug_assert_eq!(
+                rope.byte_slice(start..end),
+                rope.byte_slice(index..index + end - start),
+            );
+
+            let anchor = Cursor::build(rope.slice(..)).at_index(index);
+            let head = Cursor::build(rope.slice(..)).at_index(index + end - start);
+            self.document
+                .movements()
+                .selection(Selection::new(anchor, head), false)
+                .flip(!selection.is_forward());
+        }
+
+        self
+    }
+
+    pub fn backward(&mut self, repeat: usize, wrap: bool) -> &mut Self {
+        let rope = &self.document.rope;
+        let selection = self.document.selection;
+        let start = selection.range().start.index;
+        let end = selection.range().end.index;
+
+        let mut repeat = repeat;
+        let mut index = start;
+        let mut search = SearchBackward::new(rope.byte_slice(start..end), rope.byte_slice(..start));
+
+        while repeat != 0 {
+            if let Some(i) = search.next() {
+                index = i;
+                repeat -= 1;
+            } else if wrap {
+                search = SearchBackward::new(rope.byte_slice(start..end), rope.byte_slice(..));
+            } else {
+                break;
+            }
+        }
+
+        if index != start {
+            debug_assert_eq!(
+                rope.byte_slice(start..end),
+                rope.byte_slice(index..index + end - start),
+            );
+
+            let anchor = Cursor::build(rope.slice(..)).at_index(index);
+            let head = Cursor::build(rope.slice(..)).at_index(index + end - start);
+            self.document
+                .movements()
+                .selection(Selection::new(anchor, head), false)
+                .flip(!selection.is_forward());
+        }
+
+        self
     }
 }

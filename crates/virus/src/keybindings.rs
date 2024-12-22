@@ -452,6 +452,16 @@ actions!(
 
     select_smart(),
 
+    select_forward(
+        repeat: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    select_backward(
+        repeat: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
     flip_selection(),
 
     unselect(

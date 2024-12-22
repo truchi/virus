@@ -13,12 +13,14 @@ pub mod rope {
     mod cursor;
     mod edit;
     mod graphemes;
+    mod search;
     mod segmentation;
     mod selection;
 
     pub use cursor::*;
     pub use edit::*;
     pub use graphemes::*;
+    pub use search::*;
     pub use segmentation::*;
     pub use selection::*;
 }
