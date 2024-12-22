@@ -19,7 +19,7 @@ use std::{
     time::SystemTime,
 };
 use tempfile::TempDir;
-use tree_sitter::{Parser, Query, Tree};
+use tree_sitter::{Language, Parser, Query, Tree};
 
 ids!(
     /// [`DocumentId`] generator.
@@ -136,7 +136,7 @@ impl Document {
             panic!("File type not supported");
         }
 
-        let language = tree_sitter_rust::language();
+        let language = Language::from(tree_sitter_rust::LANGUAGE);
         let file = File::open(&path)?;
         let rope = Rope::from_reader(&mut BufReader::new(&file))?;
         let anchor_segmentation = Segmentation::new(rope.clone(), 0, 0, 0);
