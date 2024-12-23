@@ -40,6 +40,15 @@ NORMAL:
     f: files
     s: save
     q: close
+    a:
+      stick: true
+      ?count $↑: move_ast_prev   ?count +paren +square +curly +angle +pipe +single +double +back +wrap
+      ?count $↓: move_ast_next   ?count +paren +square +curly +angle +pipe +single +double +back +wrap
+      ?count $←: move_ast_parent ?count +paren +square +curly +angle +pipe +single +double +back
+      ?count $→: move_ast_child  ?count +paren +square +curly +angle +pipe +single +double +back +wrap
+      ",": select_🧠
+      ";": unstick
+      escape: unstick
 
   a:
     $↑: panes_focus_first

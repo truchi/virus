@@ -1,8 +1,10 @@
 pub mod ast {
     mod highlights;
+    mod navigation;
     mod queries;
 
     pub use highlights::*;
+    pub use navigation::*;
     pub use queries::*;
 }
 pub mod document;

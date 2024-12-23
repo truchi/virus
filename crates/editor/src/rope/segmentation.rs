@@ -93,7 +93,7 @@ impl Boundaries {
         long_word_start: bool,
         long_word_end: bool,
     ) -> Self {
-        let mut boundaries = Boundaries::empty();
+        let mut boundaries = Self::empty();
 
         punctuation_start.then(|| boundaries.insert(Self::PUNCTUATION_START));
         punctuation_end.then(|| boundaries.insert(Self::PUNCTUATION_END));

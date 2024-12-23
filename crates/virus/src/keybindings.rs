@@ -392,6 +392,59 @@ actions!(
         wrap: (Option<bool>) = false,
     ),
 
+    // MOVE ast
+
+    move_ast_parent(
+        paren: (Option<bool>) = false,
+        square: (Option<bool>) = false,
+        curly: (Option<bool>) = false,
+        angle: (Option<bool>) = false,
+        pipe: (Option<bool>) = false,
+        single: (Option<bool>) = false,
+        double: (Option<bool>) = false,
+        back: (Option<bool>) = false,
+        count: (Option<Number>) = 1,
+    ),
+
+    move_ast_child(
+        paren: (Option<bool>) = false,
+        square: (Option<bool>) = false,
+        curly: (Option<bool>) = false,
+        angle: (Option<bool>) = false,
+        pipe: (Option<bool>) = false,
+        single: (Option<bool>) = false,
+        double: (Option<bool>) = false,
+        back: (Option<bool>) = false,
+        count: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    move_ast_prev(
+        paren: (Option<bool>) = false,
+        square: (Option<bool>) = false,
+        curly: (Option<bool>) = false,
+        angle: (Option<bool>) = false,
+        pipe: (Option<bool>) = false,
+        single: (Option<bool>) = false,
+        double: (Option<bool>) = false,
+        back: (Option<bool>) = false,
+        count: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
+    move_ast_next(
+        paren: (Option<bool>) = false,
+        square: (Option<bool>) = false,
+        curly: (Option<bool>) = false,
+        angle: (Option<bool>) = false,
+        pipe: (Option<bool>) = false,
+        single: (Option<bool>) = false,
+        double: (Option<bool>) = false,
+        back: (Option<bool>) = false,
+        count: (Option<Number>) = 1,
+        wrap: (Option<bool>) = false,
+    ),
+
     //
     // SCROLL
     //

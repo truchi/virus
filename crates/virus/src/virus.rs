@@ -9,6 +9,7 @@ use crate::{
 use std::{sync::Arc, time::Instant};
 use virus_editor::{
     add_in_range,
+    ast::Pairs,
     document::Document,
     editor::WatcherEvent,
     fuzzy::Search,
@@ -795,6 +796,158 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                         wrap,
                     )
                     .collapse(select == Select::None);
+
+                self.virus.ensure_visibility();
+            }
+            Mode::Files => {}
+        }
+    }
+
+    // MOVE ast
+
+    fn move_ast_parent(
+        &mut self,
+        paren: bool,
+        square: bool,
+        curly: bool,
+        angle: bool,
+        pipe: bool,
+        single: bool,
+        double: bool,
+        back: bool,
+        count: usize,
+    ) {
+        match self.virus.mode {
+            Mode::Normal { .. } | Mode::Insert { .. } => {
+                let document = self.virus.unwrap_active_document_mut();
+
+                document.movements().ast_parent(
+                    Pairs::from_bools(paren, square, curly, angle, pipe, single, double, back),
+                    count,
+                );
+
+                match (document.selection().is_empty(), &mut self.virus.mode) {
+                    (false, Mode::Normal { select } | Mode::Insert { select }) => {
+                        if *select == Select::None {
+                            *select = Select::Range;
+                        }
+                    }
+                    _ => {}
+                }
+
+                self.virus.ensure_visibility();
+            }
+            Mode::Files => {}
+        }
+    }
+
+    fn move_ast_child(
+        &mut self,
+        paren: bool,
+        square: bool,
+        curly: bool,
+        angle: bool,
+        pipe: bool,
+        single: bool,
+        double: bool,
+        back: bool,
+        count: usize,
+        wrap: bool,
+    ) {
+        match self.virus.mode {
+            Mode::Normal { .. } | Mode::Insert { .. } => {
+                let document = self.virus.unwrap_active_document_mut();
+
+                document.movements().ast_child(
+                    Pairs::from_bools(paren, square, curly, angle, pipe, single, double, back),
+                    count,
+                    wrap,
+                );
+
+                match (document.selection().is_empty(), &mut self.virus.mode) {
+                    (false, Mode::Normal { select } | Mode::Insert { select }) => {
+                        if *select == Select::None {
+                            *select = Select::Range;
+                        }
+                    }
+                    _ => {}
+                }
+
+                self.virus.ensure_visibility();
+            }
+            Mode::Files => {}
+        }
+    }
+
+    fn move_ast_prev(
+        &mut self,
+        paren: bool,
+        square: bool,
+        curly: bool,
+        angle: bool,
+        pipe: bool,
+        single: bool,
+        double: bool,
+        back: bool,
+        count: usize,
+        wrap: bool,
+    ) {
+        match self.virus.mode {
+            Mode::Normal { .. } | Mode::Insert { .. } => {
+                let document = self.virus.unwrap_active_document_mut();
+
+                document.movements().ast_prev(
+                    Pairs::from_bools(paren, square, curly, angle, pipe, single, double, back),
+                    count,
+                    wrap,
+                );
+
+                match (document.selection().is_empty(), &mut self.virus.mode) {
+                    (false, Mode::Normal { select } | Mode::Insert { select }) => {
+                        if *select == Select::None {
+                            *select = Select::Range;
+                        }
+                    }
+                    _ => {}
+                }
+
+                self.virus.ensure_visibility();
+            }
+            Mode::Files => {}
+        }
+    }
+
+    fn move_ast_next(
+        &mut self,
+        paren: bool,
+        square: bool,
+        curly: bool,
+        angle: bool,
+        pipe: bool,
+        single: bool,
+        double: bool,
+        back: bool,
+        count: usize,
+        wrap: bool,
+    ) {
+        match self.virus.mode {
+            Mode::Normal { .. } | Mode::Insert { .. } => {
+                let document = self.virus.unwrap_active_document_mut();
+
+                document.movements().ast_next(
+                    Pairs::from_bools(paren, square, curly, angle, pipe, single, double, back),
+                    count,
+                    wrap,
+                );
+
+                match (document.selection().is_empty(), &mut self.virus.mode) {
+                    (false, Mode::Normal { select } | Mode::Insert { select }) => {
+                        if *select == Select::None {
+                            *select = Select::Range;
+                        }
+                    }
+                    _ => {}
+                }
 
                 self.virus.ensure_visibility();
             }

@@ -1,6 +1,6 @@
 use crate::{
     add_in_range,
-    ast::RUST_HIGHLIGHTS,
+    ast::{Navigation, Pairs, RUST_HIGHLIGHTS},
     history::History,
     ids,
     rope::{
@@ -523,6 +523,102 @@ impl<'document> DocumentMovements<'document> {
         self.head(self.document.head_segmentation.cursor(), false);
         self
     }
+
+    pub fn ast_parent(&mut self, pairs: Pairs, count: usize) -> &mut Self {
+        let (rope, selection) = (&self.document.rope, self.document.selection);
+        let (start, end) = (selection.range().start.index, selection.range().end.index);
+
+        if let Some(node) =
+            Navigation::new(rope.slice(..), &self.document.tree, start..end).parent(pairs, count)
+        {
+            let anchor = Cursor::build(rope.slice(..)).at_index(node.start_byte());
+            let head = Cursor::build(rope.slice(..)).at_index(node.end_byte());
+
+            debug_assert_eq!(anchor.line, node.start_position().row);
+            debug_assert_eq!(anchor.column, node.start_position().column);
+            debug_assert_eq!(head.line, node.end_position().row);
+            debug_assert_eq!(head.column, node.end_position().column);
+
+            self.document
+                .movements()
+                .selection(Selection::new(anchor, head), false)
+                .flip(true);
+        }
+
+        self
+    }
+
+    pub fn ast_child(&mut self, pairs: Pairs, count: usize, wrap: bool) -> &mut Self {
+        let (rope, selection) = (&self.document.rope, self.document.selection);
+        let (start, end) = (selection.range().start.index, selection.range().end.index);
+
+        if let Some(node) = Navigation::new(rope.slice(..), &self.document.tree, start..end)
+            .child(pairs, count, wrap)
+        {
+            let anchor = Cursor::build(rope.slice(..)).at_index(node.start_byte());
+            let head = Cursor::build(rope.slice(..)).at_index(node.end_byte());
+
+            debug_assert_eq!(anchor.line, node.start_position().row);
+            debug_assert_eq!(anchor.column, node.start_position().column);
+            debug_assert_eq!(head.line, node.end_position().row);
+            debug_assert_eq!(head.column, node.end_position().column);
+
+            self.document
+                .movements()
+                .selection(Selection::new(anchor, head), false)
+                .flip(true);
+        }
+
+        self
+    }
+
+    pub fn ast_prev(&mut self, pairs: Pairs, count: usize, wrap: bool) -> &mut Self {
+        let (rope, selection) = (&self.document.rope, self.document.selection);
+        let (start, end) = (selection.range().start.index, selection.range().end.index);
+
+        if let Some(node) = Navigation::new(rope.slice(..), &self.document.tree, start..end)
+            .prev(pairs, count, wrap)
+        {
+            let anchor = Cursor::build(rope.slice(..)).at_index(node.start_byte());
+            let head = Cursor::build(rope.slice(..)).at_index(node.end_byte());
+
+            debug_assert_eq!(anchor.line, node.start_position().row);
+            debug_assert_eq!(anchor.column, node.start_position().column);
+            debug_assert_eq!(head.line, node.end_position().row);
+            debug_assert_eq!(head.column, node.end_position().column);
+
+            self.document
+                .movements()
+                .selection(Selection::new(anchor, head), false)
+                .flip(true);
+        }
+
+        self
+    }
+
+    pub fn ast_next(&mut self, pairs: Pairs, count: usize, wrap: bool) -> &mut Self {
+        let (rope, selection) = (&self.document.rope, self.document.selection);
+        let (start, end) = (selection.range().start.index, selection.range().end.index);
+
+        if let Some(node) = Navigation::new(rope.slice(..), &self.document.tree, start..end)
+            .next(pairs, count, wrap)
+        {
+            let anchor = Cursor::build(rope.slice(..)).at_index(node.start_byte());
+            let head = Cursor::build(rope.slice(..)).at_index(node.end_byte());
+
+            debug_assert_eq!(anchor.line, node.start_position().row);
+            debug_assert_eq!(anchor.column, node.start_position().column);
+            debug_assert_eq!(head.line, node.end_position().row);
+            debug_assert_eq!(head.column, node.end_position().column);
+
+            self.document
+                .movements()
+                .selection(Selection::new(anchor, head), false)
+                .flip(true);
+        }
+
+        self
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -625,13 +721,10 @@ pub struct DocumentSearch<'document> {
 }
 
 impl<'document> DocumentSearch<'document> {
-    pub fn forward(&mut self, repeat: usize, wrap: bool) -> &mut Self {
-        let rope = &self.document.rope;
-        let selection = self.document.selection;
-        let start = selection.range().start.index;
-        let end = selection.range().end.index;
+    pub fn forward(&mut self, mut repeat: usize, wrap: bool) -> &mut Self {
+        let (rope, selection) = (&self.document.rope, self.document.selection);
+        let (start, end) = (selection.range().start.index, selection.range().end.index);
 
-        let mut repeat = repeat;
         let mut index = start;
         let mut offset = end;
         let mut search = SearchForward::new(rope.byte_slice(start..end), rope.byte_slice(end..));
@@ -665,13 +758,10 @@ impl<'document> DocumentSearch<'document> {
         self
     }
 
-    pub fn backward(&mut self, repeat: usize, wrap: bool) -> &mut Self {
-        let rope = &self.document.rope;
-        let selection = self.document.selection;
-        let start = selection.range().start.index;
-        let end = selection.range().end.index;
+    pub fn backward(&mut self, mut repeat: usize, wrap: bool) -> &mut Self {
+        let (rope, selection) = (&self.document.rope, self.document.selection);
+        let (start, end) = (selection.range().start.index, selection.range().end.index);
 
-        let mut repeat = repeat;
         let mut index = start;
         let mut search = SearchBackward::new(rope.byte_slice(start..end), rope.byte_slice(..start));
 
