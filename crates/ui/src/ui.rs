@@ -321,8 +321,8 @@ impl<'ui> UiPanesMut<'ui> {
         }
     }
 
-    pub fn scroll(&mut self, pane_id: PaneId, line: f32) {
-        let top = line * self.ui.context.theme.line_height;
+    pub fn scroll(&mut self, pane_id: PaneId, line: usize) {
+        let top = line as f32 * self.ui.context.theme.line_height;
         let tween = self.ui.context.theme.scroll_tween;
         let duration = self.ui.context.theme.scroll_duration;
 

@@ -313,7 +313,7 @@ actions!(
         pages: (Option<Number>) = 1,
         half: (Option<bool>) = false,
         wrap: (Option<bool>) = false,
-        // TODO blank? margin?
+        // TODO blank?
     ),
 
     move_up_line(
@@ -485,15 +485,11 @@ actions!(
 
     // SCROLL align
 
-    scroll_align_top(
-        margin: (Option<Number>) = 0,
-    ),
+    scroll_align_top(),
 
     scroll_align_center(),
 
-    scroll_align_bottom(
-        margin: (Option<Number>) = 0,
-    ),
+    scroll_align_bottom(),
 
     //
     // SELECTION

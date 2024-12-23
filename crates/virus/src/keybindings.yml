@@ -20,9 +20,9 @@ NORMAL:
   ?pages shift $↑: scroll_↑_page ?pages +half
   ?pages shift $↓: scroll_↓_page ?pages +half
   e:
-    z: scroll_align_↑↑ margin=3
+    z: scroll_align_↑↑
     e: scroll_align_center
-    r: scroll_align_↓↓ margin=3
+    r: scroll_align_↓↓
 
   escape: insert
   ",": select_🧠
