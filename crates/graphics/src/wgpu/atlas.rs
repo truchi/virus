@@ -6,36 +6,11 @@ use super::*;
 
 /// An [`Atlas`] item.
 #[derive(Copy, Clone, Debug)]
-struct Item<V> {
-    /// The top coordinate of the item in the atlas.
-    top: u32,
-    /// The left coordinate of the item in the atlas.
-    left: u32,
+pub struct Item<V> {
+    /// The position of the item in the atlas.
+    pub position: Position,
     /// The value associated with the item.
-    value: V,
-}
-
-impl<V> Item<V> {
-    /// Returns the position of the item.
-    fn position(&self) -> Position<u32> {
-        Position {
-            top: self.top,
-            left: self.left,
-        }
-    }
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                             Shelf                                              //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-/// An [`Atlas`] shelf.
-#[derive(Copy, Clone, Debug)]
-struct Shelf {
-    /// The occupied width of the shelf.
-    width: u32,
-    /// The height of the largest item in the shelf.
-    height: u32,
+    pub value: V,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -59,7 +34,7 @@ pub struct Atlas<K: Clone + Eq + Hash, V> {
     /// The width of bins (last may be smaller).
     bin_width: u32,
     /// The bins of the atlas.
-    bins: Vec<Vec<Shelf>>,
+    bins: Vec<Vec<Size>>,
     /// The items in the atlas.
     items: HashMap<K, Item<V>>,
     /// The GPU texture.
@@ -83,10 +58,8 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
     }
 
     /// Returns the position and value of the item for `key`.
-    pub fn get(&self, key: &K) -> Option<(Position<u32>, &V)> {
-        self.items
-            .get(&key)
-            .map(|item| (item.position(), &item.value))
+    pub fn get(&self, key: &K) -> Option<&Item<V>> {
+        self.items.get(&key)
     }
 
     /// Inserts an item for `key` with `size` and `value`.
@@ -98,9 +71,9 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
         queue: &Queue,
         key: K,
         value: V,
-        size: Size<u32>,
+        size: Size,
         bytes: &[u8],
-    ) -> Result<(Position<u32>, &V), AtlasError> {
+    ) -> Result<&Item<V>, AtlasError> {
         if self.items.contains_key(&key) {
             return Err(AtlasError::KeyExists);
         }
@@ -110,9 +83,9 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
             self.items.get(&key).unwrap()
         };
 
-        self.write(queue, Rectangle::new(item.position(), size), bytes);
+        self.write(queue, Rectangle::new(item.position, size), bytes);
 
-        Ok((item.position(), &item.value))
+        Ok(item)
     }
 
     /// Clears the atlas.
@@ -132,13 +105,8 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
 /// Private.
 impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
     /// Tries to insert an item.
-    fn try_insert(
-        &mut self,
-        key: &K,
-        value: V,
-        Size { width, height }: Size<u32>,
-    ) -> Result<(), AtlasError> {
-        if !((width <= self.bin_width) && (height <= self.texture.height())) {
+    fn try_insert(&mut self, key: &K, value: V, size: Size) -> Result<(), AtlasError> {
+        if !(size.width <= self.bin_width && size.height <= self.texture.height()) {
             return Err(AtlasError::WontFit);
         }
 
@@ -151,16 +119,15 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
             if let Some((open, closeds)) = bin.split_last_mut() {
                 for closed in closeds {
                     // Fits in closed shelf?
-                    if (width <= bin_width - closed.width) && (height <= closed.height) {
+                    if (size.width <= bin_width - closed.width) && (size.height <= closed.height) {
                         self.items.insert(
                             key.clone(),
                             Item {
-                                top: shelf_top,
-                                left: bin_left + closed.width,
+                                position: Position::new_u32(shelf_top, bin_left + closed.width),
                                 value,
                             },
                         );
-                        closed.width += width;
+                        closed.width += size.width;
 
                         return Ok(());
                     }
@@ -169,19 +136,18 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
                 }
 
                 // Fits in open shelf?
-                if (width <= bin_width - open.width)
-                    && (height <= self.texture.height() - shelf_top)
+                if (size.width <= bin_width - open.width)
+                    && (size.height <= self.texture.height() - shelf_top)
                 {
                     self.items.insert(
                         key.clone(),
                         Item {
-                            top: shelf_top,
-                            left: bin_left + open.width,
+                            position: Position::new_u32(shelf_top, bin_left + open.width),
                             value,
                         },
                     );
-                    open.width += width;
-                    open.height = open.height.max(height);
+                    open.width += size.width;
+                    open.height = open.height.max(size.height);
 
                     return Ok(());
                 }
@@ -190,16 +156,15 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
             }
 
             // Fits in new shelf?
-            if (width <= bin_width) && (height <= self.texture.height() - shelf_top) {
+            if (size.width <= bin_width) && (size.height <= self.texture.height() - shelf_top) {
                 self.items.insert(
                     key.clone(),
                     Item {
-                        top: shelf_top,
-                        left: bin_left,
+                        position: Position::new_u32(shelf_top, bin_left),
                         value,
                     },
                 );
-                bin.push(Shelf { width, height });
+                bin.push(size);
 
                 return Ok(());
             }
@@ -208,16 +173,15 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
         }
 
         // Fits in new bin?
-        if width <= self.bin_width.min(self.texture.width() - bin_left) {
+        if size.width <= self.bin_width.min(self.texture.width() - bin_left) {
             self.items.insert(
                 key.clone(),
                 Item {
-                    top: 0,
-                    left: bin_left,
+                    position: Position::new_u32(0, bin_left),
                     value,
                 },
             );
-            self.bins.push(vec![Shelf { width, height }]);
+            self.bins.push(vec![size]);
 
             return Ok(());
         }
@@ -226,14 +190,14 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
     }
 
     /// Writes `data` in texture.
-    fn write(&self, queue: &Queue, rectangle: Rectangle<u32, u32>, data: &[u8]) {
+    fn write(&self, queue: &Queue, rectangle: Rectangle, data: &[u8]) {
         queue.write_texture(
             ImageCopyTexture {
                 texture: &self.texture,
                 mip_level: 0,
                 origin: Origin3d {
-                    x: rectangle.left,
-                    y: rectangle.top,
+                    x: rectangle.left as u32,
+                    y: rectangle.top as u32,
                     z: 0,
                 },
                 aspect: TextureAspect::All,

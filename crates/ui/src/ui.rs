@@ -12,7 +12,7 @@ use virus_editor::{
     sub_in_range,
 };
 use virus_graphics::{
-    types::{Rectangle, Size},
+    types::{Position, Rectangle, Size},
     wgpu::Graphics,
 };
 use winit::window::Window;
@@ -98,28 +98,24 @@ impl Ui {
         let theme = self.context.theme;
         let window = {
             let window = self.window.inner_size();
-            Size::new(window.width as f32, window.height as f32)
+            Size::new(window.width, window.height)
         };
         let region = {
-            let size = Size {
-                width: window.width,
-                height: window.height - theme.line_height,
-            };
+            let size = Size::new(window.width, window.height - theme.line_height);
             let pixels = theme.pixels(size);
 
-            Rectangle {
-                top: (size.height - pixels.height) / 2.0,
-                left: (size.width - pixels.width) / 2.0,
-                width: pixels.width,
-                height: pixels.height,
-            }
+            Rectangle::new(
+                Position::new_u32(
+                    (size.height - pixels.height) / 2,
+                    (size.width - pixels.width) / 2,
+                ),
+                pixels,
+            )
         };
-        let status_region = Rectangle {
-            top: region.top + region.height,
-            left: 0.0,
-            width: window.width,
-            height: theme.line_height,
-        };
+        let status_region = Rectangle::new(
+            Position::new(region.top + region.height as i32, 0),
+            Size::new(window.width, theme.line_height),
+        );
 
         self.panes.render(
             &mut self.context,
@@ -322,7 +318,7 @@ impl<'ui> UiPanesMut<'ui> {
     }
 
     pub fn scroll(&mut self, pane_id: PaneId, line: usize) {
-        let top = line as f32 * self.ui.context.theme.line_height;
+        let top = line as i32 * self.ui.context.theme.line_height as i32;
         let tween = self.ui.context.theme.scroll_tween;
         let duration = self.ui.context.theme.scroll_duration;
 

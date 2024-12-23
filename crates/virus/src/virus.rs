@@ -267,7 +267,7 @@ impl Virus {
         let anchor = document.selection().anchor.line;
         let head = document.selection().head.line;
         let height_in_lines = theme.cells(pane.view.size()).height as usize;
-        let line = (pane.view.scroll_top().end() / theme.line_height).round() as usize;
+        let line = pane.view.scroll_top().end() as usize / theme.line_height as usize;
 
         let clamp = |cursor: usize, line: usize| {
             if cursor < line + MARGIN {
@@ -1014,7 +1014,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let offset = blank
                     .then_some(0)
                     .unwrap_or_else(|| document.leading_blank_lines());
-                let line = (pane.view.scroll_top().end() / theme.line_height).floor() as usize;
+                let line = pane.view.scroll_top().end() as usize / theme.line_height as usize;
                 let line =
                     line.saturating_sub(pages * cells.height as usize / if half { 2 } else { 1 });
                 let line = line.max(offset);
@@ -1042,7 +1042,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let offset = blank
                     .then_some(0)
                     .unwrap_or_else(|| document.leading_blank_lines());
-                let line = (pane.view.scroll_top().end() / theme.line_height).floor() as usize;
+                let line = pane.view.scroll_top().end() as usize / theme.line_height as usize;
                 let line = line.saturating_sub(lines);
                 let line = line.max(offset);
 
@@ -1100,7 +1100,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let offset = blank
                     .then_some(0)
                     .unwrap_or_else(|| document.trailing_blank_lines());
-                let line = (pane.view.scroll_top().end() / theme.line_height).floor() as usize;
+                let line = pane.view.scroll_top().end() as usize / theme.line_height as usize;
                 let line = line + pages * cells.height as usize / if half { 2 } else { 1 };
                 let line = line.min(
                     document
@@ -1133,7 +1133,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let offset = blank
                     .then_some(0)
                     .unwrap_or_else(|| document.trailing_blank_lines());
-                let line = (pane.view.scroll_top().end() / theme.line_height).floor() as usize;
+                let line = pane.view.scroll_top().end() as usize / theme.line_height as usize;
                 let line = line + lines;
                 let line = line.min(
                     document

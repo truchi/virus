@@ -18,7 +18,7 @@ pub struct UiTheme {
 
     pub family: FontFamilyKey,
     pub font_size: FontSize,
-    pub line_height: f32,
+    pub line_height: u32,
     pub advance: f32,
 
     pub scroll_duration: Duration,
@@ -28,7 +28,7 @@ pub struct UiTheme {
     pub normal_mode_color: Rgb,
     pub insert_mode_color: Rgb,
 
-    pub caret_width: f32,
+    pub caret_width: u32,
 
     pub status_background_color: Rgb,
     pub status_mode_foreground_color: Rgb,
@@ -37,21 +37,21 @@ pub struct UiTheme {
 
 impl UiTheme {
     /// Returns the size in cells according to advance and line height.
-    pub fn cells(&self, size: Size) -> Size<u32> {
-        Size {
-            width: (size.width / self.advance).floor() as u32,
-            height: (size.height / self.line_height).floor() as u32,
-        }
+    pub fn cells(&self, size: Size) -> Size {
+        Size::new(
+            (size.width as f32 / self.advance).floor() as u32,
+            size.height / self.line_height,
+        )
     }
 
     /// Returns the cell size in pixels according to advance and line height.
     pub fn pixels(&self, size: Size) -> Size {
         let cells = self.cells(size);
 
-        Size {
-            width: cells.width as f32 * self.advance,
-            height: cells.height as f32 * self.line_height,
-        }
+        Size::new(
+            (cells.width as f32 * self.advance).ceil() as u32,
+            cells.height * self.line_height,
+        )
     }
 }
 

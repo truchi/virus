@@ -3,7 +3,7 @@ use swash::{scale::ScaleContext, shape::ShapeContext};
 use virus_editor::fuzzy::Search;
 use virus_graphics::{
     text::{FontWeight, Fonts, Glyphs, Styles},
-    types::{Position, Rectangle},
+    types::{Position, Rectangle, Size},
     wgpu::Layer,
 };
 
@@ -29,15 +29,13 @@ impl FilesView {
         let context = context.as_mut();
         let region = {
             let columns = 2 + Panes::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS;
-            let width = columns as f32 * context.theme.advance;
-            let left = (layer.size().width - width) / 2.0;
+            let width = (columns as f32 * context.theme.advance).ceil() as u32;
+            let left = (layer.size().width.saturating_sub(width)) as i32 / 2;
 
-            Rectangle {
-                top: 0.0,
-                left,
-                width,
-                height: layer.size().height,
-            }
+            Rectangle::new(
+                Position::new(0, left),
+                Size::new(width, layer.size().height),
+            )
         };
 
         Renderer {
@@ -106,8 +104,8 @@ impl<'a> Renderer<'a> {
             .draw(
                 {
                     let mut region = self.region;
-                    region.top += self.theme.line_height;
-                    region.left += self.theme.advance;
+                    region.top += self.theme.line_height as i32;
+                    region.left += self.theme.advance.ceil() as i32;
                     region
                 },
                 0,
@@ -125,18 +123,21 @@ impl<'a> Renderer<'a> {
             .draw(
                 {
                     let mut region = self.region;
-                    region.top += self.theme.line_height;
+                    region.top += self.theme.line_height as i32;
                     region
                 },
                 0,
             )
             .rectangle(
-                Rectangle {
-                    top: 0.0,
-                    left: self.theme.advance + glyphs.advance() - self.theme.caret_width / 2.0,
-                    width: self.theme.caret_width,
-                    height: self.theme.line_height,
-                },
+                Rectangle::new(
+                    Position::new(
+                        0,
+                        (self.theme.advance + glyphs.advance()
+                            - self.theme.caret_width as f32 / 2.0)
+                            .round() as i32,
+                    ),
+                    Size::new(self.theme.caret_width, self.theme.line_height),
+                ),
                 self.theme.insert_mode_color.transparent(255),
             );
 
@@ -150,9 +151,9 @@ impl<'a> Renderer<'a> {
 
         let region = {
             let mut region = self.region;
-            region.top += 3.0 * self.theme.line_height;
-            region.left += self.theme.advance;
-            region.height -= 3.0 * self.theme.line_height;
+            region.top += 3 * self.theme.line_height as i32;
+            region.left += self.theme.advance.ceil() as i32;
+            region.height -= 3 * self.theme.line_height;
             region
         };
         let range = {
@@ -213,7 +214,7 @@ impl<'a> Renderer<'a> {
                 &glyphs,
             );
 
-            position.top += self.theme.line_height;
+            position.top += self.theme.line_height as i32;
         }
 
         self

@@ -1,54 +1,45 @@
 use std::ops::{Add, Sub};
 
-fn panicking_partial_min<T: PartialOrd>(a: T, b: T) -> T {
-    a.partial_cmp(&b).unwrap().is_lt().then_some(a).unwrap_or(b)
-}
-
-fn panicking_partial_max<T: PartialOrd>(a: T, b: T) -> T {
-    a.partial_cmp(&b).unwrap().is_lt().then_some(b).unwrap_or(a)
-}
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            Position                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-crate::muck!(unsafe Position => Float32x2);
+crate::muck!(unsafe Position => Sint32x2);
 
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
-pub struct Position<T = f32> {
-    pub top: T,
-    pub left: T,
+pub struct Position {
+    pub top: i32,
+    pub left: i32,
 }
 
-impl<T> Position<T> {
+impl Position {
     /// Creates a new [`Position`].
-    pub fn new(top: T, left: T) -> Self {
+    pub fn new(top: i32, left: i32) -> Self {
         Self { top, left }
+    }
+
+    /// Creates a new [`Position`] from `u32`s.
+    pub fn new_u32(top: u32, left: u32) -> Self {
+        Self::new(top as i32, left as i32)
     }
 }
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
-impl<T: Add<U>, U> Add<Position<U>> for Position<T> {
-    type Output = Position<<T as Add<U>>::Output>;
+impl Add<Position> for Position {
+    type Output = Position;
 
-    fn add(self, rhs: Position<U>) -> Self::Output {
-        Position {
-            top: self.top + rhs.top,
-            left: self.left + rhs.left,
-        }
+    fn add(self, rhs: Position) -> Self::Output {
+        Self::new(self.top + rhs.top, self.left + rhs.left)
     }
 }
 
-impl<T: Sub<U>, U> Sub<Position<U>> for Position<T> {
-    type Output = Position<<T as Sub<U>>::Output>;
+impl Sub<Position> for Position {
+    type Output = Position;
 
-    fn sub(self, rhs: Position<U>) -> Self::Output {
-        Position {
-            top: self.top - rhs.top,
-            left: self.left - rhs.left,
-        }
+    fn sub(self, rhs: Position) -> Self::Output {
+        Self::new(self.top - rhs.top, self.left - rhs.left)
     }
 }
 
@@ -56,54 +47,50 @@ impl<T: Sub<U>, U> Sub<Position<U>> for Position<T> {
 //                                               Size                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-crate::muck!(unsafe Size => Float32x2);
+crate::muck!(unsafe Size => Uint32x2);
 
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
-pub struct Size<T = f32> {
-    pub width: T,
-    pub height: T,
+pub struct Size {
+    pub width: u32,
+    pub height: u32,
 }
 
-impl<T> Size<T> {
+impl Size {
     /// Creates a new [`Size`].
-    pub fn new(width: T, height: T) -> Self {
+    pub fn new(width: u32, height: u32) -> Self {
         Self { width, height }
     }
 
+    /// Creates a new [`Size`] from `i32`s.
+    pub fn new_i32(width: i32, height: i32) -> Self {
+        Self::new(width as u32, height as u32)
+    }
+
     /// Crops the size to `max`.
-    pub fn crop(self, max: Self) -> Self
-    where
-        T: PartialOrd,
-    {
-        Self {
-            width: panicking_partial_min(self.width, max.width),
-            height: panicking_partial_min(self.height, max.height),
-        }
+    pub fn crop(self, max: Self) -> Self {
+        Self::new(
+            std::cmp::min(self.width, max.width),
+            std::cmp::min(self.height, max.height),
+        )
     }
 }
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
-impl<T: Add<U>, U> Add<Size<U>> for Size<T> {
-    type Output = Size<<T as Add<U>>::Output>;
+impl Add for Size {
+    type Output = Size;
 
-    fn add(self, rhs: Size<U>) -> Self::Output {
-        Size {
-            width: self.width + rhs.width,
-            height: self.height + rhs.height,
-        }
+    fn add(self, rhs: Size) -> Self::Output {
+        Self::new(self.width + rhs.width, self.height + rhs.height)
     }
 }
 
-impl<T: Sub<U>, U> Sub<Size<U>> for Size<T> {
-    type Output = Size<<T as Sub<U>>::Output>;
+impl Sub for Size {
+    type Output = Size;
 
-    fn sub(self, rhs: Size<U>) -> Self::Output {
-        Size {
-            width: self.width - rhs.width,
-            height: self.height - rhs.height,
-        }
+    fn sub(self, rhs: Size) -> Self::Output {
+        Self::new(self.width - rhs.width, self.height - rhs.height)
     }
 }
 
@@ -112,16 +99,16 @@ impl<T: Sub<U>, U> Sub<Size<U>> for Size<T> {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
-pub struct Rectangle<T = f32, U = f32> {
-    pub top: T,
-    pub left: T,
-    pub width: U,
-    pub height: U,
+pub struct Rectangle {
+    pub top: i32,
+    pub left: i32,
+    pub width: u32,
+    pub height: u32,
 }
 
-impl<T, U> Rectangle<T, U> {
+impl Rectangle {
     /// Creates a new [`Rectangle`].
-    pub fn new(position: Position<T>, size: Size<U>) -> Self {
+    pub fn new(position: Position, size: Size) -> Self {
         Self {
             top: position.top,
             left: position.left,
@@ -131,44 +118,27 @@ impl<T, U> Rectangle<T, U> {
     }
 
     /// Returns the position of the rectangle.
-    pub fn position(self) -> Position<T> {
-        Position {
-            top: self.top,
-            left: self.left,
-        }
+    pub fn position(self) -> Position {
+        Position::new(self.top, self.left)
     }
 
     /// Returns the size of the rectangle.
-    pub fn size(self) -> Size<U> {
-        Size {
-            width: self.width,
-            height: self.height,
-        }
+    pub fn size(self) -> Size {
+        Size::new(self.width, self.height)
     }
 
     /// Returns the bottom coordinate of the rectangle.
-    pub fn bottom(self) -> T
-    where
-        T: Add<Output = T>,
-        U: TryInto<T>,
-    {
-        self.top + self.height.try_into().ok().unwrap()
+    pub fn bottom(self) -> i32 {
+        self.top + self.height as i32
     }
 
     /// Returns the right coordinate of the rectangle.
-    pub fn right(self) -> T
-    where
-        T: Add<Output = T>,
-        U: TryInto<T>,
-    {
-        self.left + self.width.try_into().ok().unwrap()
+    pub fn right(self) -> i32 {
+        self.left + self.width as i32
     }
 
     /// Crops the rectangle to `max`.
-    pub fn crop(self, max: Size<U>) -> Self
-    where
-        U: Ord,
-    {
+    pub fn crop(self, max: Size) -> Self {
         Self::new(
             Position::new(self.top, self.left),
             Size::new(self.width, self.height).crop(max),
@@ -176,114 +146,70 @@ impl<T, U> Rectangle<T, U> {
     }
 
     /// Returns the intersection of `self` and `other`.
-    pub fn intersection(self, other: Self) -> Option<Rectangle<T, U>>
-    where
-        T: Copy,
-        T: PartialOrd,
-        T: Add<Output = T>,
-        T: Sub<Output = T>,
-        T: TryInto<U>,
-        U: Copy,
-        U: TryInto<T>,
-    {
-        let top = panicking_partial_max(self.top, other.top);
-        let left = panicking_partial_max(self.left, other.left);
-        let bottom = panicking_partial_min(self.bottom(), other.bottom());
-        let right = panicking_partial_min(self.right(), other.right());
+    pub fn intersection(self, other: Self) -> Option<Self> {
+        let top = std::cmp::max(self.top, other.top);
+        let left = std::cmp::max(self.left, other.left);
+        let bottom = std::cmp::min(self.bottom(), other.bottom());
+        let right = std::cmp::min(self.right(), other.right());
 
         if top < bottom && left < right {
-            Some(Rectangle {
-                top,
-                left,
-                width: (right - left).try_into().ok().unwrap(),
-                height: (bottom - top).try_into().ok().unwrap(),
-            })
+            Some(Self::new(
+                Position::new(top, left),
+                Size::new_i32(right - left, bottom - top),
+            ))
         } else {
             None
         }
     }
 
     /// Translates and crops the rectangle to `region`.
-    pub fn region(self, region: Self) -> Option<Rectangle<T, U>>
-    where
-        T: Copy,
-        T: PartialOrd,
-        T: Add<Output = T>,
-        T: Sub<Output = T>,
-        T: TryInto<U>,
-        U: Copy,
-        U: TryInto<T>,
-    {
+    pub fn region(self, region: Self) -> Option<Self> {
         (self + region.position()).intersection(region)
     }
 }
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
-impl<T: Add<V>, U, V> Add<Position<V>> for Rectangle<T, U> {
-    type Output = Rectangle<<T as Add<V>>::Output, U>;
+impl Add<Position> for Rectangle {
+    type Output = Rectangle;
 
-    fn add(self, rhs: Position<V>) -> Self::Output {
-        Rectangle::new(
-            Position {
-                top: self.top,
-                left: self.left,
-            } + rhs,
-            Size {
-                width: self.width,
-                height: self.height,
-            },
+    fn add(self, rhs: Position) -> Self::Output {
+        Self::new(
+            Position::new(self.top, self.left) + rhs,
+            Size::new(self.width, self.height),
         )
     }
 }
 
-impl<T: Sub<V>, U, V> Sub<Position<V>> for Rectangle<T, U> {
-    type Output = Rectangle<<T as Sub<V>>::Output, U>;
+impl Sub<Position> for Rectangle {
+    type Output = Rectangle;
 
-    fn sub(self, rhs: Position<V>) -> Self::Output {
-        Rectangle::new(
-            Position {
-                top: self.top,
-                left: self.left,
-            } - rhs,
-            Size {
-                width: self.width,
-                height: self.height,
-            },
+    fn sub(self, rhs: Position) -> Self::Output {
+        Self::new(
+            Position::new(self.top, self.left) - rhs,
+            Size::new(self.width, self.height),
         )
     }
 }
 
-impl<T, U: Add<V>, V> Add<Size<V>> for Rectangle<T, U> {
-    type Output = Rectangle<T, <U as Add<V>>::Output>;
+impl Add<Size> for Rectangle {
+    type Output = Rectangle;
 
-    fn add(self, rhs: Size<V>) -> Self::Output {
-        Rectangle::new(
-            Position {
-                top: self.top,
-                left: self.left,
-            },
-            Size {
-                width: self.width,
-                height: self.height,
-            } + rhs,
+    fn add(self, rhs: Size) -> Self::Output {
+        Self::new(
+            Position::new(self.top, self.left),
+            Size::new(self.width, self.height) + rhs,
         )
     }
 }
 
-impl<T, U: Sub<V>, V> Sub<Size<V>> for Rectangle<T, U> {
-    type Output = Rectangle<T, <U as Sub<V>>::Output>;
+impl Sub<Size> for Rectangle {
+    type Output = Rectangle;
 
-    fn sub(self, rhs: Size<V>) -> Self::Output {
-        Rectangle::new(
-            Position {
-                top: self.top,
-                left: self.left,
-            },
-            Size {
-                width: self.width,
-                height: self.height,
-            } - rhs,
+    fn sub(self, rhs: Size) -> Self::Output {
+        Self::new(
+            Position::new(self.top, self.left),
+            Size::new(self.width, self.height) - rhs,
         )
     }
 }

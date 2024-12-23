@@ -5,7 +5,10 @@ use virus_editor::{
     ids,
     mode::{Mode, Select},
 };
-use virus_graphics::{types::Rectangle, wgpu::Graphics};
+use virus_graphics::{
+    types::{Position, Rectangle, Size},
+    wgpu::Graphics,
+};
 
 ids!(
     /// [`PaneId`] generator.
@@ -145,47 +148,47 @@ impl Panes {
         documents: impl Fn(DocumentId) -> Option<&'a Document>,
         mode: Mode,
     ) {
-        let len = self.panes.len() as f32;
+        let len = self.panes.len() as u32;
         let theme = context.theme;
-        let region_columns = theme.cells(region.size()).width as f32;
-        let desired_columns = Self::ACTIVE_COLUMNS as f32 + DocumentView::GUTTER_COLUMNS as f32;
+        let region_columns = theme.cells(region.size()).width;
+        let desired_columns = Self::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS;
 
         let (active_width, inactive_width) = if len * desired_columns < region_columns {
             (
-                desired_columns * theme.advance,
-                desired_columns * theme.advance,
+                (desired_columns as f32 * theme.advance).ceil() as u32,
+                (desired_columns as f32 * theme.advance).ceil() as u32,
             )
         } else {
             let active_columns = region_columns.min(desired_columns);
             let inactive_columns = if self.active_id.is_some() {
                 match self.panes().len() {
                     0 => unreachable!(),
-                    1 => 0.0,
-                    _ => (region_columns - active_columns) / (len - 1.0),
+                    1 => 0,
+                    _ => (region_columns - active_columns) / (len - 1),
                 }
             } else {
                 match self.panes.len() {
-                    0 => 0.0,
+                    0 => 0,
                     _ => region_columns / len,
                 }
             };
 
             (
-                active_columns * theme.advance,
-                inactive_columns * theme.advance,
+                (active_columns as f32 * theme.advance).ceil() as u32,
+                (inactive_columns as f32 * theme.advance).ceil() as u32,
             )
         };
         let margin = {
             let remaining_width = region.width
                 - if self.active_id.is_some() {
-                    active_width + inactive_width * (len - 1.0)
+                    active_width + inactive_width * (len - 1)
                 } else {
                     inactive_width * len
                 };
 
             // Space evenly
-            remaining_width / (len + 1.0)
-        };
+            remaining_width / (len + 1)
+        } as i32;
 
         let mut left = region.left + margin;
 
@@ -198,14 +201,12 @@ impl Panes {
                     let is_active = self.active_id == Some(*id);
                     let region = {
                         let width = is_active.then_some(active_width).unwrap_or(inactive_width);
-                        let region = Rectangle {
-                            top: region.top,
-                            left,
-                            width,
-                            height: region.height,
-                        };
+                        let region = Rectangle::new(
+                            Position::new(region.top, left),
+                            Size::new(width, region.height),
+                        );
 
-                        left += width + margin;
+                        left += width as i32 + margin;
                         region
                     };
                     let mode = is_active.then_some(mode).unwrap_or_else(|| {

@@ -23,7 +23,7 @@ use virus_graphics::{
 pub struct DocumentView {
     document_id: DocumentId,
     size: Size,
-    scroll_top: Tweened<f32>,
+    scroll_top: Tweened<i32>,
     scrollbar_alpha: Tweened<u8>,
 }
 
@@ -57,11 +57,11 @@ impl DocumentView {
         self.size
     }
 
-    pub fn scroll_top(&self) -> Tweened<f32> {
+    pub fn scroll_top(&self) -> Tweened<i32> {
         self.scroll_top
     }
 
-    pub fn scroll(&mut self, top: f32, tween: Tween, duration: Duration) {
+    pub fn scroll(&mut self, top: i32, tween: Tween, duration: Duration) {
         self.scroll_top.to(top, duration, tween);
         self.scrollbar_alpha = Tweened::with_animation(255, 0, duration, tween);
     }
@@ -95,8 +95,8 @@ impl DocumentView {
             .transparent(self.scrollbar_alpha.current());
 
         let rope_lines = document.rope().len_lines();
-        let region_height_in_lines = layer.size().height / theme.line_height;
-        let scroll_top_in_lines = scroll_top / theme.line_height;
+        let region_height_in_lines = layer.size().height as f32 / theme.line_height as f32;
+        let scroll_top_in_lines = scroll_top as f32 / theme.line_height as f32;
         let (start_line, end_line) = {
             let start = scroll_top_in_lines.floor() as usize;
             let end = scroll_top_in_lines.ceil() as usize + region_height_in_lines.ceil() as usize;
@@ -118,12 +118,16 @@ impl DocumentView {
             let height = region_height_in_lines / rope_lines as f32;
             let region_height = layer.size().height as f32;
 
-            Rectangle {
-                top: top * region_height,
-                height: height * region_height,
-                left: advance / 2.0,
-                width: advance / 4.0,
-            }
+            Rectangle::new(
+                Position::new(
+                    (top * region_height).round() as i32,
+                    (advance / 2.0).round() as i32,
+                ),
+                Size::new(
+                    (height * region_height).round() as u32,
+                    (advance / 4.0).round() as u32,
+                ),
+            )
         };
         let highlighted = context.highlighteds.entry(document.id()).or_default();
         let highlighted = highlighted.get(
@@ -143,7 +147,7 @@ impl DocumentView {
             selection: document.selection(),
             highlighted,
             start_line,
-            gutter_width: advance * Self::GUTTER_COLUMNS as f32,
+            gutter_width: (advance * Self::GUTTER_COLUMNS as f32).round() as u32,
             scroll_top,
             scrollbar_rectangle,
             scrollbar_color,
@@ -171,8 +175,8 @@ struct Renderer<'a> {
     selection: Selection,
     highlighted: &'a [Glyphs],
     start_line: usize,
-    gutter_width: f32,
-    scroll_top: f32,
+    gutter_width: u32,
+    scroll_top: i32,
     scrollbar_rectangle: Rectangle,
     scrollbar_color: Rgba,
     mode: Mode,
@@ -207,10 +211,10 @@ impl<'a> Renderer<'a> {
             self.layer.draw(None, 0).glyphs(
                 self.fonts,
                 self.scale,
-                Position {
-                    top: number as f32 * self.theme.line_height - self.scroll_top,
-                    left: self.gutter_width - glyphs.advance(),
-                },
+                Position::new(
+                    number as i32 * self.theme.line_height as i32 - self.scroll_top,
+                    (self.gutter_width as f32 - glyphs.advance()).round() as i32,
+                ),
                 self.theme.line_height,
                 &glyphs,
             );
@@ -220,15 +224,15 @@ impl<'a> Renderer<'a> {
     }
 
     fn text(&mut self) -> &mut Self {
-        let left = self.gutter_width;
-
         for (index, glyphs) in self.highlighted.iter().enumerate() {
-            let top = (self.start_line + index) as f32 * self.theme.line_height - self.scroll_top;
-
             self.layer.draw(None, 0).glyphs(
                 self.fonts,
                 self.scale,
-                Position { top, left },
+                Position::new(
+                    (self.start_line + index) as i32 * self.theme.line_height as i32
+                        - self.scroll_top,
+                    self.gutter_width as i32,
+                ),
                 self.theme.line_height,
                 glyphs,
             );
@@ -238,10 +242,10 @@ impl<'a> Renderer<'a> {
     }
 
     fn selection(&mut self) -> &mut Self {
-        let pos = |top, left| Position { top, left };
-        let row = |cursor: Cursor| cursor.line as f32 * self.theme.line_height - self.scroll_top;
-        let column = |cursor: Cursor| -> f32 {
-            self.gutter_width
+        let row =
+            |cursor: Cursor| cursor.line as i32 * self.theme.line_height as i32 - self.scroll_top;
+        let column = |cursor: Cursor| {
+            self.gutter_width as i32
                 + if (self.start_line..self.start_line + self.highlighted.len())
                     .contains(&cursor.line)
                 {
@@ -255,13 +259,17 @@ impl<'a> Renderer<'a> {
                             (glyph.end as usize > cursor.column).then_some(glyph.offset)
                         })
                         .unwrap_or_else(|| glyphs.advance())
+                        .round() as i32
                 } else {
-                    0.0
+                    0
                 }
         };
 
         let (selection, is_forward) = (self.selection.range(), self.selection.is_forward());
-        let (width, height) = (self.layer.size().width, self.theme.line_height);
+        let (width, height) = (
+            self.layer.size().width as i32,
+            self.theme.line_height as i32,
+        );
         let (top, bottom) = (row(selection.start), row(selection.end));
         let (start, end) = (column(selection.start), column(selection.end));
         let draw = &mut self.layer.draw(None, 1);
@@ -284,32 +292,35 @@ impl<'a> Renderer<'a> {
 
         let render_outline = |draw: &mut Draw, top, bottom, left, right| {
             for (i, color) in outline_colors.iter().copied().enumerate() {
-                let i = i as f32;
+                let i = i as i32;
 
                 if let Some(top) = top {
-                    let i = i + 1.0; // TODO Why?!
-                    draw.polyline([(pos(top + i, left), color), (pos(top + i, right), color)]);
+                    let i = i + 1; // TODO Why?! Because grid snapping. Put that in pipeline.
+                    draw.polyline([
+                        (Position::new(top + i, left), color),
+                        (Position::new(top + i, right), color),
+                    ]);
                 }
 
                 if let Some(bottom) = bottom {
                     draw.polyline([
-                        (pos(bottom - i, left), color),
-                        (pos(bottom - i, right), color),
+                        (Position::new(bottom - i, left), color),
+                        (Position::new(bottom - i, right), color),
                     ]);
                 }
             }
         };
         let render_selection = |draw: &mut Draw, top, left, width, height| {
             draw.rectangle(
-                Rectangle::new(Position::new(top, left), Size::new(width, height)),
+                Rectangle::new(Position::new(top, left), Size::new_i32(width, height)),
                 color.transparent(255 / 4),
             );
         };
         let render_caret = |draw: &mut Draw, top, left| {
             draw.rectangle(
                 Rectangle::new(
-                    Position::new(top, left - caret_width / 2.0),
-                    Size::new(caret_width, height),
+                    Position::new(top, left - caret_width as i32 / 2),
+                    Size::new(caret_width, height as u32),
                 ),
                 color.transparent(255),
             );
@@ -320,9 +331,9 @@ impl<'a> Renderer<'a> {
             let bottom = top + height;
 
             if select == Select::Lines {
-                render_selection(draw, top, 0.0, width, height);
+                render_selection(draw, top, 0, width, height);
             } else {
-                render_outline(draw, Some(top), Some(bottom), 0.0, width);
+                render_outline(draw, Some(top), Some(bottom), 0, width);
             }
             render_caret(draw, top, start);
         }
@@ -331,9 +342,9 @@ impl<'a> Renderer<'a> {
             let bottom = top + height;
 
             if select == Select::Lines {
-                render_selection(draw, top, 0.0, width, height);
+                render_selection(draw, top, 0, width, height);
             } else {
-                render_outline(draw, Some(top), Some(bottom), 0.0, start);
+                render_outline(draw, Some(top), Some(bottom), 0, start);
                 render_outline(draw, Some(top), Some(bottom), end, width);
                 render_selection(draw, top, start, end - start, height);
             }
@@ -344,13 +355,13 @@ impl<'a> Renderer<'a> {
             let (top2, bottom2) = (top + height, bottom + height);
 
             if select == Select::Lines {
-                render_selection(draw, top, 0.0, width, bottom2 - top);
+                render_selection(draw, top, 0, width, bottom2 - top);
             } else {
-                render_outline(draw, Some(top), None, 0.0, start);
+                render_outline(draw, Some(top), None, 0, start);
                 render_outline(draw, None, Some(bottom2), end, width);
                 render_selection(draw, top, start, width - start, height);
-                render_selection(draw, top2, 0.0, width, bottom - top2);
-                render_selection(draw, bottom, 0.0, end, height);
+                render_selection(draw, top2, 0, width, bottom - top2);
+                render_selection(draw, bottom, 0, end, height);
             }
             render_caret(
                 draw,

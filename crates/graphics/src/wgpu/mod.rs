@@ -352,7 +352,7 @@ impl<'graphics> Draw<'graphics> {
         fonts: &Fonts,
         scale: &mut ScaleContext,
         position: Position,
-        line_height: f32,
+        line_height: u32,
         glyphs: &Glyphs,
     ) {
         //
@@ -361,12 +361,10 @@ impl<'graphics> Draw<'graphics> {
 
         for (Range { start, end }, background) in glyphs.backgrounds() {
             self.rectangle(
-                Rectangle {
-                    top: position.top,
-                    left: position.left + start,
-                    width: end - start,
-                    height: line_height,
-                },
+                Rectangle::new(
+                    position + Position::new(0, start.round() as i32),
+                    Size::new((end - start).round() as u32, line_height),
+                ),
                 background,
             );
         }
@@ -379,10 +377,7 @@ impl<'graphics> Draw<'graphics> {
 
         for glyph in glyphs.glyphs() {
             self.glyph(
-                Position {
-                    top: position.top,
-                    left: position.left + glyph.offset,
-                },
+                position + Position::new(0, glyph.offset.round() as i32),
                 glyph.key(),
                 glyph.styles.foreground,
                 || scaler.render(&glyph),

@@ -311,8 +311,8 @@ impl Pipeline {
     ) {
         // Early return for invisible glyphs
         if !color.is_visible()
-            || region.size().height <= position.top
-            || region.size().width <= position.left
+            || 0 <= position.top && region.size().height <= position.top as u32
+            || 0 <= position.left && region.size().width <= position.left as u32
         {
             return;
         }
@@ -322,12 +322,12 @@ impl Pipeline {
             let in_mask = || {
                 self.mask
                     .get(&key)
-                    .map(|(uv, placement)| (Type::MASK, uv, placement))
+                    .map(|item| (Type::MASK, item.position, item.value))
             };
             let in_color = || {
                 self.color
                     .get(&key)
-                    .map(|(uv, placement)| (Type::COLOR, uv, placement))
+                    .map(|item| (Type::MASK, item.position, item.value))
             };
 
             in_mask().or_else(in_color)
@@ -345,13 +345,10 @@ impl Pipeline {
                 queue,
                 key,
                 image.placement,
-                Size {
-                    width: image.placement.width,
-                    height: image.placement.height,
-                },
+                Size::new(image.placement.width, image.placement.height),
                 &image.data,
             ) {
-                Ok((uv, placement)) => (ty, uv, placement),
+                Ok(item) => (ty, item.position, item.value),
                 Err(AtlasError::KeyExists) => unreachable!("Just checked this"),
                 Err(AtlasError::OutOfSpace) => todo!("Atlas full"),
                 Err(AtlasError::WontFit) => {
@@ -362,16 +359,13 @@ impl Pipeline {
         };
 
         // Crop to region
-        let rectangle = Rectangle {
+        let rectangle = Rectangle::new(
             // Swash image placement has vertical upward from baseline
-            top: key.1 as f32 - placement.top as f32,
-            left: placement.left as f32,
-            width: placement.width as f32,
-            height: placement.height as f32,
-        } + position;
+            position + Position::new(key.1 as i32 - placement.top, placement.left),
+            Size::new(placement.width, placement.height),
+        );
         // Makes no sense but fixes top line when scrolling (up/down, weird in many ways)
-        let uv = Position::new(uv.top as f32, uv.left as f32)
-            - Position::new(rectangle.top.min(0.0), rectangle.left.min(0.0));
+        let uv = uv - Position::new(rectangle.top.min(0), rectangle.left.min(0));
 
         let Some(rectangle) = rectangle.region(region) else {
             return;
