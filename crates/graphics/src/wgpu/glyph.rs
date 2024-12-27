@@ -327,7 +327,7 @@ impl Pipeline {
             let in_color = || {
                 self.color
                     .get(&key)
-                    .map(|item| (Type::MASK, item.position, item.value))
+                    .map(|item| (Type::COLOR, item.position, item.value))
             };
 
             in_mask().or_else(in_color)
