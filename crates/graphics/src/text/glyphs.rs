@@ -1,5 +1,7 @@
-use super::{FontFamilyKey, FontSize, Fonts, Glyph, Styles};
-use crate::types::Rgba;
+use crate::{
+    color::Rgba,
+    text::{FontFamilyKey, FontKey, FontSize, FontStyle, FontWeight, Fonts},
+};
 use std::ops::Range;
 use swash::{
     scale::{image::Image, Render, ScaleContext, Source, StrikeWith},
@@ -8,6 +10,7 @@ use swash::{
         cluster::{CharCluster, Parser, Status, Token},
         Script,
     },
+    GlyphId,
 };
 
 const SCRIPT: Script = Script::Unknown;
@@ -19,6 +22,60 @@ const SOURCES: &[Source] = &[
     Source::Outline,
     Source::Bitmap(StrikeWith::BestFit),
 ];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                            GlyphKey                                            //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+/// [`Glyph`] key.
+pub type GlyphKey = (FontKey, FontSize, GlyphId);
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                             Styles                                             //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+/// [`Glyph`] styles.
+#[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
+pub struct Styles {
+    pub weight: FontWeight,
+    pub style: FontStyle,
+    pub foreground: Rgba,
+    pub background: Rgba,
+    pub underline: bool,
+    pub strike: bool,
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+//                                               Glyph                                            //
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
+
+/// A glyph.
+#[derive(Copy, Clone, Debug)]
+pub struct Glyph {
+    /// Font key.
+    pub font: FontKey,
+    /// Font size.
+    pub size: FontSize,
+    /// Glyph id.
+    pub id: GlyphId,
+    /// Glyph advance offset.
+    pub offset: f32,
+    /// Glyph advance.
+    pub advance: f32,
+    /// Start index in the underlying string.
+    pub start: u32,
+    /// End index in the underlying string.
+    pub end: u32,
+    /// Glyph styles.
+    pub styles: Styles,
+}
+
+impl Glyph {
+    /// Returns the [`GlyphKey`].
+    pub fn key(&self) -> GlyphKey {
+        (self.font, self.size, self.id)
+    }
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Glyphs                                             //

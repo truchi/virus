@@ -12,8 +12,8 @@ use virus_editor::{
     sub_in_range,
 };
 use virus_graphics::{
-    types::{Position, Rectangle, Size},
-    wgpu::Graphics,
+    geom::{Position, Rectangle, Size},
+    gpu::Gpu,
 };
 use winit::window::Window;
 
@@ -24,7 +24,7 @@ use winit::window::Window;
 pub struct Ui {
     window: Arc<Window>,
     context: Context,
-    graphics: Graphics,
+    gpu: Gpu,
     panes: Panes,
     files: FilesView,
     status: StatusView,
@@ -32,7 +32,7 @@ pub struct Ui {
 
 impl Ui {
     pub fn new(window: Arc<Window>) -> Self {
-        let graphics = Graphics::new(Arc::clone(&window));
+        let gpu = Gpu::new(Arc::clone(&window));
         let context = {
             let fonts = crate::todo::fonts();
             let theme = crate::todo::ui_theme(&fonts);
@@ -49,7 +49,7 @@ impl Ui {
         Self {
             window,
             context,
-            graphics,
+            gpu,
             panes: Panes::new(),
             files: FilesView::new(),
             status: StatusView::new(),
@@ -76,11 +76,11 @@ impl Ui {
         UiPanesMut { ui: self }
     }
 
-    /// Resizes the graphics canvas.
+    /// Resizes the gpu canvas.
     ///
     /// Does not resizes the views. Views report their last renderd sizes.
     pub fn resize(&mut self) {
-        self.graphics.resize(&self.window);
+        self.gpu.resize(&self.window);
     }
 
     pub fn update(&mut self, delta: Duration) {
@@ -117,18 +117,13 @@ impl Ui {
             Size::new(window.width, theme.line_height),
         );
 
-        self.panes.render(
-            &mut self.context,
-            &mut self.graphics,
-            region,
-            documents,
-            mode,
-        );
+        self.panes
+            .render(&mut self.context, &mut self.gpu, region, documents, mode);
 
         if let Some((needle, haystack, selected)) = file_search {
             self.files.render(
                 &mut self.context,
-                self.graphics.layer(region, 1),
+                self.gpu.layer(region, 1),
                 needle,
                 haystack,
                 selected,
@@ -137,13 +132,13 @@ impl Ui {
 
         self.status.render(
             &mut self.context,
-            self.graphics.layer(status_region, 0),
+            self.gpu.layer(status_region, 0),
             mode,
             keybindings,
             file_name,
         );
 
-        self.graphics.render(self.context.theme.background_color);
+        self.gpu.render(self.context.theme.background_color);
     }
 }
 

@@ -2,9 +2,9 @@ use crate::{panes::Panes, theme::UiTheme, views::DocumentView, Context};
 use swash::{scale::ScaleContext, shape::ShapeContext};
 use virus_editor::fuzzy::Search;
 use virus_graphics::{
+    geom::{Position, Rectangle, Size},
+    gpu::Layer,
     text::{FontWeight, Fonts, Glyphs, Styles},
-    types::{Position, Rectangle, Size},
-    wgpu::Layer,
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //

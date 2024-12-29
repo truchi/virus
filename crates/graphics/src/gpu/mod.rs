@@ -4,9 +4,10 @@ mod line;
 mod rectangle;
 
 use crate::{
+    color::{Rgb, Rgba},
+    geom::{Position, Rectangle, Size},
     muck::WithAttributes,
     text::{Fonts, GlyphKey, Glyphs},
-    types::{Position, Rectangle, Rgb, Rgba, Size},
 };
 use atlas::{Atlas, AtlasError};
 use glyph::Pipeline as GlyphPipeline;
@@ -66,11 +67,11 @@ impl Constants {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                            Graphics                                            //
+//                                              Gpu                                               //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// WebGpu graphics.
-pub struct Graphics {
+/// WebGPU drawing pipelines.
+pub struct Gpu {
     surface: Surface<'static>,
     config: SurfaceConfiguration,
     device: Device,
@@ -80,8 +81,8 @@ pub struct Graphics {
     line: LinePipeline,
 }
 
-impl Graphics {
-    /// Creates a new `Graphics`.
+impl Gpu {
+    /// Creates a new `Gpu`.
     pub fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
 
@@ -160,7 +161,7 @@ impl Graphics {
     /// Returns the `Layer`ing API.
     pub fn layer(&mut self, region: Rectangle, layer: u16) -> Layer {
         Layer {
-            graphics: self,
+            gpu: self,
             region,
             layer: layer as u32 * u16::MAX as u32,
         }
@@ -273,13 +274,13 @@ impl Graphics {
 //                                             Layer                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-pub struct Layer<'graphics> {
-    graphics: &'graphics mut Graphics,
+pub struct Layer<'gpu> {
+    gpu: &'gpu mut Gpu,
     region: Rectangle,
     layer: u32,
 }
 
-impl<'graphics> Layer<'graphics> {
+impl<'gpu> Layer<'gpu> {
     /// Returns the size.
     pub fn size(&self) -> Size {
         self.region.size()
@@ -293,7 +294,7 @@ impl<'graphics> Layer<'graphics> {
             .unwrap_or(self.region);
 
         Draw {
-            graphics: self.graphics,
+            gpu: self.gpu,
             layer: self.layer + layer as u32,
             region,
         }
@@ -304,13 +305,13 @@ impl<'graphics> Layer<'graphics> {
 //                                              Draw                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-pub struct Draw<'graphics> {
-    graphics: &'graphics mut Graphics,
+pub struct Draw<'gpu> {
+    gpu: &'gpu mut Gpu,
     region: Rectangle,
     layer: u32,
 }
 
-impl<'graphics> Draw<'graphics> {
+impl<'gpu> Draw<'gpu> {
     /// Returns the size.
     pub fn size(&self) -> Size {
         self.region.size()
@@ -322,7 +323,7 @@ impl<'graphics> Draw<'graphics> {
             .into()
             .unwrap_or_else(|| Rectangle::new(Position::default(), self.size()));
 
-        self.graphics
+        self.gpu
             .rectangle
             .push(self.layer, self.region, rectangle, color);
     }
@@ -335,8 +336,8 @@ impl<'graphics> Draw<'graphics> {
         color: Rgba,
         image: F,
     ) {
-        self.graphics.glyph.push(
-            &self.graphics.queue,
+        self.gpu.glyph.push(
+            &self.gpu.queue,
             self.layer,
             self.region,
             position,
@@ -387,15 +388,11 @@ impl<'graphics> Draw<'graphics> {
 
     /// Draws a polyline.
     pub fn polyline<T: IntoIterator<Item = (Position, Rgba)>>(&mut self, points: T) {
-        self.graphics
-            .line
-            .push(self.layer, self.region, points, false);
+        self.gpu.line.push(self.layer, self.region, points, false);
     }
 
     /// Draws a polygon.
     pub fn polygon<T: IntoIterator<Item = (Position, Rgba)>>(&mut self, points: T) {
-        self.graphics
-            .line
-            .push(self.layer, self.region, points, true);
+        self.gpu.line.push(self.layer, self.region, points, true);
     }
 }

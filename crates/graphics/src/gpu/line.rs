@@ -134,7 +134,7 @@ impl Pipeline {
         let pipeline = Init(device).pipeline(
             config,
             &bind_group_layout,
-            &device.create_shader_module(include_wgsl!("line.wgsl")),
+            &device.create_shader_module(include_wgsl!("./shaders/line.wgsl")),
         );
 
         Self {

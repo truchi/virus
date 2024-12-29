@@ -11,9 +11,10 @@ use virus_editor::{
     rope::{Cursor, Selection},
 };
 use virus_graphics::{
+    color::Rgba,
+    geom::{Position, Rectangle, Size},
+    gpu::{Draw, Layer},
     text::{FontStyle, FontWeight, Fonts, Glyphs, Styles},
-    types::{Position, Rectangle, Rgba, Size},
-    wgpu::{Draw, Layer},
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //

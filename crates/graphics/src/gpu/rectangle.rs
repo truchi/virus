@@ -132,7 +132,7 @@ impl Pipeline {
         let pipeline = Init(device).pipeline(
             config,
             &bind_group_layout,
-            &device.create_shader_module(include_wgsl!("rectangle.wgsl")),
+            &device.create_shader_module(include_wgsl!("./shaders/rectangle.wgsl")),
         );
 
         Self {

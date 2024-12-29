@@ -6,8 +6,8 @@ use virus_editor::{
     mode::{Mode, Select},
 };
 use virus_graphics::{
-    types::{Position, Rectangle, Size},
-    wgpu::Graphics,
+    geom::{Position, Rectangle, Size},
+    gpu::Gpu,
 };
 
 ids!(
@@ -143,7 +143,7 @@ impl Panes {
     pub fn render<'a>(
         &mut self,
         context: &mut Context,
-        graphics: &mut Graphics,
+        gpu: &mut Gpu,
         region: Rectangle,
         documents: impl Fn(DocumentId) -> Option<&'a Document>,
         mode: Mode,
@@ -221,13 +221,7 @@ impl Panes {
                         }
                     });
 
-                    view.render(
-                        context,
-                        graphics.layer(region, 0),
-                        document,
-                        mode,
-                        is_active,
-                    );
+                    view.render(context, gpu.layer(region, 0), document, mode, is_active);
                 }
             }
         }

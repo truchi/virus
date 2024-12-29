@@ -2,8 +2,8 @@ use crate::{theme::UiTheme, Context};
 use swash::{scale::ScaleContext, shape::ShapeContext};
 use virus_editor::mode::Mode;
 use virus_graphics::{
+    gpu::Layer,
     text::{FontWeight, Fonts, Glyphs, Styles},
-    wgpu::Layer,
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -67,7 +67,7 @@ impl<'a> Renderer<'a> {
         let (string, background) = match self.mode {
             Mode::Normal { .. } => (format!(" NORMAL "), self.theme.normal_mode_color),
             Mode::Insert { .. } => (format!(" INSERT "), self.theme.insert_mode_color),
-            Mode::Files => (format!(" FILES "), virus_graphics::types::Rgba::RED.solid()), // TODO
+            Mode::Files => (format!(" FILES "), virus_graphics::color::Rgba::RED.solid()), // TODO
         };
 
         shaper.push(

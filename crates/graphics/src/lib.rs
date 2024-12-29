@@ -1,10 +1,11 @@
+pub mod color;
+pub mod geom;
+pub mod gpu;
 pub mod muck;
-pub mod text;
-pub mod types {
-    pub use color::*;
-    pub use geom::*;
+pub mod text {
+    mod fonts;
+    mod glyphs;
 
-    mod color;
-    mod geom;
+    pub use fonts::*;
+    pub use glyphs::*;
 }
-pub mod wgpu;

@@ -70,13 +70,13 @@ mod todo {
     };
     use std::time::Duration;
     use virus_graphics::{
+        color::Rgba,
         text::{
             Font, FontSize,
             FontStyle::{self, *},
             FontWeight::{self, *},
             Fonts, Styles,
         },
-        types::Rgba,
     };
 
     pub fn fonts() -> Fonts {
