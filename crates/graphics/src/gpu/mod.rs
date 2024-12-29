@@ -1,7 +1,11 @@
 mod atlas;
-mod glyph;
-mod line;
-mod rectangle;
+mod pipelines {
+    use super::*;
+
+    pub mod glyph;
+    pub mod line;
+    pub mod rectangle;
+}
 
 use crate::{
     color::{Rgb, Rgba},
@@ -10,9 +14,9 @@ use crate::{
     text::{Fonts, GlyphKey, Glyphs},
 };
 use atlas::{Atlas, AtlasError};
-use glyph::Pipeline as GlyphPipeline;
-use line::Pipeline as LinePipeline;
-use rectangle::Pipeline as RectanglePipeline;
+use pipelines::glyph::Pipeline as GlyphPipeline;
+use pipelines::line::Pipeline as LinePipeline;
+use pipelines::rectangle::Pipeline as RectanglePipeline;
 use std::{
     collections::{BTreeMap, HashMap},
     hash::Hash,
@@ -200,7 +204,7 @@ impl Gpu {
         });
 
         enum ToRender {
-            Rectange(u32),
+            Rectangle(u32),
             Glyph(u32),
             Line(u32),
         }
@@ -226,7 +230,7 @@ impl Gpu {
 
                 if rectangle_layer == Some(min) {
                     rectangle_layers.next();
-                    Some(ToRender::Rectange(min))
+                    Some(ToRender::Rectangle(min))
                 } else if glyph_layer == Some(min) {
                     glyph_layers.next();
                     Some(ToRender::Glyph(min))
@@ -252,7 +256,7 @@ impl Gpu {
         ) {
             use ToRender::*;
             match layer {
-                Rectange(layer) => self.rectangle.render(layer, &mut render_pass),
+                Rectangle(layer) => self.rectangle.render(layer, &mut render_pass),
                 Glyph(layer) => self.glyph.render(layer, &mut render_pass),
                 Line(layer) => self.line.render(layer, &mut render_pass),
             }
@@ -317,7 +321,7 @@ impl<'gpu> Draw<'gpu> {
         self.region.size()
     }
 
-    /// Draws a rectange.
+    /// Draws a rectangle.
     pub fn rectangle(&mut self, rectangle: impl Into<Option<Rectangle>>, color: Rgba) {
         let rectangle = rectangle
             .into()

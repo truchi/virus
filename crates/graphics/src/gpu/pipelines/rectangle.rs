@@ -2,27 +2,25 @@ use super::*;
 
 macro_rules! label {
     ($label:literal) => {
-        Some(concat!("[LinePipeline] ", $label))
+        Some(concat!("[RectanglePipeline] ", $label))
     };
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                             Vertex                                             //
+//                                            Instance                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-crate::muck!(unsafe Vertex => Vertex: [Position, Size, Position, Rgba]);
+crate::muck!(unsafe Instance => Instance: [Position, Size, Rgba]);
 
-/// Vertex.
+/// Instance.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-struct Vertex {
-    /// Region position.
-    region_position: Position,
-    /// Region size.
-    region_size: Size,
-    /// Point position.
+struct Instance {
+    /// Rectangle position.
     position: Position,
-    /// Point color.
+    /// Rectangle size.
+    size: Size,
+    /// Rectangle color.
     color: Rgba,
 }
 
@@ -36,7 +34,7 @@ struct Init<'a>(&'a Device);
 impl<'a> Init<'a> {
     fn buffer(&self, size: BufferAddress) -> Buffer {
         self.0.create_buffer(&BufferDescriptor {
-            label: label!("Vertex buffer"),
+            label: label!("Instance buffer"),
             size,
             usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
             mapped_at_creation: false,
@@ -80,10 +78,10 @@ impl<'a> Init<'a> {
                 module: &module,
                 entry_point: None,
                 compilation_options: Default::default(),
-                buffers: &[Vertex::buffer_layout()],
+                buffers: &[Instance::buffer_layout()],
             },
             primitive: PrimitiveState {
-                topology: PrimitiveTopology::LineList,
+                topology: PrimitiveTopology::TriangleList,
                 ..Default::default()
             },
             depth_stencil: None,
@@ -105,14 +103,14 @@ impl<'a> Init<'a> {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                             Pipeline                                           //
+//                                            Pipeline                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 /// Pipeline.
 #[derive(Debug)]
 pub struct Pipeline {
     constants: Constants,
-    layers: BTreeMap<u32, (Vec<Vertex>, Range<BufferAddress>)>,
+    layers: BTreeMap<u32, (Vec<Instance>, Range<BufferAddress>)>,
     buffer: Buffer,
     bind_group: BindGroup,
     pipeline: RenderPipeline,
@@ -134,7 +132,7 @@ impl Pipeline {
         let pipeline = Init(device).pipeline(
             config,
             &bind_group_layout,
-            &device.create_shader_module(include_wgsl!("./shaders/line.wgsl")),
+            &device.create_shader_module(include_wgsl!("../shaders/rectangle.wgsl")),
         );
 
         Self {
@@ -156,39 +154,21 @@ impl Pipeline {
         self.constants.resize(config);
     }
 
-    /// Pushes `points` to be rendered for `layer` in `region`.
-    pub fn push<T: IntoIterator<Item = (Position, Rgba)>>(
-        &mut self,
-        layer: u32,
-        region: Rectangle,
-        points: T,
-        closed: bool,
-    ) {
-        let mut points = points.into_iter().map(|(position, color)| Vertex {
-            region_position: region.position(),
-            region_size: region.size(),
-            position,
-            color,
-        });
+    /// Pushes a `rectangle` to be rendered for `layer` in `region` with `color`.
+    pub fn push(&mut self, layer: u32, region: Rectangle, rectangle: Rectangle, color: Rgba) {
+        if !color.is_visible() {
+            return;
+        }
 
-        let (first, mut prev, layer) = if let Some(first) = points.next() {
-            (first, first, &mut self.layers.entry(layer).or_default().0)
-        } else {
-            debug_assert!(false, "No points");
+        let Some(rectangle) = rectangle.region(region) else {
             return;
         };
 
-        for curr in points {
-            layer.push(prev);
-            layer.push(curr);
-
-            prev = curr;
-        }
-
-        if closed {
-            layer.push(prev);
-            layer.push(first);
-        }
+        self.layers.entry(layer).or_default().0.push(Instance {
+            position: rectangle.position(),
+            size: rectangle.size(),
+            color,
+        });
     }
 
     /// Writes buffer.
@@ -206,8 +186,8 @@ impl Pipeline {
     /// Renders `layer`.
     pub fn render<'pass>(&'pass self, layer: u32, render_pass: &mut RenderPass<'pass>) {
         let constants = self.constants.as_array();
-        let (vertices, range) = match self.layers.get(&layer) {
-            Some((vertices, range)) if !vertices.is_empty() => (vertices, range.clone()),
+        let (instances, range) = match self.layers.get(&layer) {
+            Some((instances, range)) if !instances.is_empty() => (instances, range.clone()),
             _ => return,
         };
 
@@ -215,7 +195,7 @@ impl Pipeline {
         render_pass.set_bind_group(0, &self.bind_group, &[]);
         render_pass.set_push_constants(Constants::STAGES, 0, bytemuck::cast_slice(&constants));
         render_pass.set_vertex_buffer(0, self.buffer.slice(range));
-        render_pass.draw(0..vertices.len() as u32, 0..1);
+        render_pass.draw(0..6, 0..instances.len() as u32);
     }
 
     /// Clears layers.
