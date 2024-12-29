@@ -1,4 +1,4 @@
-use crate::rope::{Cursor, Grapheme, GraphemeCategory, GraphemesBackward};
+use crate::rope::{Cursor, Grapheme, GraphemeCategory, GraphemesBackward, Occurences};
 use ropey::{Rope, RopeSlice};
 use similar::{Algorithm, DiffOp, TextDiff};
 use std::{ops::Range, time::Duration};
@@ -339,6 +339,14 @@ impl Edit {
 
     pub fn unapply_tree(&self, tree: &mut Tree) {
         Self::apply_tree_impl(tree, self.start, self.inserted_end, self.removed_end);
+    }
+
+    pub fn apply_occurences(&self, occurences: &mut Occurences, rope: Rope) {
+        occurences.update(rope, self.start, self.removed_end, self.inserted_end);
+    }
+
+    pub fn unapply_occurences(&self, occurences: &mut Occurences, rope: Rope) {
+        occurences.update(rope, self.start, self.inserted_end, self.removed_end)
     }
 
     /// Returns whether this edit would leave some text unchanged,

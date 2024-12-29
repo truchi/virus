@@ -5,13 +5,14 @@ use crate::{
     ids,
     rope::{
         Boundaries, Cursor, Edit, GraphemeCategory, GraphemesBackward, GraphemesForward,
-        SearchBackward, SearchForward, Segmentation, Selection, Text,
+        Occurences, SearchBackward, SearchForward, Segmentation, Selection, Text,
     },
     sub_in_range,
 };
 use ropey::Rope;
 use std::{
     cmp::Ordering,
+    collections::HashMap,
     fs::File,
     io::{BufReader, BufWriter, Read, Write},
     path::{Path, PathBuf},
@@ -45,6 +46,7 @@ pub struct Document {
     tree: Tree,
     tree_version: usize,
     history: History,
+    occurences: Occurences,
     on_disk_content: Rope,
     on_disk_modified: SystemTime,
     on_disk_version: usize,
@@ -162,6 +164,7 @@ impl Document {
             tree,
             tree_version: 0,
             history: History::default(),
+            occurences: Occurences::new(rope.clone()),
             on_disk_content: rope,
             on_disk_modified: file
                 .metadata()
@@ -195,6 +198,7 @@ impl Document {
             for edit in &edits {
                 edit.apply_rope(&mut document.rope);
                 edit.apply_tree(&mut document.tree);
+                edit.apply_occurences(&mut document.occurences, document.rope.clone());
 
                 selection.anchor = edit
                     .apply_cursor(selection.anchor)
@@ -317,6 +321,10 @@ impl Document {
             self.tree = Self::parse_with(&self.rope, &mut self.parser, Some(&self.tree));
             self.tree_version = self.version;
         }
+    }
+
+    pub fn occurences(&self) -> &HashMap<String, usize> {
+        self.occurences.items()
     }
 
     pub fn movements(&mut self) -> DocumentMovements {
@@ -639,6 +647,7 @@ impl<'document> DocumentEdition<'document> {
         }
 
         edit.apply_tree(&mut self.document.tree);
+        edit.apply_occurences(&mut self.document.occurences, self.document.rope.clone());
         self.document
             .movements()
             .selection(
@@ -676,6 +685,7 @@ impl<'document> DocumentEdition<'document> {
         for edit in edits.iter().rev() {
             edit.unapply_rope(&mut self.document.rope);
             edit.unapply_tree(&mut self.document.tree);
+            edit.unapply_occurences(&mut self.document.occurences, self.document.rope.clone());
 
             selection.anchor = edit
                 .unapply_cursor(selection.anchor)
@@ -698,6 +708,7 @@ impl<'document> DocumentEdition<'document> {
         for edit in edits {
             edit.apply_rope(&mut self.document.rope);
             edit.apply_tree(&mut self.document.tree);
+            edit.apply_occurences(&mut self.document.occurences, self.document.rope.clone());
 
             selection.anchor = edit
                 .apply_cursor(selection.anchor)

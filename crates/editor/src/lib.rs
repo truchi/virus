@@ -10,11 +10,13 @@ pub mod ast {
 pub mod document;
 pub mod editor;
 pub mod fuzzy;
+pub mod history;
 pub mod mode;
 pub mod rope {
     mod cursor;
     mod edit;
     mod graphemes;
+    mod occurences;
     mod search;
     mod segmentation;
     mod selection;
@@ -22,11 +24,11 @@ pub mod rope {
     pub use cursor::*;
     pub use edit::*;
     pub use graphemes::*;
+    pub use occurences::*;
     pub use search::*;
     pub use segmentation::*;
     pub use selection::*;
 }
-pub mod history;
 
 use smol_str::SmolStr;
 

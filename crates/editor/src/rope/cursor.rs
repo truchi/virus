@@ -20,26 +20,24 @@ impl Cursor {
     pub fn build(slice: RopeSlice) -> CursorBuilder {
         CursorBuilder { slice }
     }
+}
 
+#[cfg(test)]
+impl Cursor {
     /// Extracts `┃` as cursor in the rope.
-    #[cfg(test)]
-    pub(crate) fn extract(str: &str) -> (ropey::Rope, Self) {
+    pub fn extract(str: &str) -> (ropey::Rope, Self) {
         let (rope, cursor) = Self::extract_optional(str);
         (rope, cursor.unwrap())
     }
 
     /// Extracts an optional `┃` as cursor in the rope.
-    #[cfg(test)]
-    pub(crate) fn extract_optional(str: &str) -> (ropey::Rope, Option<Self>) {
+    pub fn extract_optional(str: &str) -> (ropey::Rope, Option<Self>) {
         let (rope, cursors) = Self::extract_all(str);
         (rope, cursors.first().copied())
     }
 
     /// Extracts all `┃`s as cursors in the rope.
-    ///
-    /// (`┣`, `┫`)
-    #[cfg(test)]
-    pub(crate) fn extract_all(mut str: &str) -> (ropey::Rope, Vec<Self>) {
+    pub fn extract_all(mut str: &str) -> (ropey::Rope, Vec<Self>) {
         let mut cursors = Vec::new();
         let mut rope = ropey::Rope::from("");
 
