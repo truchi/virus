@@ -1,5 +1,5 @@
 [package]
-name = "graphics"
+name = "virus_graphics"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true

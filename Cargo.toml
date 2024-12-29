@@ -2,16 +2,15 @@
 resolver = "2"                     # Important! wgpu needs this!
 default-members = ["crates/virus"]
 members = ["crates/*"]
-exclude = ["xtask"]
 
 [workspace.package]
 authors = ["Romain TRUCHI"]
 edition = "2021"
 
 [workspace.dependencies]
-virus-editor = { path = "crates/editor", package = "editor" }
-virus-graphics = { path = "crates/graphics", package = "graphics" }
-virus-ui = { path = "crates/ui", package = "ui" }
+virus_editor = { path = "crates/editor" }
+virus_graphics = { path = "crates/graphics" }
+virus_ui = { path = "crates/ui" }
 
 bitflags = "2.6"
 bytemuck = "1.16"

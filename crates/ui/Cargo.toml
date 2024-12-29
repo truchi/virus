@@ -1,5 +1,5 @@
 [package]
-name = "ui"
+name = "virus_ui"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
@@ -7,6 +7,6 @@ edition.workspace = true
 [dependencies]
 swash.workspace = true
 tween.workspace = true
-virus-editor.workspace = true
-virus-graphics.workspace = true
+virus_editor.workspace = true
+virus_graphics.workspace = true
 winit.workspace = true

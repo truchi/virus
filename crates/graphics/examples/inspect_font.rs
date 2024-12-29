@@ -1,5 +1,5 @@
-use graphics::text::Font;
 use swash::FontDataRef;
+use virus_graphics::text::Font;
 
 const NOTO_EMOJI: &str = "/Users/romain/Library/Fonts/NotoColorEmoji.ttf";
 const APPLE_EMOJI: &str = "/System/Library/Fonts/Apple Color Emoji.ttc";
