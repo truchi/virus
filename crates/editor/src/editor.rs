@@ -12,7 +12,7 @@ use std::{
 
 pub type WatcherEvent = notify::Event;
 
-pub trait EventLoopProxy: Clone + Send + 'static {
+pub trait EventLoopProxy: 'static + Send {
     fn redraw(&self);
 
     fn watcher(&self, event: WatcherEvent);
@@ -22,16 +22,16 @@ pub trait EventLoopProxy: Clone + Send + 'static {
 //                                             Editor                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-pub struct Editor<T: EventLoopProxy> {
+pub struct Editor {
     root: PathBuf,
     document_ids: DocumentIds,
     documents: HashMap<DocumentId, Document>,
     watcher: RecommendedWatcher,
-    event_loop_proxy: T,
+    event_loop_proxy: Box<dyn EventLoopProxy>,
 }
 
-impl<T: EventLoopProxy> Editor<T> {
-    pub fn new(root: PathBuf, event_loop_proxy: T) -> Self {
+impl Editor {
+    pub fn new(root: PathBuf, event_loop_proxy: impl EventLoopProxy + Clone) -> Self {
         Self {
             root,
             document_ids: Default::default(),
@@ -45,7 +45,7 @@ impl<T: EventLoopProxy> Editor<T> {
                 }
             })
             .expect("recommended watcher"),
-            event_loop_proxy,
+            event_loop_proxy: Box::new(event_loop_proxy),
         }
     }
 

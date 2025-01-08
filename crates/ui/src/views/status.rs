@@ -2,7 +2,8 @@ use crate::{theme::UiTheme, Context};
 use swash::{scale::ScaleContext, shape::ShapeContext};
 use virus_editor::mode::Mode;
 use virus_graphics::{
-    gpu::Layer,
+    geom::{Position, Rectangle},
+    gpu::Gpu,
     text::{FontWeight, Fonts, Glyphs, Styles},
 };
 
@@ -20,19 +21,19 @@ impl StatusView {
     pub fn render<'a>(
         &mut self,
         context: &'a mut Context,
-        layer: Layer<'a>,
+        region: Rectangle,
         mode: Mode,
-        keybindings: &'a [String],
+        keybindings: impl Iterator<Item = String>,
         file_name: Option<(String, bool)>,
     ) {
-        let context = context.as_mut();
         Renderer {
-            fonts: context.fonts,
-            shape: context.shape,
-            scale: context.scale,
-            theme: context.theme,
+            fonts: &context.fonts,
+            shape: &mut context.shape,
+            scale: &mut context.scale,
+            theme: &context.theme,
+            gpu: &mut context.gpu,
+            region,
             mode,
-            layer,
             keybindings,
             file_name,
         }
@@ -44,19 +45,20 @@ impl StatusView {
 //                                            Renderer                                            //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-struct Renderer<'a> {
+struct Renderer<'a, T> {
     fonts: &'a Fonts,
     shape: &'a mut ShapeContext,
     scale: &'a mut ScaleContext,
     theme: &'a UiTheme,
-    layer: Layer<'a>,
+    gpu: &'a mut Gpu,
+    region: Rectangle,
     mode: Mode,
-    keybindings: &'a [String],
+    keybindings: T,
     file_name: Option<(String, bool)>,
 }
 
-impl<'a> Renderer<'a> {
-    fn render(&mut self) -> &mut Self {
+impl<'a, T: Iterator<Item = String>> Renderer<'a, T> {
+    fn render(&mut self) {
         let mut shaper = Glyphs::shaper(
             self.fonts,
             self.shape,
@@ -67,7 +69,7 @@ impl<'a> Renderer<'a> {
         let (string, background) = match self.mode {
             Mode::Normal { .. } => (format!(" NORMAL "), self.theme.normal_mode_color),
             Mode::Insert { .. } => (format!(" INSERT "), self.theme.insert_mode_color),
-            Mode::Files => (format!(" FILES "), virus_graphics::color::Rgba::RED.solid()), // TODO
+            Mode::Files => (format!(" FILES "), virus_graphics::color::Rgb::RED), // TODO
         };
 
         shaper.push(
@@ -80,7 +82,7 @@ impl<'a> Renderer<'a> {
             },
         );
 
-        for (i, key) in self.keybindings.iter().enumerate() {
+        for (i, key) in (&mut self.keybindings).enumerate() {
             let space = (i == 0).then_some(" ").unwrap_or_default();
 
             shaper.push(
@@ -104,18 +106,15 @@ impl<'a> Renderer<'a> {
             );
         }
 
-        self.layer
-            .draw(None, 0)
-            .rectangle(None, self.theme.status_background_color.transparent(255));
-
-        self.layer.draw(None, 0).glyphs(
-            self.fonts,
-            self.scale,
-            Default::default(),
-            self.theme.line_height,
-            &shaper.glyphs(),
-        );
-
-        self
+        self.gpu
+            .draw(self.region)
+            .fill(self.theme.status_background_color.transparent(255))
+            .glyphs(
+                self.fonts,
+                self.scale,
+                Position::default(),
+                self.theme.line_height,
+                &shaper.glyphs(),
+            );
     }
 }

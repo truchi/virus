@@ -5,16 +5,9 @@ use crate::{
 };
 use std::{sync::Arc, time::Duration};
 use virus_editor::{
-    add_in_range,
-    document::{Document, DocumentId},
-    fuzzy::Search,
-    mode::Mode,
-    sub_in_range,
+    add_in_range, document::DocumentId, editor::Editor, fuzzy::Search, mode::Mode, sub_in_range,
 };
-use virus_graphics::{
-    geom::{Position, Rectangle, Size},
-    gpu::Gpu,
-};
+use virus_graphics::{geom::Rectangle, gpu::Gpu};
 use winit::window::Window;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -22,9 +15,7 @@ use winit::window::Window;
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct Ui {
-    window: Arc<Window>,
     context: Context,
-    gpu: Gpu,
     panes: Panes,
     files: FilesView,
     status: StatusView,
@@ -32,12 +23,14 @@ pub struct Ui {
 
 impl Ui {
     pub fn new(window: Arc<Window>) -> Self {
-        let gpu = Gpu::new(Arc::clone(&window));
         let context = {
+            let gpu = Gpu::new(Arc::clone(&window));
             let fonts = crate::todo::fonts();
             let theme = crate::todo::ui_theme(&fonts);
 
             Context {
+                window,
+                gpu,
                 fonts,
                 shape: Default::default(),
                 scale: Default::default(),
@@ -47,9 +40,7 @@ impl Ui {
         };
 
         Self {
-            window,
             context,
-            gpu,
             panes: Panes::new(),
             files: FilesView::new(),
             status: StatusView::new(),
@@ -58,10 +49,6 @@ impl Ui {
 
     pub fn is_animating(&self) -> bool {
         self.panes.is_animating()
-    }
-
-    pub fn window(&self) -> &Window {
-        &self.window
     }
 
     pub fn context(&self) -> &Context {
@@ -80,65 +67,57 @@ impl Ui {
     ///
     /// Does not resizes the views. Views report their last renderd sizes.
     pub fn resize(&mut self) {
-        self.gpu.resize(&self.window);
+        self.context.gpu.resize(&self.context.window);
     }
 
     pub fn update(&mut self, delta: Duration) {
         self.panes.update(delta);
     }
 
-    pub fn render<'a>(
+    pub fn render(
         &mut self,
-        documents: impl Fn(DocumentId) -> Option<&'a Document>,
+        editor: &Editor,
         mode: Mode,
-        file_search: Option<(usize, &'a str, &Search)>,
-        keybindings: &[String],
+        file_search: Option<(usize, &str, &Search)>,
+        keybindings: impl Iterator<Item = String>,
         file_name: Option<(String, bool)>,
     ) {
         let theme = self.context.theme;
         let window = {
-            let window = self.window.inner_size();
-            Size::new(window.width, window.height)
+            let window = self.context.window.inner_size();
+            Rectangle::new(0, 0, window.width, window.height)
         };
-        let region = {
-            let size = Size::new(window.width, window.height - theme.line_height);
-            let pixels = theme.pixels(size);
-
-            Rectangle::new(
-                Position::new_u32(
-                    (size.height - pixels.height) / 2,
-                    (size.width - pixels.width) / 2,
-                ),
-                pixels,
-            )
-        };
+        let region = window.centered(theme.pixels(window.size()));
+        let panes_region = Rectangle::new(
+            region.top,
+            region.left,
+            region.width,
+            region.height - theme.line_height,
+        );
         let status_region = Rectangle::new(
-            Position::new(region.top + region.height as i32, 0),
-            Size::new(window.width, theme.line_height),
+            region.top + region.height as i32 - theme.line_height as i32,
+            region.left,
+            region.width,
+            theme.line_height,
         );
 
         self.panes
-            .render(&mut self.context, &mut self.gpu, region, documents, mode);
+            .render(&mut self.context, panes_region, editor, mode);
 
-        if let Some((needle, haystack, selected)) = file_search {
-            self.files.render(
-                &mut self.context,
-                self.gpu.layer(region, 1),
-                needle,
-                haystack,
-                selected,
-            );
+        if let Some((selected, haystack, search)) = file_search {
+            self.files
+                .render(&mut self.context, panes_region, selected, haystack, search)
         }
 
         self.status.render(
             &mut self.context,
-            self.gpu.layer(status_region, 0),
+            status_region,
             mode,
             keybindings,
             file_name,
         );
 
-        self.gpu.render(self.context.theme.background_color);
+        self.context.gpu.render(self.context.theme.background_color);
     }
 }
 

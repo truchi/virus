@@ -11,7 +11,7 @@ use virus_editor::{
     add_in_range,
     ast::Pairs,
     document::Document,
-    editor::WatcherEvent,
+    editor::{Editor, WatcherEvent},
     fuzzy::Search,
     mode::{Mode, Select},
     rope::{Boundaries, Cursor, Text},
@@ -34,10 +34,6 @@ const MARGIN: usize = 3;
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            Handler                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-type Editor = virus_editor::editor::Editor<EventLoopProxy>;
-
-// ────────────────────────────────────────────────────────────────────────────────────────────── //
 
 #[derive(Debug)]
 enum EventLoopEvent {
@@ -383,7 +379,7 @@ impl Virus {
             .map(|(_, document)| document.parse());
 
         // TODO handle that better
-        self.ui.window().request_redraw();
+        self.ui.context().window.request_redraw();
     }
 
     fn on_resized(&mut self, event_loop: &ActiveEventLoop) {
@@ -396,7 +392,7 @@ impl Virus {
         let delta = if let Some(delta) = self.last_render.map(|last_render| now - last_render) {
             if delta.as_millis() < Self::MILLIS_PER_FRAME {
                 // TODO better frame scheduling
-                self.ui.window().request_redraw();
+                self.ui.context().window.request_redraw();
                 return;
             }
 
@@ -408,22 +404,18 @@ impl Virus {
         self.last_render = Some(now);
         self.ui.update(delta);
         self.ui.render(
-            |id| self.editor.get_document(id),
+            &self.editor,
             self.mode,
             (self.mode == Mode::Files).then_some((
                 self.file_search.selected,
                 &self.file_search.needle,
                 &self.file_search.search,
             )),
-            &self
-                .keybindings
-                .originals()
-                .map(|(count, key)| {
-                    count
-                        .map(|count| count.to_string())
-                        .unwrap_or_else(|| key.to_string())
-                })
-                .collect::<Vec<_>>(),
+            self.keybindings.originals().map(|(count, key)| {
+                count
+                    .map(|count| count.to_string())
+                    .unwrap_or_else(|| key.to_string())
+            }),
             self.get_active_document().map(|(_, document)| {
                 (
                     document
@@ -438,7 +430,7 @@ impl Virus {
         );
 
         if self.ui.is_animating() {
-            self.ui.window().request_redraw();
+            self.ui.context().window.request_redraw();
         }
     }
 

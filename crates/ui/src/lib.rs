@@ -1,4 +1,4 @@
-mod highlighteds;
+pub mod highlighteds;
 pub mod panes;
 pub mod theme;
 pub mod tween;
@@ -14,11 +14,12 @@ pub mod views {
 }
 
 use highlighteds::Highlighted;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 use swash::{scale::ScaleContext, shape::ShapeContext};
 use theme::UiTheme;
 use virus_editor::document::DocumentId;
-use virus_graphics::text::Fonts;
+use virus_graphics::{gpu::Gpu, text::Fonts};
+use winit::window::Window;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                            Context                                             //
@@ -26,6 +27,10 @@ use virus_graphics::text::Fonts;
 
 /// Rendering context.
 pub struct Context {
+    /// Window.
+    pub window: Arc<Window>,
+    /// Gpu.
+    pub gpu: Gpu,
     /// Font cache.
     pub fonts: Fonts,
     /// Shape context.
@@ -36,26 +41,6 @@ pub struct Context {
     pub theme: UiTheme,
     /// Highlighted documents cache.
     pub highlighteds: HashMap<DocumentId, Highlighted>,
-}
-
-impl Context {
-    pub fn as_mut(&mut self) -> ContextMut {
-        ContextMut {
-            fonts: &mut self.fonts,
-            shape: &mut self.shape,
-            scale: &mut self.scale,
-            theme: &mut self.theme,
-            highlighteds: &mut self.highlighteds,
-        }
-    }
-}
-
-pub struct ContextMut<'a> {
-    pub fonts: &'a Fonts,
-    pub shape: &'a mut ShapeContext,
-    pub scale: &'a mut ScaleContext,
-    pub theme: &'a UiTheme,
-    pub highlighteds: &'a mut HashMap<DocumentId, Highlighted>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //

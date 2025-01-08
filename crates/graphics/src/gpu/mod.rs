@@ -1,28 +1,17 @@
 mod atlas;
-mod pipelines {
-    use super::*;
-
-    pub mod glyph;
-    pub mod line;
-    pub mod rectangle;
-}
+mod pipeline;
 
 use crate::{
     color::{Rgb, Rgba},
     geom::{Position, Rectangle, Size},
+    gpu::{
+        atlas::{Atlas, AtlasError},
+        pipeline::Pipeline,
+    },
     muck::WithAttributes,
     text::{Fonts, GlyphKey, Glyphs},
 };
-use atlas::{Atlas, AtlasError};
-use pipelines::glyph::Pipeline as GlyphPipeline;
-use pipelines::line::Pipeline as LinePipeline;
-use pipelines::rectangle::Pipeline as RectanglePipeline;
-use std::{
-    collections::{BTreeMap, HashMap},
-    hash::Hash,
-    ops::Range,
-    sync::Arc,
-};
+use std::{collections::HashMap, hash::Hash, num::NonZeroU64, ops::Range, sync::Arc};
 use swash::{
     scale::{
         image::{Content, Image},
@@ -35,8 +24,8 @@ use wgpu::{
     BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, BlendState,
     Buffer, BufferAddress, BufferDescriptor, BufferUsages, Color, ColorTargetState, ColorWrites,
     CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Extent3d, Features,
-    FragmentState, ImageCopyTexture, ImageDataLayout, Instance, Limits, LoadOp, Operations,
-    Origin3d, PipelineLayoutDescriptor, PresentMode, PrimitiveState, PrimitiveTopology,
+    FragmentState, ImageCopyTexture, ImageDataLayout, Instance as WGpuInstance, Limits, LoadOp,
+    Operations, Origin3d, PipelineLayoutDescriptor, PresentMode, PrimitiveState, PrimitiveTopology,
     PushConstantRange, Queue, RenderPass, RenderPassColorAttachment, RenderPassDescriptor,
     RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions, SamplerBindingType,
     ShaderModule, ShaderStages, StoreOp, Surface, SurfaceConfiguration, Texture, TextureAspect,
@@ -80,25 +69,17 @@ pub struct Gpu {
     config: SurfaceConfiguration,
     device: Device,
     queue: Queue,
-    rectangle: RectanglePipeline,
-    glyph: GlyphPipeline,
-    line: LinePipeline,
+    pipeline: Pipeline,
 }
 
 impl Gpu {
     /// Creates a new `Gpu`.
     pub fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
-
-        // WGPU instance
-        let instance = Instance::new(Default::default());
-
-        // Surface (window/canvas)
+        let instance = WGpuInstance::new(Default::default());
         let surface = instance
             .create_surface(window)
             .expect("Cannot create surface");
-
-        // Request adapter (device handle), device (gpu connection) and queue (handle to command queue)
         let adapter = pollster::block_on(instance.request_adapter(&RequestAdapterOptions {
             compatible_surface: Some(&surface),
             ..Default::default()
@@ -117,8 +98,6 @@ impl Gpu {
             None,
         ))
         .unwrap();
-
-        // Configure surface
         let config = {
             let capabilities = surface.get_capabilities(&adapter);
             SurfaceConfiguration {
@@ -133,45 +112,42 @@ impl Gpu {
             }
         };
         surface.configure(&device, &config);
-
-        // Pipelines
-        let rectangle = RectanglePipeline::new(&device, &config);
-        let glyph = GlyphPipeline::new(&device, &config);
-        let line = LinePipeline::new(&device, &config);
+        let pipeline = Pipeline::new(&device, &config);
 
         Self {
             surface,
             config,
             device,
             queue,
-            rectangle,
-            glyph,
-            line,
+            pipeline,
         }
     }
 
     /// Resizes the surface to the window's logical size.
     pub fn resize(&mut self, window: &Window) {
         let size = window.inner_size();
+
         self.config.width = size.width;
         self.config.height = size.height;
-
         self.surface.configure(&self.device, &self.config);
-        self.rectangle.resize(&self.config);
-        self.glyph.resize(&self.device, &self.config);
-        self.line.resize(&self.config);
+        self.pipeline.resize(&self.device, &self.config);
     }
 
-    /// Returns the `Layer`ing API.
-    pub fn layer(&mut self, region: Rectangle, layer: u16) -> Layer {
-        Layer {
-            gpu: self,
+    /// Returns the size of the surface.
+    pub fn size(&self) -> Size {
+        Size::new(self.config.width, self.config.height)
+    }
+
+    /// Returns the drawing API.
+    pub fn draw(&mut self, region: Rectangle) -> Draw {
+        Draw {
             region,
-            layer: layer as u32 * u16::MAX as u32,
+            queue: &self.queue,
+            pipeline: &mut self.pipeline,
         }
     }
 
-    /// Renders to the screen.
+    /// Clears and draws to the screen.
     pub fn render(&mut self, clear: Rgb) {
         // Get output texture from surface
         let output = self.surface.get_current_texture().unwrap();
@@ -182,7 +158,7 @@ impl Gpu {
                 label: Some("Encoder"),
             });
 
-        // Render pipelines in output texture
+        // Draw pipelines in output texture
         let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some("Render pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
@@ -203,105 +179,13 @@ impl Gpu {
             occlusion_query_set: None,
         });
 
-        enum ToRender {
-            Rectangle(u32),
-            Glyph(u32),
-            Line(u32),
-        }
-
-        fn layers(
-            rectangle_layers: impl Iterator<Item = u32>,
-            glyph_layers: impl Iterator<Item = u32>,
-            line_layers: impl Iterator<Item = u32>,
-        ) -> impl Iterator<Item = ToRender> {
-            let mut rectangle_layers = rectangle_layers.peekable();
-            let mut glyph_layers = glyph_layers.peekable();
-            let mut line_layers = line_layers.peekable();
-
-            std::iter::from_fn(move || {
-                let rectangle_layer = rectangle_layers.peek().copied();
-                let glyph_layer = glyph_layers.peek().copied();
-                let line_layer = line_layers.peek().copied();
-
-                let min = rectangle_layer
-                    .unwrap_or(u32::MAX)
-                    .min(glyph_layer.unwrap_or(u32::MAX))
-                    .min(line_layer.unwrap_or(u32::MAX));
-
-                if rectangle_layer == Some(min) {
-                    rectangle_layers.next();
-                    Some(ToRender::Rectangle(min))
-                } else if glyph_layer == Some(min) {
-                    glyph_layers.next();
-                    Some(ToRender::Glyph(min))
-                } else if line_layer == Some(min) {
-                    line_layers.next();
-                    Some(ToRender::Line(min))
-                } else {
-                    None
-                }
-            })
-        }
-
-        // Pre render
-        self.rectangle.pre_render(&self.queue);
-        self.glyph.pre_render(&self.queue);
-        self.line.pre_render(&self.queue);
-
-        // Render layers
-        for layer in layers(
-            self.rectangle.layers(),
-            self.glyph.layers(),
-            self.line.layers(),
-        ) {
-            use ToRender::*;
-            match layer {
-                Rectangle(layer) => self.rectangle.render(layer, &mut render_pass),
-                Glyph(layer) => self.glyph.render(layer, &mut render_pass),
-                Line(layer) => self.line.render(layer, &mut render_pass),
-            }
-        }
+        // Draw primitives
+        self.pipeline.draw(&mut render_pass);
 
         // Flush
-        drop(render_pass);
+        drop(render_pass); // Runtime error if we don't drop the render pass
         self.queue.submit([encoder.finish()]);
         output.present();
-
-        // Post render
-        self.rectangle.post_render();
-        self.glyph.post_render();
-        self.line.post_render();
-    }
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                             Layer                                              //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-pub struct Layer<'gpu> {
-    gpu: &'gpu mut Gpu,
-    region: Rectangle,
-    layer: u32,
-}
-
-impl<'gpu> Layer<'gpu> {
-    /// Returns the size.
-    pub fn size(&self) -> Size {
-        self.region.size()
-    }
-
-    /// Returns the `Draw`ing API.
-    pub fn draw(&mut self, region: impl Into<Option<Rectangle>>, layer: u16) -> Draw {
-        let region = region
-            .into()
-            .map(|rectangle| rectangle.region(self.region).unwrap_or_default())
-            .unwrap_or(self.region);
-
-        Draw {
-            gpu: self.gpu,
-            layer: self.layer + layer as u32,
-            region,
-        }
     }
 }
 
@@ -309,49 +193,52 @@ impl<'gpu> Layer<'gpu> {
 //                                              Draw                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
+/// Drawing API.
 pub struct Draw<'gpu> {
-    gpu: &'gpu mut Gpu,
     region: Rectangle,
-    layer: u32,
+    queue: &'gpu Queue,
+    pipeline: &'gpu mut Pipeline,
 }
 
 impl<'gpu> Draw<'gpu> {
-    /// Returns the size.
-    pub fn size(&self) -> Size {
-        self.region.size()
+    /// Returns the draw region.
+    pub fn region(&self) -> Rectangle {
+        self.region
     }
 
-    /// Draws a rectangle.
-    pub fn rectangle(&mut self, rectangle: impl Into<Option<Rectangle>>, color: Rgba) {
-        let rectangle = rectangle
-            .into()
-            .unwrap_or_else(|| Rectangle::new(Position::default(), self.size()));
+    /// Draws `rectangle` with `color`.
+    pub fn rectangle(&mut self, rectangle: Rectangle, color: Rgba) -> &mut Self {
+        self.pipeline
+            .write_rectangle(self.queue, self.region, rectangle, color);
 
-        self.gpu
-            .rectangle
-            .push(self.layer, self.region, rectangle, color);
+        self
     }
 
-    /// Draws a glyph.
+    /// Fills the region with `color`.
+    pub fn fill(&mut self, color: Rgba) -> &mut Self {
+        self.rectangle(
+            Rectangle::from((Position::default(), self.region.size())),
+            color,
+        );
+
+        self
+    }
+
+    /// Draws a glyph at `position` with `color`.
     pub fn glyph<F: FnOnce() -> Image>(
         &mut self,
         position: Position,
         key: GlyphKey,
         color: Rgba,
         image: F,
-    ) {
-        self.gpu.glyph.push(
-            &self.gpu.queue,
-            self.layer,
-            self.region,
-            position,
-            key,
-            color,
-            image,
-        );
+    ) -> &mut Self {
+        self.pipeline
+            .write_glyph(self.queue, self.region, position, key, color, image);
+
+        self
     }
 
-    /// Draws glyphs.
+    /// Draws glyphs at `position`.
     pub fn glyphs(
         &mut self,
         fonts: &Fonts,
@@ -359,7 +246,7 @@ impl<'gpu> Draw<'gpu> {
         position: Position,
         line_height: u32,
         glyphs: &Glyphs,
-    ) {
+    ) -> &mut Self {
         //
         // Add backgrounds
         //
@@ -367,8 +254,10 @@ impl<'gpu> Draw<'gpu> {
         for (Range { start, end }, background) in glyphs.backgrounds() {
             self.rectangle(
                 Rectangle::new(
-                    position + Position::new(0, start.round() as i32),
-                    Size::new((end - start).round() as u32, line_height),
+                    position.top,
+                    position.left + start.round() as i32,
+                    (end - start).round() as u32,
+                    line_height,
                 ),
                 background,
             );
@@ -382,21 +271,13 @@ impl<'gpu> Draw<'gpu> {
 
         for glyph in glyphs.glyphs() {
             self.glyph(
-                position + Position::new(0, glyph.offset.round() as i32),
+                Position::new(position.top, position.left + glyph.offset.round() as i32),
                 glyph.key(),
                 glyph.styles.foreground,
                 || scaler.render(&glyph),
             );
         }
-    }
 
-    /// Draws a polyline.
-    pub fn polyline<T: IntoIterator<Item = (Position, Rgba)>>(&mut self, points: T) {
-        self.gpu.line.push(self.layer, self.region, points, false);
-    }
-
-    /// Draws a polygon.
-    pub fn polygon<T: IntoIterator<Item = (Position, Rgba)>>(&mut self, points: T) {
-        self.gpu.line.push(self.layer, self.region, points, true);
+        self
     }
 }

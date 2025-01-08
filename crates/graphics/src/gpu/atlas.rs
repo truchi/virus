@@ -83,7 +83,7 @@ impl<K: Clone + Eq + Hash, V> Atlas<K, V> {
             self.items.get(&key).unwrap()
         };
 
-        self.write(queue, Rectangle::new(item.position, size), bytes);
+        self.write(queue, Rectangle::from((item.position, size)), bytes);
 
         Ok(item)
     }

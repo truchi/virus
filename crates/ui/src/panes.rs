@@ -1,14 +1,12 @@
 use crate::{views::DocumentView, Context};
 use std::time::Duration;
 use virus_editor::{
-    document::{Document, DocumentId},
+    document::DocumentId,
+    editor::Editor,
     ids,
     mode::{Mode, Select},
 };
-use virus_graphics::{
-    geom::{Position, Rectangle, Size},
-    gpu::Gpu,
-};
+use virus_graphics::geom::Rectangle;
 
 ids!(
     /// [`PaneId`] generator.
@@ -143,16 +141,14 @@ impl Panes {
     pub fn render<'a>(
         &mut self,
         context: &mut Context,
-        gpu: &mut Gpu,
         region: Rectangle,
-        documents: impl Fn(DocumentId) -> Option<&'a Document>,
+        editor: &Editor,
         mode: Mode,
     ) {
         let len = self.panes.len() as u32;
         let theme = context.theme;
         let region_columns = theme.cells(region.size()).width;
         let desired_columns = Self::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS;
-
         let (active_width, inactive_width) = if len * desired_columns < region_columns {
             (
                 (desired_columns as f32 * theme.advance).ceil() as u32,
@@ -195,16 +191,13 @@ impl Panes {
         for pane in &mut self.panes {
             match pane {
                 Pane::Document(DocumentPane { id, view }) => {
-                    let Some(document) = documents(view.document_id()) else {
+                    let Some(document) = editor.get_document(view.document_id()) else {
                         continue;
                     };
                     let is_active = self.active_id == Some(*id);
                     let region = {
                         let width = is_active.then_some(active_width).unwrap_or(inactive_width);
-                        let region = Rectangle::new(
-                            Position::new(region.top, left),
-                            Size::new(width, region.height),
-                        );
+                        let region = Rectangle::new(region.top, left, width, region.height);
 
                         left += width as i32 + margin;
                         region
@@ -221,7 +214,7 @@ impl Panes {
                         }
                     });
 
-                    view.render(context, gpu.layer(region, 0), document, mode, is_active);
+                    view.render(context, region, document, mode, is_active);
                 }
             }
         }

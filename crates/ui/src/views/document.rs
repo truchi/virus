@@ -3,7 +3,7 @@ use crate::{
     tween::{Tween, Tweened},
     Context,
 };
-use std::{fmt::Write, time::Duration};
+use std::{fmt::Write, time::Duration, usize};
 use swash::{scale::ScaleContext, shape::ShapeContext};
 use virus_editor::{
     document::{Document, DocumentId},
@@ -13,8 +13,8 @@ use virus_editor::{
 use virus_graphics::{
     color::Rgba,
     geom::{Position, Rectangle, Size},
-    gpu::{Draw, Layer},
-    text::{FontStyle, FontWeight, Fonts, Glyphs, Styles},
+    gpu::{Draw, Gpu},
+    text::{Fonts, Glyphs, Styles},
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -75,7 +75,7 @@ impl DocumentView {
     pub fn render(
         &mut self,
         context: &mut Context,
-        layer: Layer,
+        region: Rectangle,
         document: &Document,
         mode: Mode,
         is_active: bool,
@@ -86,17 +86,16 @@ impl DocumentView {
             _ => true,
         });
 
-        self.size = layer.size();
+        self.size = region.size();
 
-        let context = context.as_mut();
-        let theme = *context.theme;
+        let theme = context.theme;
         let scroll_top = self.scroll_top.current();
         let scrollbar_color = theme
             .scrollbar_color
             .transparent(self.scrollbar_alpha.current());
 
         let rope_lines = document.rope().len_lines();
-        let region_height_in_lines = layer.size().height as f32 / theme.line_height as f32;
+        let region_height_in_lines = region.size().height as f32 / theme.line_height as f32;
         let scroll_top_in_lines = scroll_top as f32 / theme.line_height as f32;
         let (start_line, end_line) = {
             let start = scroll_top_in_lines.floor() as usize;
@@ -107,44 +106,37 @@ impl DocumentView {
 
             (start, end)
         };
-        let advance = context
-            .fonts
-            .get((theme.family, FontWeight::Regular, FontStyle::Normal))
-            .unwrap()
-            .advance_for_size(theme.font_size);
+        let advance = context.theme.advance;
         let scrollbar_rectangle = if rope_lines <= region_height_in_lines as usize {
             Rectangle::default()
         } else {
             let top = scroll_top_in_lines / rope_lines as f32;
             let height = region_height_in_lines / rope_lines as f32;
-            let region_height = layer.size().height as f32;
+            let region_height = region.size().height as f32;
 
             Rectangle::new(
-                Position::new(
-                    (top * region_height).round() as i32,
-                    (advance / 2.0).round() as i32,
-                ),
-                Size::new(
-                    (height * region_height).round() as u32,
-                    (advance / 4.0).round() as u32,
-                ),
+                (top * region_height).round() as i32,
+                (advance / 2.0).round() as i32,
+                (advance / 4.0).round() as u32,
+                (height * region_height).round() as u32,
             )
         };
         let highlighted = context.highlighteds.entry(document.id()).or_default();
         let highlighted = highlighted.get(
-            context.fonts,
-            context.shape,
+            &context.fonts,
+            &mut context.shape,
             theme,
             document,
             start_line..end_line,
         );
 
         Renderer {
-            fonts: context.fonts,
-            shape: context.shape,
-            scale: context.scale,
-            theme: context.theme,
-            layer,
+            fonts: &context.fonts,
+            shape: &mut context.shape,
+            scale: &mut context.scale,
+            theme: &context.theme,
+            gpu: &mut context.gpu,
+            region,
             selection: document.selection(),
             highlighted,
             start_line,
@@ -172,7 +164,8 @@ struct Renderer<'a> {
     shape: &'a mut ShapeContext,
     scale: &'a mut ScaleContext,
     theme: &'a UiTheme,
-    layer: Layer<'a>,
+    gpu: &'a mut Gpu,
+    region: Rectangle,
     selection: Selection,
     highlighted: &'a [Glyphs],
     start_line: usize,
@@ -186,8 +179,8 @@ struct Renderer<'a> {
 
 impl<'a> Renderer<'a> {
     fn scrollbar(&mut self) -> &mut Self {
-        self.layer
-            .draw(None, 0)
+        self.gpu
+            .draw(self.region)
             .rectangle(self.scrollbar_rectangle, self.scrollbar_color);
 
         self
@@ -209,7 +202,7 @@ impl<'a> Renderer<'a> {
             .push(&format!("{} ", number + 1), styles)
             .glyphs();
 
-            self.layer.draw(None, 0).glyphs(
+            self.gpu.draw(self.region).glyphs(
                 self.fonts,
                 self.scale,
                 Position::new(
@@ -226,7 +219,7 @@ impl<'a> Renderer<'a> {
 
     fn text(&mut self) -> &mut Self {
         for (index, glyphs) in self.highlighted.iter().enumerate() {
-            self.layer.draw(None, 0).glyphs(
+            self.gpu.draw(self.region).glyphs(
                 self.fonts,
                 self.scale,
                 Position::new(
@@ -267,13 +260,10 @@ impl<'a> Renderer<'a> {
         };
 
         let (selection, is_forward) = (self.selection.range(), self.selection.is_forward());
-        let (width, height) = (
-            self.layer.size().width as i32,
-            self.theme.line_height as i32,
-        );
+        let (width, height) = (self.region.width as i32, self.theme.line_height as i32);
         let (top, bottom) = (row(selection.start), row(selection.end));
         let (start, end) = (column(selection.start), column(selection.end));
-        let draw = &mut self.layer.draw(None, 1);
+        let draw = &mut self.gpu.draw(self.region);
         let caret_width = self.theme.caret_width;
         let color = match self.mode {
             Mode::Normal { .. } => self.theme.normal_mode_color,
@@ -292,36 +282,33 @@ impl<'a> Renderer<'a> {
         ];
 
         let render_outline = |draw: &mut Draw, top, bottom, left, right| {
+            let width = (right - left) as u32;
+
             for (i, color) in outline_colors.iter().copied().enumerate() {
                 let i = i as i32;
 
                 if let Some(top) = top {
-                    let i = i + 1; // TODO Why?! Because grid snapping. Put that in pipeline.
-                    draw.polyline([
-                        (Position::new(top + i, left), color),
-                        (Position::new(top + i, right), color),
-                    ]);
+                    draw.rectangle(Rectangle::new(top + i, left, width, 1), color);
                 }
 
                 if let Some(bottom) = bottom {
-                    draw.polyline([
-                        (Position::new(bottom - i, left), color),
-                        (Position::new(bottom - i, right), color),
-                    ]);
+                    draw.rectangle(Rectangle::new(bottom - i - 1, left, width, 1), color);
                 }
             }
         };
         let render_selection = |draw: &mut Draw, top, left, width, height| {
             draw.rectangle(
-                Rectangle::new(Position::new(top, left), Size::new_i32(width, height)),
+                Rectangle::new(top, left, width as u32, height as u32),
                 color.transparent(255 / 4),
             );
         };
         let render_caret = |draw: &mut Draw, top, left| {
             draw.rectangle(
                 Rectangle::new(
-                    Position::new(top, left - caret_width as i32 / 2),
-                    Size::new(caret_width, height as u32),
+                    top,
+                    left - caret_width as i32 / 2,
+                    caret_width,
+                    height as u32,
                 ),
                 color.transparent(255),
             );
@@ -376,11 +363,9 @@ impl<'a> Renderer<'a> {
 
     fn foreground(&mut self) -> &mut Self {
         if !self.is_active {
-            let size = self.layer.size();
-            self.layer.draw(None, 2).rectangle(
-                Rectangle::new(Position::default(), size),
-                self.theme.inactive_foreground_color,
-            );
+            self.gpu
+                .draw(self.region)
+                .fill(self.theme.inactive_foreground_color);
         }
 
         self

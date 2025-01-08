@@ -3,7 +3,7 @@ use swash::{scale::ScaleContext, shape::ShapeContext};
 use virus_editor::fuzzy::Search;
 use virus_graphics::{
     geom::{Position, Rectangle, Size},
-    gpu::Layer,
+    gpu::Gpu,
     text::{FontWeight, Fonts, Glyphs, Styles},
 };
 
@@ -21,33 +21,21 @@ impl FilesView {
     pub fn render(
         &mut self,
         context: &mut Context,
-        layer: Layer,
+        region: Rectangle,
         selected: usize,
         needle: &str,
         search: &Search,
     ) {
-        let context = context.as_mut();
-        let region = {
-            let columns = 2 + Panes::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS;
-            let width = (columns as f32 * context.theme.advance).ceil() as u32;
-            let left = (layer.size().width.saturating_sub(width)) as i32 / 2;
-
-            Rectangle::new(
-                Position::new(0, left),
-                Size::new(width, layer.size().height),
-            )
-        };
-
         Renderer {
-            fonts: context.fonts,
-            shape: context.shape,
-            scale: context.scale,
-            theme: context.theme,
-            layer,
+            fonts: &context.fonts,
+            shape: &mut context.shape,
+            scale: &mut context.scale,
+            theme: &context.theme,
+            gpu: &mut context.gpu,
+            region,
             selected,
             needle,
             search,
-            region,
         }
         .background()
         .needle()
@@ -64,21 +52,30 @@ struct Renderer<'a> {
     shape: &'a mut ShapeContext,
     scale: &'a mut ScaleContext,
     theme: &'a UiTheme,
-    layer: Layer<'a>,
+    gpu: &'a mut Gpu,
+    region: Rectangle,
     selected: usize,
     needle: &'a str,
     search: &'a Search,
-    region: Rectangle,
 }
 
 impl<'a> Renderer<'a> {
+    fn centered(&self, margin: u32) -> Rectangle {
+        self.region.centered(Size::new(
+            ((margin + Panes::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS) as f32
+                * self.theme.advance)
+                .ceil() as u32,
+            self.region.height,
+        ))
+    }
+
     fn background(&mut self) -> &mut Self {
-        self.layer
-            .draw(None, 0)
-            .rectangle(None, self.theme.inactive_foreground_color);
-        self.layer
-            .draw(self.region, 0)
-            .rectangle(None, self.theme.background_color.transparent(255));
+        self.gpu
+            .draw(self.region)
+            .fill(self.theme.inactive_foreground_color);
+        self.gpu
+            .draw(self.centered(2))
+            .fill(self.theme.background_color.transparent(255));
 
         self
     }
@@ -91,7 +88,7 @@ impl<'a> Renderer<'a> {
             self.theme.font_size,
         )
         .push(
-            &self.needle,
+            self.needle,
             Styles {
                 weight: FontWeight::Bold,
                 ..self.theme.syntax.default
@@ -100,59 +97,36 @@ impl<'a> Renderer<'a> {
         .glyphs();
 
         // Needle
-        self.layer
-            .draw(
-                {
-                    let mut region = self.region;
-                    region.top += self.theme.line_height as i32;
-                    region.left += self.theme.advance.ceil() as i32;
-                    region
-                },
-                0,
-            )
-            .glyphs(
-                self.fonts,
-                self.scale,
-                Position::default(),
-                self.theme.line_height,
-                &glyphs,
-            );
+        self.gpu.draw(self.centered(0)).glyphs(
+            self.fonts,
+            self.scale,
+            Position::new(self.theme.line_height as i32, 0),
+            self.theme.line_height,
+            &glyphs,
+        );
 
         // Caret
-        self.layer
-            .draw(
-                {
-                    let mut region = self.region;
-                    region.top += self.theme.line_height as i32;
-                    region
-                },
-                0,
-            )
-            .rectangle(
+        let left = glyphs.advance() - self.theme.caret_width as f32 / 2.0;
+
+        if left <= self.centered(0).width() as f32 {
+            self.gpu.draw(self.centered(2)).rectangle(
                 Rectangle::new(
-                    Position::new(
-                        0,
-                        (self.theme.advance + glyphs.advance()
-                            - self.theme.caret_width as f32 / 2.0)
-                            .round() as i32,
-                    ),
-                    Size::new(self.theme.caret_width, self.theme.line_height),
+                    self.theme.line_height as i32,
+                    (self.theme.advance + left).round() as i32,
+                    self.theme.caret_width,
+                    self.theme.line_height,
                 ),
                 self.theme.insert_mode_color.transparent(255),
             );
+        }
 
         self
     }
 
     fn matches(&mut self) -> &mut Self {
-        if self.search.matches().is_empty() {
-            return self;
-        }
-
         let region = {
-            let mut region = self.region;
+            let mut region = self.centered(0);
             region.top += 3 * self.theme.line_height as i32;
-            region.left += self.theme.advance.ceil() as i32;
             region.height -= 3 * self.theme.line_height;
             region
         };
@@ -206,7 +180,7 @@ impl<'a> Renderer<'a> {
                 shaper.glyphs()
             };
 
-            self.layer.draw(region, 0).glyphs(
+            self.gpu.draw(region).glyphs(
                 self.fonts,
                 self.scale,
                 position,

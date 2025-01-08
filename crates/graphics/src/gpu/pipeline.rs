@@ -1,11 +1,5 @@
 use super::*;
 
-macro_rules! label {
-    ($label:literal) => {
-        Some(concat!("[GlyphPipeline] ", $label))
-    };
-}
-
 const MASK_ATLAS_BIN_WIDTH: u32 = 400;
 const COLOR_ATLAS_BIN_WIDTH: u32 = 400;
 const MASK_ATLAS_SURFACE_FACTOR: u32 = 2;
@@ -17,14 +11,15 @@ const COLOR_ATLAS_SURFACE_FACTOR: u32 = 2;
 
 crate::muck!(unsafe Type => Uint32);
 
-/// Type: [`Type::MASK`]/[`Type::COLOR`].
+/// Type: [`Type::RECTANGLE`]/[`Type::MASK`]/[`Type::COLOR`].
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-struct Type(u32);
+pub struct Type(u32);
 
 impl Type {
-    const MASK: Self = Self(0);
-    const COLOR: Self = Self(1);
+    pub const RECTANGLE: Self = Self(0);
+    pub const MASK: Self = Self(1);
+    pub const COLOR: Self = Self(2);
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
@@ -36,16 +31,11 @@ crate::muck!(unsafe Instance => Instance: [Type, Position, Size, Position, Rgba]
 /// Instance.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-struct Instance {
-    /// Glyph type.
+pub struct Instance {
     ty: Type,
-    /// Glyph position.
     position: Position,
-    /// Glyph size.
     size: Size,
-    /// Glyph uv.
     uv: Position,
-    /// Glyph color.
     color: Rgba,
 }
 
@@ -59,7 +49,7 @@ struct Init<'a>(&'a Device);
 impl<'a> Init<'a> {
     fn buffer(&self, size: BufferAddress) -> Buffer {
         self.0.create_buffer(&BufferDescriptor {
-            label: label!("Instance buffer"),
+            label: Some("Instance buffer"),
             size,
             usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
             mapped_at_creation: false,
@@ -68,7 +58,7 @@ impl<'a> Init<'a> {
 
     fn mask_texture(&self, max_texture_dimension: u32, config: &SurfaceConfiguration) -> Texture {
         self.0.create_texture(&TextureDescriptor {
-            label: label!("Mask texture"),
+            label: Some("Mask texture"),
             size: Extent3d {
                 width: max_texture_dimension.min(MASK_ATLAS_SURFACE_FACTOR * config.width),
                 height: max_texture_dimension.min(MASK_ATLAS_SURFACE_FACTOR * config.height),
@@ -85,7 +75,7 @@ impl<'a> Init<'a> {
 
     fn color_texture(&self, max_texture_dimension: u32, config: &SurfaceConfiguration) -> Texture {
         self.0.create_texture(&TextureDescriptor {
-            label: label!("Color texture"),
+            label: Some("Color texture"),
             size: Extent3d {
                 width: max_texture_dimension.min(COLOR_ATLAS_SURFACE_FACTOR * config.width),
                 height: max_texture_dimension.min(COLOR_ATLAS_SURFACE_FACTOR * config.height),
@@ -102,7 +92,7 @@ impl<'a> Init<'a> {
 
     fn bind_group_layout(&self) -> BindGroupLayout {
         self.0.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: label!("Bind group layout"),
+            label: Some("Bind group layout"),
             entries: &[
                 // Mask texture
                 BindGroupLayoutEntry {
@@ -144,7 +134,7 @@ impl<'a> Init<'a> {
         color: &Texture,
     ) -> BindGroup {
         self.0.create_bind_group(&BindGroupDescriptor {
-            label: label!("Bind group"),
+            label: Some("Bind group"),
             layout: &bind_group_layout,
             entries: &[
                 // Mask texture
@@ -173,7 +163,7 @@ impl<'a> Init<'a> {
         module: &ShaderModule,
     ) -> RenderPipeline {
         let pipeline_layout = self.0.create_pipeline_layout(&PipelineLayoutDescriptor {
-            label: label!("Pipeline layout"),
+            label: Some("Pipeline layout"),
             bind_group_layouts: &[&bind_group_layout],
             push_constant_ranges: &[PushConstantRange {
                 stages: Constants::STAGES,
@@ -182,7 +172,7 @@ impl<'a> Init<'a> {
         });
 
         self.0.create_render_pipeline(&RenderPipelineDescriptor {
-            label: label!("Pipeline"),
+            label: Some("Pipeline"),
             layout: Some(&pipeline_layout),
             vertex: VertexState {
                 module: &module,
@@ -220,7 +210,8 @@ impl<'a> Init<'a> {
 #[derive(Debug)]
 pub struct Pipeline {
     constants: Constants,
-    layers: BTreeMap<u32, (Vec<Instance>, Range<BufferAddress>)>,
+    instances: u32,
+    bytes: Range<BufferAddress>,
     buffer: Buffer,
     mask: Atlas<GlyphKey, Placement>,
     color: Atlas<GlyphKey, Placement>,
@@ -248,19 +239,19 @@ impl Pipeline {
             Init(device).color_texture(max_texture_dimension, config),
             COLOR_ATLAS_BIN_WIDTH,
         );
-        let layers = Default::default();
         let bind_group_layout = Init(device).bind_group_layout();
         let bind_group =
             Init(device).bind_group(&bind_group_layout, mask.texture(), color.texture());
         let pipeline = Init(device).pipeline(
             config,
             &bind_group_layout,
-            &device.create_shader_module(include_wgsl!("../shaders/glyph.wgsl")),
+            &device.create_shader_module(include_wgsl!("./shader.wgsl")),
         );
 
         Self {
             constants,
-            layers,
+            instances: 0,
+            bytes: 0..0,
             buffer,
             mask,
             color,
@@ -268,11 +259,6 @@ impl Pipeline {
             bind_group,
             pipeline,
         }
-    }
-
-    /// Returns a sorted iterator of layers.
-    pub fn layers(&self) -> impl '_ + Iterator<Item = u32> {
-        self.layers.keys().copied()
     }
 
     /// Resizes the `Pipeline`.
@@ -295,14 +281,47 @@ impl Pipeline {
         );
     }
 
-    /// Pushes a glyph `key` to be rendered for `layer` in `region`
-    /// with `position`, `font_size` and `color`.
-    ///
-    /// Image data will be obtained through `ìmage` and only called if not in atlas already.
-    pub fn push<F: FnOnce() -> Image>(
+    /// Writes a `rectangle` to be rendered in `region` with `color`.
+    pub fn write_rectangle(
         &mut self,
         queue: &Queue,
-        layer: u32,
+        region: Rectangle,
+        rectangle: Rectangle,
+        color: Rgba,
+    ) {
+        if !color.is_visible() {
+            return;
+        }
+
+        let Some(rectangle) = rectangle.intersection_in(region) else {
+            return;
+        };
+
+        let instance = &[Instance {
+            ty: Type::RECTANGLE,
+            position: rectangle.position(),
+            size: rectangle.size(),
+            uv: Position::default(),
+            color,
+        }];
+        let bytes = bytemuck::cast_slice::<_, u8>(instance);
+        let len = NonZeroU64::new(bytes.len() as BufferAddress).unwrap();
+
+        queue
+            .write_buffer_with(&self.buffer, self.bytes.end, len)
+            .expect("large enough buffer")
+            .clone_from_slice(bytes);
+
+        self.instances += 1;
+        self.bytes.end += len.get();
+    }
+
+    /// Writes a glyph `key` to be rendered in `region` with `position` and `color`.
+    ///
+    /// Image data will be obtained through `ìmage` and only called if not in atlas already.
+    pub fn write_glyph<F: FnOnce() -> Image>(
+        &mut self,
+        queue: &Queue,
         region: Rectangle,
         position: Position,
         key: GlyphKey,
@@ -311,8 +330,8 @@ impl Pipeline {
     ) {
         // Early return for invisible glyphs
         if !color.is_visible()
-            || 0 <= position.top && region.size().height <= position.top as u32
-            || 0 <= position.left && region.size().width <= position.left as u32
+            || 0 <= position.top && region.height() <= position.top as u32
+            || 0 <= position.left && region.width() <= position.left as u32
         {
             return;
         }
@@ -361,57 +380,54 @@ impl Pipeline {
         // Crop to region
         let rectangle = Rectangle::new(
             // Swash image placement has vertical upward from baseline
-            position + Position::new(key.1 as i32 - placement.top, placement.left),
-            Size::new(placement.width, placement.height),
+            position.top + key.1 as i32 - placement.top,
+            position.left + placement.left,
+            placement.width,
+            placement.height,
         );
-        // Makes no sense but fixes top line when scrolling (up/down, weird in many ways)
         let uv = uv - Position::new(rectangle.top.min(0), rectangle.left.min(0));
 
-        let Some(rectangle) = rectangle.region(region) else {
+        let Some(rectangle) = rectangle.intersection_in(region) else {
             return;
         };
 
-        self.layers.entry(layer).or_default().0.push(Instance {
+        let instance = &[Instance {
             ty,
             position: rectangle.position(),
             size: rectangle.size(),
             uv,
             color,
-        });
+        }];
+        let bytes = bytemuck::cast_slice::<_, u8>(instance);
+        let len = NonZeroU64::new(bytes.len() as BufferAddress).unwrap();
+
+        queue
+            .write_buffer_with(&self.buffer, self.bytes.end, len)
+            .expect("large enough buffer")
+            .clone_from_slice(bytes);
+
+        self.instances += 1;
+        self.bytes.end += len.get();
     }
 
-    /// Writes buffer.
-    pub fn pre_render(&mut self, queue: &Queue) {
-        let mut offset = 0;
-
-        for (_, (instances, range)) in &mut self.layers {
-            let instances = bytemuck::cast_slice(instances);
-            queue.write_buffer(&self.buffer, offset, instances);
-            *range = offset..offset + instances.len() as BufferAddress;
-            offset = range.end;
+    /// Draws.
+    pub fn draw(&mut self, render_pass: &mut RenderPass) {
+        if self.bytes.is_empty() {
+            debug_assert!(self.instances == 0);
+            return;
+        } else {
+            debug_assert!(!self.instances != 0);
         }
-    }
 
-    /// Renders `layer`.
-    pub fn render<'pass>(&'pass self, layer: u32, render_pass: &mut RenderPass<'pass>) {
         let constants = self.constants.as_array();
-        let (instances, range) = match self.layers.get(&layer) {
-            Some((instances, range)) if !instances.is_empty() => (instances, range.clone()),
-            _ => return,
-        };
 
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
         render_pass.set_push_constants(Constants::STAGES, 0, bytemuck::cast_slice(&constants));
-        render_pass.set_vertex_buffer(0, self.buffer.slice(range));
-        render_pass.draw(0..6, 0..instances.len() as u32);
-    }
+        render_pass.set_vertex_buffer(0, self.buffer.slice(self.bytes.clone()));
+        render_pass.draw(0..6, 0..self.instances);
 
-    /// Clears layers.
-    pub fn post_render(&mut self) {
-        for (instances, range) in self.layers.values_mut() {
-            instances.clear();
-            *range = Default::default();
-        }
+        self.instances = 0;
+        self.bytes = 0..0;
     }
 }
