@@ -1,4 +1,3 @@
-use crate::document::{Document, DocumentId, DocumentIds};
 use ignore::WalkBuilder;
 use notify::{
     event::ModifyKind, recommended_watcher, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
@@ -7,6 +6,7 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
+use virus_document::document::{Document, DocumentId, DocumentIds};
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 

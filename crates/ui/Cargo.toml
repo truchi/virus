@@ -7,6 +7,7 @@ edition.workspace = true
 [dependencies]
 swash.workspace = true
 tween.workspace = true
+virus_document.workspace = true
 virus_editor.workspace = true
 virus_graphics.workspace = true
 winit.workspace = true

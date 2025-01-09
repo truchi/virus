@@ -5,11 +5,12 @@ use crate::{
 };
 use std::{fmt::Write, time::Duration, usize};
 use swash::{scale::ScaleContext, shape::ShapeContext};
-use virus_editor::{
+use virus_document::{
+    cursor::Cursor,
     document::{Document, DocumentId},
-    mode::{Mode, Select},
-    rope::{Cursor, Selection},
+    selection::Selection,
 };
+use virus_editor::mode::{Mode, Select};
 use virus_graphics::{
     color::Rgba,
     geom::{Position, Rectangle, Size},

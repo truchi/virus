@@ -1,4 +1,7 @@
-use crate::rope::{Boundaries, Cursor, Segmentation};
+use crate::{
+    cursor::Cursor,
+    segmentation::{Boundaries, Segmentation},
+};
 use ropey::Rope;
 use std::collections::HashMap;
 
@@ -132,7 +135,7 @@ impl Occurences {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rope::{Edit, Selection};
+    use crate::{edit::Edit, selection::Selection};
 
     fn sort<'a>(items: impl IntoIterator<Item = &'a str>) -> Vec<&'a str> {
         let mut items = items.into_iter().collect::<Vec<_>>();

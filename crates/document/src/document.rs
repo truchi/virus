@@ -1,12 +1,16 @@
 use crate::{
     add_in_range,
-    ast::{Navigation, Pairs, RUST_HIGHLIGHTS},
+    cursor::Cursor,
+    edit::{Edit, Text},
+    graphemes::{GraphemesBackward, GraphemesForward},
     history::History,
     ids,
-    rope::{
-        Boundaries, Cursor, Edit, GraphemeCategory, GraphemesBackward, GraphemesForward,
-        Occurences, SearchBackward, SearchForward, Segmentation, Selection, Text,
-    },
+    navigation::{Navigation, Pairs},
+    occurences::Occurences,
+    queries::RUST_HIGHLIGHTS,
+    search::{SearchBackward, SearchForward},
+    segmentation::{Boundaries, GraphemeCategory, Segmentation},
+    selection::Selection,
     sub_in_range,
 };
 use ropey::Rope;

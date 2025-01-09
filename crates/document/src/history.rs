@@ -1,4 +1,4 @@
-use crate::rope::Edit;
+use crate::edit::Edit;
 use std::collections::VecDeque;
 
 #[derive(Debug)]

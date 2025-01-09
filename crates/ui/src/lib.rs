@@ -17,7 +17,7 @@ use highlighteds::Highlighted;
 use std::{collections::HashMap, sync::Arc};
 use swash::{scale::ScaleContext, shape::ShapeContext};
 use theme::UiTheme;
-use virus_editor::document::DocumentId;
+use virus_document::document::DocumentId;
 use virus_graphics::{gpu::Gpu, text::Fonts};
 use winit::window::Window;
 

@@ -1,5 +1,4 @@
-use super::HighlightsTag;
-use crate::{rope::Cursor, StrOrSmol};
+use crate::{cursor::Cursor, queries::HighlightsTag, StrOrSmol};
 use ropey::Rope;
 use smol_str::SmolStrBuilder;
 use std::{cmp::Ordering, ops::Range};

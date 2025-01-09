@@ -1,9 +1,8 @@
 use crate::{views::DocumentView, Context};
 use std::time::Duration;
+use virus_document::{document::DocumentId, ids};
 use virus_editor::{
-    document::DocumentId,
     editor::Editor,
-    ids,
     mode::{Mode, Select},
 };
 use virus_graphics::geom::Rectangle;

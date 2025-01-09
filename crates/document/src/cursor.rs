@@ -1,4 +1,4 @@
-use crate::rope::GraphemesForward;
+use crate::graphemes::GraphemesForward;
 use ropey::RopeSlice;
 use std::cmp::Ordering;
 use unicode_width::UnicodeWidthStr;

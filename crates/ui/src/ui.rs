@@ -4,9 +4,8 @@ use crate::{
     Context,
 };
 use std::{sync::Arc, time::Duration};
-use virus_editor::{
-    add_in_range, document::DocumentId, editor::Editor, fuzzy::Search, mode::Mode, sub_in_range,
-};
+use virus_document::{add_in_range, document::DocumentId, sub_in_range};
+use virus_editor::{editor::Editor, fuzzy::Search, mode::Mode};
 use virus_graphics::{geom::Rectangle, gpu::Gpu};
 use winit::window::Window;
 

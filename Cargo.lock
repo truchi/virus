@@ -180,9 +180,9 @@ dependencies = [
 
 [[package]]
 name = "bstr"
-version = "1.9.1"
+version = "1.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05efc5cfd9110c8416e471df0e96702d58690178e206e61b7173706673c93706"
+checksum = "531a9155a481e2ee699d4f98f43c0ca4ff8ee1bfd55c31e9e98fb29d2b176fe0"
 dependencies = [
  "memchr",
  "serde",
@@ -353,9 +353,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-deque"
-version = "0.8.5"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "613f8cc01fe9cf1a3eb3d7f488fd2fa8388403e97039e2f73692932e291a770d"
+checksum = "9dd111b7b7f7d55b72c0a6ae361660ee5853c9af73f70c3c2ef6858b950e2e51"
 dependencies = [
  "crossbeam-epoch",
  "crossbeam-utils",
@@ -541,9 +541,9 @@ dependencies = [
 
 [[package]]
 name = "globset"
-version = "0.4.14"
+version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57da3b9b5b85bd66f31093f8c408b90a74431672542466497dcbdfdc02034be1"
+checksum = "15f1ce686646e7f1e19bf7d5533fe443a45dbfb990e00629110797578b42fb19"
 dependencies = [
  "aho-corasick",
  "bstr",
@@ -654,9 +654,9 @@ checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
 
 [[package]]
 name = "ignore"
-version = "0.4.22"
+version = "0.4.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b46810df39e66e925525d6e38ce1e7f6e1d208f72dc39757880fcb66e2c58af1"
+checksum = "6d89fd380afde86567dfba715db065673989d6253f42b88179abd3eae47bda4b"
 dependencies = [
  "crossbeam-deque",
  "globset",
@@ -1037,9 +1037,9 @@ dependencies = [
 
 [[package]]
 name = "notify-types"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7393c226621f817964ffb3dc5704f9509e107a8b024b489cc2c1b217378785df"
+checksum = "585d3cb5e12e01aed9e8a1f70d5c6b5e86fe2a6e48fc8cd0b3e0b8df6f6eb174"
 dependencies = [
  "instant",
 ]
@@ -1624,17 +1624,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_json"
-version = "1.0.118"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d947f6b3163d8857ea16c4fa0dd4840d52f3041039a85decd46867eb1abef2e4"
-dependencies = [
- "itoa",
- "ryu",
- "serde",
-]
-
-[[package]]
 name = "serde_yaml"
 version = "0.9.34+deprecated"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1991,9 +1980,26 @@ dependencies = [
  "serde_yaml",
  "smol_str 0.3.2",
  "thiserror 2.0.3",
+ "virus_document",
  "virus_editor",
  "virus_ui",
  "winit",
+]
+
+[[package]]
+name = "virus_document"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.6.0",
+ "ropey",
+ "similar",
+ "smol_str 0.3.2",
+ "tempfile",
+ "tree-sitter",
+ "tree-sitter-rust",
+ "unicode-properties",
+ "unicode-segmentation",
+ "unicode-width",
 ]
 
 [[package]]
@@ -2003,16 +2009,7 @@ dependencies = [
  "bitflags 2.6.0",
  "ignore",
  "notify",
- "ropey",
- "serde_json",
- "similar",
- "smol_str 0.3.2",
- "tempfile",
- "tree-sitter",
- "tree-sitter-rust",
- "unicode-properties",
- "unicode-segmentation",
- "unicode-width",
+ "virus_document",
 ]
 
 [[package]]
@@ -2033,6 +2030,7 @@ version = "0.1.0"
 dependencies = [
  "swash",
  "tween",
+ "virus_document",
  "virus_editor",
  "virus_graphics",
  "winit",

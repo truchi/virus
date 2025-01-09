@@ -1,4 +1,9 @@
-use crate::rope::{Cursor, Grapheme, GraphemeCategory, GraphemesBackward, Occurences};
+use crate::{
+    cursor::Cursor,
+    graphemes::{Grapheme, GraphemesBackward},
+    occurences::Occurences,
+    segmentation::GraphemeCategory,
+};
 use ropey::{Rope, RopeSlice};
 use similar::{Algorithm, DiffOp, TextDiff};
 use std::{ops::Range, time::Duration};
@@ -552,7 +557,7 @@ impl Edit {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rope::Selection;
+    use crate::selection::Selection;
 
     #[test]
     fn rope() {

@@ -8,15 +8,14 @@ use crate::{
     keybindings::{ActionHandler, Keybindings},
 };
 use std::{sync::Arc, time::Instant};
+use virus_document::{
+    add_in_range, cursor::Cursor, document::Document, edit::Text, navigation::Pairs,
+    segmentation::Boundaries, sub_in_range,
+};
 use virus_editor::{
-    add_in_range,
-    ast::Pairs,
-    document::Document,
     editor::{Editor, WatcherEvent},
     fuzzy::Search,
     mode::{Mode, Select},
-    rope::{Boundaries, Cursor, Text},
-    sub_in_range,
 };
 use virus_ui::{
     panes::{DocumentPane, Pane},

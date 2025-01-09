@@ -1,4 +1,4 @@
-use crate::rope::Cursor;
+use crate::cursor::Cursor;
 use ropey::Rope;
 use unicode_properties::{GeneralCategoryGroup, UnicodeGeneralCategory};
 use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};

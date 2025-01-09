@@ -1,6 +1,6 @@
 use crate::tween::Tween;
 use std::{ops::Index, time::Duration};
-use virus_editor::ast::HighlightsTag;
+use virus_document::queries::HighlightsTag;
 use virus_graphics::{
     color::{Rgb, Rgba},
     geom::Size,

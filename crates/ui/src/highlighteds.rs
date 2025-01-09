@@ -1,9 +1,9 @@
 use crate::theme::UiTheme;
 use std::ops::Range;
 use swash::shape::ShapeContext;
-use virus_editor::{
-    ast::Highlights,
+use virus_document::{
     document::{Document, DocumentId},
+    highlights::Highlights,
 };
 use virus_graphics::text::{Fonts, Glyphs};
 
