@@ -380,7 +380,7 @@ impl Pipeline {
         // Crop to region
         let rectangle = Rectangle::new(
             // Swash image placement has vertical upward from baseline
-            position.top + key.1 as i32 - placement.top,
+            position.top + key.1.as_i32() - placement.top,
             position.left + placement.left,
             placement.width,
             placement.height,

@@ -116,8 +116,8 @@ impl DocumentView {
 
             Rectangle::new(
                 (top * region_height).round() as i32,
-                (advance / 2.0).round() as i32,
-                (advance / 4.0).round() as u32,
+                (advance as f32 / 2.0).round() as i32,
+                (advance as f32 / 4.0).round() as u32,
                 (height * region_height).round() as u32,
             )
         };
@@ -140,7 +140,7 @@ impl DocumentView {
             selection: document.selection(),
             highlighted,
             start_line,
-            gutter_width: (advance * Self::GUTTER_COLUMNS as f32).round() as u32,
+            gutter_width: advance * Self::GUTTER_COLUMNS,
             scroll_top,
             scrollbar_rectangle,
             scrollbar_color,
@@ -198,6 +198,7 @@ impl<'a> Renderer<'a> {
                 self.shape,
                 self.theme.family,
                 self.theme.font_size,
+                self.theme.advance,
             )
             .push(&format!("{} ", number + 1), styles)
             .glyphs();
@@ -207,7 +208,7 @@ impl<'a> Renderer<'a> {
                 self.scale,
                 Position::new(
                     number as i32 * self.theme.line_height as i32 - self.scroll_top,
-                    (self.gutter_width as f32 - glyphs.advance()).round() as i32,
+                    self.gutter_width as i32 - glyphs.advance() as i32,
                 ),
                 self.theme.line_height,
                 &glyphs,
@@ -252,8 +253,7 @@ impl<'a> Renderer<'a> {
                             // TODO consecutive glyphs may have same range!
                             (glyph.end as usize > cursor.column).then_some(glyph.offset)
                         })
-                        .unwrap_or_else(|| glyphs.advance())
-                        .round() as i32
+                        .unwrap_or_else(|| glyphs.advance()) as i32
                 } else {
                     0
                 }

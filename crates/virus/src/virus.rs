@@ -1,6 +1,7 @@
 //! 🦠: a 😍 editor in 🦀 with ❤️
 // Hello! -- the-world - _ hello- _ ____world - the----w __ salut HTTPProxyOfTheDeath23MORE123
 // hello {((((world))))}, salut
+// abcdefghijklmnopqrstuvwxyz &é"'(§è!çà)^$ ù`;:=,;"
 
 use crate::{
     events::{Event, Events, Key, KeyEvent},

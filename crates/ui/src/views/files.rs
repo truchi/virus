@@ -62,9 +62,7 @@ struct Renderer<'a> {
 impl<'a> Renderer<'a> {
     fn centered(&self, margin: u32) -> Rectangle {
         self.region.centered(Size::new(
-            ((margin + Panes::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS) as f32
-                * self.theme.advance)
-                .ceil() as u32,
+            (margin + Panes::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS) * self.theme.advance,
             self.region.height,
         ))
     }
@@ -86,6 +84,7 @@ impl<'a> Renderer<'a> {
             self.shape,
             self.theme.family,
             self.theme.font_size,
+            self.theme.advance,
         )
         .push(
             self.needle,
@@ -106,13 +105,13 @@ impl<'a> Renderer<'a> {
         );
 
         // Caret
-        let left = glyphs.advance() - self.theme.caret_width as f32 / 2.0;
+        let left = glyphs.advance() as i32 - self.theme.caret_width as i32 / 2;
 
-        if left <= self.centered(0).width() as f32 {
+        if left <= self.centered(0).width() as i32 {
             self.gpu.draw(self.centered(2)).rectangle(
                 Rectangle::new(
                     self.theme.line_height as i32,
-                    (self.theme.advance + left).round() as i32,
+                    self.theme.advance as i32 + left,
                     self.theme.caret_width,
                     self.theme.line_height,
                 ),
@@ -162,6 +161,7 @@ impl<'a> Renderer<'a> {
                     self.shape,
                     self.theme.family,
                     self.theme.font_size,
+                    self.theme.advance,
                 );
 
                 for range in &m.indices {

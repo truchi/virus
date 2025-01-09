@@ -151,22 +151,23 @@ mod todo {
 
     pub fn ui_theme(fonts: &Fonts) -> UiTheme {
         let catppuccin = Catppuccin::latte();
-        let family = fonts.get("Victor").unwrap().key();
-        let font_size = 15 as FontSize;
-        let line_height = font_size as u32 * 5 / 4;
+        let family = fonts.get("Victor").unwrap();
+        let font = fonts
+            .get(family.best_match_regular_normal().unwrap())
+            .unwrap();
+        let font_size = font.size_for_advance(font.advance_for_size(15.0).round());
+        let advance = font.advance_for_size(font_size).round() as u32;
+        let line_height = (font_size * 5.0 / 4.0).round() as u32;
 
         UiTheme {
             syntax: catppuccin.syntax_theme(),
             background_color: catppuccin.base.solid(),
             inactive_foreground_color: catppuccin.mantle.solid().transparent(255 / 3),
 
-            family,
-            font_size,
+            family: family.key(),
+            font_size: FontSize::new(font_size),
             line_height,
-            advance: fonts
-                .get((family, FontWeight::default(), FontStyle::default()))
-                .unwrap()
-                .advance_for_size(font_size),
+            advance,
 
             scroll_duration: Duration::from_millis(500),
             scroll_tween: Tween::ExpoOut,

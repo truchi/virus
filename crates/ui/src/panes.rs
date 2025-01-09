@@ -151,8 +151,8 @@ impl Panes {
         let desired_columns = Self::ACTIVE_COLUMNS + DocumentView::GUTTER_COLUMNS;
         let (active_width, inactive_width) = if len * desired_columns < region_columns {
             (
-                (desired_columns as f32 * theme.advance).ceil() as u32,
-                (desired_columns as f32 * theme.advance).ceil() as u32,
+                desired_columns * theme.advance,
+                desired_columns * theme.advance,
             )
         } else {
             let active_columns = region_columns.min(desired_columns);
@@ -170,8 +170,8 @@ impl Panes {
             };
 
             (
-                (active_columns as f32 * theme.advance).ceil() as u32,
-                (inactive_columns as f32 * theme.advance).ceil() as u32,
+                active_columns * theme.advance,
+                inactive_columns * theme.advance,
             )
         };
         let margin = {

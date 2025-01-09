@@ -65,7 +65,7 @@ impl Highlighted {
             document.highlights(),
         );
 
-        let mut shaper = Glyphs::shaper(fonts, shape, theme.family, theme.font_size);
+        let mut shaper = Glyphs::shaper(fonts, shape, theme.family, theme.font_size, theme.advance);
 
         self.lines.clear();
 

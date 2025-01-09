@@ -64,6 +64,7 @@ impl<'a, T: Iterator<Item = String>> Renderer<'a, T> {
             self.shape,
             self.theme.family,
             self.theme.font_size,
+            self.theme.advance,
         );
 
         let (string, background) = match self.mode {

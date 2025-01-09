@@ -1,6 +1,6 @@
 use crate::{
     color::Rgba,
-    text::{FontFamilyKey, FontKey, FontSize, FontStyle, FontWeight, Fonts},
+    text::{Font, FontFamilyKey, FontKey, FontSize, FontStyle, FontWeight, Fonts},
 };
 use std::ops::Range;
 use swash::{
@@ -59,9 +59,9 @@ pub struct Glyph {
     /// Glyph id.
     pub id: GlyphId,
     /// Glyph advance offset.
-    pub offset: f32,
+    pub offset: u32,
     /// Glyph advance.
-    pub advance: f32,
+    pub advance: u32,
     /// Start index in the underlying string.
     pub start: u32,
     /// End index in the underlying string.
@@ -94,12 +94,21 @@ impl Glyphs {
         shape: &'a mut ShapeContext,
         family: FontFamilyKey,
         size: FontSize,
+        advance: u32,
     ) -> Shaper<'a> {
+        let font_size = size;
+        let font_advance = advance;
+        let emoji_advance = 2 * font_advance;
+        let emoji_size = FontSize::new(fonts.emoji().size_for_advance(emoji_advance as f32));
+
         Shaper {
             fonts,
             shape,
             family,
-            size,
+            font_size,
+            emoji_size,
+            font_advance,
+            emoji_advance,
             glyphs: Self { glyphs: Vec::new() },
             column: 0,
         }
@@ -125,7 +134,7 @@ impl Glyphs {
     }
 
     /// Returns the full advance.
-    pub fn advance(&self) -> f32 {
+    pub fn advance(&self) -> u32 {
         self.glyphs
             .last()
             .map(|glyph| glyph.offset + glyph.advance)
@@ -133,7 +142,7 @@ impl Glyphs {
     }
 
     /// Returns an iterator of background color ranges.
-    pub fn backgrounds<'a>(&'a self) -> impl 'a + Iterator<Item = (Range<f32>, Rgba)> {
+    pub fn backgrounds<'a>(&'a self) -> impl 'a + Iterator<Item = (Range<u32>, Rgba)> {
         let mut glyphs = self.glyphs.iter().peekable();
 
         std::iter::from_fn(move || {
@@ -163,7 +172,10 @@ pub struct Shaper<'a> {
     fonts: &'a Fonts,
     shape: &'a mut ShapeContext,
     family: FontFamilyKey,
-    size: FontSize,
+    font_size: FontSize,
+    emoji_size: FontSize,
+    font_advance: u32,
+    emoji_advance: u32,
     glyphs: Glyphs,
     column: u32,
 }
@@ -180,16 +192,12 @@ impl<'a> Shaper<'a> {
             .get((self.family, styles.weight, styles.style))
             .expect("Font not found in font cache");
         let emoji = self.fonts.emoji();
-        let font_size = self.size;
-        let emoji_size = self
-            .fonts
-            .emoji()
-            .size_for_advance(2.0 * font.advance_for_size(font_size));
         let font_charmap = font.as_ref().charmap();
         let emoji_charmap = emoji.as_ref().charmap();
 
         let mut current_key = font.key();
         let mut cluster = CharCluster::default();
+        let mut shaper = Self::build(&mut self.shape, (font, self.font_size));
         let mut parser = Parser::new(
             SCRIPT,
             str.char_indices().map({
@@ -204,29 +212,6 @@ impl<'a> Shaper<'a> {
                 }
             }),
         );
-        let mut shaper = self
-            .shape
-            .builder(font.as_ref())
-            .script(SCRIPT)
-            .size(font_size as f32)
-            .features(FEATURES)
-            .build();
-        let mut flush = |shaper: SwashShaper, font, size| {
-            shaper.shape_with(|cluster| {
-                for glyph in cluster.glyphs {
-                    self.glyphs.glyphs.push(Glyph {
-                        font,
-                        size,
-                        id: glyph.id,
-                        offset: self.glyphs.advance(),
-                        advance: glyph.advance,
-                        start: cluster.source.start,
-                        end: cluster.source.end,
-                        styles,
-                    });
-                }
-            });
-        };
 
         while parser.next(&mut cluster) {
             let selected_key = match cluster.map(|char| font_charmap.map(char)) {
@@ -246,56 +231,90 @@ impl<'a> Shaper<'a> {
             };
 
             if current_key != selected_key {
-                flush(
+                Self::flush(
+                    &mut self.glyphs,
                     shaper,
                     current_key,
                     match () {
-                        _ if current_key == font.key() => font_size,
-                        _ if current_key == emoji.key() => emoji_size,
+                        _ if current_key == font.key() => (self.font_size, self.font_advance),
+                        _ if current_key == emoji.key() => (self.emoji_size, self.emoji_advance),
+                        _ => unreachable!(),
+                    },
+                    styles,
+                );
+
+                current_key = selected_key;
+                shaper = Self::build(
+                    &mut self.shape,
+                    match () {
+                        _ if current_key == font.key() => (font, self.font_size),
+                        _ if current_key == emoji.key() => (emoji, self.emoji_size),
                         _ => unreachable!(),
                     },
                 );
-
-                shaper = self
-                    .shape
-                    .builder(match () {
-                        _ if selected_key == font.key() => font.as_ref(),
-                        _ if selected_key == emoji.key() => emoji.as_ref(),
-                        _ => unreachable!(),
-                    })
-                    .script(SCRIPT)
-                    .size(match () {
-                        _ if selected_key == font.key() => font_size as f32,
-                        _ if selected_key == emoji.key() => emoji_size as f32,
-                        _ => unreachable!(),
-                    })
-                    .features(FEATURES)
-                    .build();
-
-                current_key = selected_key;
             }
 
             shaper.add_cluster(&cluster);
-            self.column += cluster.range().to_range().len() as u32;
         }
 
-        flush(
+        Self::flush(
+            &mut self.glyphs,
             shaper,
             current_key,
             match () {
-                _ if current_key == font.key() => font_size,
-                _ if current_key == emoji.key() => emoji_size,
+                _ if current_key == font.key() => (self.font_size, self.font_advance),
+                _ if current_key == emoji.key() => (self.emoji_size, self.emoji_advance),
                 _ => unreachable!(),
             },
+            styles,
         );
 
+        self.column += str.len() as u32;
         self
     }
 
-    /// Returns the [`Glyphs`] and resets the shaper.
+    /// Resets the shaper and returns the [`Glyphs`].
     pub fn glyphs(&mut self) -> Glyphs {
         self.column = 0;
         std::mem::take(&mut self.glyphs)
+    }
+}
+
+/// Private.
+impl<'a> Shaper<'a> {
+    fn build<'b>(
+        shape: &'b mut ShapeContext,
+        (font, size): (&'b Font, FontSize),
+    ) -> SwashShaper<'b> {
+        shape
+            .builder(font.as_ref())
+            .script(SCRIPT)
+            .size(size.as_f32())
+            .features(FEATURES)
+            .build()
+    }
+
+    fn flush(
+        glyphs: &mut Glyphs,
+        shaper: SwashShaper,
+        font: FontKey,
+        (size, advance): (FontSize, u32),
+        styles: Styles,
+    ) {
+        shaper.shape_with(|cluster| {
+            for glyph in cluster.glyphs {
+                glyphs.glyphs.push(Glyph {
+                    font,
+                    size,
+                    id: glyph.id,
+                    offset: glyphs.advance(),
+                    advance,
+                    start: cluster.source.start,
+                    end: cluster.source.end,
+                    styles,
+                });
+            }
+        });
     }
 }
 
@@ -324,7 +343,7 @@ impl<'a> Scaler<'a> {
         let scaler = &mut self
             .scale
             .builder(font.as_ref())
-            .size(glyph.size as f32)
+            .size(glyph.size.as_f32())
             .hint(HINT)
             .build();
 

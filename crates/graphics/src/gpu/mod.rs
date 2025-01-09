@@ -255,8 +255,8 @@ impl<'gpu> Draw<'gpu> {
             self.rectangle(
                 Rectangle::new(
                     position.top,
-                    position.left + start.round() as i32,
-                    (end - start).round() as u32,
+                    position.left + start as i32,
+                    end - start,
                     line_height,
                 ),
                 background,
@@ -271,7 +271,7 @@ impl<'gpu> Draw<'gpu> {
 
         for glyph in glyphs.glyphs() {
             self.glyph(
-                Position::new(position.top, position.left + glyph.offset.round() as i32),
+                Position::new(position.top, position.left + glyph.offset as i32),
                 glyph.key(),
                 glyph.styles.foreground,
                 || scaler.render(&glyph),

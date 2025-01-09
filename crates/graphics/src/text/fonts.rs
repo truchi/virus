@@ -5,8 +5,49 @@ use swash::{CacheKey, FontDataRef, FontRef};
 //                                             FontSize                                           //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-/// Font size unit (`u8`).
-pub type FontSize = u8;
+/// Font size (`f32`).
+#[derive(Copy, Clone, Debug)]
+pub struct FontSize(f32);
+
+impl FontSize {
+    pub fn new(size: f32) -> Self {
+        Self(size)
+    }
+
+    pub fn as_f32(&self) -> f32 {
+        self.0
+    }
+
+    pub fn as_i32(&self) -> i32 {
+        self.0.round() as i32
+    }
+}
+
+impl PartialEq for FontSize {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other).is_eq()
+    }
+}
+
+impl Eq for FontSize {}
+
+impl PartialOrd for FontSize {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for FontSize {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.total_cmp(&other.0)
+    }
+}
+
+impl std::hash::Hash for FontSize {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.to_bits().hash(state);
+    }
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             FontWeight                                         //
@@ -156,17 +197,17 @@ impl Font {
     }
 
     /// Returns the advance given `size`.
-    pub fn advance_for_size(&self, size: FontSize) -> f32 {
+    pub fn advance_for_size(&self, size: f32) -> f32 {
         let metrics = self.as_ref().metrics(&[]);
 
-        size as f32 * metrics.max_width / metrics.units_per_em as f32
+        size * metrics.max_width / metrics.units_per_em as f32
     }
 
     /// Returns the size given `advance`.
-    pub fn size_for_advance(&self, advance: f32) -> FontSize {
+    pub fn size_for_advance(&self, advance: f32) -> f32 {
         let metrics = self.as_ref().metrics(&[]);
 
-        (advance * metrics.units_per_em as f32 / metrics.max_width).round() as FontSize
+        advance * metrics.units_per_em as f32 / metrics.max_width
     }
 }
 
