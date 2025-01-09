@@ -23,6 +23,8 @@ impl Occurences {
 
     /// Returns the occurences.
     pub fn items(&self) -> &HashMap<String, usize> {
+        debug_assert!(self.items.values().all(|n| *n != 0));
+
         &self.items
     }
 
@@ -104,6 +106,8 @@ impl Occurences {
 
     fn add(items: &mut HashMap<String, usize>, str: &str) {
         if let Some(count) = items.get_mut(str) {
+            debug_assert_ne!(*count, 0);
+
             *count += 1;
         } else {
             items.insert(str.to_owned(), 1);

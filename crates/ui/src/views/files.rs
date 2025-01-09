@@ -23,7 +23,6 @@ impl FilesView {
         context: &mut Context,
         region: Rectangle,
         selected: usize,
-        needle: &str,
         search: &Search,
     ) {
         Renderer {
@@ -34,7 +33,6 @@ impl FilesView {
             gpu: &mut context.gpu,
             region,
             selected,
-            needle,
             search,
         }
         .background()
@@ -55,7 +53,6 @@ struct Renderer<'a> {
     gpu: &'a mut Gpu,
     region: Rectangle,
     selected: usize,
-    needle: &'a str,
     search: &'a Search,
 }
 
@@ -87,7 +84,7 @@ impl<'a> Renderer<'a> {
             self.theme.advance,
         )
         .push(
-            self.needle,
+            self.search.needle(),
             Styles {
                 weight: FontWeight::Bold,
                 ..self.theme.syntax.default

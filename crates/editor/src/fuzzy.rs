@@ -85,6 +85,7 @@ pub struct Match {
 #[derive(Default, Debug)]
 pub struct Search {
     config: Config,
+    needle: String,
     haystack: Vec<String>,
     matches: Vec<Match>,
 }
@@ -93,6 +94,7 @@ impl Search {
     pub fn new(config: Config) -> Self {
         Self {
             config,
+            needle: Default::default(),
             haystack: Default::default(),
             matches: Default::default(),
         }
@@ -102,38 +104,46 @@ impl Search {
         Self::new(Config::FILE_SEARCH)
     }
 
+    pub fn needle(&self) -> &str {
+        &self.needle
+    }
+
+    pub fn haystack(&self) -> &[String] {
+        &self.haystack
+    }
+
     pub fn matches(&self) -> &[Match] {
         &self.matches
     }
 
-    pub fn haystack(&self) -> &Vec<String> {
-        &self.haystack
+    pub fn needle_mut(&mut self) -> &mut String {
+        &mut self.needle
     }
 
-    pub fn set_haystack(&mut self, haystack: impl Iterator<Item = String>) {
-        self.haystack = haystack.collect();
-        self.reset();
+    pub fn haystack_mut(&mut self) -> &mut Vec<String> {
+        &mut self.haystack
     }
 
-    pub fn search(&mut self, needle: &str) {
-        self.matches =
-            Fuzzy::new(self.config, needle).scores(self.haystack.iter().map(String::as_str));
-    }
-
-    pub fn reset(&mut self) {
-        self.matches = self
-            .haystack
-            .iter()
-            .enumerate()
-            .map(|(index, _)| Match {
-                index,
-                score: Default::default(),
-                indices: Default::default(),
-            })
-            .collect();
+    pub fn search(&mut self) {
+        if self.needle.is_empty() {
+            self.matches = self
+                .haystack
+                .iter()
+                .enumerate()
+                .map(|(index, _)| Match {
+                    index,
+                    score: Default::default(),
+                    indices: Default::default(),
+                })
+                .collect();
+        } else {
+            self.matches = Fuzzy::new(self.config, &self.needle)
+                .scores(self.haystack.iter().map(String::as_str));
+        }
     }
 
     pub fn clear(&mut self) {
+        self.needle.clear();
         self.haystack.clear();
         self.matches.clear();
     }

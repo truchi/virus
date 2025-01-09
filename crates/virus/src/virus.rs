@@ -126,46 +126,14 @@ pub struct Clipboard {
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
-struct FileSearch {
-    selected: usize,
-    needle: String,
-    search: Search,
-}
-
-impl Default for FileSearch {
-    fn default() -> Self {
-        Self {
-            selected: 0,
-            needle: String::new(),
-            search: Search::new_file_search(),
-        }
-    }
-}
-
-impl FileSearch {
-    fn selected(&self) -> Option<&str> {
-        self.search
-            .matches()
-            .get(self.selected)
-            .map(|m| self.search.haystack()[m.index].as_str())
-    }
-
-    fn clear(&mut self) {
-        self.selected = 0;
-        self.needle.clear();
-        self.search.clear();
-    }
-}
-
-// ────────────────────────────────────────────────────────────────────────────────────────────── //
-
 pub struct Virus {
     events: Events,
     editor: Editor,
     mode: Mode,
     ui: Ui,
     last_render: Option<Instant>,
-    file_search: FileSearch,
+    file_search: Search,
+    file_search_selected: usize,
     keybindings: Keybindings,
     clipboard: Option<Clipboard>,
 }
@@ -207,9 +175,17 @@ impl Virus {
             ui: Ui::new(Arc::new(window)),
             last_render: Default::default(),
             file_search: Default::default(),
+            file_search_selected: Default::default(),
             keybindings: Default::default(),
             clipboard: Default::default(),
         }
+    }
+
+    fn file_search_selected(&self) -> Option<&str> {
+        self.file_search
+            .matches()
+            .get(self.file_search_selected)
+            .map(|m| self.file_search.haystack()[m.index].as_str())
     }
 
     fn get_active_document(&self) -> Option<(&DocumentPane, &Document)> {
@@ -351,24 +327,19 @@ impl Virus {
                 },
                 Mode::Files => match event.modded().as_str() {
                     Key::Str(str) => {
-                        self.file_search.selected = 0;
-                        self.file_search.needle.push_str(str);
-                        self.file_search.search.search(&self.file_search.needle);
+                        self.file_search_selected = 0;
+                        self.file_search.needle_mut().push_str(str);
+                        self.file_search.search();
                     }
                     Key::Space => {
-                        self.file_search.selected = 0;
-                        self.file_search.needle.push(' ');
-                        self.file_search.search.search(&self.file_search.needle);
+                        self.file_search_selected = 0;
+                        self.file_search.needle_mut().push(' ');
+                        self.file_search.search();
                     }
                     Key::Backspace => {
-                        self.file_search.selected = 0;
-                        self.file_search.needle.pop();
-
-                        if self.file_search.needle.is_empty() {
-                            self.file_search.search.reset();
-                        } else {
-                            self.file_search.search.search(&self.file_search.needle);
-                        }
+                        self.file_search_selected = 0;
+                        self.file_search.needle_mut().pop();
+                        self.file_search.search();
                     }
                     _ => {}
                 },
@@ -407,11 +378,7 @@ impl Virus {
         self.ui.render(
             &self.editor,
             self.mode,
-            (self.mode == Mode::Files).then_some((
-                self.file_search.selected,
-                &self.file_search.needle,
-                &self.file_search.search,
-            )),
+            (self.mode == Mode::Files).then_some((self.file_search_selected, &self.file_search)),
             self.keybindings.originals().map(|(count, key)| {
                 count
                     .map(|count| count.to_string())
@@ -467,7 +434,7 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 self.virus.ensure_visibility();
             }
             Mode::Files => {
-                self.virus.file_search.selected = 0;
+                self.virus.file_search_selected = 0;
             }
         }
     }
@@ -491,9 +458,9 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let lines = 10; // TODO: we don't know the height in lines here...
                 let lines = pages * lines / if half { 2 } else { 1 };
 
-                self.virus.file_search.selected = sub_in_range(
-                    self.virus.file_search.search.matches().len(),
-                    self.virus.file_search.selected,
+                self.virus.file_search_selected = sub_in_range(
+                    self.virus.file_search.matches().len(),
+                    self.virus.file_search_selected,
                     lines,
                     wrap,
                 );
@@ -512,9 +479,9 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 self.virus.ensure_visibility();
             }
             Mode::Files => {
-                self.virus.file_search.selected = sub_in_range(
-                    self.virus.file_search.search.matches().len(),
-                    self.virus.file_search.selected,
+                self.virus.file_search_selected = sub_in_range(
+                    self.virus.file_search.matches().len(),
+                    self.virus.file_search_selected,
                     lines,
                     wrap,
                 );
@@ -535,13 +502,8 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 self.virus.ensure_visibility();
             }
             Mode::Files => {
-                self.virus.file_search.selected = self
-                    .virus
-                    .file_search
-                    .search
-                    .matches()
-                    .len()
-                    .saturating_sub(1);
+                self.virus.file_search_selected =
+                    self.virus.file_search.matches().len().saturating_sub(1);
             }
         }
     }
@@ -565,9 +527,9 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 let lines = 10; // TODO: we don't know the height in lines here...
                 let lines = pages * lines / if half { 2 } else { 1 };
 
-                self.virus.file_search.selected = add_in_range(
-                    self.virus.file_search.search.matches().len(),
-                    self.virus.file_search.selected,
+                self.virus.file_search_selected = add_in_range(
+                    self.virus.file_search.matches().len(),
+                    self.virus.file_search_selected,
                     lines,
                     wrap,
                 );
@@ -586,9 +548,9 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 self.virus.ensure_visibility();
             }
             Mode::Files => {
-                self.virus.file_search.selected = add_in_range(
-                    self.virus.file_search.search.matches().len(),
-                    self.virus.file_search.selected,
+                self.virus.file_search_selected = add_in_range(
+                    self.virus.file_search.matches().len(),
+                    self.virus.file_search_selected,
                     lines,
                     wrap,
                 );
@@ -1332,16 +1294,15 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 self.virus.ui.panes_mut().open_first(document_id);
             }
             Mode::Files => {
-                let Some(file) = self.virus.file_search.selected() else {
+                let Some(file) = self.virus.file_search_selected() else {
                     return;
                 };
+                let file = self.virus.editor.root().join(file);
 
-                self.virus.ui.panes_mut().open_first(
-                    self.virus
-                        .editor
-                        .open(self.virus.editor.root().join(file))
-                        .unwrap(),
-                );
+                self.virus
+                    .ui
+                    .panes_mut()
+                    .open_first(self.virus.editor.open(file).unwrap());
                 self.virus.file_search.clear();
                 self.virus.mode(Mode::Normal {
                     select: Select::None,
@@ -1360,15 +1321,13 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                     .open_prev(document_id, panes, wrap);
             }
             Mode::Files => {
-                let Some(file) = self.virus.file_search.selected() else {
+                let Some(file) = self.virus.file_search_selected() else {
                     return;
                 };
+                let file = self.virus.editor.root().join(file);
 
                 self.virus.ui.panes_mut().open_prev(
-                    self.virus
-                        .editor
-                        .open(self.virus.editor.root().join(file))
-                        .unwrap(),
+                    self.virus.editor.open(file).unwrap(),
                     panes,
                     wrap,
                 );
@@ -1390,15 +1349,13 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                     .open_next(document_id, panes, wrap);
             }
             Mode::Files => {
-                let Some(file) = self.virus.file_search.selected() else {
+                let Some(file) = self.virus.file_search_selected() else {
                     return;
                 };
+                let file = self.virus.editor.root().join(file);
 
                 self.virus.ui.panes_mut().open_next(
-                    self.virus
-                        .editor
-                        .open(self.virus.editor.root().join(file))
-                        .unwrap(),
+                    self.virus.editor.open(file).unwrap(),
                     panes,
                     wrap,
                 );
@@ -1417,16 +1374,15 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
                 self.virus.ui.panes_mut().open_last(document_id);
             }
             Mode::Files => {
-                let Some(file) = self.virus.file_search.selected() else {
+                let Some(file) = self.virus.file_search_selected() else {
                     return;
                 };
+                let file = self.virus.editor.root().join(file);
 
-                self.virus.ui.panes_mut().open_last(
-                    self.virus
-                        .editor
-                        .open(self.virus.editor.root().join(file))
-                        .unwrap(),
-                );
+                self.virus
+                    .ui
+                    .panes_mut()
+                    .open_last(self.virus.editor.open(file).unwrap());
                 self.virus.file_search.clear();
                 self.virus.mode(Mode::Normal {
                     select: Select::None,
@@ -1564,14 +1520,14 @@ impl<'a> ActionHandler for VirusActionHandler<'a> {
     fn files(&mut self) {
         match self.virus.mode {
             Mode::Normal { .. } | Mode::Insert { .. } => {
-                let files = self
+                self.virus.file_search.clear();
+                *self.virus.file_search.haystack_mut() = self
                     .virus
                     .editor
                     .files(true, false)
-                    .filter_map(|file| file.as_os_str().to_str().map(|file| file.to_owned()));
-
-                self.virus.file_search.clear();
-                self.virus.file_search.search.set_haystack(files);
+                    .filter_map(|file| file.as_os_str().to_str().map(|file| file.to_owned()))
+                    .collect();
+                self.virus.file_search.search();
                 self.virus.mode(Mode::Files);
             }
             Mode::Files => {}

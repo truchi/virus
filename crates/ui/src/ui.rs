@@ -78,7 +78,7 @@ impl Ui {
         &mut self,
         editor: &Editor,
         mode: Mode,
-        file_search: Option<(usize, &str, &Search)>,
+        file_search: Option<(usize, &Search)>,
         keybindings: impl Iterator<Item = String>,
         file_name: Option<(String, bool)>,
     ) {
@@ -104,9 +104,9 @@ impl Ui {
         self.panes
             .render(&mut self.context, panes_region, editor, mode);
 
-        if let Some((selected, haystack, search)) = file_search {
+        if let Some((selected, search)) = file_search {
             self.files
-                .render(&mut self.context, panes_region, selected, haystack, search)
+                .render(&mut self.context, panes_region, selected, search)
         }
 
         self.status.render(
