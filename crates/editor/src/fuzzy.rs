@@ -16,7 +16,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub const FILE_SEARCH: Self = Self {
+    pub const FILES: Self = Self {
         hits_bonus: 10,
         accumulated_hits_bonus: 1,
         accumulated_hits_bonus_limit: 10,
@@ -100,8 +100,8 @@ impl Search {
         }
     }
 
-    pub fn new_file_search() -> Self {
-        Self::new(Config::FILE_SEARCH)
+    pub fn new_files() -> Self {
+        Self::new(Config::FILES)
     }
 
     pub fn needle(&self) -> &str {

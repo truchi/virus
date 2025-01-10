@@ -1,4 +1,7 @@
-use ignore::WalkBuilder;
+use crate::{
+    files::{EditorFiles, EditorFilesMut, Files},
+    mode::{Mode, Select},
+};
 use notify::{
     event::ModifyKind, recommended_watcher, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
 };
@@ -6,7 +9,10 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
-use virus_document::document::{Document, DocumentId, DocumentIds};
+use virus_document::{
+    document::{Document, DocumentId, DocumentIds},
+    edit::Text,
+};
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
@@ -18,16 +24,27 @@ pub trait EventLoopProxy: 'static + Send {
     fn watcher(&self, event: WatcherEvent);
 }
 
+// ────────────────────────────────────────────────────────────────────────────────────────────── //
+
+#[derive(Clone, Debug)]
+pub struct Clipboard {
+    pub select: Select,
+    pub text: Text,
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Editor                                             //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
 pub struct Editor {
-    root: PathBuf,
-    document_ids: DocumentIds,
-    documents: HashMap<DocumentId, Document>,
-    watcher: RecommendedWatcher,
-    event_loop_proxy: Box<dyn EventLoopProxy>,
+    pub(crate) root: PathBuf,
+    pub(crate) document_ids: DocumentIds,
+    pub(crate) documents: HashMap<DocumentId, Document>,
+    pub(crate) mode: Mode,
+    pub(crate) files: Files,
+    pub(crate) clipboard: Option<Clipboard>,
+    pub(crate) watcher: RecommendedWatcher,
+    pub(crate) event_loop_proxy: Box<dyn EventLoopProxy>,
 }
 
 impl Editor {
@@ -36,6 +53,9 @@ impl Editor {
             root,
             document_ids: Default::default(),
             documents: Default::default(),
+            mode: Default::default(),
+            files: Files::new(),
+            clipboard: Default::default(),
             watcher: recommended_watcher({
                 let event_loop_proxy = event_loop_proxy.clone();
 
@@ -91,38 +111,28 @@ impl Editor {
         self.watcher.unwatch(document.path()).expect("unwatch");
     }
 
-    pub fn files(&self, hidden: bool, ignored: bool) -> impl '_ + Iterator<Item = PathBuf> {
-        let walker = WalkBuilder::new(&self.root)
-            .hidden(!hidden)
-            .parents(!ignored)
-            .ignore(!ignored)
-            .git_ignore(!ignored)
-            .git_global(!ignored)
-            .git_exclude(!ignored)
-            .filter_entry(|entry| {
-                entry
-                    .path()
-                    .file_name()
-                    .map(|name| name != ".git")
-                    .unwrap_or_default()
-            })
-            .sort_by_file_path(|a, b| match (a.is_dir(), b.is_dir()) {
-                (true, true) | (false, false) => a.cmp(b),
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
-            })
-            .build();
+    pub fn mode(&self) -> Mode {
+        self.mode
+    }
 
-        walker
-            .filter_map(Result::ok)
-            .filter(|entry| matches!(entry.file_type(), Some(ty) if ty.is_file()))
-            .filter_map(|entry| {
-                entry
-                    .into_path()
-                    .strip_prefix(&self.root)
-                    .map(|path| path.to_owned())
-                    .ok()
-            })
+    pub fn mode_mut(&mut self) -> &mut Mode {
+        &mut self.mode
+    }
+
+    pub fn clipboard(&self) -> &Option<Clipboard> {
+        &self.clipboard
+    }
+
+    pub fn clipboard_mut(&mut self) -> &mut Option<Clipboard> {
+        &mut self.clipboard
+    }
+
+    pub fn files(&self) -> EditorFiles {
+        EditorFiles::new(self)
+    }
+
+    pub fn files_mut(&mut self) -> EditorFilesMut {
+        EditorFilesMut::new(self)
     }
 
     pub fn handle_watcher_event(&mut self, event: WatcherEvent) {

@@ -1,6 +1,6 @@
 use crate::{panes::Panes, theme::UiTheme, views::DocumentView, Context};
 use swash::{scale::ScaleContext, shape::ShapeContext};
-use virus_editor::fuzzy::Search;
+use virus_editor::{editor::Editor, files::EditorFiles, mode::Mode};
 use virus_graphics::{
     geom::{Position, Rectangle, Size},
     gpu::Gpu,
@@ -18,13 +18,11 @@ impl FilesView {
         Self {}
     }
 
-    pub fn render(
-        &mut self,
-        context: &mut Context,
-        region: Rectangle,
-        selected: usize,
-        search: &Search,
-    ) {
+    pub fn render(&mut self, context: &mut Context, region: Rectangle, editor: &Editor) {
+        if editor.mode() != Mode::Files {
+            return;
+        }
+
         Renderer {
             fonts: &context.fonts,
             shape: &mut context.shape,
@@ -32,8 +30,7 @@ impl FilesView {
             theme: &context.theme,
             gpu: &mut context.gpu,
             region,
-            selected,
-            search,
+            files: editor.files(),
         }
         .background()
         .needle()
@@ -52,8 +49,7 @@ struct Renderer<'a> {
     theme: &'a UiTheme,
     gpu: &'a mut Gpu,
     region: Rectangle,
-    selected: usize,
-    search: &'a Search,
+    files: EditorFiles<'a>,
 }
 
 impl<'a> Renderer<'a> {
@@ -84,7 +80,7 @@ impl<'a> Renderer<'a> {
             self.theme.advance,
         )
         .push(
-            self.search.needle(),
+            self.files.needle(),
             Styles {
                 weight: FontWeight::Bold,
                 ..self.theme.syntax.default
@@ -120,6 +116,7 @@ impl<'a> Renderer<'a> {
     }
 
     fn matches(&mut self) -> &mut Self {
+        let selected = self.files.selected_index();
         let region = {
             let mut region = self.centered(0);
             region.top += 3 * self.theme.line_height as i32;
@@ -129,17 +126,17 @@ impl<'a> Renderer<'a> {
         let range = {
             let region_height_in_lines = (region.height / self.theme.line_height) as usize;
 
-            if self.selected < region_height_in_lines {
-                0..region_height_in_lines.min(self.search.matches().len())
+            if selected < region_height_in_lines {
+                0..region_height_in_lines.min(self.files.matches().len())
             } else {
-                self.selected + 1 - region_height_in_lines..self.selected + 1
+                selected + 1 - region_height_in_lines..selected + 1
             }
         };
         let mut position = Position::default();
 
-        for (index, m) in self.search.matches()[range.clone()].iter().enumerate() {
-            let str = self.search.haystack()[m.index].as_str();
-            let weight = (index + range.start == self.selected)
+        for (index, m) in self.files.matches()[range.clone()].iter().enumerate() {
+            let str = self.files.haystack()[m.index].as_str();
+            let weight = (index + range.start == selected)
                 .then_some(FontWeight::Bold)
                 .unwrap_or_default();
             let styles0 = Styles {

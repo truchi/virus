@@ -1,6 +1,6 @@
 use crate::{theme::UiTheme, Context};
 use swash::{scale::ScaleContext, shape::ShapeContext};
-use virus_editor::mode::Mode;
+use virus_editor::{editor::Editor, mode::Mode};
 use virus_graphics::{
     geom::{Position, Rectangle},
     gpu::Gpu,
@@ -22,7 +22,7 @@ impl StatusView {
         &mut self,
         context: &'a mut Context,
         region: Rectangle,
-        mode: Mode,
+        editor: &Editor,
         keybindings: impl Iterator<Item = String>,
         file_name: Option<(String, bool)>,
     ) {
@@ -33,7 +33,7 @@ impl StatusView {
             theme: &context.theme,
             gpu: &mut context.gpu,
             region,
-            mode,
+            mode: editor.mode(),
             keybindings,
             file_name,
         }

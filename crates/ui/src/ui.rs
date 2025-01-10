@@ -5,7 +5,7 @@ use crate::{
 };
 use std::{sync::Arc, time::Duration};
 use virus_document::{add_in_range, document::DocumentId, sub_in_range};
-use virus_editor::{editor::Editor, fuzzy::Search, mode::Mode};
+use virus_editor::editor::Editor;
 use virus_graphics::{geom::Rectangle, gpu::Gpu};
 use winit::window::Window;
 
@@ -76,8 +76,6 @@ impl Ui {
     pub fn render(
         &mut self,
         editor: &Editor,
-        mode: Mode,
-        file_search: Option<(usize, &Search)>,
         keybindings: impl Iterator<Item = String>,
         file_name: Option<(String, bool)>,
     ) {
@@ -100,18 +98,12 @@ impl Ui {
             theme.line_height,
         );
 
-        self.panes
-            .render(&mut self.context, panes_region, editor, mode);
-
-        if let Some((selected, search)) = file_search {
-            self.files
-                .render(&mut self.context, panes_region, selected, search)
-        }
-
+        self.panes.render(&mut self.context, panes_region, editor);
+        self.files.render(&mut self.context, panes_region, editor);
         self.status.render(
             &mut self.context,
             status_region,
-            mode,
+            editor,
             keybindings,
             file_name,
         );

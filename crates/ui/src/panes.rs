@@ -137,13 +137,7 @@ impl Panes {
         }
     }
 
-    pub fn render<'a>(
-        &mut self,
-        context: &mut Context,
-        region: Rectangle,
-        editor: &Editor,
-        mode: Mode,
-    ) {
+    pub fn render<'a>(&mut self, context: &mut Context, region: Rectangle, editor: &Editor) {
         let len = self.panes.len() as u32;
         let theme = context.theme;
         let region_columns = theme.cells(region.size()).width;
@@ -201,7 +195,7 @@ impl Panes {
                         left += width as i32 + margin;
                         region
                     };
-                    let mode = is_active.then_some(mode).unwrap_or_else(|| {
+                    let mode = is_active.then_some(editor.mode()).unwrap_or_else(|| {
                         // We want the document to look the same when it will be active again
                         // Assuming this is the logic:
                         Mode::Normal {
