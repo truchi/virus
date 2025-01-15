@@ -10,6 +10,7 @@ edition = "2021"
 [workspace.dependencies]
 virus_document = { path = "crates/document" }
 virus_editor = { path = "crates/editor" }
+virus_fuzzy = { path = "crates/fuzzy" }
 virus_graphics = { path = "crates/graphics" }
 virus_ui = { path = "crates/ui" }
 

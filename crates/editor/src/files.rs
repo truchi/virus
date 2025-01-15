@@ -1,16 +1,13 @@
-use crate::{
-    editor::Editor,
-    fuzzy::{Match, Search},
-};
+use crate::editor::Editor;
 use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
 use virus_document::{add_in_range, sub_in_range};
+use virus_fuzzy::{Match, Search};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Files                                              //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 
-#[derive(Debug)]
 pub struct Files {
     selected: usize,
     search: Search,

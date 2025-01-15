@@ -9,3 +9,4 @@ bitflags.workspace = true
 ignore.workspace = true
 notify.workspace = true
 virus_document.workspace = true
+virus_fuzzy.workspace = true

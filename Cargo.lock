@@ -2010,7 +2010,12 @@ dependencies = [
  "ignore",
  "notify",
  "virus_document",
+ "virus_fuzzy",
 ]
+
+[[package]]
+name = "virus_fuzzy"
+version = "0.1.0"
 
 [[package]]
 name = "virus_graphics"
