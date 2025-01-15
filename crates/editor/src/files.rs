@@ -2,7 +2,7 @@ use crate::editor::Editor;
 use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
 use virus_document::{add_in_range, sub_in_range};
-use virus_fuzzy::{Match, Search};
+use virus_fuzzy::{Config, Fuzzy, Match};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                             Files                                              //
@@ -10,13 +10,13 @@ use virus_fuzzy::{Match, Search};
 
 pub struct Files {
     selected: usize,
-    search: Search,
+    fuzzy: Fuzzy,
 }
 
 impl Files {
     pub fn new() -> Self {
         Self {
-            search: Search::new_files(),
+            fuzzy: Fuzzy::new(Config::FILES),
             selected: 0,
         }
     }
@@ -42,23 +42,23 @@ impl<'editor> EditorFiles<'editor> {
     pub fn selected_file(&self) -> Option<PathBuf> {
         self.editor
             .files
-            .search
+            .fuzzy
             .matches()
             .get(self.editor.files.selected)
-            .map(|m| self.editor.files.search.haystack()[m.index].as_str())
+            .map(|m| self.editor.files.fuzzy.haystack()[m.index].as_str())
             .map(|path| self.editor.root.join(path))
     }
 
     pub fn needle(&self) -> &str {
-        self.editor.files.search.needle()
+        self.editor.files.fuzzy.needle()
     }
 
     pub fn haystack(&self) -> &[String] {
-        self.editor.files.search.haystack()
+        self.editor.files.fuzzy.haystack()
     }
 
     pub fn matches(&self) -> &[Match] {
-        self.editor.files.search.matches()
+        self.editor.files.fuzzy.matches()
     }
 }
 
@@ -78,19 +78,19 @@ impl<'editor> EditorFilesMut<'editor> {
     pub fn open(&mut self) {
         self.close();
 
-        *self.editor.files.search.haystack_mut() = files(&self.editor.root, true, false).collect();
-        self.editor.files.search.search();
+        *self.editor.files.fuzzy.haystack_mut() = files(&self.editor.root, true, false).collect();
+        self.editor.files.fuzzy.search();
     }
 
     pub fn close(&mut self) {
         self.editor.files.selected = 0;
-        self.editor.files.search.clear();
+        self.editor.files.fuzzy.clear();
     }
 
     pub fn update(&mut self, f: impl FnOnce(&mut String)) {
-        f(self.editor.files.search.needle_mut());
+        f(self.editor.files.fuzzy.needle_mut());
         self.editor.files.selected = 0;
-        self.editor.files.search.search();
+        self.editor.files.fuzzy.search();
     }
 
     pub fn top(&mut self) {
@@ -98,12 +98,12 @@ impl<'editor> EditorFilesMut<'editor> {
     }
 
     pub fn bottom(&mut self) {
-        self.editor.files.selected = self.editor.files.search.matches().len().saturating_sub(1);
+        self.editor.files.selected = self.editor.files.fuzzy.matches().len().saturating_sub(1);
     }
 
     pub fn up(&mut self, lines: usize, wrap: bool) {
         self.editor.files.selected = sub_in_range(
-            self.editor.files.search.matches().len(),
+            self.editor.files.fuzzy.matches().len(),
             self.editor.files.selected,
             lines,
             wrap,
@@ -112,7 +112,7 @@ impl<'editor> EditorFilesMut<'editor> {
 
     pub fn down(&mut self, lines: usize, wrap: bool) {
         self.editor.files.selected = add_in_range(
-            self.editor.files.search.matches().len(),
+            self.editor.files.fuzzy.matches().len(),
             self.editor.files.selected,
             lines,
             wrap,
