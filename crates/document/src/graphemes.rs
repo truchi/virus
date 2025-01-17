@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     fn forward() {
-        let str = (String::from('e') + &COMBINING.repeat(200) + " abc").repeat(2);
+        let str = (String::from('e') + &COMBINING.repeat(2048) + " abc").repeat(2);
         let rope = Rope::from(str.as_str());
 
         assert_eq!(
