@@ -1,8 +1,6 @@
 use crate::{
-    cursor::Cursor,
-    graphemes::{Grapheme, GraphemesBackward},
-    occurences::Occurences,
-    segmentation::GraphemeCategory,
+    cursor::Cursor, graphemes::GraphemesBackward, occurences::Occurences,
+    segmentation::GraphemeCategory, smol::SmolCow,
 };
 use ropey::{Rope, RopeSlice};
 use similar::{Algorithm, DiffOp, TextDiff};
@@ -96,7 +94,7 @@ impl Text {
                 .graphemes(true)
                 .rev()
                 .next()
-                .map(|grapheme| Grapheme::Str(grapheme)),
+                .map(|grapheme| SmolCow::Str(grapheme)),
             Self::Rope(rope) => GraphemesBackward::new(rope.slice(..)).next(),
         }
         .map(|grapheme| (GraphemeCategory::from(grapheme.as_str()), grapheme));

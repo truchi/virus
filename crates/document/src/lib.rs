@@ -10,8 +10,7 @@ pub mod queries;
 pub mod search;
 pub mod segmentation;
 pub mod selection;
-
-use smol_str::SmolStr;
+pub mod smol;
 
 // ────────────────────────────────────────────────────────────────────────────────────────────── //
 
@@ -75,23 +74,4 @@ pub fn sub_in_range(end: usize, at: usize, sub: usize, wrap: bool) -> usize {
 
     debug_assert!((0..end).contains(&result));
     result
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                           StrOrSmol                                            //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub enum StrOrSmol<'a> {
-    Str(&'a str),
-    Smol(SmolStr),
-}
-
-impl<'a> StrOrSmol<'a> {
-    pub fn as_str(&self) -> &str {
-        match self {
-            StrOrSmol::Str(str) => str,
-            StrOrSmol::Smol(smol) => smol.as_str(),
-        }
-    }
 }

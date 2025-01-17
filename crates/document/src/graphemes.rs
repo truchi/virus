@@ -1,56 +1,6 @@
+use crate::smol::SmolCow;
 use ropey::{iter::Chunks, RopeSlice};
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-//                                            Grapheme                                            //
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
-
-#[derive(Clone, Debug)]
-pub enum Grapheme<'rope> {
-    Str(&'rope str),
-    String(String),
-}
-
-impl<'rope> Grapheme<'rope> {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Grapheme::Str(grapheme) => grapheme,
-            Grapheme::String(grapheme) => grapheme,
-        }
-    }
-
-    fn default() -> Self {
-        Self::Str("")
-    }
-
-    fn append(&mut self, str: &'rope str) {
-        match self {
-            Self::Str(grapheme) if grapheme.is_empty() => {
-                *self = Self::Str(str);
-            }
-            Self::Str(grapheme) => {
-                *self = Self::String(format!("{grapheme}{str}"));
-            }
-            Self::String(grapheme) => {
-                grapheme.insert_str(grapheme.len(), str);
-            }
-        }
-    }
-
-    fn prepend(&mut self, str: &'rope str) {
-        match self {
-            Self::Str(grapheme) if grapheme.is_empty() => {
-                *self = Self::Str(str);
-            }
-            Self::Str(grapheme) => {
-                *self = Self::String(format!("{str}{grapheme}"));
-            }
-            Self::String(grapheme) => {
-                grapheme.insert_str(0, str);
-            }
-        }
-    }
-}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ //
 //                                        GraphemesForward                                        //
@@ -78,10 +28,10 @@ impl<'rope> GraphemesForward<'rope> {
 }
 
 impl<'rope> Iterator for GraphemesForward<'rope> {
-    type Item = Grapheme<'rope>;
+    type Item = SmolCow<'rope>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut grapheme = Grapheme::default();
+        let mut grapheme = SmolCow::builder();
 
         loop {
             let chunk = self.chunk?;
@@ -95,7 +45,7 @@ impl<'rope> Iterator for GraphemesForward<'rope> {
                 }
                 Ok(Some(next)) => {
                     grapheme.append(&chunk[index - self.chunk_start..next - self.chunk_start]);
-                    return Some(grapheme);
+                    return Some(grapheme.build());
                 }
                 Err(GraphemeIncomplete::NextChunk) => {
                     grapheme.append(&chunk[index - self.chunk_start..]);
@@ -136,10 +86,10 @@ impl<'rope> GraphemesBackward<'rope> {
 }
 
 impl<'rope> Iterator for GraphemesBackward<'rope> {
-    type Item = Grapheme<'rope>;
+    type Item = SmolCow<'rope>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut grapheme = Grapheme::default();
+        let mut grapheme = SmolCow::builder();
 
         loop {
             let chunk = self.chunk?;
@@ -153,7 +103,7 @@ impl<'rope> Iterator for GraphemesBackward<'rope> {
                 }
                 Ok(Some(prev)) => {
                     grapheme.prepend(&chunk[prev - self.chunk_start..index - self.chunk_start]);
-                    return Some(grapheme);
+                    return Some(grapheme.build());
                 }
                 Err(GraphemeIncomplete::PrevChunk) => {
                     grapheme.prepend(&chunk[..index - self.chunk_start]);

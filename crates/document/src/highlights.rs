@@ -1,6 +1,5 @@
-use crate::{cursor::Cursor, queries::HighlightsTag, StrOrSmol};
+use crate::{cursor::Cursor, queries::HighlightsTag, smol::SmolCow};
 use ropey::Rope;
-use smol_str::SmolStrBuilder;
 use std::{cmp::Ordering, ops::Range};
 use tree_sitter::{Node, Point, Query, QueryCursor};
 
@@ -113,7 +112,7 @@ impl Highlights {
     /// Returns an iterator of strings and their highlight tag.                                                                    
     ///                                                                                                                            
     /// The whole line range of text is covered.                                                                                   
-    pub fn highlights(&self) -> impl Iterator<Item = (StrOrSmol, Option<HighlightsTag>)> {
+    pub fn highlights(&self) -> impl Iterator<Item = (SmolCow, Option<HighlightsTag>)> {
         Self::split(
             self.rope.byte_slice(self.start..self.end).chunks(),
             self.highlights
@@ -216,7 +215,7 @@ impl Highlights {
     fn split<'a>(
         mut chunks: impl Iterator<Item = &'a str>,
         mut lens: impl Iterator<Item = usize>,
-    ) -> impl Iterator<Item = StrOrSmol<'a>> {
+    ) -> impl Iterator<Item = SmolCow<'a>> {
         let mut current_chunk = chunks.next();
         let mut current_len = lens.next();
 
@@ -226,10 +225,10 @@ impl Highlights {
 
             match chunk.len().cmp(&len) {
                 Ordering::Less => {
-                    let mut smol = SmolStrBuilder::new();
+                    let mut smol = SmolCow::builder();
                     let mut take = len;
 
-                    smol.push_str(chunk);
+                    smol.append(chunk);
                     take -= chunk.len();
 
                     loop {
@@ -237,23 +236,23 @@ impl Highlights {
 
                         match c.len().cmp(&take) {
                             Ordering::Less => {
-                                smol.push_str(c);
+                                smol.append(c);
                                 take -= c.len();
                             }
                             Ordering::Equal => {
                                 current_chunk = chunks.next();
                                 current_len = lens.next();
 
-                                smol.push_str(c);
-                                return Some(StrOrSmol::Smol(smol.finish()));
+                                smol.append(c);
+                                return Some(smol.build());
                             }
                             Ordering::Greater => {
                                 let (str, c) = c.split_at(take);
                                 current_chunk = Some(c);
                                 current_len = lens.next();
 
-                                smol.push_str(str);
-                                return Some(StrOrSmol::Smol(smol.finish()));
+                                smol.append(str);
+                                return Some(smol.build());
                             }
                         }
                     }
@@ -262,14 +261,14 @@ impl Highlights {
                     current_chunk = chunks.next();
                     current_len = lens.next();
 
-                    return Some(StrOrSmol::Str(chunk));
+                    return Some(SmolCow::Str(chunk));
                 }
                 Ordering::Greater => {
                     let (str, c) = chunk.split_at(len);
                     current_chunk = Some(c);
                     current_len = lens.next();
 
-                    return Some(StrOrSmol::Str(str));
+                    return Some(SmolCow::Str(str));
                 }
             }
         })
