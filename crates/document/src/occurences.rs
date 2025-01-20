@@ -136,6 +136,7 @@ impl Occurences {
 mod tests {
     use super::*;
     use crate::{edit::Edit, selection::Selection};
+    use smol_str::SmolStr;
 
     fn sort<'a>(items: impl IntoIterator<Item = &'a str>) -> Vec<&'a str> {
         let mut items = items.into_iter().collect::<Vec<_>>();
@@ -192,7 +193,11 @@ mod tests {
         ] {
             let (rope, selection) = Selection::extract(rope);
             let mut edited = rope.clone();
-            let edit = Edit::edit(&mut edited, selection.range(), inserted.into());
+            let edit = Edit::edit(
+                &mut edited,
+                selection.range(),
+                SmolStr::new(inserted).into(),
+            );
             let mut occurences = Occurences::new(rope);
 
             assert_eq!(

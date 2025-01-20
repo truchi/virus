@@ -4,6 +4,7 @@ use crate::{
 };
 use ropey::{Rope, RopeSlice};
 use similar::{Algorithm, DiffOp, TextDiff};
+use smol_str::{SmolStr, SmolStrBuilder};
 use std::{ops::Range, time::Duration};
 use tree_sitter::{InputEdit, Point, Tree};
 use unicode_segmentation::UnicodeSegmentation;
@@ -15,16 +16,16 @@ use unicode_width::UnicodeWidthStr;
 
 #[derive(Clone, Eq)]
 pub enum Text {
-    String(String),
+    Smol(SmolStr),
     Rope(Rope),
 }
 
 impl PartialEq for Text {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::String(a), Self::String(b)) => a == b,
-            (Self::String(a), Self::Rope(b)) => a == b,
-            (Self::Rope(a), Self::String(b)) => a == b,
+            (Self::Smol(a), Self::Smol(b)) => a == b,
+            (Self::Smol(a), Self::Rope(b)) => a.as_str() == b,
+            (Self::Rope(a), Self::Smol(b)) => a == b.as_str(),
             (Self::Rope(a), Self::Rope(b)) => a == b,
         }
     }
@@ -32,26 +33,42 @@ impl PartialEq for Text {
 
 impl Default for Text {
     fn default() -> Self {
-        Self::String(String::new())
+        Self::Smol(SmolStr::default())
     }
 }
 
-impl<'a> From<&'a str> for Text {
-    fn from(str: &'a str) -> Self {
-        Self::String(str.into())
+impl<'a> From<&'a SmolStr> for Text {
+    fn from(smol: &'a SmolStr) -> Self {
+        if smol.len() <= Self::BREAKPOINT {
+            Self::Smol(smol.clone())
+        } else {
+            Self::Rope(smol.as_str().into())
+        }
     }
 }
 
-impl<'a> From<String> for Text {
-    fn from(string: String) -> Self {
-        Self::String(string)
+impl From<SmolStr> for Text {
+    fn from(smol: SmolStr) -> Self {
+        if smol.len() <= Self::BREAKPOINT {
+            Self::Smol(smol)
+        } else {
+            Self::Rope(smol.as_str().into())
+        }
     }
 }
 
 impl<'a> From<RopeSlice<'a>> for Text {
     fn from(slice: RopeSlice<'a>) -> Self {
         if slice.len_bytes() <= Self::BREAKPOINT {
-            Self::String(slice.into())
+            Self::Smol({
+                let mut smol = SmolStrBuilder::new();
+
+                for chunk in slice.chunks() {
+                    smol.push_str(chunk);
+                }
+
+                smol.finish()
+            })
         } else {
             Self::Rope(slice.into())
         }
@@ -61,7 +78,15 @@ impl<'a> From<RopeSlice<'a>> for Text {
 impl<'a> From<Rope> for Text {
     fn from(rope: Rope) -> Self {
         if rope.len_bytes() <= Self::BREAKPOINT {
-            Self::String(rope.into())
+            Self::Smol({
+                let mut smol = SmolStrBuilder::new();
+
+                for chunk in rope.chunks() {
+                    smol.push_str(chunk);
+                }
+
+                smol.finish()
+            })
         } else {
             Self::Rope(rope)
         }
@@ -69,16 +94,20 @@ impl<'a> From<Rope> for Text {
 }
 
 impl Text {
-    /// Ropes greater than this breakpoint will be stored as is.
-    /// Smaller ropes will be converted into strings.
-    /// About 6 chunks.
+    /// `text.len() <= Self::BREAKPOINT ? Self::Smol(text) : Self::Rope(text)`.
     ///
+    /// 6 chunks of text data.
+    /// We want to reduce memory overhead of ropes for "small" text
+    /// while still having structural sharing for "big" ropes.
+    ///
+    /// Also, as this text is to be inserted in document ropes, we align to the
+    /// [`Rope::try_insert()`] logic.
     /// @see [`Rope::try_insert()`] comments.
     pub const BREAKPOINT: usize = 6 * 984;
 
     pub fn len(&self) -> usize {
         match self {
-            Self::String(string) => string.len(),
+            Self::Smol(smol) => smol.len(),
             Self::Rope(rope) => rope.len_bytes(),
         }
     }
@@ -89,7 +118,7 @@ impl Text {
 
     pub fn trailing_line_break(&mut self, bool: bool) {
         let trailing_line_break_len = match self {
-            Self::String(string) => string
+            Self::Smol(smol) => smol
                 .as_str()
                 .graphemes(true)
                 .rev()
@@ -105,14 +134,19 @@ impl Text {
                 let chars = grapheme.as_str().chars().count();
 
                 match self {
-                    Self::String(string) => string.truncate(string.len() - bytes),
+                    Self::Smol(smol) => *smol = SmolStr::new(&smol[..smol.len() - bytes]),
                     Self::Rope(rope) => rope.remove(rope.len_chars() - chars..rope.len_chars()),
                 }
             }
         } else {
             if bool {
                 match self {
-                    Self::String(string) => string.push_str("\n"),
+                    Self::Smol(smol) => {
+                        let mut builder = SmolStrBuilder::new();
+                        builder.push_str(smol);
+                        builder.push_str("\n");
+                        *smol = builder.finish();
+                    }
                     Self::Rope(rope) => rope.insert(rope.len_chars(), "\n"),
                 }
             }
@@ -126,7 +160,7 @@ impl std::fmt::Debug for Text {
             f,
             "\"{}\"",
             match self {
-                Self::String(string) => string.clone(),
+                Self::Smol(smol) => smol.to_string(),
                 Self::Rope(rope) => rope.to_string(),
             },
         )
@@ -275,7 +309,7 @@ impl Edit {
                             start,
                             removed_end,
                             start,
-                            Text::from(olds.iter().copied().collect::<String>()),
+                            Text::from(olds.iter().copied().collect::<SmolStr>()),
                             Text::default(),
                         );
                     }
@@ -290,7 +324,7 @@ impl Edit {
                             start,
                             inserted_end,
                             Text::default(),
-                            Text::from(news.iter().copied().collect::<String>()),
+                            Text::from(news.iter().copied().collect::<SmolStr>()),
                         );
                     }
                     DiffOp::Replace {
@@ -308,8 +342,8 @@ impl Edit {
                             start,
                             removed_end,
                             inserted_end,
-                            Text::from(olds.iter().copied().collect::<String>()),
-                            Text::from(news.iter().copied().collect::<String>()),
+                            Text::from(olds.iter().copied().collect::<SmolStr>()),
+                            Text::from(news.iter().copied().collect::<SmolStr>()),
                         );
                     }
                 }
@@ -436,7 +470,7 @@ impl Edit {
         let index = rope.byte_to_char(index);
 
         match inserted {
-            Text::String(inserted) => rope.insert(index, inserted),
+            Text::Smol(inserted) => rope.insert(index, inserted),
             Text::Rope(inserted) => {
                 let right = rope.split_off(index);
                 rope.append(inserted.clone());
@@ -458,8 +492,8 @@ impl Edit {
         let removed = rope.split_off(start);
 
         match inserted {
-            Text::String(text) => rope.insert(start, text),
-            Text::Rope(text) => rope.append(text.clone()),
+            Text::Smol(inserted) => rope.insert(start, inserted),
+            Text::Rope(inserted) => rope.append(inserted.clone()),
         };
 
         rope.append(right);
@@ -567,8 +601,8 @@ mod tests {
                 width: column,
             }
         }
-        fn to_text_string(str: &str) -> Text {
-            Text::String(str.into())
+        fn to_text_smol(str: &str) -> Text {
+            Text::Smol(str.into())
         }
         fn to_text_rope(str: &str) -> Text {
             Text::Rope(str.into())
@@ -585,15 +619,15 @@ mod tests {
             let removed_end = cursor(removed_end, 0, removed_end);
             let inserted_end = cursor(inserted_end, 0, inserted_end);
 
-            for to_text in [to_text_string, to_text_rope] {
+            for to_text in [to_text_smol, to_text_rope] {
                 let mut rope = Rope::from(old);
                 let edit = Edit::edit(&mut rope, start..removed_end, to_text(inserted));
 
                 assert_eq!(edit.start, start);
                 assert_eq!(edit.removed_end, removed_end);
                 assert_eq!(edit.inserted_end, inserted_end);
-                assert_eq!(edit.removed, removed.into());
-                assert_eq!(edit.inserted, inserted.into());
+                assert_eq!(edit.removed, SmolStr::new(removed).into());
+                assert_eq!(edit.inserted, SmolStr::new(inserted).into());
                 assert_eq!(rope, Rope::from(new));
 
                 edit.unapply_rope(&mut rope);

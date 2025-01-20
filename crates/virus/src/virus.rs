@@ -7,6 +7,7 @@ use crate::{
     events::{Event, Events, Key, KeyEvent},
     keybindings::{ActionHandler, Keybindings},
 };
+use smol_str::SmolStr;
 use std::{sync::Arc, time::Instant};
 use virus_document::{
     cursor::Cursor, document::Document, edit::Text, navigation::Pairs, segmentation::Boundaries,
@@ -277,17 +278,17 @@ impl Virus {
                     Key::Str(str) => {
                         self.unwrap_active_document_mut()
                             .edition()
-                            .edit(str.as_str().into(), false);
+                            .edit(str.into(), false);
                     }
                     Key::Tab => {
                         self.unwrap_active_document_mut()
                             .edition()
-                            .edit("    ".into(), false);
+                            .edit(SmolStr::new("    ").into(), false);
                     }
                     Key::Space => {
                         self.unwrap_active_document_mut()
                             .edition()
-                            .edit(" ".into(), false);
+                            .edit(SmolStr::new(" ").into(), false);
                     }
                     Key::Backspace => {
                         self.unwrap_active_document_mut().edition().backspace();
@@ -295,7 +296,7 @@ impl Virus {
                     Key::Enter => {
                         self.unwrap_active_document_mut()
                             .edition()
-                            .edit("\n".into(), false);
+                            .edit(SmolStr::new("\n").into(), false);
                     }
                     _ => {}
                 },
